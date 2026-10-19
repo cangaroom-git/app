@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* my-hotel — Modern Fastwork Style Design Tokens (www.fastwork.com & WeGlobal) */
+    --bg-primary: #f6f8fb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #eff6ff;
+    --surface-dark: #0f172a;
+    --brand-primary: #0063f5;
+    --brand-primary-hover: #0052cc;
+    --brand-primary-soft: #eff6ff;
+    --brand-primary-border: #bfdbfe;
+    --text-primary: #121317;
+    --text-secondary: #475467;
+    --text-muted: #64748b;
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    --shadow-blue: 0 6px 20px -3px rgba(0, 99, 245, 0.28);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom utility classes matching Fastwork Modern SaaS & WeGlobal Design System */
+.shadow-moder-card {
+  box-shadow: var(--shadow-card);
+}
+
+.shadow-fastwork-blue {
+  box-shadow: var(--shadow-blue);
+}
+
+.btn-round-border {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #121317;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.btn-round-border:hover {
+  background-color: #eff6ff;
+  border-color: #0063f5;
+  color: #0063f5;
+}
+
+.btn-round-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 1px solid #0063f5;
+  background-color: #0063f5;
+  color: #ffffff;
+  padding: 0.625rem 1.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 99, 245, 0.22);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.btn-round-solid:hover {
+  background-color: #0052cc;
+  border-color: #0052cc;
+  box-shadow: 0 6px 16px rgba(0, 99, 245, 0.32);
+}
+
+.btn-round-solid:disabled {
+  background-color: #e2e8f0;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Hide scrollbars cleanly for horizontal sliders and pill bars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

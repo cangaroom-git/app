@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Room {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  code            String    @unique
+  nameTh          String
+  nameEn          String
+  categoryTh      String
+  categoryEn      String
+  shortDescTh     String
+  shortDescEn     String
+  basePriceThb    Int
+  weekendPriceThb Int
+  sizeSqm         Int
+  minGuests       Int       @default(1)
+  maxGuests       Int       @default(2)
+  bedrooms        Int       @default(1)
+  beds            Int       @default(1)
+  bathrooms       Int       @default(1)
+  petsAllowed     Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  bookings        Booking[]
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  bookingCode   String        @unique
+  roomId        String
+  room          Room          @relation(fields: [roomId], references: [id])
+  checkInDate   DateTime
+  checkOutDate  DateTime
+  nights        Int
+  guests        Int
+  guestName     String
+  guestPhone    String
+  guestContact  String?
+  guestNote     String?
+  addonsJson    String?
+  totalPriceThb Int
+  slipImageUrl  String?
+  status        BookingStatus @default(PENDING_PAYMENT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([roomId, checkInDate, checkOutDate])
+}
