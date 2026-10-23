@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { HotelAppShell } from "@/components/HotelAppShell";
 
 export const metadata: Metadata = {
   title: "my-hotel · Sapan Unseen — ระบบเว็บไซต์และจองที่พักโดยตรงสำหรับโรงแรม",
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
+    <html lang="th" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -22,17 +23,18 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
       <body
-        className="min-h-screen bg-[#F6F8FB] text-[#121317] antialiased selection:bg-[#0063F5]/15 selection:text-[#0063F5]"
+        className="min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)] antialiased selection:bg-[var(--color-accent)]/15"
         style={{
-          fontFamily: "'Plus Jakarta Sans', 'Anuphan', sans-serif",
+          fontFamily:
+            '"Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif',
         }}
       >
-        {children}
+        <HotelAppShell>{children}</HotelAppShell>
       </body>
     </html>
   );

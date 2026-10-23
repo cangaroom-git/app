@@ -13,20 +13,60 @@ import {
   ChevronRight,
   Grid,
   Home,
-  Maximize2,
   Calendar,
   Play,
   Pause,
   Video,
   Volume2,
   VolumeX,
+  Thermometer,
+  Clock,
+  Users,
 } from "lucide-react";
 import {
   RoomLodge,
+  BookingRecord,
   ExtraAddon,
   ResortExperienceItem,
   WhiteLabelPropertyConfig,
 } from "@/data/rooms";
+import {
+  addDaysToDate,
+  formatDateStr,
+  getRoomInventoryForRange,
+} from "@/lib/store";
+import { LiveWeatherData } from "@/components/ResortWeatherWidget";
+
+const MONTH_NAMES_TH = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
+const MONTH_NAMES_EN = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const WEEKDAYS_TH = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+const WEEKDAYS_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export interface GalleryPhoto {
   id: string;
@@ -59,6 +99,15 @@ interface RoomGalleryModalProps {
   experiences?: ResortExperienceItem[];
   lang: "th" | "en";
   onBookRoom?: (room: RoomLodge) => void;
+  bookings?: BookingRecord[];
+  today?: Date;
+  checkIn?: string;
+  setCheckIn?: (d: string) => void;
+  checkOut?: string;
+  setCheckOut?: (d: string) => void;
+  nights?: number;
+  weather?: LiveWeatherData | null;
+  skipEntryAnimation?: boolean;
 }
 
 export function RoomGalleryModal({
@@ -69,65 +118,100 @@ export function RoomGalleryModal({
   propertyConfig,
   lang,
   onBookRoom,
+  bookings = [],
+  today,
+  checkIn = "",
+  setCheckIn,
+  checkOut = "",
+  setCheckOut,
+  nights = 1,
+  weather = null,
+  skipEntryAnimation = false,
 }: RoomGalleryModalProps) {
-  // Active Tab state — Defaults to "all" (All photos) first as requested
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-
-  // Lightbox / Single-photo zoom view
+  const [activeCategory, setActiveCategory] = useState<string>("calendar");
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
-
-  // Video interactive states
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [activeRoomFilter, setActiveRoomFilter] = useState<string>("ALL");
+  const [calendarRoomId, setCalendarRoomId] = useState<string>(
+    () => selectedRoom?.id || allRooms[0]?.id || ""
+  );
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => {
+    const now = today || new Date();
+    const minMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const base = checkIn ? new Date(checkIn + "T00:00:00") : now;
+    const valid = isNaN(base.getTime()) ? now : base;
+    const candidate = new Date(valid.getFullYear(), valid.getMonth(), 1);
+    return candidate < minMonth ? minMonth : candidate;
+  });
+
 
   const modalBodyRef = useRef<HTMLDivElement>(null);
   const tabNavRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const calendarScrollRef = useRef<HTMLDivElement>(null);
+  const isDraggingCalendarRef = useRef<boolean>(false);
+  const dragStartXRef = useRef<number>(0);
+  const dragScrollLeftRef = useRef<number>(0);
+  const hasDraggedCalendarRef = useRef<boolean>(false);
   const isProgrammaticScrollRef = useRef<boolean>(false);
+  const wasOpenRef = useRef<boolean>(false);
 
-  // Tabs ordered by importance: All photos > Video > Property Views > Rooms > Facilities > Dining > Other
   const categoryTabs = useMemo(
     () => [
-      { id: "all", labelTh: "All photos", labelEn: "All photos" },
-      { id: "video", labelTh: "Video", labelEn: "Video" },
-      { id: "property", labelTh: "Property views", labelEn: "Property views" },
-      { id: "rooms", labelTh: "Rooms", labelEn: "Rooms" },
-      { id: "facilities", labelTh: "Facilities", labelEn: "Facilities" },
-      { id: "dining", labelTh: "Dining", labelEn: "Dining" },
-      { id: "other", labelTh: "Other", labelEn: "Other" },
+      {
+        id: "calendar",
+        labelTh: "ปฏิทินห้องว่าง",
+        labelEn: "Availability Calendar",
+      },
+      { id: "all", labelTh: "ทั้งหมด", labelEn: "All Photos" },
+      { id: "video", labelTh: "วิดีโอ", labelEn: "Video" },
+      { id: "property", labelTh: "บรรยากาศที่พัก", labelEn: "Property Views" },
+      { id: "rooms", labelTh: "ห้องพัก", labelEn: "Rooms" },
+      { id: "facilities", labelTh: "สิ่งอำนวยความสะดวก", labelEn: "Facilities" },
+      { id: "dining", labelTh: "อาหาร & เครื่องดื่ม", labelEn: "Dining" },
+      {
+        id: "other",
+        labelTh: "รีวิว & รอบที่พัก",
+        labelEn: "Attractions & Guest Photos",
+      },
     ],
     []
   );
 
-  // Reset to "all" view and reset states when modal opens
   useEffect(() => {
-    if (isOpen) {
-      setActiveCategory("all");
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
+      setActiveCategory("calendar");
       setActivePhotoIndex(null);
       setIsPlayingVideo(false);
+      const now = today || new Date();
+      const minMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const base = checkIn ? new Date(checkIn + "T00:00:00") : now;
+      if (!isNaN(base.getTime())) {
+        const candidateMonth = new Date(base.getFullYear(), base.getMonth(), 1);
+        setCalendarMonth(
+          candidateMonth.getTime() < minMonth.getTime()
+            ? minMonth
+            : candidateMonth
+        );
+      }
       if (selectedRoom) {
         setActiveRoomFilter(selectedRoom.code);
+        setCalendarRoomId(selectedRoom.id);
       } else {
         setActiveRoomFilter("ALL");
+        if (allRooms[0]) {
+          setCalendarRoomId(allRooms[0].id);
+        }
       }
+    } else if (!isOpen && wasOpenRef.current) {
+      wasOpenRef.current = false;
     }
-  }, [isOpen, selectedRoom]);
-
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = window.getComputedStyle(document.body).overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = originalStyle;
-      };
-    }
-  }, [isOpen]);
-
+  }, [isOpen, selectedRoom, allRooms, checkIn, today]);
 
   // =========================================================================
-  // CATEGORIZED PHOTO DATA BUILDER (100% Real Authentic Photos)
+  // CATEGORIZED PHOTO DATA BUILDER
   // =========================================================================
   const propertyPhotos: GalleryPhoto[] = useMemo(() => {
     const list = [
@@ -171,7 +255,7 @@ export function RoomGalleryModal({
       captionTh: item.captionTh,
       captionEn: item.captionEn,
       category: "property" as const,
-      categoryLabelTh: "Property views",
+      categoryLabelTh: "บรรยากาศรอบที่พัก",
       categoryLabelEn: "Property views",
       sourceType: "property" as const,
     }));
@@ -189,7 +273,7 @@ export function RoomGalleryModal({
           captionEn:
             img.captionEn || `${rm.nameEn} (${rm.code}) - Photo ${idx + 1}`,
           category: "rooms",
-          categoryLabelTh: `Rooms · ${rm.code}`,
+          categoryLabelTh: `ห้องพัก · ${rm.code}`,
           categoryLabelEn: `Rooms · ${rm.code}`,
           roomCode: rm.code,
           roomNameTh: rm.nameTh,
@@ -231,7 +315,7 @@ export function RoomGalleryModal({
       captionTh: item.captionTh,
       captionEn: item.captionEn,
       category: "facilities" as const,
-      categoryLabelTh: "Facilities",
+      categoryLabelTh: "สิ่งอำนวยความสะดวก",
       categoryLabelEn: "Facilities",
       sourceType: "property" as const,
     }));
@@ -267,7 +351,7 @@ export function RoomGalleryModal({
       captionTh: item.captionTh,
       captionEn: item.captionEn,
       category: "dining" as const,
-      categoryLabelTh: "Dining",
+      categoryLabelTh: "อาหารและเครื่องดื่ม",
       categoryLabelEn: "Dining",
       sourceType: "property" as const,
     }));
@@ -311,24 +395,6 @@ export function RoomGalleryModal({
         captionEn: "Guest Photo: A-Frame lodge is true to photos, clean & peaceful",
         cat: "guest" as const,
       },
-      {
-        url: "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=1400&q=85",
-        captionTh: "ภาพจากผู้เข้าพัก: เปิดม่านห้องนอนมาเจอหมอกเต็มตา",
-        captionEn: "Guest Photo: Waking up to panoramic sea of mist right outside bed",
-        cat: "guest" as const,
-      },
-      {
-        url: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1400&q=85",
-        captionTh: "ภาพจากผู้เข้าพัก: ดริปกาแฟน่านตอนเช้า หอมกรุ่นชื่นใจ",
-        captionEn: "Guest Photo: Hand-dripping Nan Arabica coffee on terrace",
-        cat: "guest" as const,
-      },
-      {
-        url: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1400&q=85",
-        captionTh: "ภาพจากผู้เข้าพัก: ศาลาพักผ่อนรับลมหนาวสดชื่นยามบ่าย",
-        captionEn: "Guest Photo: Relaxing pavilion in cool afternoon breeze",
-        cat: "guest" as const,
-      },
     ];
 
     return list.map((item, idx) => ({
@@ -337,13 +403,13 @@ export function RoomGalleryModal({
       captionTh: item.captionTh,
       captionEn: item.captionEn,
       category: item.cat,
-      categoryLabelTh: "Other",
+      categoryLabelTh: "อื่นๆ และภาพจากลูกค้า",
       categoryLabelEn: "Other",
-      sourceType: item.cat === "guest" ? ("guest" as const) : ("property" as const),
+      sourceType:
+        item.cat === "guest" ? ("guest" as const) : ("property" as const),
     }));
   }, []);
 
-  // Master array of all photos for unified Lightbox browsing
   const allPhotos: GalleryPhoto[] = useMemo(() => {
     return [
       ...propertyPhotos,
@@ -354,7 +420,6 @@ export function RoomGalleryModal({
     ];
   }, [propertyPhotos, roomPhotos, facilitiesPhotos, diningPhotos, otherPhotos]);
 
-  // Filtered room photos when using room code chips
   const displayedRoomPhotos = useMemo(() => {
     if (activeRoomFilter === "ALL") return roomPhotos;
     return roomPhotos.filter((p) => p.roomCode === activeRoomFilter);
@@ -363,7 +428,6 @@ export function RoomGalleryModal({
   const savedScrollTopRef = useRef<number>(0);
   const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll active thumbnail into view in the thumbnail strip
   useEffect(() => {
     if (activePhotoIndex !== null && thumbnailStripRef.current) {
       const activeThumb =
@@ -380,7 +444,6 @@ export function RoomGalleryModal({
     }
   }, [activePhotoIndex]);
 
-  // Find photo index in allPhotos for Lightbox mode
   const openLightboxForPhoto = useCallback(
     (photo: GalleryPhoto) => {
       let idx = allPhotos.findIndex((p) => p.id === photo.id);
@@ -396,7 +459,6 @@ export function RoomGalleryModal({
     [allPhotos]
   );
 
-  // Close Lightbox mode and restore exact feed scroll position
   const closeLightbox = useCallback(() => {
     setActivePhotoIndex(null);
     const targetScroll = savedScrollTopRef.current;
@@ -407,9 +469,6 @@ export function RoomGalleryModal({
     }, 40);
   }, []);
 
-  // =========================================================================
-  // SCROLLSPY ENGINE: Auto-update tab indicator as user scrolls the gallery
-  // =========================================================================
   const handleScroll = useCallback(() => {
     if (isProgrammaticScrollRef.current) return;
     const container = modalBodyRef.current;
@@ -417,20 +476,18 @@ export function RoomGalleryModal({
 
     const { scrollTop, scrollHeight, clientHeight } = container;
 
-    // Reached bottom of container
     if (scrollTop + clientHeight >= scrollHeight - 35) {
       setActiveCategory("other");
       return;
     }
 
-    // Near the top of the container
     if (scrollTop < 70) {
-      setActiveCategory("all");
+      setActiveCategory("calendar");
       return;
     }
 
-    // Check each section relative to container top
     const sectionIds = [
+      "calendar",
       "video",
       "property",
       "rooms",
@@ -440,7 +497,7 @@ export function RoomGalleryModal({
     ];
 
     const containerRect = container.getBoundingClientRect();
-    let detectedSection = "all";
+    let detectedSection = "calendar";
 
     for (const secId of sectionIds) {
       const el = document.getElementById(`gallery-section-${secId}`);
@@ -455,7 +512,6 @@ export function RoomGalleryModal({
     setActiveCategory(detectedSection);
   }, []);
 
-  // Keep active tab horizontally centered in the scrolling tabs bar
   useEffect(() => {
     if (tabNavRef.current) {
       const activeBtn = tabNavRef.current.querySelector<HTMLButtonElement>(
@@ -471,17 +527,27 @@ export function RoomGalleryModal({
     }
   }, [activeCategory]);
 
-  // Tab click handler: Smooth scroll to selected section
   const handleTabClick = (tabId: string) => {
     setActiveCategory(tabId);
     isProgrammaticScrollRef.current = true;
 
-    const performScroll = () => {
-      const container = modalBodyRef.current;
-      if (!container) return;
-
-      if (tabId === "all") {
-        container.scrollTo({ top: 0, behavior: "smooth" });
+    const container = modalBodyRef.current;
+    if (container) {
+      if (tabId === "calendar" || tabId === "all") {
+        if (tabId === "calendar") {
+          container.scrollTo({ top: 0, behavior: "smooth" });
+        } else {
+          const targetEl = document.getElementById("gallery-section-video");
+          if (targetEl) {
+            const offset = targetEl.offsetTop - container.offsetTop;
+            container.scrollTo({
+              top: Math.max(0, offset - 10),
+              behavior: "smooth",
+            });
+          } else {
+            container.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        }
       } else {
         const targetEl = document.getElementById(`gallery-section-${tabId}`);
         if (targetEl) {
@@ -496,17 +562,9 @@ export function RoomGalleryModal({
       setTimeout(() => {
         isProgrammaticScrollRef.current = false;
       }, 550);
-    };
-
-    if (activePhotoIndex !== null) {
-      setActivePhotoIndex(null);
-      setTimeout(performScroll, 50);
-    } else {
-      performScroll();
     }
   };
 
-  // Toggle Video Play / Pause
   const toggleVideoPlayback = () => {
     if (videoRef.current) {
       if (isPlayingVideo) {
@@ -519,11 +577,9 @@ export function RoomGalleryModal({
     }
   };
 
-  // Keyboard Navigation for Lightbox
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!isOpen) return;
-
       if (e.key === "Escape") {
         if (activePhotoIndex !== null) {
           closeLightbox();
@@ -531,20 +587,20 @@ export function RoomGalleryModal({
           onClose();
         }
       } else if (activePhotoIndex !== null) {
-        if (e.key === "ArrowLeft") {
+        if (e.key === "ArrowRight") {
+          setActivePhotoIndex((prev) =>
+            prev !== null ? (prev + 1) % allPhotos.length : 0
+          );
+        } else if (e.key === "ArrowLeft") {
           setActivePhotoIndex((prev) =>
             prev !== null
               ? (prev - 1 + allPhotos.length) % allPhotos.length
-              : null
-          );
-        } else if (e.key === "ArrowRight") {
-          setActivePhotoIndex((prev) =>
-            prev !== null ? (prev + 1) % allPhotos.length : null
+              : 0
           );
         }
       }
     },
-    [isOpen, activePhotoIndex, allPhotos.length, onClose, closeLightbox]
+    [isOpen, activePhotoIndex, allPhotos.length, closeLightbox, onClose]
   );
 
   useEffect(() => {
@@ -553,609 +609,961 @@ export function RoomGalleryModal({
   }, [handleKeyDown]);
 
   // =========================================================================
-  // RENDER HELPERS: Clean 3-column desktop grid & Dynamic alternating mobile grid
+  // RENDER HELPERS: Clean Social-Theme Photo Cards (Click to view full photo)
   // =========================================================================
-
-  // Desktop 3-column clean photo grid (No quote cards, 100% real photos)
-  const renderDesktopGrid = (photos: GalleryPhoto[]) => (
-    <div className="hidden md:grid md:grid-cols-3 gap-3.5">
+  const renderPhotoGrid = (photos: GalleryPhoto[]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 sm:gap-2.5">
       {photos.map((photo) => (
         <article
           key={photo.id}
           onClick={() => openLightboxForPhoto(photo)}
-          className="group relative aspect-[16/10] overflow-hidden rounded-[2px] bg-[#EAE4DC] border border-[#E6E0D6] hover:border-[#2563EB] shadow-2xs hover:shadow-md transition-all duration-300 cursor-pointer"
+          className="relative aspect-[16/10] w-full rounded-none sm:rounded-[16px] overflow-hidden bg-black border-y sm:border border-x-0 border-[var(--color-border)] cursor-pointer"
         >
           <img
             src={photo.url}
             alt={lang === "th" ? photo.captionTh : photo.captionEn}
-            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover object-center"
           />
-          <div className="absolute top-2.5 left-2.5 z-10">
-            {photo.roomCode ? (
-              <span className="rounded-[2px] bg-[#2C2A29]/80 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Home className="w-3 h-3 text-[#E6DEC8]" />
-                <span>{photo.roomCode}</span>
-              </span>
-            ) : (
-              <span className="rounded-[2px] bg-[#2C2A29]/75 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-medium">
-                {lang === "th" ? photo.categoryLabelTh : photo.categoryLabelEn}
-              </span>
-            )}
-          </div>
-          <div className="absolute top-2.5 right-2.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="h-7 w-7 rounded-[2px] bg-black/60 text-white flex items-center justify-center">
-              <Maximize2 className="w-3.5 h-3.5" />
-            </span>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 text-white opacity-90 group-hover:opacity-100 transition-opacity">
-            <p className="text-xs font-medium leading-snug line-clamp-1">
-              {lang === "th" ? photo.captionTh : photo.captionEn}
-            </p>
-          </div>
         </article>
       ))}
     </div>
   );
 
-  // Mobile dynamic alternating editorial grid (Always strictly alternating: Wide -> Pair -> Wide -> Pair...)
-  const renderMobileEditorialGrid = (photos: GalleryPhoto[]) => {
-    if (photos.length === 0) return null;
-
-    const elements: React.ReactNode[] = [];
-    let i = 0;
-    let isWide = true;
-
-    while (i < photos.length) {
-      if (isWide) {
-        // Single wide hero photo (Row with 1 full-width photo)
-        const photo = photos[i];
-        elements.push(
-          <div
-            key={`wide-${photo.id}`}
-            onClick={() => openLightboxForPhoto(photo)}
-            className="group relative aspect-[16/10] w-full overflow-hidden rounded-[2px] bg-[#EAE4DC] border border-[#E6E0D6] cursor-pointer"
-          >
-            <img
-              src={photo.url}
-              alt={lang === "th" ? photo.captionTh : photo.captionEn}
-              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            {photo.roomCode && (
-              <span className="absolute top-2.5 left-2.5 rounded-[2px] bg-[#2C2A29]/80 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                <Home className="w-3 h-3 text-[#E6DEC8]" />
-                <span>{photo.roomCode}</span>
-              </span>
-            )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 text-white opacity-90">
-              <p className="text-xs font-medium leading-snug line-clamp-1">
-                {lang === "th" ? photo.captionTh : photo.captionEn}
-              </p>
-            </div>
-          </div>
-        );
-        i += 1;
-        isWide = false; // Next row MUST be a 2-column pair
-      } else {
-        // 2-column pair row (Row with 2 photos side-by-side)
-        const p1 = photos[i];
-        const p2 = photos[i + 1];
-
-        if (p2) {
-          // Exactly 2 photos side-by-side
-          elements.push(
-            <div key={`pair-${p1.id}-${p2.id}`} className="grid grid-cols-2 gap-2.5">
-              <div
-                onClick={() => openLightboxForPhoto(p1)}
-                className="group relative aspect-[4/3] w-full overflow-hidden rounded-[2px] bg-[#EAE4DC] border border-[#E6E0D6] cursor-pointer"
-              >
-                <img
-                  src={p1.url}
-                  alt={lang === "th" ? p1.captionTh : p1.captionEn}
-                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                {p1.roomCode && (
-                  <span className="absolute top-2 left-2 rounded-[2px] bg-[#2C2A29]/80 backdrop-blur-xs text-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Home className="w-2.5 h-2.5 text-[#E6DEC8]" />
-                    <span>{p1.roomCode}</span>
-                  </span>
-                )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-transparent to-transparent p-2 text-white">
-                  <p className="text-[11px] font-medium leading-tight line-clamp-1">
-                    {lang === "th" ? p1.captionTh : p1.captionEn}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                onClick={() => openLightboxForPhoto(p2)}
-                className="group relative aspect-[4/3] w-full overflow-hidden rounded-[2px] bg-[#EAE4DC] border border-[#E6E0D6] cursor-pointer"
-              >
-                <img
-                  src={p2.url}
-                  alt={lang === "th" ? p2.captionTh : p2.captionEn}
-                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                {p2.roomCode && (
-                  <span className="absolute top-2 left-2 rounded-[2px] bg-[#2C2A29]/80 backdrop-blur-xs text-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Home className="w-2.5 h-2.5 text-[#E6DEC8]" />
-                    <span>{p2.roomCode}</span>
-                  </span>
-                )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-transparent to-transparent p-2 text-white">
-                  <p className="text-[11px] font-medium leading-tight line-clamp-1">
-                    {lang === "th" ? p2.captionTh : p2.captionEn}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-          i += 2;
-          isWide = true; // Next row MUST be a wide photo
-        } else {
-          // Only 1 photo remaining at the end, render as single wide photo
-          elements.push(
-            <div
-              key={`wide-tail-${p1.id}`}
-              onClick={() => openLightboxForPhoto(p1)}
-              className="group relative aspect-[16/10] w-full overflow-hidden rounded-[2px] bg-[#EAE4DC] border border-[#E6E0D6] cursor-pointer"
-            >
-              <img
-                src={p1.url}
-                alt={lang === "th" ? p1.captionTh : p1.captionEn}
-                className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              {p1.roomCode && (
-                <span className="absolute top-2.5 left-2.5 rounded-[2px] bg-[#2C2A29]/80 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Home className="w-3 h-3 text-[#E6DEC8]" />
-                  <span>{p1.roomCode}</span>
-                </span>
-              )}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 text-white opacity-90">
-                <p className="text-xs font-medium leading-snug line-clamp-1">
-                  {lang === "th" ? p1.captionTh : p1.captionEn}
-                </p>
-              </div>
-            </div>
-          );
-          i += 1;
-          isWide = true; // Next row MUST be a wide photo
-        }
-      }
-    }
-
-    return <div className="space-y-2.5 md:hidden">{elements}</div>;
-  };
-
   if (!isOpen) return null;
 
-  const currentPhoto =
-    activePhotoIndex !== null ? allPhotos[activePhotoIndex] : null;
+  const activeBookingRoom =
+    allRooms.find((r) => r.id === calendarRoomId) ||
+    selectedRoom ||
+    allRooms[0] ||
+    null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden"
     >
-      {/* Standard Backdrop Overlay */}
+      {/* Backdrop Overlay (No heavy backdrop-blur during slide-up for 60/120fps smoothness) */}
       <div
-        className="fixed inset-0 bg-[#4A4946]/65 backdrop-blur-xs transition-opacity hidden md:block"
+        className={`fixed inset-0 bg-black/60 ${
+          skipEntryAnimation ? "" : "animate-fade-in-backdrop"
+        }`}
         onClick={onClose}
       />
 
-      {/* Main Container: Fullscreen on Mobile (< md), Fixed Height on Desktop/Tablet (>= md) */}
-      <div className="relative w-full h-[100dvh] md:h-[88vh] md:max-h-[88vh] md:min-h-[88vh] md:max-w-6xl bg-white rounded-none md:rounded-[2px] shadow-2xl flex flex-col overflow-hidden z-10 border-0 md:border md:border-[#E2DAD0]">
+      {/* Main Container: Bottom-aligned sheet/modal (smooth GPU slide-up) */}
+      <div
+        className={`relative w-full h-[95dvh] max-h-[95dvh] lg:h-[95vh] lg:max-h-[95vh] lg:w-[90vw] lg:max-w-4xl xl:max-w-[960px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] rounded-t-[24px] rounded-b-none shadow-2xl flex flex-col overflow-hidden z-10 border-t border-x border-[var(--color-border)] border-b-0 ${
+          skipEntryAnimation ? "" : "animate-slide-up-modal"
+        }`}
+      >
         {/* ===================================================================
-            AGODA-STYLE TOP BAR & TABS (Header Anatomy)
+            TOP HEADER & CATEGORY PILL TABS (Unified Theme)
         ==================================================================== */}
-        <header className="bg-white shrink-0 z-20">
-          {/* Row 1: Left '✕' or '←' + Photos & Videos Title / Subtitle + Right CTA */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 border-b border-[#E6E0D6]">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={activePhotoIndex !== null ? closeLightbox : onClose}
-                aria-label={
-                  activePhotoIndex !== null
-                    ? "Back to All Photos"
-                    : "Close Gallery"
-                }
-                className="p-1 -ml-1 text-[#2C2A29] hover:bg-[#F4EFE6] rounded-[2px] transition cursor-pointer shrink-0"
-              >
-                {activePhotoIndex !== null ? (
-                  <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-[#2563EB]" />
-                ) : (
-                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
-                )}
-              </button>
-
-              <div className="min-w-0">
-                <h1 className="text-sm sm:text-base font-bold text-[#1E293B] leading-tight truncate">
-                  {activePhotoIndex !== null && currentPhoto
-                    ? lang === "th"
-                      ? currentPhoto.captionTh
-                      : currentPhoto.captionEn
-                    : `Photos & Videos (${allPhotos.length + 1})`}
-                </h1>
-                <p className="text-[11px] sm:text-xs text-[#64748B] truncate">
-                  {activePhotoIndex !== null
-                    ? lang === "th"
-                      ? "กดปุ่มเพื่อกลับไปดูภาพรวมทั้งหมด (Grid View)"
-                      : "Click back to view all photos in Grid View"
-                    : propertyConfig.nameTh || "Sapan Unseen Nan"}
-                </p>
-              </div>
+        <header className="bg-[var(--color-background-card)] border-b border-[var(--color-border)] shrink-0 z-20">
+          {/* Row 1: Unified Step Header (Title Left, Date Pill & Close Right) */}
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-[var(--color-border)]">
+            <div className="flex-1 min-w-0">
+              <h1 className="ty-subtitle truncate">
+                {lang === "th"
+                  ? `เลือกวันเข้าพัก (${activeBookingRoom?.code || "ทุกห้อง"})`
+                  : `Select Stay Dates (${activeBookingRoom?.code || "All"})`}
+              </h1>
             </div>
 
-            {/* Right Action: Clean Agoda Book Room CTA (Sharp rounded-[2px]) */}
-            {selectedRoom && onBookRoom && (
+            <div className="flex items-center gap-2.5 shrink-0">
+              {/* Right-aligned Check-in -> Check-out Summary Pill */}
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onBookRoom(selectedRoom);
-                }}
-                className="rounded-[2px] bg-[#A29080] hover:bg-[#8E7B6B] text-white px-3 sm:px-4 py-1.5 text-xs font-bold transition cursor-pointer shadow-xs inline-flex items-center gap-1.5 shrink-0"
+                onClick={() => handleTabClick("calendar")}
+                className="hidden sm:inline-flex items-center gap-2.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-overlay-hover)] border border-[var(--color-border)] px-3.5 py-1.5 transition cursor-pointer"
               >
-                <Calendar className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">
-                  {lang === "th"
-                    ? `เลือกจองห้องพัก ${selectedRoom.code}`
-                    : `Book Room ${selectedRoom.code}`}
-                </span>
-                <span className="sm:hidden">
-                  {lang === "th" ? `จอง ${selectedRoom.code}` : `Book`}
+                <Calendar className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+                <div className="flex items-center gap-2 text-left">
+                  <span className="text-[11px] text-[var(--color-text-secondary)] hidden md:inline">
+                    {lang === "th" ? "เช็คอิน" : "Check-in"}
+                  </span>
+                  <span className="ty-body font-bold text-[var(--color-text-primary)] whitespace-nowrap">
+                    {checkIn || "-"}
+                  </span>
+                  <span className="text-[var(--color-text-secondary)] font-semibold">
+                    →
+                  </span>
+                  <span className="text-[11px] text-[var(--color-text-secondary)] hidden md:inline">
+                    {lang === "th" ? "เช็คเอาท์" : "Check-out"}
+                  </span>
+                  <span className="ty-body font-bold text-[var(--color-text-primary)] whitespace-nowrap">
+                    {checkOut || "-"}
+                  </span>
+                </div>
+                <span className="rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--color-text-primary)] shrink-0">
+                  {Math.max(1, nights)} {lang === "th" ? "คืน" : "nights"}
                 </span>
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close Modal"
+                className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-overlay-hover)] text-[var(--color-text-primary)] flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Row 2: In Lightbox Mode, show prominent Back Bar; in Grid Mode, show Category Tabs */}
-          {activePhotoIndex !== null ? (
-            <div className="flex items-center justify-between px-4 sm:px-6 py-2 sm:py-2.5 border-b border-[#E6E0D6] bg-[#FBF9F6]">
-              <button
-                type="button"
-                onClick={closeLightbox}
-                className="rounded-[2px] bg-white hover:bg-[#F4EFE6] border border-[#A29080] text-[#4A4643] hover:text-[#A29080] px-3.5 py-1.5 text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition cursor-pointer shadow-xs"
-              >
-                <Grid className="w-4 h-4 text-[#A29080]" />
-                <span>
-                  {lang === "th"
-                    ? "← กลับไปดูภาพรวมทั้งหมด (Grid View)"
-                    : "← Back to All Photos (Grid View)"}
-                </span>
-              </button>
-
-              <div className="flex items-center gap-2">
-                {currentPhoto?.roomCode && (
-                  <span className="rounded-[2px] bg-[#2C2A29] text-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
-                    <Home className="w-3 h-3 text-[#E6DEC8]" />
-                    <span>{currentPhoto.roomCode}</span>
-                  </span>
-                )}
-                <div className="rounded-[2px] bg-[#4A4643] text-white px-2.5 py-1 text-xs font-bold tracking-wider">
-                  {activePhotoIndex + 1} / {allPhotos.length}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <nav
-              ref={tabNavRef}
-              aria-label="Photo Categories"
-              className="flex items-center gap-4 sm:gap-6 overflow-x-auto px-4 sm:px-6 border-b border-[#E6E0D6] bg-white scrollbar-none"
-            >
-              {categoryTabs.map((tab) => {
-                const isActive = activeCategory === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    data-tab-id={tab.id}
-                    type="button"
-                    onClick={() => handleTabClick(tab.id)}
-                    className={`shrink-0 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition cursor-pointer border-b-2 whitespace-nowrap ${
-                      isActive
-                        ? "border-[#2563EB] text-[#2563EB] font-bold"
-                        : "border-transparent text-[#64748B] hover:text-[#1E293B]"
-                    }`}
-                  >
-                    {lang === "th" ? tab.labelTh : tab.labelEn}
-                  </button>
-                );
-              })}
-            </nav>
-          )}
+          {/* Row 2: Category Filter Pills */}
+          <nav
+            ref={tabNavRef}
+            aria-label="Photo Categories"
+            className="flex items-center gap-2 overflow-x-auto px-4 sm:px-6 py-2.5 bg-[var(--color-background-card)] no-scrollbar"
+          >
+            {categoryTabs.map((tab) => {
+              const isActive = activeCategory === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  data-tab-id={tab.id}
+                  type="button"
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                      : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  {lang === "th" ? tab.labelTh : tab.labelEn}
+                </button>
+              );
+            })}
+          </nav>
         </header>
 
         {/* ===================================================================
-            MODAL BODY: Switch between Continuous Agoda Photo Feed and Lightbox Viewer
+            MODAL BODY: Full-Size Lightbox OR Continuous Photo Stream
         ==================================================================== */}
-        <div
-          ref={modalBodyRef}
-          onScroll={activePhotoIndex === null ? handleScroll : undefined}
-          className={`flex-1 bg-white sm:bg-[#FBF9F6] ${
-            activePhotoIndex !== null
-              ? "p-2 sm:p-4 overflow-hidden flex flex-col"
-              : "p-4 sm:p-6 overflow-y-auto"
-          }`}
-        >
-          {activePhotoIndex !== null && currentPhoto ? (
-            /* ===============================================================
-               LIGHTBOX / SLIDESHOW MODE (Full resolution with Next/Prev)
-            ================================================================ */
-            <div className="flex flex-col h-full justify-between items-center space-y-2 sm:space-y-3">
-              {/* Main Photo Viewport with Left/Right Buttons & Floating Controls */}
-              <div className="relative w-full flex-1 min-h-[260px] bg-black rounded-[2px] overflow-hidden flex items-center justify-center shadow-lg">
-                <img
-                  src={currentPhoto.url}
-                  alt={
-                    lang === "th"
-                      ? currentPhoto.captionTh
-                      : currentPhoto.captionEn
-                  }
-                  className="max-h-full max-w-full object-contain select-none"
-                />
+        {activePhotoIndex !== null && allPhotos[activePhotoIndex] ? (
+          <div className="flex-1 bg-[var(--color-background-card)] flex flex-col overflow-hidden">
+            {/* Lightbox Top Bar */}
+            <div className="px-4 sm:px-6 py-2.5 border-b border-[var(--color-border)] flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={closeLightbox}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-overlay-hover)] px-3.5 py-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>{lang === "th" ? "กลับไปหน้ารวมรูปภาพ" : "Back to photos"}</span>
+              </button>
 
-                {/* Floating Top-Left Back Button for direct one-click return */}
-                <button
-                  type="button"
-                  onClick={closeLightbox}
-                  className="absolute top-3 left-3 z-20 rounded-[2px] bg-black/70 hover:bg-black/90 backdrop-blur-xs text-white border border-white/25 px-3 py-1.5 text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer shadow-md"
-                >
-                  <Grid className="w-3.5 h-3.5 text-[#E6DEC8]" />
-                  <span>
-                    {lang === "th" ? "กลับไปดูภาพรวม" : "Back to Grid"}
-                  </span>
-                </button>
+              <span className="ty-body font-semibold text-[var(--color-text-secondary)] tabular-nums">
+                {activePhotoIndex + 1} / {allPhotos.length}
+              </span>
+            </div>
 
-                {/* Floating Top-Right Counter Badge */}
-                <div className="absolute top-3 right-3 z-20 rounded-[2px] bg-black/70 backdrop-blur-xs text-white border border-white/25 px-2.5 py-1 text-xs font-bold shadow-md">
-                  {activePhotoIndex + 1} / {allPhotos.length}
-                </div>
+            {/* Main Full-Size Photo Stage */}
+            <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden select-none">
+              <img
+                src={allPhotos[activePhotoIndex].url}
+                alt={
+                  lang === "th"
+                    ? allPhotos[activePhotoIndex].captionTh
+                    : allPhotos[activePhotoIndex].captionEn
+                }
+                className="max-h-full max-w-full object-contain"
+              />
 
-                {/* Left Arrow Button */}
-                {allPhotos.length > 1 && (
+              {allPhotos.length > 1 && (
+                <>
                   <button
                     type="button"
                     onClick={() =>
                       setActivePhotoIndex(
-                        (activePhotoIndex - 1 + allPhotos.length) %
-                          allPhotos.length
+                        (prev) =>
+                          ((prev ?? 0) - 1 + allPhotos.length) % allPhotos.length
                       )
                     }
                     aria-label="Previous photo"
-                    className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 sm:h-12 sm:w-12 rounded-[2px] bg-black/60 hover:bg-black/85 text-white flex items-center justify-center transition cursor-pointer shadow-md z-10"
+                    className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center transition cursor-pointer"
                   >
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft className="w-5 h-5" />
                   </button>
-                )}
-
-                {/* Right Arrow Button */}
-                {allPhotos.length > 1 && (
                   <button
                     type="button"
                     onClick={() =>
                       setActivePhotoIndex(
-                        (activePhotoIndex + 1) % allPhotos.length
+                        (prev) => ((prev ?? 0) + 1) % allPhotos.length
                       )
                     }
                     aria-label="Next photo"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 sm:h-12 sm:w-12 rounded-[2px] bg-black/60 hover:bg-black/85 text-white flex items-center justify-center transition cursor-pointer shadow-md z-10"
+                    className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-black/65 hover:bg-black/85 text-white flex items-center justify-center transition cursor-pointer"
                   >
-                    <ChevronRight className="w-6 h-6" />
+                    <ChevronRight className="w-5 h-5" />
                   </button>
-                )}
+                </>
+              )}
+            </div>
 
-                {/* Bottom Caption Overlay */}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent p-3 sm:p-4 text-white z-10">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs sm:text-sm font-medium leading-snug">
-                      {lang === "th"
-                        ? currentPhoto.captionTh
-                        : currentPhoto.captionEn}
-                    </p>
-                    {currentPhoto.roomCode && (
-                      <span className="shrink-0 rounded-[2px] bg-[#A29080] text-white px-2 py-0.5 text-[11px] font-bold">
-                        {currentPhoto.roomCode}
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {/* Caption + Thumbnail Strip */}
+            <div className="bg-[var(--color-background-card)] border-t border-[var(--color-border)] px-4 sm:px-6 py-3 space-y-2.5 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="ty-body font-semibold text-[var(--color-text-primary)] truncate">
+                  {lang === "th"
+                    ? allPhotos[activePhotoIndex].captionTh
+                    : allPhotos[activePhotoIndex].captionEn}
+                </p>
+                <span className="ty-caption shrink-0">
+                  {lang === "th"
+                    ? allPhotos[activePhotoIndex].categoryLabelTh
+                    : allPhotos[activePhotoIndex].categoryLabelEn}
+                </span>
               </div>
 
-              {/* Bottom Thumbnail Strip for Fast Scrubbing */}
               <div
                 ref={thumbnailStripRef}
-                className="w-full shrink-0 flex items-center gap-2 overflow-x-auto py-1 px-1 scrollbar-none"
+                className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5"
               >
-                {allPhotos.map((photo, idx) => (
-                  <button
-                    key={photo.id}
-                    data-thumb-index={idx}
-                    type="button"
-                    onClick={() => setActivePhotoIndex(idx)}
-                    className={`relative h-12 sm:h-14 w-16 sm:w-20 shrink-0 rounded-[2px] overflow-hidden cursor-pointer transition ${
-                      activePhotoIndex === idx
-                        ? "ring-2 ring-[#2563EB] opacity-100 scale-105"
-                        : "opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <img
-                      src={photo.url}
-                      alt={photo.captionTh}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
+                {allPhotos.map((thumb, idx) => {
+                  const isCurrent = idx === activePhotoIndex;
+                  return (
+                    <button
+                      key={thumb.id}
+                      data-thumb-index={idx}
+                      type="button"
+                      onClick={() => setActivePhotoIndex(idx)}
+                      className={`relative h-12 w-18 rounded-[8px] overflow-hidden shrink-0 border-2 transition cursor-pointer ${
+                        isCurrent
+                          ? "border-[var(--color-accent)] opacity-100"
+                          : "border-transparent opacity-55 hover:opacity-90"
+                      }`}
+                    >
+                      <img
+                        src={thumb.url}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          ) : (
-            /* ===============================================================
-               CONTINUOUS PHOTO GALLERY STREAM WITH SCROLLSPY
-               Ordered by Importance:
-               1. Video / 360
-               2. Property views
-               3. Rooms
-               4. Facilities
-               5. Dining
-               6. Other (Attractions & Guest Photos)
-            ================================================================ */
-            <div className="space-y-10 pb-12">
-              {/* =============================================================
-                  SECTION 1: VIDEO TOUR
-              ============================================================== */}
-              <section id="gallery-section-video" className="scroll-mt-4 space-y-4">
-                <div className="flex items-center justify-between">
+          </div>
+        ) : (
+        <div
+          ref={modalBodyRef}
+          onScroll={handleScroll}
+          className={`flex-1 bg-[var(--color-background-body)] py-4 px-0 sm:p-6 overflow-y-auto overscroll-contain ${
+            skipEntryAnimation ? "animate-modal-step-in-left" : ""
+          }`}
+        >
+          <div className="space-y-8 pb-6">
+              {/* SECTION 0: MINIMAL APPLE CALENDAR-STYLE ROOM AVAILABILITY GRID
+                  - Minimal 1px hairline grid (no cards, no multi-color fills)
+                  - Single unified horizontal scroll container (slides the entire panel together)
+                  - Sticky left room column + horizontal day columns for up to 1 full month
+                  - Month selector (cannot go back to past months)
+              */}
+              {(() => {
+                const calendarRoom =
+                  allRooms.find((r) => r.id === calendarRoomId) ||
+                  selectedRoom ||
+                  allRooms[0] ||
+                  null;
+                const todayDate = today || new Date();
+                const todayStr = formatDateStr(todayDate);
+                const minMonthDate = new Date(
+                  todayDate.getFullYear(),
+                  todayDate.getMonth(),
+                  1
+                );
+
+                const year = calendarMonth.getFullYear();
+                const month = calendarMonth.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const isCurrentMonth =
+                  year === todayDate.getFullYear() &&
+                  month === todayDate.getMonth();
+                const canGoPrevMonth =
+                  year > minMonthDate.getFullYear() ||
+                  (year === minMonthDate.getFullYear() &&
+                    month > minMonthDate.getMonth());
+
+                // Build list of selectable upcoming months (current month + next 11 months, no past months)
+                const upcomingMonths = Array.from({ length: 12 }, (_, idx) => {
+                  const mDate = new Date(
+                    minMonthDate.getFullYear(),
+                    minMonthDate.getMonth() + idx,
+                    1
+                  );
+                  const mYear = mDate.getFullYear();
+                  const mMonth = mDate.getMonth();
+                  const value = `${mYear}-${String(mMonth + 1).padStart(
+                    2,
+                    "0"
+                  )}`;
+                  const label =
+                    lang === "th"
+                      ? `${MONTH_NAMES_TH[mMonth]} ${mYear + 543}`
+                      : `${MONTH_NAMES_EN[mMonth]} ${mYear}`;
+                  return { value, label, year: mYear, month: mMonth };
+                });
+                const currentMonthValue = `${year}-${String(month + 1).padStart(
+                  2,
+                  "0"
+                )}`;
+
+                const activeSelectedDateStr = checkIn || todayStr;
+                const activeSelectedEndStr =
+                  checkOut && checkOut > activeSelectedDateStr
+                    ? checkOut
+                    : formatDateStr(
+                        addDaysToDate(
+                          new Date(activeSelectedDateStr + "T00:00:00"),
+                          1
+                        )
+                      );
+                const monthLabel =
+                  lang === "th"
+                    ? `${MONTH_NAMES_TH[month]} ${year + 543}`
+                    : `${MONTH_NAMES_EN[month]} ${year}`;
+                const weekdaysShortEn = [
+                  "Sun",
+                  "Mon",
+                  "Tue",
+                  "Wed",
+                  "Thu",
+                  "Fri",
+                  "Sat",
+                ];
+
+                // Build all days within the selected month (from today for current month; 1..daysInMonth for future months)
+                const startDayNum = isCurrentMonth ? todayDate.getDate() : 1;
+                const monthDays = Array.from(
+                  { length: Math.max(1, daysInMonth - startDayNum + 1) },
+                  (_, i) => {
+                    const dayNum = startDayNum + i;
+                    const d = new Date(year, month, dayNum);
+                    const dStr = formatDateStr(d);
+                    const nextDStr = formatDateStr(addDaysToDate(d, 1));
+                    const forecast = weather?.daily?.find(
+                      (w) => w.dateStr === dStr
+                    );
+                    const tempAvg =
+                      forecast?.tempAvg ??
+                      weather?.currentTemp ??
+                      21 - (dayNum % 3);
+                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+
+                    return {
+                      date: d,
+                      dateStr: dStr,
+                      nextDateStr: nextDStr,
+                      dayNum,
+                      isToday: dStr === todayStr,
+                      isWeekend,
+                      dowLabel:
+                        lang === "th"
+                          ? WEEKDAYS_TH[d.getDay()]
+                          : weekdaysShortEn[d.getDay()],
+                      tempAvg,
+                    };
+                  }
+                );
+
+                const slideCalendarHorizontally = (dir: "left" | "right") => {
+                  const delta = dir === "left" ? -420 : 420;
+                  calendarScrollRef.current?.scrollBy({
+                    left: delta,
+                    behavior: "smooth",
+                  });
+                };
+
+                const handleCalendarMouseDown = (
+                  e: React.MouseEvent<HTMLDivElement>
+                ) => {
+                  if (!calendarScrollRef.current) return;
+                  isDraggingCalendarRef.current = true;
+                  hasDraggedCalendarRef.current = false;
+                  dragStartXRef.current =
+                    e.pageX - calendarScrollRef.current.offsetLeft;
+                  dragScrollLeftRef.current =
+                    calendarScrollRef.current.scrollLeft;
+                };
+
+                const handleCalendarMouseMove = (
+                  e: React.MouseEvent<HTMLDivElement>
+                ) => {
+                  if (
+                    !isDraggingCalendarRef.current ||
+                    !calendarScrollRef.current
+                  )
+                    return;
+                  const x = e.pageX - calendarScrollRef.current.offsetLeft;
+                  const walk = x - dragStartXRef.current;
+                  if (Math.abs(walk) > 5) {
+                    hasDraggedCalendarRef.current = true;
+                  }
+                  calendarScrollRef.current.scrollLeft =
+                    dragScrollLeftRef.current - walk;
+                };
+
+                const handleCalendarMouseUpOrLeave = () => {
+                  isDraggingCalendarRef.current = false;
+                };
+
+                const selectRoomAndDate = (
+                  targetRoom: RoomLodge,
+                  targetDate: Date
+                ) => {
+                  if (hasDraggedCalendarRef.current) {
+                    hasDraggedCalendarRef.current = false;
+                    return;
+                  }
+                  const dStr = formatDateStr(targetDate);
+                  if (dStr < todayStr) return;
+
+                  const clickedNextStr = formatDateStr(
+                    addDaysToDate(targetDate, 1)
+                  );
+                  const clickedInv = getRoomInventoryForRange(
+                    targetRoom,
+                    dStr,
+                    clickedNextStr,
+                    bookings
+                  );
+                  const isClickedDayFree =
+                    clickedInv.state === "AVAILABLE" &&
+                    clickedInv.availableUnits > 0;
+
+                  // Cannot select a date where the room is already full
+                  if (!isClickedDayFree) return;
+
+                  const isSameRoom = calendarRoom?.id === targetRoom.id;
+                  setCalendarRoomId(targetRoom.id);
+                  setActiveRoomFilter(targetRoom.code);
+
+                  if (!setCheckIn || !setCheckOut) return;
+
+                  if (!isSameRoom) {
+                    setCheckIn(dStr);
+                    setCheckOut(clickedNextStr);
+                    return;
+                  }
+
+                  const curStart = activeSelectedDateStr;
+                  const curEnd = activeSelectedEndStr;
+                  const curNights = Math.max(
+                    1,
+                    Math.round(
+                      (new Date(curEnd + "T00:00:00").getTime() -
+                        new Date(curStart + "T00:00:00").getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  );
+
+                  // Multi-night range selection on the same room:
+                  // - If 1 night is selected and user clicks another date (before or after), try to span between them
+                  // - If >1 nights are selected and user clicks a later date (dStr >= curEnd), try to extend the stay
+                  if (
+                    (curNights === 1 && dStr !== curStart) ||
+                    (curNights > 1 && dStr >= curEnd)
+                  ) {
+                    const rangeStart = dStr < curStart ? dStr : curStart;
+                    const rangeEnd = dStr < curStart ? curEnd : clickedNextStr;
+                    const rangeInv = getRoomInventoryForRange(
+                      targetRoom,
+                      rangeStart,
+                      rangeEnd,
+                      bookings
+                    );
+                    if (
+                      rangeInv.state === "AVAILABLE" &&
+                      rangeInv.availableUnits > 0
+                    ) {
+                      setCheckIn(rangeStart);
+                      setCheckOut(rangeEnd);
+                      return;
+                    }
+                  }
+
+                  // Otherwise (clicked inside existing range or blocked by a full/booked date in between): start fresh 1-night selection at clicked date
+                  setCheckIn(dStr);
+                  setCheckOut(clickedNextStr);
+                };
+
+                return (
+                  <section
+                    id="gallery-section-calendar"
+                    className="scroll-mt-4 px-0"
+                  >
+                    <div className="relative rounded-none sm:rounded-[16px] overflow-hidden border-y sm:border border-x-0 border-[var(--color-border)] bg-[var(--color-background-card)]">
+                      {/* BUILT-IN SELECTED ROOM PHOTO HEADER AT TOP OF CALENDAR */}
+                      {calendarRoom && (() => {
+                        const heroImg = calendarRoom.images?.[0] || {
+                          url: propertyConfig.heroImageUrl || "",
+                          captionTh: "",
+                          captionEn: "",
+                        };
+                        return (
+                          <div className="border-b border-[var(--color-border)] bg-[var(--color-background-card)]">
+                            <div
+                              onClick={() =>
+                                openLightboxForPhoto({
+                                  id: `cal-head-${calendarRoom.id}-0`,
+                                  url: heroImg.url,
+                                  captionTh:
+                                    heroImg.captionTh || calendarRoom.nameTh,
+                                  captionEn:
+                                    heroImg.captionEn || calendarRoom.nameEn,
+                                  category: "rooms",
+                                  categoryLabelTh: `ห้องพัก (${calendarRoom.code})`,
+                                  categoryLabelEn: `Room (${calendarRoom.code})`,
+                                  sourceType: "property",
+                                })
+                              }
+                              className="relative w-full aspect-[16/9] sm:h-64 lg:h-72 overflow-hidden bg-black cursor-pointer"
+                            >
+                              <img
+                                src={heroImg.url}
+                                alt={
+                                  lang === "th"
+                                    ? calendarRoom.nameTh
+                                    : calendarRoom.nameEn
+                                }
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* APPLE CALENDAR-STYLE MINIMAL TOP TOOLBAR */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-background-card)]">
+                        {/* Left: Static Month Title + Prev/Next Month */}
+                        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
+                          <h2 className="text-[18px] sm:text-[20px] font-bold tracking-tight text-[var(--color-text-primary)] shrink-0">
+                            {monthLabel}
+                          </h2>
+
+                          {/* Month Prev / Next */}
+                          <div className="inline-flex items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-background-card)] overflow-hidden shrink-0">
+                            <button
+                              type="button"
+                              disabled={!canGoPrevMonth}
+                              onClick={() => {
+                                if (!canGoPrevMonth) return;
+                                setCalendarMonth(new Date(year, month - 1, 1));
+                                if (calendarScrollRef.current) {
+                                  calendarScrollRef.current.scrollLeft = 0;
+                                }
+                              }}
+                              title={
+                                lang === "th"
+                                  ? "เดือนก่อนหน้า"
+                                  : "Previous month"
+                              }
+                              className={`h-7 w-7 flex items-center justify-center transition ${
+                                canGoPrevMonth
+                                  ? "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] cursor-pointer"
+                                  : "opacity-30 text-[var(--color-text-disabled)] cursor-not-allowed"
+                              }`}
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="w-px h-4 bg-[var(--color-border)]" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCalendarMonth(new Date(year, month + 1, 1));
+                                if (calendarScrollRef.current) {
+                                  calendarScrollRef.current.scrollLeft = 0;
+                                }
+                              }}
+                              title={lang === "th" ? "เดือนถัดไป" : "Next month"}
+                              className="h-7 w-7 hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center transition cursor-pointer"
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Right: Apple Calendar Segmented Slide Controls (< | Today | >) */}
+                        <div className="flex items-center gap-2.5">
+                          <div className="inline-flex items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-background-card)] overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => slideCalendarHorizontally("left")}
+                              aria-label="เลื่อนตารางไปทางซ้าย"
+                              className="h-8 px-2.5 hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center transition cursor-pointer"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <div className="w-px h-4 bg-[var(--color-border)]" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCalendarMonth(minMonthDate);
+                                if (calendarRoom) {
+                                  selectRoomAndDate(
+                                    calendarRoom,
+                                    todayDate
+                                  );
+                                }
+                                calendarScrollRef.current?.scrollTo({
+                                  left: 0,
+                                  behavior: "smooth",
+                                });
+                              }}
+                              className="h-8 px-3 hover:bg-[var(--color-background-muted)] text-[12px] font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+                            >
+                              {lang === "th" ? "วันนี้" : "Today"}
+                            </button>
+                            <div className="w-px h-4 bg-[var(--color-border)]" />
+                            <button
+                              type="button"
+                              onClick={() => slideCalendarHorizontally("right")}
+                              aria-label="เลื่อนตารางไปทางขวา"
+                              className="h-8 px-2.5 hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center transition cursor-pointer"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2-PANE CALENDAR LAYOUT: Static Left Rooms Column + Horizontally Scrollable Days Pane (Zero Jitter) */}
+                      <div className="flex w-full overflow-hidden">
+                        {/* STATIC LEFT ROOM COLUMN (Only Room Code + Guest Capacity, no full name or price) */}
+                        <div className="w-[92px] sm:w-[112px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-background-card)] z-10 flex flex-col">
+                          {/* Left Column Header */}
+                          <div className="h-[68px] border-b border-[var(--color-border)] px-3 py-2 flex flex-col justify-center bg-[var(--color-background-muted)]/40">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                              {lang === "th" ? "ห้องพัก" : "ROOMS"}
+                            </span>
+                            <span className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                              {allRooms.length}{" "}
+                              {lang === "th" ? "ห้อง" : "Rooms"}
+                            </span>
+                          </div>
+
+                          {/* Left Column Room Rows: Only Code + Guests */}
+                          {allRooms.map((rm, rIdx) => {
+                            const isFocusedRoom = calendarRoom?.id === rm.id;
+                            const isLastRow = rIdx === allRooms.length - 1;
+
+                            return (
+                              <button
+                                key={rm.id}
+                                type="button"
+                                onClick={() => {
+                                  setCalendarRoomId(rm.id);
+                                  setActiveRoomFilter(rm.code);
+                                }}
+                                className={`h-[68px] sm:h-[72px] px-3 text-left flex flex-col justify-center transition cursor-pointer ${
+                                  !isLastRow
+                                    ? "border-b border-[var(--color-border)]"
+                                    : ""
+                                } ${
+                                  isFocusedRoom
+                                    ? "bg-[var(--color-background-muted)]"
+                                    : "bg-[var(--color-background-card)] hover:bg-[var(--color-overlay-hover)]"
+                                }`}
+                              >
+                                <span className="inline-flex w-fit items-center justify-center rounded bg-[var(--color-accent)] text-[var(--color-on-accent)] px-1.5 py-0.5 text-[11px] font-bold">
+                                  {rm.code}
+                                </span>
+                                <span className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
+                                  {rm.baseGuests}–{rm.maxGuests}{" "}
+                                  {lang === "th" ? "ท่าน" : "guests"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* HORIZONTALLY SCROLLABLE DAYS PANE */}
+                        <div
+                          ref={calendarScrollRef}
+                          onMouseDown={handleCalendarMouseDown}
+                          onMouseMove={handleCalendarMouseMove}
+                          onMouseUp={handleCalendarMouseUpOrLeave}
+                          onMouseLeave={handleCalendarMouseUpOrLeave}
+                          className="flex-1 min-w-0 overflow-x-auto select-none cursor-grab active:cursor-grabbing no-scrollbar"
+                        >
+                          <div className="min-w-max">
+                            {/* Days Header Row */}
+                            <div className="flex h-[68px] border-b border-[var(--color-border)] bg-[var(--color-background-muted)]/40">
+                              {monthDays.map((md) => {
+                                const isCurrentSelected =
+                                  md.dateStr >= activeSelectedDateStr &&
+                                  md.dateStr < activeSelectedEndStr;
+
+                                return (
+                                  <button
+                                    key={md.dateStr}
+                                    type="button"
+                                    onClick={() => {
+                                      if (calendarRoom) {
+                                        selectRoomAndDate(
+                                          calendarRoom,
+                                          md.date
+                                        );
+                                      }
+                                    }}
+                                    className={`w-[88px] sm:w-[98px] shrink-0 border-r border-[var(--color-border)] py-2 px-2 flex flex-col items-center justify-center transition cursor-pointer ${
+                                      isCurrentSelected
+                                        ? "bg-[var(--color-background-muted)]"
+                                        : "bg-[var(--color-background-card)] hover:bg-[var(--color-overlay-hover)]"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`text-[11px] font-medium ${
+                                        md.isWeekend
+                                          ? "text-[var(--color-text-primary)] font-semibold"
+                                          : "text-[var(--color-text-secondary)]"
+                                      }`}
+                                    >
+                                      {md.dowLabel}
+                                    </span>
+                                    <span
+                                      className={`mt-1 h-7 w-7 rounded-full inline-flex items-center justify-center text-[14px] font-bold transition ${
+                                        isCurrentSelected || md.isToday
+                                          ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                                          : "text-[var(--color-text-primary)]"
+                                      }`}
+                                    >
+                                      {md.dayNum}
+                                    </span>
+                                    <span className="mt-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                                      {md.tempAvg}°C
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Room Rows on the Days Grid */}
+                            {allRooms.map((rm, rIdx) => {
+                              const isFocusedRoom = calendarRoom?.id === rm.id;
+                              const isLastRow = rIdx === allRooms.length - 1;
+
+                              return (
+                                <div
+                                  key={rm.id}
+                                  className={`flex h-[68px] sm:h-[72px] ${
+                                    !isLastRow
+                                      ? "border-b border-[var(--color-border)]"
+                                      : ""
+                                  }`}
+                                >
+                                  {monthDays.map((md) => {
+                                    const inv = getRoomInventoryForRange(
+                                      rm,
+                                      md.dateStr,
+                                      md.nextDateStr,
+                                      bookings
+                                    );
+                                    const dayFree =
+                                      inv.state === "AVAILABLE" &&
+                                      inv.availableUnits > 0;
+                                    const isCellSelected =
+                                      isFocusedRoom &&
+                                      md.dateStr >= activeSelectedDateStr &&
+                                      md.dateStr < activeSelectedEndStr;
+
+                                    return (
+                                      <button
+                                        key={`${rm.id}-${md.dateStr}`}
+                                        type="button"
+                                        disabled={!dayFree}
+                                        onClick={() =>
+                                          selectRoomAndDate(rm, md.date)
+                                        }
+                                        className={`w-[88px] sm:w-[98px] shrink-0 border-r border-[var(--color-border)] p-2 flex items-center justify-center text-center transition ${
+                                          !dayFree
+                                            ? "bg-[var(--color-background-card)] cursor-not-allowed"
+                                            : isCellSelected
+                                            ? "bg-[var(--color-background-muted)] ring-1 ring-inset ring-[var(--color-accent)] cursor-pointer"
+                                            : "bg-[var(--color-background-card)] hover:bg-[var(--color-overlay-hover)] cursor-pointer"
+                                        }`}
+                                      >
+                                        {/* Available: Price centered. Booked: Red bullet centered. */}
+                                        {dayFree ? (
+                                          <span
+                                            className={`text-[11px] sm:text-[12px] tabular-nums leading-none ${
+                                              isCellSelected
+                                                ? "font-bold text-[var(--color-text-primary)]"
+                                                : "font-normal text-[var(--color-text-secondary)]"
+                                            }`}
+                                          >
+                                            ฿{rm.basePriceThb.toLocaleString()}
+                                          </span>
+                                        ) : (
+                                          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
+
+              {/* SECTION 1: VIDEO TOUR */}
+              <section
+                id="gallery-section-video"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex items-center justify-between px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B] flex items-center gap-2">
-                      <Video className="w-5 h-5 text-[#A29080]" />
+                    <h2 className="ty-title flex items-center gap-2">
+                      <Video className="w-5 h-5" />
                       <span>
                         {lang === "th"
-                          ? "วิดีโอแนะนำรีสอร์ต"
+                          ? "วิดีโอแนะนำบรรยากาศที่พัก"
                           : "Resort Video Tour"}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-[2px] bg-[#A29080]/15 text-[#A29080] tracking-wider uppercase">
-                        4K UHD
-                      </span>
                     </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <p className="ty-caption mt-0.5">
                       {lang === "th"
-                        ? "สัมผัสบรรยากาศจริงผ่านมุมมองทางอากาศ 4K บินลัดเลาะทะเลหมอกและหุบเขาสะปัน"
-                        : "Experience real resort ambiance via 4K aerial drone footage over Sapan Valley"}
+                        ? "มุมมองทางอากาศ 4K ทะเลหมอกและหุบเขาสะปัน"
+                        : "4K aerial footage over Sapan Valley"}
                     </p>
                   </div>
                 </div>
 
-                {/* Single Featured Video Card */}
-                <div className="w-full">
-                  <div className="group relative rounded-[2px] overflow-hidden bg-black border border-[#E6E0D6] shadow-2xs aspect-[16/9] sm:aspect-[21/9] max-h-[480px] flex flex-col justify-end">
+                <div className="w-full rounded-none sm:rounded-[20px] overflow-hidden bg-[var(--color-background-card)] border-y sm:border border-x-0 border-[var(--color-border)]">
+                  <div className="group relative w-full aspect-[16/9] sm:aspect-auto sm:h-[380px] lg:h-[440px] bg-black overflow-hidden">
                     <video
                       ref={videoRef}
                       loop
                       muted={isMuted}
                       playsInline
-                      poster={propertyConfig.heroImageUrl || "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=85"}
-                      className="absolute inset-0 w-full h-full object-cover"
+                      preload="metadata"
+                      poster={
+                        propertyConfig.heroImageUrl ||
+                        "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=1200&q=85"
+                      }
+                      className="w-full h-full object-cover"
                       src="https://assets.mixkit.co/videos/preview/mixkit-drone-flying-over-mountains-in-a-misty-morning-42657-large.mp4"
                     />
 
-                    {/* Top Badges */}
-                    <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
-                      <span className="rounded-[2px] bg-black/75 backdrop-blur-xs text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        <Video className="w-3 h-3 text-[#A29080]" />
-                        <span>{lang === "th" ? "วิดีโอมุมสูง 4K" : "4K Drone Reel"}</span>
-                      </span>
-                      <span className="rounded-[2px] bg-black/60 text-white/90 px-1.5 py-0.5 text-[10px] font-medium">
-                        0:45
-                      </span>
-                    </div>
-
-                    {/* Center Big Play Button Overlay */}
                     {!isPlayingVideo && (
                       <div
                         onClick={toggleVideoPlayback}
                         className="absolute inset-0 flex items-center justify-center bg-black/25 hover:bg-black/35 transition cursor-pointer z-10"
                       >
-                        <div className="h-14 w-14 rounded-[2px] bg-[#A29080] hover:bg-[#8E7B6B] text-white flex items-center justify-center shadow-lg transition transform group-hover:scale-110">
-                          <Play className="w-6 h-6 fill-white ml-0.5" />
+                        <div className="h-14 w-14 rounded-full bg-white text-[#171717] flex items-center justify-center shadow-lg transition">
+                          <Play className="w-6 h-6 fill-current ml-0.5" />
                         </div>
                       </div>
                     )}
+                  </div>
 
-                    {/* Bottom Controls & Caption Overlay */}
-                    <div className="relative z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3.5 pt-8 text-white flex items-end justify-between">
-                      <div>
-                        <p className="text-xs sm:text-sm font-semibold">
-                          {lang === "th"
-                            ? "บินลัดเลาะทะเลหมอกและหุบเขาสะปัน (4K Aerial)"
-                            : "Sapan Valley Morning Sea of Mist Drone Tour"}
-                        </p>
-                        <p className="text-[11px] text-slate-300">
-                          {lang === "th"
-                            ? "มุมมองภาพรวมรีสอร์ตและขุนเขาดงพญา"
-                            : "Bird's eye view over resort grounds and Dong Phaya"}
-                        </p>
-                      </div>
+                  {/* Clean Video Controls Bar Below Video (No gradient overlay) */}
+                  <div className="p-3.5 px-4 sm:px-5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="ty-body font-semibold">
+                        {lang === "th"
+                          ? "บินลัดเลาะทะเลหมอกและหุบเขาสะปัน (4K Aerial)"
+                          : "Sapan Valley Morning Sea of Mist Drone Tour"}
+                      </p>
+                      <p className="ty-caption">
+                        {lang === "th"
+                          ? "มุมมองภาพรวมรีสอร์ตและขุนเขาดงพญา"
+                          : "Bird's eye view over resort grounds"}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setIsMuted(!isMuted)}
-                          className="p-1.5 rounded-[2px] bg-black/60 hover:bg-black/90 text-white text-xs transition cursor-pointer"
-                          title={isMuted ? "Unmute" : "Mute"}
-                        >
-                          {isMuted ? (
-                            <VolumeX className="w-4 h-4" />
-                          ) : (
-                            <Volume2 className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={toggleVideoPlayback}
-                          className="p-1.5 rounded-[2px] bg-black/60 hover:bg-black/90 text-white text-xs transition cursor-pointer"
-                        >
-                          {isPlayingVideo ? (
-                            <Pause className="w-4 h-4" />
-                          ) : (
-                            <Play className="w-4 h-4 fill-white" />
-                          )}
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-overlay-hover)] text-[var(--color-text-primary)] flex items-center justify-center transition cursor-pointer"
+                        title={isMuted ? "Unmute" : "Mute"}
+                      >
+                        {isMuted ? (
+                          <VolumeX className="w-4 h-4" />
+                        ) : (
+                          <Volume2 className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleVideoPlayback}
+                        className="h-9 w-9 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center transition cursor-pointer"
+                      >
+                        {isPlayingVideo ? (
+                          <Pause className="w-4 h-4" />
+                        ) : (
+                          <Play className="w-4 h-4 fill-current" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>
               </section>
 
-              {/* =============================================================
-                  SECTION 2: PROPERTY VIEWS
-              ============================================================== */}
-              <section id="gallery-section-property" className="scroll-mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* SECTION 2: PROPERTY VIEWS */}
+              <section
+                id="gallery-section-property"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex items-center justify-between px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B]">
-                      {lang === "th" ? "Property views · วิวและบรรยากาศรีสอร์ต" : "Property views"}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <h2 className="ty-title">
                       {lang === "th"
-                        ? "บ้านไม้ A-Frame สระน้ำ ลำธารธรรมชาติ และวิวทะเลหมอกยามเช้า"
+                        ? "บรรยากาศและวิวรอบที่พัก"
+                        : "Property views"}
+                    </h2>
+                    <p className="ty-caption">
+                      {lang === "th"
+                        ? "บ้านไม้ A-Frame ลำธารธรรมชาติ และวิวทะเลหมอกยามเช้า"
                         : "Iconic timber villas, natural stream, and sea of mist"}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-[#64748B]">
+                  <span className="ty-caption font-semibold">
                     {propertyPhotos.length} {lang === "th" ? "ภาพ" : "photos"}
                   </span>
                 </div>
 
-                {/* Clean 3-Column Desktop Grid & Alternating Editorial Mobile Grid */}
-                {renderDesktopGrid(propertyPhotos)}
-                {renderMobileEditorialGrid(propertyPhotos)}
+                {renderPhotoGrid(propertyPhotos)}
               </section>
 
-              {/* =============================================================
-                  SECTION 3: ROOMS
-              ============================================================== */}
-              <section id="gallery-section-rooms" className="scroll-mt-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              {/* SECTION 3: ROOMS */}
+              <section
+                id="gallery-section-rooms"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B]">
-                      {lang === "th" ? "Rooms · ห้องพักทั้งหมด" : "Rooms"}
+                    <h2 className="ty-title">
+                      {lang === "th" ? "ห้องพักทั้งหมด" : "Rooms"}
                     </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <p className="ty-caption">
                       {lang === "th"
-                        ? "ภาพถ่ายจริงห้องพักทุกหลัง สะอาด ตรงปก พร้อมอ่างแช่น้ำชมวิว"
+                        ? "ภาพถ่ายจริงของห้องพักและพูลวิลล่าแต่ละหลัง"
                         : "Verified photos of all guest villas and suites"}
                     </p>
                   </div>
 
                   {/* Room Quick Filter Chips */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
                     <button
                       type="button"
                       onClick={() => setActiveRoomFilter("ALL")}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-[2px] transition cursor-pointer shrink-0 border ${
+                      className={`px-3 py-1.5 text-[12px] font-semibold rounded-full transition cursor-pointer shrink-0 ${
                         activeRoomFilter === "ALL"
-                          ? "bg-[#2563EB] text-white border-[#2563EB]"
-                          : "bg-white text-[#4A4643] border-[#E2DAD0] hover:border-[#A29080]"
+                          ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                          : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                       }`}
                     >
                       {lang === "th" ? "ทุกห้อง" : "All Rooms"}
@@ -1165,10 +1573,10 @@ export function RoomGalleryModal({
                         key={rm.id}
                         type="button"
                         onClick={() => setActiveRoomFilter(rm.code)}
-                        className={`px-2.5 py-1 text-xs font-semibold rounded-[2px] transition cursor-pointer shrink-0 border ${
+                        className={`px-3 py-1.5 text-[12px] font-semibold rounded-full transition cursor-pointer shrink-0 ${
                           activeRoomFilter === rm.code
-                            ? "bg-[#2563EB] text-white border-[#2563EB]"
-                            : "bg-white text-[#4A4643] border-[#E2DAD0] hover:border-[#A29080]"
+                            ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                            : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                         }`}
                       >
                         {rm.code}
@@ -1177,128 +1585,169 @@ export function RoomGalleryModal({
                   </div>
                 </div>
 
-                {/* Selected Room Notification Banner if user picked a room */}
-                {selectedRoom && (
-                  <div className="bg-[#F4EFE6] border border-[#E2DAD0] p-2.5 sm:p-3 rounded-[2px] flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Home className="w-4 h-4 text-[#A29080] shrink-0" />
-                      <p className="text-xs text-[#2C2A29] truncate">
-                        <span className="font-bold">
-                          {lang === "th" ? `ห้องพักที่คุณเลือก:` : `Selected Room:`}
-                        </span>{" "}
-                        {selectedRoom.code} · {lang === "th" ? selectedRoom.nameTh : selectedRoom.nameEn}
-                      </p>
-                    </div>
-
-                    {onBookRoom && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onBookRoom(selectedRoom);
-                        }}
-                        className="rounded-[2px] bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3 py-1 text-xs font-bold transition cursor-pointer shadow-2xs shrink-0"
-                      >
-                        {lang === "th" ? `จองห้องนี้` : `Book Now`}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Clean 3-Column Desktop Grid & Alternating Editorial Mobile Grid */}
-                {renderDesktopGrid(displayedRoomPhotos)}
-                {renderMobileEditorialGrid(displayedRoomPhotos)}
+                {renderPhotoGrid(displayedRoomPhotos)}
               </section>
 
-              {/* =============================================================
-                  SECTION 4: FACILITIES
-              ============================================================== */}
-              <section id="gallery-section-facilities" className="scroll-mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* SECTION 4: FACILITIES */}
+              <section
+                id="gallery-section-facilities"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex items-center justify-between px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B]">
-                      {lang === "th" ? "Facilities · สิ่งอำนวยความสะดวก & สปา" : "Facilities"}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <h2 className="ty-title">
                       {lang === "th"
-                        ? "อ่างแช่น้ำกลางแจ้ง สปาส่วนตัว เตียงนุ่มดูดวิญญาณ และระเบียงกว้าง"
+                        ? "สิ่งอำนวยความสะดวก & สปา"
+                        : "Facilities"}
+                    </h2>
+                    <p className="ty-caption">
+                      {lang === "th"
+                        ? "อ่างแช่น้ำกลางแจ้ง สปาส่วนตัว และชุดเครื่องนอนระดับพรีเมียม"
                         : "Outdoor soaking tubs, spa pavilions, and luxury bedding"}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-[#64748B]">
-                    {facilitiesPhotos.length} {lang === "th" ? "ภาพ" : "photos"}
+                  <span className="ty-caption font-semibold">
+                    {facilitiesPhotos.length}{" "}
+                    {lang === "th" ? "ภาพ" : "photos"}
                   </span>
                 </div>
 
-                {/* Clean 3-Column Desktop Grid & Alternating Editorial Mobile Grid */}
-                {renderDesktopGrid(facilitiesPhotos)}
-                {renderMobileEditorialGrid(facilitiesPhotos)}
+                {renderPhotoGrid(facilitiesPhotos)}
               </section>
 
-              {/* =============================================================
-                  SECTION 5: DINING
-              ============================================================== */}
-              <section id="gallery-section-dining" className="scroll-mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* SECTION 5: DINING */}
+              <section
+                id="gallery-section-dining"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex items-center justify-between px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B]">
-                      {lang === "th" ? "Dining · อาหารและเครื่องดื่ม" : "Dining"}
+                    <h2 className="ty-title">
+                      {lang === "th" ? "อาหารและเครื่องดื่ม" : "Dining"}
                     </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <p className="ty-caption">
                       {lang === "th"
-                        ? "ชุดหมูกระทะเสิร์ฟถึงระเบียง กาแฟดริปน่าน และชุดอาหารเช้าพื้นเมือง"
-                        : "Private terrace Thai BBQ, single-origin drip coffee, and local breakfast"}
+                        ? "ชุดหมูกระทะเสิร์ฟถึงระเบียง กาแฟดริปน่าน และชุดอาหารเช้า"
+                        : "Private terrace Thai BBQ, drip coffee, and local breakfast"}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-[#64748B]">
+                  <span className="ty-caption font-semibold">
                     {diningPhotos.length} {lang === "th" ? "ภาพ" : "photos"}
                   </span>
                 </div>
 
-                {/* Clean 3-Column Desktop Grid & Alternating Editorial Mobile Grid */}
-                {renderDesktopGrid(diningPhotos)}
-                {renderMobileEditorialGrid(diningPhotos)}
+                {renderPhotoGrid(diningPhotos)}
               </section>
 
-              {/* =============================================================
-                  SECTION 6: OTHER (Attractions & Guest Verified Photos)
-              ============================================================== */}
-              <section id="gallery-section-other" className="scroll-mt-4 space-y-3">
-                <div className="flex items-center justify-between">
+              {/* SECTION 6: OTHER */}
+              <section
+                id="gallery-section-other"
+                className="scroll-mt-4 space-y-3 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
+              >
+                <div className="flex items-center justify-between px-4 sm:px-0">
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-[#1E293B]">
+                    <h2 className="ty-title">
                       {lang === "th"
-                        ? "Other · แหล่งท่องเที่ยวสะปัน & ภาพจากผู้เข้าพัก"
-                        : "Other · Attractions & Guest Photos"}
+                        ? "แหล่งท่องเที่ยวสะปัน & ภาพจากผู้เข้าพัก"
+                        : "Attractions & Guest Photos"}
                     </h2>
-                    <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+                    <p className="ty-caption">
                       {lang === "th"
-                        ? "น้ำตกสะปัน นาข้าวขั้นบันได บ่อเกลือโบราณ 800 ปี และภาพถ่ายจริงจากลูกค้า"
+                        ? "น้ำตกสะปัน นาข้าวขั้นบันได บ่อเกลือโบราณ และภาพจริงจากลูกค้า"
                         : "Nearby sights around Ban Sapan and verified guest photos"}
                     </p>
                   </div>
-                  <span className="text-xs font-semibold text-[#64748B]">
+                  <span className="ty-caption font-semibold">
                     {otherPhotos.length} {lang === "th" ? "ภาพ" : "photos"}
                   </span>
                 </div>
 
-                {/* Clean 3-Column Desktop Grid & Alternating Editorial Mobile Grid */}
-                {renderDesktopGrid(otherPhotos)}
-                {renderMobileEditorialGrid(otherPhotos)}
+                {renderPhotoGrid(otherPhotos)}
               </section>
             </div>
-          )}
         </div>
+        )}
 
-        {/* Modal Footer Bar */}
-        <footer className="hidden md:flex px-5 sm:px-7 py-2.5 bg-white border-t border-[#E6E0D6] items-center justify-between text-xs text-[#6E675F] shrink-0">
-          <span>
-            {propertyConfig.nameTh} · {propertyConfig.locationTh}
-          </span>
-          <span className="font-medium text-[#2C2A29]">
-            {allPhotos.length} {lang === "th" ? "ภาพถ่ายและวิดีโอทั้งหมด" : "Total photos and videos"}
-          </span>
-        </footer>
+        {/* STICKY BOTTOM BOOKING BAR (Unified across all 3 modal steps) */}
+        {activeBookingRoom && onBookRoom && (() => {
+          const stayNights = Math.max(1, nights);
+          const originalTotal = activeBookingRoom.basePriceThb * stayNights;
+          const discountedNightly = Math.round(
+            activeBookingRoom.basePriceThb *
+              (1 - (activeBookingRoom.discountPercent || 0) / 100)
+          );
+          const netTotal = discountedNightly * stayNights;
+          const footerInv =
+            checkIn && checkOut
+              ? getRoomInventoryForRange(
+                  activeBookingRoom,
+                  checkIn,
+                  checkOut,
+                  bookings
+                )
+              : null;
+          const isFooterRoomAvailable = footerInv
+            ? footerInv.state === "AVAILABLE" && footerInv.availableUnits > 0
+            : true;
+
+          return (
+            <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-background-card)] px-4 sm:px-6 py-3 z-20 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                {activeBookingRoom.images?.[0]?.url && (
+                  <img
+                    src={activeBookingRoom.images[0].url}
+                    alt={activeBookingRoom.code}
+                    className="h-11 w-16 rounded-[10px] object-cover border border-[var(--color-border)] shrink-0 hidden sm:block"
+                  />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center justify-center rounded bg-[var(--color-accent)] text-[var(--color-on-accent)] px-1.5 py-0.5 text-[11px] font-bold shrink-0">
+                      {activeBookingRoom.code}
+                    </span>
+                    <span className="ty-caption truncate">
+                      ({stayNights} {lang === "th" ? "คืน · 1 หลัง" : "nights · 1 villa"})
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <span className="ty-title leading-none">
+                      ฿{netTotal.toLocaleString()}
+                    </span>
+                    {activeBookingRoom.discountPercent > 0 && (
+                      <span className="ty-caption line-through">
+                        ฿{originalTotal.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={!isFooterRoomAvailable}
+                onClick={() => {
+                  if (!isFooterRoomAvailable) return;
+                  onBookRoom(activeBookingRoom);
+                }}
+                className={`btn-round-solid !px-5 !py-2.5 shrink-0 ${
+                  !isFooterRoomAvailable
+                    ? "opacity-40 !cursor-not-allowed pointer-events-none"
+                    : ""
+                }`}
+              >
+                <span>
+                  {!isFooterRoomAvailable
+                    ? lang === "th"
+                      ? "เต็มแล้ว"
+                      : "Fully Booked"
+                    : lang === "th"
+                    ? "รายละเอียดและจองห้องพัก →"
+                    : "Room Details & Book →"}
+                </span>
+              </button>
+            </footer>
+          );
+        })()}
       </div>
     </div>
   );

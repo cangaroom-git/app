@@ -101,6 +101,7 @@ export interface NightlyRateDetail {
   rateBeforeRoomDiscount: number;
   finalNightlyRate: number;
   rateLabelTh: string;
+  rateLabelEn: string;
   rateType: "SPECIAL_DATE" | "SEASONAL" | "WEEKEND" | "WEEKDAY";
 }
 
@@ -117,6 +118,7 @@ export function calculateNightlyRateForDate(
   let rateLabelTh = weekend
     ? "ราคาวันศุกร์-เสาร์ (Weekend)"
     : "ราคาวันธรรมดา (Weekday)";
+  let rateLabelEn = weekend ? "Weekend Rate (Fri–Sat)" : "Weekday Rate";
   let rateType: NightlyRateDetail["rateType"] = weekend ? "WEEKEND" : "WEEKDAY";
 
   // Check Seasonal Rate Rules (PEAK takes priority over HIGH/LOW)
@@ -131,6 +133,7 @@ export function calculateNightlyRateForDate(
     const topSeason = matchingSeasons[0];
     rateType = "SEASONAL";
     rateLabelTh = topSeason.badgeTh || topSeason.nameTh;
+    rateLabelEn = topSeason.badgeEn || topSeason.badgeTh || topSeason.nameEn;
 
     if (topSeason.adjustmentType === "PERCENT_SURCHARGE") {
       rateBeforeDiscount = Math.round(
@@ -151,12 +154,15 @@ export function calculateNightlyRateForDate(
   );
   if (specialOverride) {
     rateType = "SPECIAL_DATE";
+    const spEn = specialOverride.titleEn || specialOverride.titleTh;
     if (specialOverride.pricingMode === "FIXED_PRICE_THB") {
       rateBeforeDiscount = specialOverride.amountThb;
       rateLabelTh = `${specialOverride.titleTh} (ราคาพิเศษ)`;
+      rateLabelEn = `${spEn} (Special Rate)`;
     } else {
       rateBeforeDiscount = rateBeforeDiscount + specialOverride.amountThb;
       rateLabelTh = `${specialOverride.titleTh} (+฿${specialOverride.amountThb.toLocaleString()})`;
+      rateLabelEn = `${spEn} (+฿${specialOverride.amountThb.toLocaleString()})`;
     }
   }
 
@@ -171,6 +177,7 @@ export function calculateNightlyRateForDate(
     rateBeforeRoomDiscount: rateBeforeDiscount,
     finalNightlyRate,
     rateLabelTh,
+    rateLabelEn,
     rateType,
   };
 }
@@ -188,6 +195,7 @@ export function calculateStayPricingBreakdown(params: {
   specialDateRates: SpecialDateRateOverride[];
   addons: ExtraAddon[];
   selectedAddonIds: string[];
+  addonQuantities?: Record<string, number>;
   coupons: PromoCoupon[];
   appliedCouponCode: string | null;
 }) {
@@ -201,6 +209,7 @@ export function calculateStayPricingBreakdown(params: {
     specialDateRates,
     addons,
     selectedAddonIds,
+    addonQuantities,
     coupons,
     appliedCouponCode,
   } = params;
@@ -235,7 +244,10 @@ export function calculateStayPricingBreakdown(params: {
     (a) => a.isActive && selectedAddonIds.includes(a.id)
   );
   const addonsTotal = activeAddonsList.reduce(
-    (sum, item) => sum + item.priceThb,
+    (sum, item) => {
+      const qty = addonQuantities?.[item.id] ?? 1;
+      return sum + item.priceThb * Math.max(1, qty);
+    },
     0
   );
 
@@ -655,7 +667,15 @@ export function useSapanStore() {
                 ...(parsed.propertyConfig?.sectionsVisibility || {}),
               },
             },
-            rooms: parsed.rooms,
+            rooms: parsed.rooms.map((rm) => {
+              const defRoom = def.rooms.find((dr) => dr.id === rm.id);
+              return defRoom
+                ? {
+                    ...rm,
+                    amenitiesEn: rm.amenitiesEn ?? defRoom.amenitiesEn,
+                  }
+                : rm;
+            }),
             seasonalRates: parsed.seasonalRates ?? def.seasonalRates,
             specialDateRates: parsed.specialDateRates ?? def.specialDateRates,
             addons: parsed.addons ?? def.addons,

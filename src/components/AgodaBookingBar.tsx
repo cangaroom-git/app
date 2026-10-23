@@ -386,7 +386,7 @@ export function AgodaBookingBar({
                   )
                 )
               }
-              className="h-8 w-8 rounded-lg border border-slate-200 hover:border-[#0063F5] hover:bg-[#EFF6FF] flex items-center justify-center text-[#121317] transition cursor-pointer"
+              className="h-8 w-8 rounded-full bg-[#0000000f] hover:bg-[#00000018] flex items-center justify-center text-[#171717] transition cursor-pointer"
               aria-label="Previous month"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -395,7 +395,7 @@ export function AgodaBookingBar({
             <div className="w-8" />
           )}
 
-          <h4 className="text-sm sm:text-[15px] font-bold tracking-wide text-[#121317]">
+          <h4 className="text-[14px] font-semibold text-[#171717]">
             {formatMonthTitle(monthDate, lang)}
           </h4>
 
@@ -411,7 +411,7 @@ export function AgodaBookingBar({
                   )
                 )
               }
-              className="h-8 w-8 rounded-lg border border-slate-200 hover:border-[#0063F5] hover:bg-[#EFF6FF] flex items-center justify-center text-[#121317] transition cursor-pointer"
+              className="h-8 w-8 rounded-full bg-[#0000000f] hover:bg-[#00000018] flex items-center justify-center text-[#171717] transition cursor-pointer"
               aria-label="Next month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -421,12 +421,9 @@ export function AgodaBookingBar({
           )}
         </div>
 
-        <div className="grid grid-cols-7 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-          {weekdays.map((dayLabel, i) => (
-            <span
-              key={dayLabel}
-              className={`py-1 ${i >= 4 ? "text-[#0063F5]" : ""}`}
-            >
+        <div className="grid grid-cols-7 text-center text-[11px] font-medium text-[#737373] mb-1.5">
+          {weekdays.map((dayLabel) => (
+            <span key={dayLabel} className="py-1">
               {dayLabel}
             </span>
           ))}
@@ -444,27 +441,22 @@ export function AgodaBookingBar({
             const isInRange = dateStr > checkIn && dateStr < effectiveEnd;
             const avail = cell.availability;
             const free = avail?.freeRoomsCount ?? 0;
-            const total = avail?.totalActiveRooms ?? totalRoomsCount;
 
             let badgeText = "";
-            let badgeColorClass = "text-slate-400";
+            let badgeColorClass = "text-[var(--color-text-secondary)]";
             if (!cell.isPast && avail) {
               if (free === 0) {
                 badgeText = lang === "th" ? "เต็ม" : "Full";
                 badgeColorClass =
-                  isStart || isEnd ? "text-red-100" : "text-rose-600/80";
-              } else if (free >= Math.ceil(total * 0.5)) {
-                badgeText = lang === "th" ? `ว่าง ${free}` : `${free} left`;
-                badgeColorClass =
                   isStart || isEnd
-                    ? "text-white"
-                    : "text-[#0063F5] font-semibold";
+                    ? "text-[var(--color-on-accent)] opacity-80"
+                    : "text-[var(--color-error)]";
               } else {
                 badgeText = lang === "th" ? `ว่าง ${free}` : `${free} left`;
                 badgeColorClass =
                   isStart || isEnd
-                    ? "text-amber-100"
-                    : "text-amber-600 font-semibold";
+                    ? "text-[var(--color-on-accent)] opacity-80"
+                    : "text-[var(--color-text-secondary)] font-medium";
               }
             }
 
@@ -493,7 +485,7 @@ export function AgodaBookingBar({
                 {(isInRange || isStart || isEnd) &&
                   effectiveEnd > checkIn && (
                     <div
-                      className={`absolute inset-y-1 bg-[#EFF6FF] z-0 ${
+                      className={`absolute inset-y-1 bg-[var(--color-background-muted)] z-0 ${
                         isStart
                           ? "left-1/2 right-0"
                           : isEnd
@@ -507,16 +499,16 @@ export function AgodaBookingBar({
                   type="button"
                   disabled={cell.isPast}
                   onClick={() => handleSelectCalendarDate(dateStr, deviceMode)}
-                  className={`relative z-10 w-10 h-11 rounded-xl flex flex-col items-center justify-center transition ${
+                  className={`relative z-10 w-10 h-11 rounded-[10px] flex flex-col items-center justify-center transition ${
                     cell.isPast
-                      ? "text-slate-300 cursor-not-allowed"
+                      ? "text-[var(--color-text-disabled)] cursor-not-allowed"
                       : isStart || isEnd
-                      ? "bg-[#0063F5] text-white font-bold shadow-[0_4px_12px_rgba(0,99,245,0.28)] cursor-pointer"
+                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold cursor-pointer shadow-xs"
                       : isInRange
-                      ? "text-[#0063F5] font-bold hover:bg-[#DBEAFE] cursor-pointer"
+                      ? "text-[var(--color-text-primary)] font-semibold hover:bg-[var(--color-overlay-hover)] cursor-pointer"
                       : free === 0
-                      ? "text-slate-400 hover:bg-rose-50/60 cursor-pointer"
-                      : "text-[#121317] font-semibold hover:bg-slate-100 cursor-pointer"
+                      ? "text-[var(--color-text-disabled)] hover:bg-[var(--color-overlay-hover)] cursor-pointer"
+                      : "text-[var(--color-text-primary)] font-medium hover:bg-[var(--color-overlay-hover)] cursor-pointer"
                   }`}
                 >
                   {avail?.isSpecialOrHoliday &&
@@ -524,7 +516,7 @@ export function AgodaBookingBar({
                     !isStart &&
                     !isEnd && (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-[#0063F5] mb-0.5"
+                        className="w-1 h-1 rounded-full bg-[var(--color-text-primary)] mb-0.5"
                         title={avail.rateBadgeTh}
                       />
                     )}
@@ -549,29 +541,29 @@ export function AgodaBookingBar({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm sm:text-base font-bold text-[#121317]">
-            {lang === "th" ? "ห้องพัก (Rooms)" : "Rooms"}
+          <div className="text-[14px] font-semibold text-[#171717]">
+            {lang === "th" ? "ห้องพัก" : "Rooms"}
           </div>
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[12px] text-[#737373]">
             {lang === "th"
               ? `มีห้องว่างรวม ${freeCount} ยูนิตในวันที่เลือก`
               : `${freeCount} units available`}
           </div>
         </div>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             disabled={roomsCount <= 1}
             onClick={() => setRoomsCount((r) => Math.max(1, r - 1))}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               roomsCount <= 1
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Minus className="w-4 h-4 stroke-[2]" />
+            <Minus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
-          <span className="w-5 text-center text-base font-bold text-[#121317]">
+          <span className="w-5 text-center text-[14px] font-semibold text-[#171717]">
             {roomsCount}
           </span>
           <button
@@ -580,42 +572,42 @@ export function AgodaBookingBar({
             onClick={() =>
               setRoomsCount((r) => Math.min(totalRoomsCount, r + 1))
             }
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               roomsCount >= totalRoomsCount
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Plus className="w-4 h-4 stroke-[2]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm sm:text-base font-bold text-[#121317]">
-            {lang === "th" ? "ผู้ใหญ่ (Adult)" : "Adult"}
+          <div className="text-[14px] font-semibold text-[#171717]">
+            {lang === "th" ? "ผู้ใหญ่" : "Adults"}
           </div>
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[12px] text-[#737373]">
             {lang === "th" ? "อายุ 18 ปีขึ้นไป" : "Ages 18 or above"}
           </div>
         </div>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             disabled={adultsCount <= 1}
             onClick={() =>
               updateGuestsBreakdown(adultsCount - 1, childrenCount)
             }
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               adultsCount <= 1
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Minus className="w-4 h-4 stroke-[2]" />
+            <Minus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
-          <span className="w-5 text-center text-base font-bold text-[#121317]">
+          <span className="w-5 text-center text-[14px] font-semibold text-[#171717]">
             {adultsCount}
           </span>
           <button
@@ -624,42 +616,42 @@ export function AgodaBookingBar({
             onClick={() =>
               updateGuestsBreakdown(adultsCount + 1, childrenCount)
             }
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               adultsCount + childrenCount >= 6
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Plus className="w-4 h-4 stroke-[2]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm sm:text-base font-bold text-[#121317]">
-            {lang === "th" ? "เด็ก (Children)" : "Children"}
+          <div className="text-[14px] font-semibold text-[#171717]">
+            {lang === "th" ? "เด็ก" : "Children"}
           </div>
-          <div className="text-[11px] text-slate-500">
+          <div className="text-[12px] text-[#737373]">
             {lang === "th" ? "อายุ 0-17 ปี" : "Ages 0-17"}
           </div>
         </div>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3">
           <button
             type="button"
             disabled={childrenCount <= 0}
             onClick={() =>
               updateGuestsBreakdown(adultsCount, childrenCount - 1)
             }
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               childrenCount <= 0
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Minus className="w-4 h-4 stroke-[2]" />
+            <Minus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
-          <span className="w-5 text-center text-base font-bold text-[#121317]">
+          <span className="w-5 text-center text-[14px] font-semibold text-[#171717]">
             {childrenCount}
           </span>
           <button
@@ -668,13 +660,13 @@ export function AgodaBookingBar({
             onClick={() =>
               updateGuestsBreakdown(adultsCount, childrenCount + 1)
             }
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
               adultsCount + childrenCount >= 6
-                ? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
-                : "border-[#0063F5] text-[#0063F5] hover:bg-[#EFF6FF] cursor-pointer"
+                ? "bg-[#f1f1f1] text-[#a3a3a3] cursor-not-allowed"
+                : "bg-[#0000000f] text-[#171717] hover:bg-[#00000018] cursor-pointer"
             }`}
           >
-            <Plus className="w-4 h-4 stroke-[2]" />
+            <Plus className="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
@@ -685,31 +677,34 @@ export function AgodaBookingBar({
     <div ref={barRef} className="w-full relative z-30">
       <div className="max-w-7xl mx-auto flex items-center justify-center">
         {/* ===================================================================
-            MOBILE COMPACT UNIFIED BOOKING BAR (< md) — Fastwork Rounded Style
+            MOBILE COMPACT UNIFIED BOOKING BAR (< sm)
         ==================================================================== */}
-        <div className="md:hidden w-full flex items-stretch h-13 rounded-2xl bg-white border border-slate-200/90 shadow-moder-card overflow-hidden">
+        <div className="sm:hidden w-full flex items-center justify-between h-12 rounded-full bg-[var(--color-background-card)] shadow-xs border border-[var(--color-border)] p-1.5">
           <button
             type="button"
             onClick={() => {
               setMobileSheetOpen((prev) => !prev);
               setMobileActiveTab("dates");
             }}
-            className="flex-1 flex items-center gap-2.5 px-3.5 text-left text-[#121317] min-w-0 cursor-pointer"
+            className="flex-1 flex items-center gap-2.5 px-2.5 text-left text-[var(--color-text-primary)] min-w-0 cursor-pointer"
           >
-            <div className="h-8 w-8 rounded-xl bg-[#EFF6FF] text-[#0063F5] flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[var(--color-neutral)] text-[var(--color-text-primary)] flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4" />
             </div>
             <div className="truncate leading-tight">
-              <div className="text-xs font-extrabold text-[#121317] truncate">
+              <div className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
                 {formatCompactMobileDate(checkIn, lang)} –{" "}
-                {formatCompactMobileDate(checkOut, lang)} ({nights} คืน)
+                {formatCompactMobileDate(checkOut, lang)} ({nights}{" "}
+                {lang === "th" ? "คืน" : "nights"})
               </div>
-              <div className="text-[11px] text-slate-500 truncate">
-                ผู้ใหญ่ {adultsCount}
-                {childrenCount > 0 ? `, เด็ก ${childrenCount}` : ""} ·{" "}
-                <span className="text-[#0063F5] font-bold">
-                  ว่าง {freeCount} ยูนิต
-                </span>
+              <div className="text-[11px] text-[var(--color-text-secondary)] truncate">
+                {lang === "th"
+                  ? `ผู้ใหญ่ ${adultsCount}${
+                      childrenCount > 0 ? `, เด็ก ${childrenCount}` : ""
+                    } · ว่าง ${freeCount} ยูนิต`
+                  : `${adultsCount} Adults${
+                      childrenCount > 0 ? `, ${childrenCount} Child` : ""
+                    } · ${freeCount} left`}
               </div>
             </div>
           </button>
@@ -717,18 +712,19 @@ export function AgodaBookingBar({
           <button
             type="button"
             onClick={scrollToRooms}
-            className="px-4 bg-[#0063F5] hover:bg-[#0052CC] text-white text-xs font-bold flex items-center gap-1.5 shrink-0 transition cursor-pointer"
+            className="h-9 px-3.5 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-90 text-[12px] font-semibold flex items-center gap-1.5 shrink-0 transition cursor-pointer"
           >
             <Search className="w-3.5 h-3.5" />
-            <span>เช็คห้องว่าง</span>
+            <span>{lang === "th" ? "ค้นหา" : "Search"}</span>
           </button>
         </div>
 
         {/* ===================================================================
-            DESKTOP & TABLET UNIFIED BOOKING BAR (>= md) — Modern Fastwork Card
+            DESKTOP & TABLET UNIFIED BOOKING BAR (>= sm) — Non-Overflowing Grid
+            Fits 100% cleanly inside the 760px centered feed container
         ==================================================================== */}
-        <div className="hidden md:inline-flex relative items-stretch h-[60px] rounded-2xl bg-white border border-slate-200/90 shadow-[0_8px_30px_rgba(15,23,42,0.08)] p-1.5 gap-1">
-          {/* 1. CHECK-IN SEGMENT */}
+        <div className="hidden sm:grid grid-cols-12 relative items-center w-full h-[56px] rounded-full bg-[var(--color-background-card)] shadow-xs border border-[var(--color-border)] p-1.5 gap-1">
+          {/* 1. CHECK-IN SEGMENT (col-span-3) */}
           <button
             type="button"
             onClick={() =>
@@ -736,31 +732,26 @@ export function AgodaBookingBar({
                 activePopover === "checkin" ? "none" : "checkin"
               )
             }
-            className={`relative flex items-center gap-3 px-4 rounded-xl text-left transition cursor-pointer min-w-[205px] ${
+            className={`col-span-3 min-w-0 relative flex items-center gap-2.5 px-3 h-full rounded-full text-left transition cursor-pointer ${
               activePopover === "checkin"
-                ? "bg-[#EFF6FF] ring-1 ring-[#0063F5]"
-                : "hover:bg-slate-50"
+                ? "bg-[var(--color-neutral)]"
+                : "hover:bg-[var(--color-overlay-hover)]"
             }`}
           >
-            <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] text-[#0063F5] flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[var(--color-neutral)] text-[var(--color-text-primary)] flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4" />
             </div>
-            <div className="leading-tight">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                วันเช็คอิน (Check-in)
+            <div className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[12px] font-medium text-[var(--color-text-secondary)] truncate">
+                {lang === "th" ? "เช็คอิน" : "Check-in"}
               </span>
-              <span className="block text-[13px] font-bold text-[#121317] mt-0.5">
+              <span className="block text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
                 {formatAgodaDateMain(checkIn, lang)}{" "}
-                <span className="text-[11px] font-medium text-slate-500">
-                  ({formatAgodaWeekday(checkIn, lang)})
-                </span>
               </span>
             </div>
           </button>
 
-          <div className="w-[1px] my-2 bg-slate-200" />
-
-          {/* 2. CHECK-OUT SEGMENT */}
+          {/* 2. CHECK-OUT SEGMENT (col-span-3) */}
           <button
             type="button"
             onClick={() =>
@@ -768,32 +759,29 @@ export function AgodaBookingBar({
                 activePopover === "checkout" ? "none" : "checkout"
               )
             }
-            className={`relative flex items-center gap-3 px-4 rounded-xl text-left transition cursor-pointer min-w-[205px] ${
+            className={`col-span-3 min-w-0 relative flex items-center gap-2.5 px-3 h-full rounded-full text-left transition cursor-pointer ${
               activePopover === "checkout"
-                ? "bg-[#EFF6FF] ring-1 ring-[#0063F5]"
-                : "hover:bg-slate-50"
+                ? "bg-[var(--color-neutral)]"
+                : "hover:bg-[var(--color-overlay-hover)]"
             }`}
           >
-            <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] text-[#0063F5] flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[var(--color-neutral)] text-[var(--color-text-primary)] flex items-center justify-center shrink-0">
               <Calendar className="w-4 h-4" />
             </div>
-            <div className="leading-tight">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                วันเช็คเอาท์ ({nights} คืน)
+            <div className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[12px] font-medium text-[var(--color-text-secondary)] truncate">
+                {lang === "th"
+                  ? `เช็คเอาท์ (${nights} คืน)`
+                  : `Check-out (${nights} nights)`}
               </span>
-              <span className="block text-[13px] font-bold text-[#121317] mt-0.5">
+              <span className="block text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
                 {formatAgodaDateMain(checkOut, lang)}{" "}
-                <span className="text-[11px] font-medium text-slate-500">
-                  ({formatAgodaWeekday(checkOut, lang)})
-                </span>
               </span>
             </div>
           </button>
 
-          <div className="w-[1px] my-2 bg-slate-200" />
-
-          {/* 3. GUESTS & AVAILABILITY SEGMENT */}
-          <div className="relative flex items-stretch">
+          {/* 3. GUESTS & AVAILABILITY SEGMENT (col-span-4) */}
+          <div className="col-span-4 min-w-0 relative flex items-stretch h-full">
             <button
               type="button"
               onClick={() =>
@@ -801,75 +789,73 @@ export function AgodaBookingBar({
                   activePopover === "guests" ? "none" : "guests"
                 )
               }
-              className={`relative flex items-center justify-between gap-3 px-4 rounded-xl text-left min-w-[225px] transition cursor-pointer ${
+              className={`w-full min-w-0 relative flex items-center justify-between gap-2 px-3 h-full rounded-full text-left transition cursor-pointer ${
                 activePopover === "guests"
-                  ? "bg-[#EFF6FF] ring-1 ring-[#0063F5]"
-                  : "hover:bg-slate-50"
+                  ? "bg-[var(--color-neutral)]"
+                  : "hover:bg-[var(--color-overlay-hover)]"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-[#EFF6FF] text-[#0063F5] flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="h-8 w-8 rounded-full bg-[var(--color-neutral)] text-[var(--color-text-primary)] flex items-center justify-center shrink-0">
                   <Users className="w-4 h-4" />
                 </div>
-                <div className="leading-tight">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-[#0063F5]">
-                    ผู้เข้าพัก · ว่าง {freeCount} ยูนิต
+                <div className="min-w-0 flex-1 leading-tight">
+                  <span className="block text-[12px] font-medium text-[var(--color-text-secondary)] truncate">
+                    {lang === "th"
+                      ? `ผู้เข้าพัก · ว่าง ${freeCount} ยูนิต`
+                      : `Guests · ${freeCount} available`}
                   </span>
-                  <span className="block text-[13px] font-bold text-[#121317] mt-0.5">
-                    ผู้ใหญ่ {adultsCount} ท่าน
-                    {childrenCount > 0 ? `, เด็ก ${childrenCount}` : ""} ·{" "}
-                    {roomsCount} ห้อง
+                  <span className="block text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
+                    {lang === "th"
+                      ? `ผู้ใหญ่ ${adultsCount}${
+                          childrenCount > 0 ? `, เด็ก ${childrenCount}` : ""
+                        } · ${roomsCount} ห้อง`
+                      : `${adultsCount} Adults${
+                          childrenCount > 0 ? `, ${childrenCount} Child` : ""
+                        } · ${roomsCount} ${roomsCount > 1 ? "Rooms" : "Room"}`}
                   </span>
                 </div>
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-slate-400 transition-transform ${
-                  activePopover === "guests" ? "rotate-180 text-[#0063F5]" : ""
+                className={`w-4 h-4 text-[var(--color-text-secondary)] shrink-0 transition-transform ${
+                  activePopover === "guests" ? "rotate-180" : ""
                 }`}
               />
             </button>
 
             {activePopover === "guests" && (
-              <div className="absolute right-0 top-[calc(100%+10px)] w-[330px] rounded-2xl bg-white shadow-[0_20px_50px_rgba(15,23,42,0.18)] border border-slate-200 p-5 z-50">
+              <div className="absolute right-0 top-[calc(100%+10px)] w-[320px] rounded-[20px] bg-[var(--color-background-popover)] shadow-[0_16px_40px_rgba(0,0,0,0.16)] border border-[var(--color-border)] p-5 z-50">
                 {renderGuestsControls()}
               </div>
             )}
           </div>
 
-          {/* 4. FASTWORK BLUE CTA BUTTON ("เช็คห้องว่าง") */}
+          {/* 4. COMPACT PILL CTA BUTTON (col-span-2) */}
           <button
             type="button"
             onClick={scrollToRooms}
-            className="px-6 rounded-xl bg-[#0063F5] hover:bg-[#0052CC] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(0,99,245,0.28)] transition cursor-pointer shrink-0"
+            className="col-span-2 h-full px-3 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-90 font-semibold text-[14px] flex items-center justify-center gap-1.5 transition cursor-pointer shrink-0"
           >
-            <Search className="w-4 h-4" />
-            <span>เช็คห้องว่าง</span>
+            <Search className="w-4 h-4 shrink-0" />
+            <span className="truncate">
+              {lang === "th" ? "ค้นหา" : "Search"}
+            </span>
           </button>
 
           {/* CUSTOM DAILY ROOM AVAILABILITY DATEPICKER DROPDOWN */}
           {(activePopover === "checkin" || activePopover === "checkout") && (
-            <div className="absolute left-0 top-[calc(100%+10px)] w-[350px] lg:w-[680px] rounded-2xl bg-white shadow-[0_20px_50px_rgba(15,23,42,0.18)] border border-slate-200 p-5 z-50">
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-200">
+            <div className="absolute left-0 right-0 top-[calc(100%+10px)] w-full rounded-[20px] bg-[var(--color-background-popover)] shadow-[0_16px_40px_rgba(0,0,0,0.16)] border border-[var(--color-border)] p-5 z-50">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-[var(--color-border)]">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs sm:text-sm font-extrabold text-[#121317]">
+                  <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                     {activePopover === "checkin"
-                      ? "1. เลือกวันเช็คอิน (แสดงจำนวนห้องว่างรายวัน)"
-                      : "2. เลือกวันเช็คเอาท์"}
+                      ? lang === "th"
+                        ? "เลือกวันเช็คอิน (แสดงจำนวนห้องว่างรายวัน)"
+                        : "Select Check-in Date (Daily room availability)"
+                      : lang === "th"
+                      ? "เลือกวันเช็คเอาท์"
+                      : "Select Check-out Date"}
                   </span>
-                  <div className="hidden sm:flex items-center gap-2.5 text-[11px] text-slate-500">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-[#0063F5]" />
-                      ว่างพร้อมจอง
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      เรทวันหยุดพิเศษ
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      เต็ม
-                    </span>
-                  </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -880,9 +866,9 @@ export function AgodaBookingBar({
                       setCheckOut(formatDateStr(addDaysToDate(today, 1)));
                       setActivePopover("none");
                     }}
-                    className="rounded-lg bg-slate-50 hover:bg-[#0063F5] hover:text-white px-2.5 py-1 text-[11px] font-bold text-[#121317] border border-slate-200 transition cursor-pointer"
+                    className="rounded-full bg-[var(--color-neutral)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-primary)] transition cursor-pointer"
                   >
-                    คืนนี้ (1 คืน)
+                    {lang === "th" ? "คืนนี้ (1 คืน)" : "Tonight (1 night)"}
                   </button>
                   <button
                     type="button"
@@ -891,9 +877,9 @@ export function AgodaBookingBar({
                       setCheckOut(formatDateStr(addDaysToDate(today, 3)));
                       setActivePopover("none");
                     }}
-                    className="rounded-lg bg-slate-50 hover:bg-[#0063F5] hover:text-white px-2.5 py-1 text-[11px] font-bold text-[#121317] border border-slate-200 transition cursor-pointer"
+                    className="rounded-full bg-[var(--color-neutral)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-primary)] transition cursor-pointer"
                   >
-                    2 คืนสุดฮิต
+                    {lang === "th" ? "2 คืนสุดฮิต" : "Popular 2 Nights"}
                   </button>
                 </div>
               </div>
@@ -921,28 +907,33 @@ export function AgodaBookingBar({
                 )}
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-2 text-xs">
-                <div className="font-semibold text-[#121317]">
+              <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex items-center justify-between gap-2 text-[13px]">
+                <div className="font-medium text-[var(--color-text-primary)]">
                   {formatAgodaDateMain(checkIn, lang)} →{" "}
-                  {formatAgodaDateMain(checkOut, lang)} ({nights} คืน) ·{" "}
+                  {formatAgodaDateMain(checkOut, lang)} ({nights}{" "}
+                  {lang === "th" ? "คืน" : "nights"}) ·{" "}
                   <span
                     className={
                       freeCount > 0
-                        ? "text-[#0063F5] font-bold"
-                        : "text-rose-600 font-bold"
+                        ? "text-[var(--color-text-primary)] font-semibold"
+                        : "text-[var(--color-error)] font-semibold"
                     }
                   >
                     {freeCount > 0
-                      ? `มีห้องว่างพร้อมจอง ${freeCount} ยูนิต`
-                      : "เต็มทุกห้องในวันที่เลือก"}
+                      ? lang === "th"
+                        ? `ว่างพร้อมจอง ${freeCount} ยูนิต`
+                        : `${freeCount} units available`
+                      : lang === "th"
+                      ? "เต็มทุกห้องในวันที่เลือก"
+                      : "Sold out on selected dates"}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActivePopover("none")}
-                  className="rounded-xl bg-[#0063F5] hover:bg-[#0052CC] text-white font-bold px-5 py-2 text-xs transition cursor-pointer"
+                  className="rounded-full bg-[var(--color-accent)] hover:opacity-90 text-[var(--color-on-accent)] font-medium px-5 py-2 text-[13px] transition cursor-pointer"
                 >
-                  ตกลง
+                  {lang === "th" ? "ตกลง" : "Done"}
                 </button>
               </div>
             </div>
@@ -950,54 +941,58 @@ export function AgodaBookingBar({
         </div>
       </div>
 
-      {/* MOBILE SLIDE-DOWN FILTER & AVAILABILITY SHEET (< md) */}
+      {/* MOBILE SLIDE-DOWN FILTER & AVAILABILITY SHEET (< sm) */}
       <div
-        className={`md:hidden fixed inset-0 top-14 z-50 transition-all duration-300 ${
+        className={`sm:hidden fixed inset-0 top-0 z-50 transition-all duration-300 ${
           mobileSheetOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
       >
         <div
-          className="absolute inset-0 bg-slate-900/50 backdrop-blur-xs"
+          className="absolute inset-0 bg-black/40 backdrop-blur-xs"
           onClick={() => setMobileSheetOpen(false)}
         />
 
         <div
-          className={`relative bg-white rounded-b-3xl shadow-2xl border-b border-slate-200 p-4 max-h-[82vh] overflow-y-auto transition-transform duration-300 ease-out ${
+          className={`relative bg-[var(--color-background-card)] rounded-b-[24px] shadow-xl border-b border-[var(--color-border)] p-4 max-h-[82vh] overflow-y-auto transition-transform duration-300 ease-out ${
             mobileSheetOpen ? "translate-y-0" : "-translate-y-full"
           }`}
         >
           <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="grid grid-cols-2 flex-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+            <div className="grid grid-cols-2 flex-1 bg-[var(--color-background-muted)] p-1 rounded-full text-[12px] font-medium">
               <button
                 type="button"
                 onClick={() => setMobileActiveTab("dates")}
-                className={`py-2 rounded-lg transition cursor-pointer ${
+                className={`py-2 rounded-full transition cursor-pointer ${
                   mobileActiveTab === "dates"
-                    ? "bg-[#0063F5] text-white shadow-xs"
-                    : "text-slate-600"
+                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                    : "text-[var(--color-text-secondary)]"
                 }`}
               >
-                📅 วันเข้าพัก ({nights} คืน)
+                {lang === "th"
+                  ? `วันเข้าพัก (${nights} คืน)`
+                  : `Stay Dates (${nights} nights)`}
               </button>
               <button
                 type="button"
                 onClick={() => setMobileActiveTab("guests")}
-                className={`py-2 rounded-lg transition cursor-pointer ${
+                className={`py-2 rounded-full transition cursor-pointer ${
                   mobileActiveTab === "guests"
-                    ? "bg-[#0063F5] text-white shadow-xs"
-                    : "text-slate-600"
+                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                    : "text-[var(--color-text-secondary)]"
                 }`}
               >
-                👥 ผู้เข้าพัก ({guests} ท่าน)
+                {lang === "th"
+                  ? `ผู้เข้าพัก (${guests} ท่าน)`
+                  : `Guests (${guests})`}
               </button>
             </div>
 
             <button
               type="button"
               onClick={() => setMobileSheetOpen(false)}
-              className="h-9 w-9 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-[#121317] cursor-pointer shrink-0"
+              className="h-9 w-9 rounded-full bg-[var(--color-neutral)] flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1009,38 +1004,40 @@ export function AgodaBookingBar({
                 <button
                   type="button"
                   onClick={() => setMobileDateStep("checkin")}
-                  className={`rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                  className={`rounded-[12px] border p-2.5 text-left transition cursor-pointer ${
                     mobileDateStep === "checkin"
-                      ? "border-[#0063F5] bg-[#EFF6FF]/60 ring-1 ring-[#0063F5]"
-                      : "border-slate-200 bg-slate-50"
+                      ? "border-[var(--color-accent)] bg-[var(--color-background-muted)]"
+                      : "border-[var(--color-border)] bg-[var(--color-background-card)]"
                   }`}
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#0063F5] block">
-                    วันเช็คอิน (14:00)
+                  <span className="text-[11px] font-medium text-[var(--color-text-secondary)] block">
+                    {lang === "th" ? "วันเช็คอิน (14:00)" : "Check-in (14:00)"}
                   </span>
-                  <span className="text-xs font-bold text-[#121317]">
+                  <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                     {formatAgodaDateMain(checkIn, lang)}
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setMobileDateStep("checkout")}
-                  className={`rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                  className={`rounded-[12px] border p-2.5 text-left transition cursor-pointer ${
                     mobileDateStep === "checkout"
-                      ? "border-[#0063F5] bg-[#EFF6FF]/60 ring-1 ring-[#0063F5]"
-                      : "border-slate-200 bg-slate-50"
+                      ? "border-[var(--color-accent)] bg-[var(--color-background-muted)]"
+                      : "border-[var(--color-border)] bg-[var(--color-background-card)]"
                   }`}
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#0063F5] block">
-                    วันเช็คเอาท์ (12:00)
+                  <span className="text-[11px] font-medium text-[var(--color-text-secondary)] block">
+                    {lang === "th"
+                      ? "วันเช็คเอาท์ (12:00)"
+                      : "Check-out (12:00)"}
                   </span>
-                  <span className="text-xs font-bold text-[#121317]">
+                  <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                     {formatAgodaDateMain(checkOut, lang)}
                   </span>
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-3">
                 {renderCustomAvailabilityMonth(
                   leftMonth,
                   leftGrid,
@@ -1053,25 +1050,35 @@ export function AgodaBookingBar({
             <div className="py-2 px-1">{renderGuestsControls()}</div>
           )}
 
-          <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
-            <div className="text-xs">
-              <span className="text-slate-500 block">สถานะห้องว่าง</span>
+          <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex items-center justify-between gap-3">
+            <div className="text-[12px]">
+              <span className="text-[var(--color-text-secondary)] block">
+                {lang === "th" ? "สถานะห้องว่าง" : "Availability"}
+              </span>
               <span
-                className={`font-bold ${
-                  freeCount > 0 ? "text-[#0063F5]" : "text-rose-600"
+                className={`font-semibold ${
+                  freeCount > 0
+                    ? "text-[var(--color-text-primary)]"
+                    : "text-[var(--color-error)]"
                 }`}
               >
                 {freeCount > 0
-                  ? `ว่างพร้อมจอง ${freeCount} ยูนิต`
-                  : "เต็มทุกห้องในวันที่เลือก"}
+                  ? lang === "th"
+                    ? `ว่างพร้อมจอง ${freeCount} ยูนิต`
+                    : `${freeCount} units available`
+                  : lang === "th"
+                  ? "เต็มทุกห้องในวันที่เลือก"
+                  : "Sold out on selected dates"}
               </span>
             </div>
             <button
               type="button"
               onClick={scrollToRooms}
-              className="rounded-xl bg-[#0063F5] hover:bg-[#0052CC] text-white font-bold text-xs px-5 py-3 cursor-pointer shadow-[0_4px_12px_rgba(0,99,245,0.25)]"
+              className="rounded-full bg-[var(--color-accent)] hover:opacity-90 text-[var(--color-on-accent)] font-medium text-[13px] px-5 py-2.5 cursor-pointer"
             >
-              ดูห้องพักที่ว่าง ({freeCount} ยูนิต)
+              {lang === "th"
+                ? `ดูห้องพักที่ว่าง (${freeCount} ยูนิต)`
+                : `View Rooms (${freeCount} left)`}
             </button>
           </div>
         </div>

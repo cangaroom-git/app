@@ -134,7 +134,7 @@ export function ResortWeatherWidget({
 
   const handleSlide = (dir: "left" | "right") => {
     if (!sliderRef.current) return;
-    const amount = 580;
+    const amount = 540;
     sliderRef.current.scrollBy({
       left: dir === "left" ? -amount : amount,
       behavior: "smooth",
@@ -144,8 +144,8 @@ export function ResortWeatherWidget({
   if (loading && !weather) {
     return (
       <div className="py-6 animate-pulse flex items-center justify-between">
-        <div className="h-6 w-64 bg-slate-200 rounded-xl" />
-        <div className="h-6 w-36 bg-slate-200 rounded-xl" />
+        <div className="h-6 w-64 bg-[#f1f1f1] rounded-[12px]" />
+        <div className="h-6 w-36 bg-[#f1f1f1] rounded-[12px]" />
       </div>
     );
   }
@@ -154,44 +154,35 @@ export function ResortWeatherWidget({
 
   return (
     <div className="w-full">
-      {/* Section Header — With Right-Aligned Slider Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-        <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] px-3 py-1 text-[11px] font-bold text-[#0063F5]">
-            <ThermometerSnowflake className="w-3.5 h-3.5" />
-            <span>
-              14-DAY FORECAST & AVAILABILITY · {cityLabel} (ตอนนี้{" "}
-              {weather.currentTemp}°C)
-            </span>
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#121317] mt-2">
-            พยากรณ์อากาศ 14 วัน & ราคาห้องพักรายวัน
-          </h2>
-          <p className="text-xs sm:text-sm text-[#475467] mt-1">
-            {lang === "th" ? (
-              <>
-                เลือกวันที่อากาศหนาวที่สุดเพื่อสัมผัสไอหมอกและอากาศบริสุทธิ์ล่วงหน้า 14 วัน —{" "}
-                <strong className="text-[#0063F5]">
-                  คลิกที่การ์ดเพื่อเลือกวันเช็คอินได้ทันที
-                </strong>
-              </>
-            ) : (
-              <>
-                Choose the chilliest dates to experience mountain mist and crisp air —{" "}
-                <strong className="text-[#0063F5]">
-                  Click any card to select your check-in date
-                </strong>
-              </>
-            )}
-          </p>
+      {/* Section Header — fastwork.com Minimalist Style with Right-Aligned Slider Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="fw-head-icon shrink-0">
+            <ThermometerSnowflake className="w-5 h-5 text-[#171717]" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[18px] sm:text-[20px] font-semibold text-[#171717]">
+                พยากรณ์อากาศ 14 วัน & ราคาห้องพักรายวัน
+              </h2>
+              <span className="rounded-full bg-[#0000000f] px-2.5 py-0.5 text-[12px] font-medium text-[#171717]">
+                {cityLabel} · {weather.currentTemp}°C
+              </span>
+            </div>
+            <p className="text-[13px] text-[#737373] mt-0.5">
+              {lang === "th"
+                ? "เลือกวันที่อากาศเย็นสบายและคลิกที่การ์ดเพื่อกำหนดวันเช็คอินได้ทันที"
+                : "Select any forecast card below to set your check-in date"}
+            </p>
+          </div>
         </div>
 
-        {/* Modern Fastwork Slider Controls — Right-Aligned */}
+        {/* Right-Aligned Slider Controls — fastwork.com Neutral Pills */}
         <div className="ml-auto flex items-center justify-end gap-2 shrink-0">
           <button
             type="button"
             onClick={() => handleSlide("left")}
-            className="rounded-xl px-3.5 py-2 text-xs font-bold border bg-white border-slate-200 text-[#475467] hover:border-[#0063F5] hover:text-[#0063F5] hover:bg-[#EFF6FF] transition cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+            className="rounded-full px-3.5 py-2 text-[12px] font-medium bg-[#0000000f] hover:bg-[#00000018] text-[#171717] transition cursor-pointer inline-flex items-center gap-1"
           >
             <ChevronLeft className="w-4 h-4" />
             <span>ก่อนหน้า</span>
@@ -199,7 +190,7 @@ export function ResortWeatherWidget({
           <button
             type="button"
             onClick={() => handleSlide("right")}
-            className="rounded-xl px-3.5 py-2 text-xs font-bold border bg-white border-slate-200 text-[#475467] hover:border-[#0063F5] hover:text-[#0063F5] hover:bg-[#EFF6FF] transition cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+            className="rounded-full px-3.5 py-2 text-[12px] font-medium bg-[#0000000f] hover:bg-[#00000018] text-[#171717] transition cursor-pointer inline-flex items-center gap-1"
           >
             <span>ถัดไป</span>
             <ChevronRight className="w-4 h-4" />
@@ -207,26 +198,22 @@ export function ResortWeatherWidget({
         </div>
       </div>
 
-      {/* 14-Day Vertical Cards Slider — Fastwork Modern Style */}
+      {/* 14-Day Vertical Cards Slider — fastwork.com Minimalist Cards */}
       <div
         ref={sliderRef}
-        className="flex items-stretch gap-4 sm:gap-5 overflow-x-auto pb-3 snap-x snap-mandatory"
-        style={{ scrollbarWidth: "thin" }}
+        className="flex items-stretch gap-3.5 overflow-x-auto pb-2 snap-x snap-mandatory no-scrollbar"
       >
         {weather.daily.slice(0, 14).map((day, idx) => {
           const isSelected = day.dateStr === checkInDateStr;
           const dObj = new Date(day.dateStr + "T00:00:00");
           const dayOfWeek = dObj.getDay();
-          const isWeekend = dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+          const isWeekend =
+            dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
 
           const dayNum = dObj.getDate();
           const weekdayFull = dObj.toLocaleDateString(
             lang === "th" ? "th-TH" : "en-US",
             { weekday: "long" }
-          );
-          const weekdayShort = dObj.toLocaleDateString(
-            lang === "th" ? "th-TH" : "en-US",
-            { weekday: "short" }
           );
           const monthShort = dObj.toLocaleDateString(
             lang === "th" ? "th-TH" : "en-US",
@@ -260,152 +247,109 @@ export function ResortWeatherWidget({
                 if (!isAvailable) return;
                 onSelectCheckInDate?.(day.dateStr);
               }}
-              className={`group snap-start shrink-0 w-[250px] sm:w-[270px] relative flex flex-col justify-between rounded-2xl bg-white border overflow-hidden transition duration-200 ${
+              className={`group snap-start shrink-0 w-[235px] sm:w-[250px] relative flex flex-col justify-between rounded-[16px] bg-white border p-4 transition duration-150 ${
                 !isAvailable
-                  ? "opacity-60 bg-slate-50 border-slate-200 cursor-not-allowed select-none"
+                  ? "opacity-55 bg-[#fafafa] border-[#ebebeb] cursor-not-allowed select-none"
                   : isSelected
-                  ? "border-[#0063F5] shadow-[0_10px_28px_rgba(0,99,245,0.18)] ring-2 ring-[#0063F5] cursor-pointer"
-                  : isColdest
-                  ? "border-[#93C5FD] hover:border-[#0063F5] hover:shadow-moder-card cursor-pointer"
-                  : "border-slate-200/90 hover:border-[#0063F5] hover:shadow-moder-card cursor-pointer"
+                  ? "cursor-pointer"
+                  : "border-[#ebebeb] hover:border-[#262626] cursor-pointer"
               }`}
             >
               <div>
-                {/* Top Visual Area: Cool Blue Weather Header */}
-                <div className="relative w-full overflow-hidden p-4 flex flex-col justify-between border-b bg-gradient-to-b from-[#EFF6FF] via-[#F8FAFC] to-white border-slate-100">
-                  <div className="flex items-center justify-between gap-2 min-h-[22px]">
-                    {isColdest ? (
-                      <span className="rounded-full bg-[#0063F5] text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-2xs">
-                        <ThermometerSnowflake className="w-3 h-3" />
-                        <span>
-                          {lang === "th" ? "❄ หนาวสุดในรอบ 14 วัน" : "❄ COLDEST"}
-                        </span>
-                      </span>
-                    ) : idx === 0 ? (
-                      <span className="rounded-full bg-slate-900 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                        {lang === "th" ? "วันนี้ · TODAY" : "TODAY"}
-                      </span>
-                    ) : isWeekend ? (
-                      <span className="rounded-full bg-sky-100 text-[#0063F5] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                        {lang === "th" ? "สุดสัปดาห์" : "WEEKEND"}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        FORECAST
-                      </span>
-                    )}
-
-                    {!isAvailable && (
-                      <span className="rounded-full bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 text-[10px] font-bold uppercase">
-                        {lang === "th" ? "ห้องเต็ม" : "FULL"}
-                      </span>
-                    )}
+                {/* Top Date & Tag Row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-[14px] font-semibold text-[#171717]">
+                      {weekdayFull}
+                    </div>
+                    <div className="text-[12px] text-[#737373]">
+                      {dayNum} {monthLong}
+                    </div>
                   </div>
 
-                  {/* Hero: Lowest Temperature of the Day */}
-                  <div className="mt-3 flex items-end justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#475467]">
-                        <ThermometerSnowflake className="w-3.5 h-3.5 text-[#0063F5]" />
-                        <span>
-                          {lang === "th" ? "อุณหภูมิต่ำสุด" : "MIN TEMP"}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#121317]">
-                          {day.tempMin}°
-                        </span>
-                        <span className="text-sm font-bold text-[#0063F5]">
-                          C
-                        </span>
-                      </div>
-                    </div>
+                  {!isAvailable ? (
+                    <span className="rounded-full bg-[#facecb] text-[#a50c25] px-2.5 py-0.5 text-[11px] font-medium">
+                      เต็ม
+                    </span>
+                  ) : isColdest ? (
+                    <span className="rounded-full bg-[#262626] text-white px-2.5 py-0.5 text-[11px] font-medium">
+                      หนาวสุด
+                    </span>
+                  ) : idx === 0 ? (
+                    <span className="rounded-full bg-[#0000000f] text-[#171717] px-2.5 py-0.5 text-[11px] font-medium">
+                      วันนี้
+                    </span>
+                  ) : isWeekend ? (
+                    <span className="rounded-full bg-[#0000000f] text-[#737373] px-2.5 py-0.5 text-[11px] font-medium">
+                      สุดสัปดาห์
+                    </span>
+                  ) : null}
+                </div>
 
-                    <div className="text-right pb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        {lang === "th" ? "สูงสุดกลางวัน" : "DAY HIGH"}
+                {/* Temperature Display Box */}
+                <div className="mt-3.5 rounded-[12px] bg-[#f1f1f1] p-3 flex items-end justify-between">
+                  <div>
+                    <span className="text-[11px] text-[#737373] block">
+                      อุณหภูมิต่ำสุด
+                    </span>
+                    <div className="flex items-baseline gap-0.5 mt-0.5">
+                      <span className="text-[28px] font-semibold leading-none text-[#171717]">
+                        {day.tempMin}°
                       </span>
-                      <span className="text-base font-bold text-[#334155] block">
-                        {day.tempMax}°C
+                      <span className="text-[12px] font-medium text-[#737373]">
+                        C
                       </span>
                     </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] text-[#737373] block">
+                      สูงสุด
+                    </span>
+                    <span className="text-[13px] font-semibold text-[#171717]">
+                      {day.tempMax}°C
+                    </span>
                   </div>
                 </div>
 
-                {/* Card Content: Prominent Date Presentation */}
-                <div className="p-4 sm:p-5 flex flex-col gap-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-xl bg-[#F6F8FB] border border-slate-200 px-3 py-2 text-center shrink-0 min-w-[56px] group-hover:border-[#0063F5] group-hover:bg-[#EFF6FF] transition">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#0063F5]">
-                        {monthShort}
+                {/* Availability & Starting Price */}
+                <div className="mt-3.5 pt-3 border-t border-[#ebebeb] flex items-end justify-between">
+                  <div>
+                    <span className="block text-[12px] font-medium text-[#171717]">
+                      {isAvailable
+                        ? `ว่าง ${snap.freeRoomsCount} ยูนิต`
+                        : "ไม่มีห้องว่าง"}
+                    </span>
+                    {isAvailable && snap.isPromoDay && (
+                      <span className="text-[11px] text-[#737373] block mt-0.5">
+                        {snap.promoLabelTh}
                       </span>
-                      <span className="block text-2xl sm:text-3xl font-extrabold text-[#121317] leading-none my-0.5">
-                        {dayNum}
-                      </span>
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        {weekdayShort}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-base sm:text-lg tracking-tight leading-snug text-[#121317] group-hover:text-[#0063F5] transition-colors">
-                        {weekdayFull}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {dayNum} {monthLong}
-                      </p>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Availability & Starting Price */}
-                  <div className="pt-3 border-t border-slate-100 flex items-end justify-between text-xs text-[#475467]">
-                    <div>
-                      <span className="block font-bold text-[#121317]">
-                        {isAvailable
-                          ? lang === "th"
-                            ? `ว่าง ${snap.freeRoomsCount} ยูนิต`
-                            : `${snap.freeRoomsCount} rooms left`
-                          : lang === "th"
-                          ? "ไม่มีห้องว่าง"
-                          : "Fully booked"}
-                      </span>
-                      {isAvailable && snap.isPromoDay && (
-                        <span className="text-[10px] text-[#0063F5] font-semibold block">
-                          {snap.promoLabelTh}
+                  <div className="text-right">
+                    {isAvailable &&
+                      snap.originalPriceThb > snap.startingPriceThb && (
+                        <span className="text-[11px] line-through text-[#a3a3a3] block">
+                          ฿{snap.originalPriceThb.toLocaleString()}
                         </span>
                       )}
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
-                        เริ่มต้น
-                      </span>
-                      {isAvailable &&
-                        snap.originalPriceThb > snap.startingPriceThb && (
-                          <span className="text-[10px] line-through text-slate-400 block">
-                            ฿{snap.originalPriceThb.toLocaleString()}
-                          </span>
-                        )}
-                      <span className="text-lg font-extrabold text-[#0063F5]">
-                        ฿{snap.startingPriceThb.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        {lang === "th" ? "/ คืน" : "/ night"}
-                      </span>
-                    </div>
+                    <span className="text-[16px] font-semibold text-[#171717]">
+                      ฿{snap.startingPriceThb.toLocaleString()}
+                    </span>
+                    <span className="text-[11px] text-[#737373]"> / คืน</span>
                   </div>
                 </div>
               </div>
 
-              {/* Action Button */}
-              <footer className="px-4 sm:px-5 pb-4 sm:pb-5">
+              {/* Action Pill Button */}
+              <div className="mt-3.5">
                 <div
-                  className={`w-full rounded-xl py-2.5 px-3 text-xs font-bold text-center border transition flex items-center justify-center gap-1.5 ${
+                  className={`w-full rounded-full py-2 px-3 text-[12px] font-medium text-center transition flex items-center justify-center gap-1.5 ${
                     !isAvailable
-                      ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                      ? "bg-[#f1f1f1] text-[#a3a3a3]"
                       : isSelected
-                      ? "bg-[#0F172A] border-[#0F172A] text-white"
-                      : "bg-[#0063F5] border-[#0063F5] text-white group-hover:bg-[#0052CC] group-hover:border-[#0052CC] shadow-[0_4px_12px_rgba(0,99,245,0.2)]"
+                      ? "bg-[#262626] text-white"
+                      : "bg-[#0000000f] text-[#171717] group-hover:bg-[#262626] group-hover:text-white"
                   }`}
                 >
                   {isSelected ? (
@@ -416,16 +360,12 @@ export function ResortWeatherWidget({
                       </span>
                     </>
                   ) : isAvailable ? (
-                    <span>
-                      {lang === "th"
-                        ? `เลือกเช็คอินวันนี้ (${day.tempMin}°C)`
-                        : `SELECT DATE (${day.tempMin}°C)`}
-                    </span>
+                    <span>เลือกเช็คอิน ({day.tempMin}°C)</span>
                   ) : (
-                    <span>เต็มแล้ว (SOLD OUT)</span>
+                    <span>เต็มแล้ว</span>
                   )}
                 </div>
-              </footer>
+              </div>
             </article>
           );
         })}

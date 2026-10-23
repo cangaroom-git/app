@@ -1,26 +1,97 @@
+"use client";
+
 import React from "react";
 
-/**
- * MY-HOTEL MODERN FASTWORK DESIGN SYSTEM STANDARDS
- * Modeled after www.fastwork.com & WeGlobal (/Users/light/my-shop)
- *
- * CORE DESIGN PRINCIPLE:
- * - Modern neutral SaaS aesthetic that adapts seamlessly to any hotel property.
- * - Primary Brand Blue: #0063F5 (Hover #0052CC, Soft Tint #EFF6FF, Border Tint #BFDBFE)
- * - Clean Surfaces: Pure White #FFFFFF & Cool Canvas #F6F8FB
- * - Crisp Slate Typography: Heading #121317, Body #475467, Muted #64748B
- * - Modern Rounded Geometry: rounded-xl / rounded-2xl cards & buttons, rounded-full pills.
- */
+/* ============================================================================
+   MY-HOTEL · UNIFIED UI, LAYOUT & TYPOGRAPHY STANDARDS
+   Enforces:
+   1. Single Centered Feed Layout (`max-w-[760px] mx-auto`) — Facebook/Instagram style
+   2. Strict 5-Tier Font Scale (`ty-display`, `ty-title`, `ty-subtitle`, `ty-body`, `ty-caption`)
+   3. Automatic Light Mode (#ffffff) & Dark Mode (#0a0a0a / #141414) surfaces
+   ============================================================================ */
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?:
-    | "primary"
-    | "secondary"
-    | "outline"
-    | "subtle"
-    | "ghost"
-    | "danger";
-  size?: "sm" | "md" | "lg";
+export function StandardFeedContainer({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`app-feed-shell py-0 lg:py-6 flex flex-col gap-2.5 lg:gap-5 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function StandardCard({
+  children,
+  className = "",
+  noPadding = false,
+  id,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  noPadding?: boolean;
+  id?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={`app-card ${
+        noPadding ? "overflow-hidden" : "p-4 sm:p-6"
+      } ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+export function StandardSectionHeader({
+  eyebrow,
+  title,
+  description,
+  icon,
+  action,
+  className = "",
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)] ${className}`}
+    >
+      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+        {icon && <div className="fw-head-icon shrink-0">{icon}</div>}
+        <div className="min-w-0">
+          {eyebrow && (
+            <span className="ty-caption font-semibold uppercase tracking-wider block mb-0.5">
+              {eyebrow}
+            </span>
+          )}
+          <h2 className="ty-title truncate">{title}</h2>
+          {description && <p className="ty-body-muted mt-0.5">{description}</p>}
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+type ButtonVariant = "primary" | "secondary" | "outline" | "subtle";
+type ButtonSize = "sm" | "md" | "lg";
+
+interface StandardButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   fullWidth?: boolean;
 }
 
@@ -31,33 +102,29 @@ export function StandardButton({
   className = "",
   children,
   ...props
-}: ButtonProps) {
-  const sizeClasses = {
-    sm: "h-9 px-4 text-xs font-semibold",
-    md: "h-10 px-5 text-xs sm:text-sm font-semibold",
-    lg: "h-12 px-7 text-sm font-bold",
-  }[size];
+}: StandardButtonProps) {
+  const sizeClasses: Record<ButtonSize, string> = {
+    sm: "h-9 px-3.5 text-[14px]",
+    md: "h-10 px-4 text-[14px]",
+    lg: "h-11 px-5 text-[14px]",
+  };
 
-  const variantClasses = {
+  const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[#0063F5] text-white border border-[#0063F5] hover:bg-[#0052CC] hover:border-[#0052CC] shadow-[0_4px_12px_rgba(0,99,245,0.22)] disabled:bg-[#E2E8F0] disabled:border-[#E2E8F0] disabled:text-[#94A3B8] disabled:shadow-none",
+      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-90 border border-[var(--color-accent)]",
     secondary:
-      "bg-[#0F172A] text-white border border-[#0F172A] hover:bg-[#1E293B] hover:border-[#1E293B]",
+      "bg-[var(--color-neutral)] text-[var(--color-text-primary)] hover:bg-[var(--color-overlay-pressed)] border border-transparent",
     outline:
-      "bg-white text-[#121317] border border-[#CBD5E1] hover:border-[#0063F5] hover:text-[#0063F5] hover:bg-[#EFF6FF] disabled:border-[#E2E8F0] disabled:text-[#94A3B8]",
+      "bg-transparent text-[var(--color-text-primary)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-overlay-hover)]",
     subtle:
-      "bg-[#EFF6FF] text-[#0063F5] border border-[#BFDBFE] hover:bg-[#DBEAFE] hover:border-[#93C5FD]",
-    ghost:
-      "bg-transparent text-[#475467] hover:text-[#0063F5] hover:bg-[#F1F5F9]",
-    danger:
-      "bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] hover:bg-[#FEE2E2]",
-  }[variant];
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:opacity-90 border border-[var(--color-border)]",
+  };
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-xl transition-all duration-200 cursor-pointer disabled:cursor-not-allowed ${sizeClasses} ${variantClasses} ${
-        fullWidth ? "w-full" : ""
-      } ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${
+        sizeClasses[size]
+      } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
     >
       {children}
@@ -65,88 +132,74 @@ export function StandardButton({
   );
 }
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface StandardInputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
-  helperText?: string;
   optionalText?: string;
 }
 
 export function StandardInput({
   label,
-  helperText,
   optionalText,
+  id,
   className = "",
   ...props
-}: InputProps) {
+}: StandardInputProps) {
+  const generatedId = React.useId();
+  const inputId = id || generatedId;
+
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-[#334155]">
+        <label
+          htmlFor={inputId}
+          className="ty-body font-semibold text-[var(--color-text-primary)]"
+        >
           {label}
         </label>
-        {optionalText && (
-          <span className="text-[11px] text-[#64748B]">{optionalText}</span>
-        )}
+        {optionalText && <span className="ty-caption">{optionalText}</span>}
       </div>
       <input
-        className={`h-11 w-full rounded-xl border border-[#CBD5E1] bg-white px-3.5 text-sm text-[#121317] placeholder:text-[#94A3B8] transition-all focus:border-[#0063F5] focus:outline-none focus:ring-3 focus:ring-[#0063F5]/15 ${className}`}
+        id={inputId}
+        className={`h-10 w-full rounded-[12px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] px-3.5 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:border-[var(--color-text-primary)] focus:outline-none ${className}`}
         {...props}
       />
-      {helperText && (
-        <p className="text-[11px] text-[#64748B] leading-snug">{helperText}</p>
-      )}
     </div>
   );
 }
 
-export type PillStatusType =
-  | "available"
-  | "last_unit"
-  | "pending"
-  | "booked"
-  | "maintenance"
-  | "neutral";
+type RoomStatusType = "available" | "last_unit" | "booked";
 
 export function StatusPill({
   status,
-  tone,
   label,
 }: {
-  status?: PillStatusType;
-  tone?: PillStatusType;
+  status: RoomStatusType;
   label: string;
 }) {
-  const key: PillStatusType = status ?? tone ?? "neutral";
-
-  const styles: Record<PillStatusType, string> = {
-    available:
-      "bg-[#0063F5] text-white border-[#0052CC] shadow-xs",
-    last_unit:
-      "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
-    pending:
-      "bg-[#EFF6FF] text-[#0063F5] border-[#BFDBFE]",
-    booked:
-      "bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]",
-    maintenance:
-      "bg-[#F1F5F9] text-[#475569] border-[#CBD5E1]",
-    neutral: "bg-[#F8FAFC] text-[#334155] border-[#E2E8F0]",
+  const styles: Record<RoomStatusType, { wrapper: string; dot: string }> = {
+    available: {
+      wrapper: "bg-[#dcfce7] text-[#15803d] dark:bg-emerald-950/80 dark:text-emerald-300",
+      dot: "bg-[#15803d] dark:bg-emerald-400",
+    },
+    last_unit: {
+      wrapper: "bg-[#fef3c7] text-[#92400e] dark:bg-amber-950/80 dark:text-amber-300",
+      dot: "bg-[#92400e] dark:bg-amber-400 animate-pulse",
+    },
+    booked: {
+      wrapper: "bg-[#fee2e2] text-[#b91c1c] dark:bg-rose-950/80 dark:text-rose-300",
+      dot: "bg-[#b91c1c] dark:bg-rose-400",
+    },
   };
 
-  const dotStyles: Record<PillStatusType, string> = {
-    available: "bg-[#60A5FA]",
-    last_unit: "bg-[#F59E0B]",
-    pending: "bg-[#0063F5]",
-    booked: "bg-[#EF4444]",
-    maintenance: "bg-[#64748B]",
-    neutral: "bg-[#0063F5]",
-  };
+  const current = styles[status];
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold leading-none whitespace-nowrap ${styles[key]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-7 text-[12px] font-semibold ${current.wrapper}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${dotStyles[key]}`} />
-      {label}
+      <span className={`h-1.5 w-1.5 rounded-full ${current.dot}`} />
+      <span>{label}</span>
     </span>
   );
 }

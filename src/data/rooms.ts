@@ -44,6 +44,11 @@ export interface RoomLodge {
     dining: string[];
     outdoor: string[];
   };
+  amenitiesEn?: {
+    common: string[];
+    dining: string[];
+    outdoor: string[];
+  };
 }
 
 export interface SeasonalRateRule {
@@ -57,6 +62,7 @@ export interface SeasonalRateRule {
   adjustmentValue: number; // e.g. 20 (+20%), 15 (-15%), or 800 (+฿800/คืน)
   minStayNights: number;
   badgeTh: string;
+  badgeEn?: string;
   isActive: boolean;
 }
 
@@ -64,6 +70,7 @@ export interface SpecialDateRateOverride {
   id: string;
   dateStr: string; // YYYY-MM-DD
   titleTh: string;
+  titleEn?: string;
   pricingMode: "SURCHARGE_THB" | "FIXED_PRICE_THB";
   amountThb: number; // บวกเพิ่มต่อคืน หรือ กำหนดราคาคงที่
   isActive: boolean;
@@ -138,6 +145,11 @@ export interface WhiteLabelPropertyConfig {
   breakfastTime: string;
   promptPayId: string;
   promptPayAccountName: string;
+  autoConfirmSlip?: boolean;
+  subdomainSlug?: string;
+  customDomain?: string;
+  lineNotifyConnected?: boolean;
+  aiAutoBookingEnabled?: boolean;
   rulesTh: string[];
   sectionsVisibility: {
     heroSection: boolean;
@@ -187,7 +199,7 @@ export interface BookingRecord {
   slipDataUrl?: string;
   slipQrVerified?: boolean;
   slipQrPayload?: string;
-  source: "WEBSITE" | "ADMIN_BLOCK" | "LINE_FACEBOOK";
+  source: "WEBSITE" | "ADMIN_BLOCK" | "LINE_FACEBOOK" | "AI_AGENT";
 }
 
 export const WEATHER_LOCATION_PRESETS: Array<{
@@ -274,6 +286,11 @@ export const INITIAL_PROPERTY_CONFIG: WhiteLabelPropertyConfig = {
   breakfastTime: "08:00 – 09:30 น.",
   promptPayId: "0957797971",
   promptPayAccountName: "สะปัน อันซีน น่าน (Sapan Unseen)",
+  autoConfirmSlip: true,
+  subdomainSlug: "sapanunseen",
+  customDomain: "www.sapanunseen.com",
+  lineNotifyConnected: true,
+  aiAutoBookingEnabled: true,
   rulesTh: [
     "เช็คอิน 14:00 น. / เช็คเอาท์ 11:00 น. (ฟรีอาหารเช้าเสิร์ฟถึงห้องพักเวลา 08:00 – 09:30 น.)",
     "เด็กอายุ 0–5 ปี เข้าพักฟรี (ไม่เสริมที่นอน) | เสริมที่นอนท่านละ 850 บาท/คืน รวมอาหารเช้า (แจ้งล่วงหน้าอย่างน้อย 3 วัน)",
@@ -343,6 +360,7 @@ export const INITIAL_SPECIAL_DATE_OVERRIDES: SpecialDateRateOverride[] = [
     id: "sp-chulalongkorn-day",
     dateStr: "2026-10-23",
     titleTh: "วันปิยมหาราช (Long Weekend Holiday)",
+    titleEn: "Chulalongkorn Memorial Day (Long Weekend)",
     pricingMode: "SURCHARGE_THB",
     amountThb: 500,
     isActive: true,
@@ -351,6 +369,7 @@ export const INITIAL_SPECIAL_DATE_OVERRIDES: SpecialDateRateOverride[] = [
     id: "sp-newyear-eve",
     dateStr: "2026-12-31",
     titleTh: "คืนส่งท้ายปีเก่าต้อนรับปีใหม่ (New Year's Eve)",
+    titleEn: "New Year's Eve Holiday",
     pricingMode: "SURCHARGE_THB",
     amountThb: 1000,
     isActive: true,
@@ -433,6 +452,23 @@ export const INITIAL_SAPAN_ROOMS: RoomLodge[] = [
         "ระเบียงไม้ชมทะเลหมอกและขุนเขาส่วนตัว",
       ],
     },
+    amenitiesEn: {
+      common: [
+        "2-Storey A-Frame Villa (Ground floor + Attic loft)",
+        "Air conditioning & water heater",
+        "Premium bedding, towels, and hair dryer",
+        "Complimentary high-speed Wi-Fi",
+      ],
+      dining: [
+        "Free breakfast served to your room (08:00 – 09:30)",
+        "Pour-over drip coffee set & electric kettle",
+        "Complimentary drinking water & in-room minibar",
+      ],
+      outdoor: [
+        "Private outdoor soaking bathtub on terrace",
+        "Private wooden viewing deck overlooking sea of mist",
+      ],
+    },
   },
   {
     id: "room-a2",
@@ -505,6 +541,23 @@ export const INITIAL_SAPAN_ROOMS: RoomLodge[] = [
       outdoor: [
         "อ่างแช่น้ำกลางแจ้ง (Outdoor Bathtub) หน้าระเบียง",
         "ระเบียงส่วนตัวรับลมหนาว",
+      ],
+    },
+    amenitiesEn: {
+      common: [
+        "2-Storey A-Frame Villa (Ground floor + Attic loft)",
+        "Air conditioning & water heater",
+        "Premium bedding, towels, and hair dryer",
+        "Complimentary high-speed Wi-Fi",
+      ],
+      dining: [
+        "Free breakfast served to your room (08:00 – 09:30)",
+        "Pour-over drip coffee set & electric kettle",
+        "Complimentary drinking water",
+      ],
+      outdoor: [
+        "Private outdoor soaking bathtub on terrace",
+        "Private mountain-view terrace",
       ],
     },
   },
@@ -581,6 +634,23 @@ export const INITIAL_SAPAN_ROOMS: RoomLodge[] = [
         "ระเบียงไม้ส่วนตัวพร้อมชุดโต๊ะนั่งเล่น",
       ],
     },
+    amenitiesEn: {
+      common: [
+        "King-size bed facing mountain ridge",
+        "Air conditioning & water heater",
+        "Hair dryer, towels, and bath amenities",
+        "Complimentary high-speed Wi-Fi",
+      ],
+      dining: [
+        "Free breakfast served to your room (08:00 – 09:30)",
+        "Coffee set & electric kettle",
+        "Complimentary drinking water",
+      ],
+      outdoor: [
+        "Outdoor soaking bathtub overlooking the valley",
+        "Private wooden terrace with lounge seating",
+      ],
+    },
   },
   {
     id: "room-a4",
@@ -653,6 +723,23 @@ export const INITIAL_SAPAN_ROOMS: RoomLodge[] = [
       outdoor: [
         "ระเบียงส่วนตัวหลังริมสุดไร้คนเดินผ่าน",
         "อ่างแช่น้ำกลางแจ้งชมวิวขุนเขา",
+      ],
+    },
+    amenitiesEn: {
+      common: [
+        "King-size bed facing mountain ridge",
+        "Air conditioning & water heater",
+        "Hair dryer & towel set",
+        "Complimentary high-speed Wi-Fi",
+      ],
+      dining: [
+        "Free breakfast served to your room (08:00 – 09:30)",
+        "Coffee set & electric kettle",
+        "Complimentary drinking water",
+      ],
+      outdoor: [
+        "Private secluded corner terrace with zero foot traffic",
+        "Outdoor soaking bathtub with panoramic valley view",
       ],
     },
   },
