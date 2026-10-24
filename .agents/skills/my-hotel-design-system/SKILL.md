@@ -31,9 +31,14 @@ Every component, page, and interactive widget in `my-hotel` MUST strictly follow
 
 ## 3. Single Centered Social Feed (`760px` Max-Width) & Instagram Desktop Right Rail
 - All public pages render inside `StandardFeedContainer` (`max-w-[760px] mx-auto`) and `StandardCard` (`rounded-[20px]` on desktop, edge-to-edge on mobile).
-- Desktop secondary panels (such as the Room Availability & Quick Jump list on the right side of the feed) MUST follow **Instagram Desktop's borderless "Suggested for you" aesthetic**:
-  - No boxy outer borders or heavy card shadows; sit cleanly on the page background.
-  - Each row uses a `44px` (`h-11 w-11`) circular avatar/thumbnail on the left, a 2-line title + muted status subtitle in the center, and a concise text action on the right.
+- Desktop secondary panels (such as the Room Availability & Quick Jump list on the right side of the feed) MUST follow **Instagram Desktop's 2-Column Flex + Sticky Right Rail architecture**:
+  - **NEVER use `position: fixed` for the right rail**, as `fixed` causes the sidebar to overlap the central feed when the viewport narrows.
+  - Always place the `760px` Feed Column (`flex-1 max-w-[760px] min-w-0`) and the Right Rail (`hidden xl:flex w-[160px] shrink-0 sticky top-4`) inside a shared parent flex row (`max-w-[960px] mx-auto flex justify-center items-start gap-8`) so they push each other naturally and never overlap.
+  - No boxy outer borders, no heavy card shadows, and no noisy section headers (`Suggested rooms`, `See all`, profile headers, or date ranges).
+  - **Ultra-Minimal Room Row**: Each item displays ONLY 3 elements:
+    1. `44px` (`h-11 w-11`) circular room image/icon with a small availability dot,
+    2. Short room code (`A1`, `A2`),
+    3. Concise availability status (`ว่าง` / `เต็ม` or `Available` / `Full`). Never include long room names, prices, or extra action links.
 - Media (Photos & 9:16 Reels/Shorts) must be clean and unobstructed—avoid heavy dark gradients or walls of text overlaid on photos/videos.
 
 ## 4. Strict 5-Tier Typography Scale

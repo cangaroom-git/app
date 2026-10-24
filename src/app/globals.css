@@ -211,6 +211,14 @@ h1, h2, h3, h4, .font-serif {
   color: var(--color-text-secondary);
 }
 
+.bg-\[var\(--color-accent\)\],
+.bg-\[var\(--color-accent\)\].ty-body,
+.bg-\[var\(--color-accent\)\].ty-caption,
+.bg-\[var\(--color-accent\)\].ty-subtitle,
+.bg-\[var\(--color-accent\)\].ty-title {
+  color: var(--color-on-accent);
+}
+
 /* Clamp non-standard micro/intermediate font sizes to the 5-tier scale */
 .text-\[9px\],
 .text-\[10px\],

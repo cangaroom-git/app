@@ -39,6 +39,24 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum UserRole {
+  SUPER_ADMIN
+  HOTEL_ADMIN
+  GUEST
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  role         UserRole @default(GUEST)
+  provider     String   @default("EMAIL") // "GOOGLE" | "LINE" | "APPLE" | "EMAIL"
+  providerId   String?
+  hotelSlug    String?  // For HOTEL_ADMIN: links to their property tenant
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Booking {
   id            String        @id @default(cuid())
   bookingCode   String        @unique

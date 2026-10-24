@@ -168,7 +168,7 @@ export default function HomePage() {
 
   const reelsSliderRef = useRef<HTMLDivElement | null>(null);
   const dateSliderRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const photoSliderRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const photoTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const scrollReelsSlider = (dir: "left" | "right") => {
     const el = reelsSliderRef.current;
@@ -196,14 +196,7 @@ export default function HomePage() {
   };
 
   const scrollPhotoToSlide = (roomId: string, targetIdx: number) => {
-    const el = photoSliderRefs.current[roomId];
     setCardSlideIndex((prev) => ({ ...prev, [roomId]: targetIdx }));
-    if (el && el.clientWidth > 0) {
-      el.scrollTo({
-        left: targetIdx * el.clientWidth,
-        behavior: "smooth",
-      });
-    }
   };
 
   const toggleLikeRoom = (roomId: string) => {
@@ -258,145 +251,6 @@ export default function HomePage() {
 
   return (
     <>
-      {/* =====================================================================
-          INSTAGRAM DESKTOP RIGHT SIDEBAR ("Suggested for you" Room Availability & Anchor Warp)
-          - Borderless, minimal IG layout on the right side of the 760px feed
-          - Shows circular room avatar, room code + title, availability status, and View action
-          - Clicking any row warps smoothly to that room card
-      ====================================================================== */}
-      <aside
-        aria-label={
-          lang === "th"
-            ? "สรุปห้องว่างและทางลัดห้องพัก"
-            : "Room availability & quick jump"
-        }
-        className="hidden xl:flex fixed top-[88px] right-6 2xl:left-[calc(50%+416px)] 2xl:right-auto z-20 w-[264px] 2xl:w-[292px] flex-col select-none"
-      >
-        {/* 1. Top Resort Profile Row (IG Switch Row Style) */}
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={
-                propertyConfig.heroImageUrl ||
-                rooms[0]?.images[0]?.url ||
-                "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=200&q=80"
-              }
-              alt={propertyConfig.nameEn}
-              className="h-11 w-11 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)]"
-            />
-            <div className="min-w-0">
-              <p className="ty-body font-semibold text-[var(--color-text-primary)] truncate leading-tight">
-                {propertyConfig.subdomainSlug || "sapanunseen"}
-              </p>
-              <p className="ty-caption text-[var(--color-text-secondary)] truncate leading-tight mt-0.5">
-                {formatShortDate(checkIn, lang)} –{" "}
-                {formatShortDate(checkOut, lang)}
-              </p>
-            </div>
-          </div>
-
-          <span
-            className={`ty-caption font-semibold shrink-0 ${
-              availableRoomTypesCount > 0
-                ? "text-[var(--color-success)]"
-                : "text-[var(--color-error)]"
-            }`}
-          >
-            {availableRoomTypesCount}/{rooms.length}{" "}
-            {lang === "th" ? "ว่าง" : "free"}
-          </span>
-        </div>
-
-        {/* 2. Section Header ("Suggested for you" / "See all" Style) */}
-        <div className="flex items-center justify-between gap-2 mb-2.5">
-          <span className="ty-body font-semibold text-[var(--color-text-secondary)]">
-            {lang === "th" ? "ห้องพักสำหรับคุณ" : "Suggested rooms"}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              if (rooms[0]) scrollToRoomCard(rooms[0].id);
-            }}
-            className="ty-caption font-semibold text-[var(--color-text-primary)] hover:opacity-70 transition cursor-pointer"
-          >
-            {lang === "th" ? "ดูทั้งหมด" : "See all"}
-          </button>
-        </div>
-
-        {/* 3. Room List Rows (IG Suggested User Row Style) */}
-        <div className="flex flex-col gap-3 pl-2 max-h-[calc(100vh-240px)] overflow-y-auto no-scrollbar py-1">
-          {rooms.map((rm) => {
-            const st = roomStatusMap[rm.id];
-            const isAvail =
-              st?.state === "AVAILABLE" && (st?.availableUnits ?? 0) > 0;
-            const nightly = st?.effectiveNightlyPrice ?? rm.basePriceThb;
-            const isActive = activeAnchorRoomId === rm.id;
-
-            return (
-              <button
-                key={rm.id}
-                type="button"
-                onClick={() => scrollToRoomCard(rm.id)}
-                className="group w-full flex items-center justify-between gap-3 text-left transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative h-11 w-11 shrink-0">
-                    <img
-                      src={rm.images[0]?.url}
-                      alt={rm.nameTh}
-                      className={`h-11 w-11 rounded-full object-cover bg-[var(--color-background-muted)] transition ${
-                        isActive
-                          ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-body)]"
-                          : ""
-                      }`}
-                    />
-                    <span
-                      className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--color-background-body)] ${
-                        isAvail ? "bg-emerald-500" : "bg-rose-500"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p
-                      className={`ty-body truncate leading-tight ${
-                        isActive ? "font-bold" : "font-semibold"
-                      } text-[var(--color-text-primary)] group-hover:opacity-80`}
-                    >
-                      {rm.code} · {lang === "th" ? rm.nameTh : rm.nameEn}
-                    </p>
-                    <p className="ty-caption text-[var(--color-text-secondary)] truncate leading-tight mt-0.5">
-                      {isAvail
-                        ? lang === "th"
-                          ? `ว่าง · ฿${nightly.toLocaleString()}/คืน`
-                          : `Available · ฿${nightly.toLocaleString()}`
-                        : lang === "th"
-                        ? "เต็มในวันที่เลือก"
-                        : "Booked on selected dates"}
-                    </p>
-                  </div>
-                </div>
-
-                <span
-                  className={`ty-caption font-semibold shrink-0 ${
-                    isAvail
-                      ? "text-[#0074e2] group-hover:opacity-80"
-                      : "text-[var(--color-text-secondary)]"
-                  }`}
-                >
-                  {isAvail
-                    ? lang === "th"
-                      ? "ดูห้อง"
-                      : "View"
-                    : lang === "th"
-                    ? "เต็ม"
-                    : "Full"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
       {/* =====================================================================
           UNIFIED TOP SECTION (#overview): ASK AI INPUT + LARGE PURE VIDEO REELS SLIDER
           - No border, no padding on #overview
@@ -476,21 +330,8 @@ export default function HomePage() {
       {/* Anchor target for Sticky Booking Bar */}
       <div id="rooms" className="scroll-mt-24 -mb-3 lg:-mb-5" />
 
-      {/* Mobile / Tablet Compact Sticky Room Anchor Strip (< xl) */}
+      {/* Mobile / Tablet Compact Sticky Room Anchor Strip (< xl) — Icon + Room Code + Available/Full Only */}
       <div className="xl:hidden sticky top-[60px] z-20 bg-[var(--color-background-body)]/95 backdrop-blur-md px-4 py-2 border-b border-[var(--color-border)] flex items-center gap-2 overflow-x-auto no-scrollbar">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full px-2.5 h-8 text-[11px] font-bold shrink-0 ${
-            availableRoomTypesCount > 0
-              ? "bg-[var(--color-success-muted)] text-[var(--color-success)]"
-              : "bg-[var(--color-error-muted)] text-[var(--color-error)]"
-          }`}
-        >
-          <BedDouble className="w-3.5 h-3.5" />
-          <span>
-            {availableRoomTypesCount}/{rooms.length}
-          </span>
-        </span>
-
         {rooms.map((rm) => {
           const st = roomStatusMap[rm.id];
           const isAvail =
@@ -502,18 +343,34 @@ export default function HomePage() {
               key={rm.id}
               type="button"
               onClick={() => scrollToRoomCard(rm.id)}
-              className={`h-8 px-3 rounded-full inline-flex items-center gap-1.5 text-[12px] font-semibold shrink-0 border transition cursor-pointer ${
+              className={`h-9 pl-1.5 pr-3 rounded-full inline-flex items-center gap-2 ty-caption font-semibold shrink-0 border transition cursor-pointer ${
                 isActive
                   ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] border-[var(--color-accent)]"
                   : "bg-[var(--color-background-card)] text-[var(--color-text-primary)] border-[var(--color-border)]"
               }`}
             >
-              <span>{rm.code}</span>
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  isAvail ? "bg-emerald-500" : "bg-rose-500"
-                }`}
-              />
+              <div className="relative h-6 w-6 shrink-0">
+                <img
+                  src={rm.images[0]?.url}
+                  alt={rm.code}
+                  className="h-6 w-6 rounded-full object-cover"
+                />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-[var(--color-background-card)] ${
+                    isAvail ? "bg-emerald-500" : "bg-rose-500"
+                  }`}
+                />
+              </div>
+              <span className="font-bold">{rm.code}</span>
+              <span className="opacity-75 font-medium">
+                {isAvail
+                  ? lang === "th"
+                    ? "ว่าง"
+                    : "Available"
+                  : lang === "th"
+                  ? "เต็ม"
+                  : "Full"}
+              </span>
             </button>
           );
         })}
@@ -645,33 +502,49 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 2. Tall Portrait Swipeable Post Image (Full-bleed left/right, NO gradient, NO text on image) */}
+            {/* 2. Tall Portrait Post Image Carousel (touch-pan-y + CSS translateX so vertical scroll down NEVER gets trapped) */}
             <div
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 toggleLikeRoom(room.id);
               }}
-              className="relative w-full aspect-[4/5] sm:h-[540px] overflow-hidden bg-black group/photo"
+              onTouchStart={(e) => {
+                const t = e.touches[0];
+                if (t) {
+                  photoTouchStartRef.current = { x: t.clientX, y: t.clientY };
+                }
+              }}
+              onTouchEnd={(e) => {
+                if (!photoTouchStartRef.current || totalSlides <= 1) return;
+                const t = e.changedTouches[0];
+                if (!t) return;
+                const dx = t.clientX - photoTouchStartRef.current.x;
+                const dy = t.clientY - photoTouchStartRef.current.y;
+                photoTouchStartRef.current = null;
+                if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                  if (dx < 0) {
+                    scrollPhotoToSlide(room.id, (currentSlide + 1) % totalSlides);
+                  } else {
+                    scrollPhotoToSlide(
+                      room.id,
+                      (currentSlide - 1 + totalSlides) % totalSlides
+                    );
+                  }
+                }
+              }}
+              className="relative w-full aspect-[4/5] sm:h-[540px] overflow-hidden bg-black group/photo touch-pan-y"
             >
               <div
-                ref={(el) => {
-                  photoSliderRefs.current[room.id] = el;
+                style={{
+                  transform: `translate3d(-${currentSlide * 100}%, 0, 0)`,
                 }}
-                onScroll={(e) => {
-                  const el = e.currentTarget;
-                  if (!el.clientWidth) return;
-                  const idx = Math.round(el.scrollLeft / el.clientWidth);
-                  if (idx !== currentSlide) {
-                    setCardSlideIndex((prev) => ({ ...prev, [room.id]: idx }));
-                  }
-                }}
-                className="flex h-full w-full overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth touch-pan-x"
+                className="flex h-full w-full transition-transform duration-300 ease-out will-change-transform"
               >
                 {room.images.map((img, imgIdx) => (
                   <div
                     key={imgIdx}
                     onClick={() => openGalleryModal(room)}
-                    className="h-full w-full shrink-0 snap-center overflow-hidden cursor-pointer"
+                    className="h-full w-full shrink-0 overflow-hidden cursor-pointer"
                   >
                     <img
                       src={img.url}

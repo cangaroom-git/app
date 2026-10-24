@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import QRCode from "qrcode";
 import {
   CheckCircle2,
   Upload,
@@ -11,6 +12,7 @@ import {
   Users,
   Printer,
   ShieldCheck,
+  Pencil,
 } from "lucide-react";
 import { BookingRecord } from "@/data/rooms";
 
@@ -35,146 +37,133 @@ function crc16Ccitt(data: string): string {
 }
 
 /**
- * Generates an EMVCo-compliant Thai PromptPay Dynamic QR Payload string with exact amount.
+ * Generates an official Bank of Thailand (BOT) / EMVCo-compliant
+ * Thai PromptPay QR Payload string with exact transaction amount.
+ * Supports:
+ * - 10-digit Thai Mobile Number (08X/09X/06X -> 0066...)
+ * - 13-digit National ID / Tax ID
+ * - 15-digit e-Wallet ID
  */
 export function generatePromptPayPayload(
   rawId: string,
-  amountThb: number
+  amountThb?: number
 ): string {
   const digits = rawId.replace(/\D/g, "");
   let targetField = "";
-  if (digits.length >= 13) {
-    targetField = formatField("02", digits.slice(0, 13));
+
+  if (digits.length === 15) {
+    // e-Wallet ID (Sub-tag 03)
+    targetField = formatField("03", digits);
+  } else if (digits.length === 13) {
+    // National ID / Tax ID (Sub-tag 02)
+    targetField = formatField("02", digits);
   } else {
-    const mobile = digits.startsWith("0")
-      ? `0066${digits.slice(1)}`
-      : `0066${digits}`;
-    targetField = formatField("01", mobile);
+    // Mobile Phone Number (Sub-tag 01: 13 digits starting with 0066)
+    let phoneNoLeadingZero = digits;
+    if (digits.startsWith("66") && digits.length === 11) {
+      phoneNoLeadingZero = digits.slice(2);
+    } else if (digits.startsWith("0")) {
+      phoneNoLeadingZero = digits.slice(1);
+    }
+    const formattedMobile = `0066${phoneNoLeadingZero}`.slice(0, 13);
+    targetField = formatField("01", formattedMobile);
   }
 
   const merchantInfo =
     formatField("00", "A000000677010111") + targetField;
 
-  const amountStr = Math.max(0, amountThb).toFixed(2);
+  const hasAmount = typeof amountThb === "number" && amountThb > 0;
+  const amountTag = hasAmount
+    ? formatField("54", Number(amountThb).toFixed(2))
+    : "";
+
   const body =
     formatField("00", "01") +
-    formatField("01", "12") +
+    formatField("01", hasAmount ? "12" : "11") +
     formatField("29", merchantInfo) +
     formatField("58", "TH") +
     formatField("53", "764") +
-    formatField("54", amountStr) +
+    amountTag +
     "6304";
 
   return body + crc16Ccitt(body);
 }
 
 /**
- * Renders a deterministic 25x25 QR Matrix SVG from a PromptPay payload string.
+ * Renders a 100% genuine, scannable ISO/IEC 18004 QR Code SVG
+ * using the `qrcode` Reed-Solomon encoder so real Thai mobile banking apps
+ * (K PLUS, SCB EASY, Krungthai NEXT, BBL, KMA, ttb touch) can scan and pay.
  */
 export function DynamicPromptPayQrSvg({
   promptPayId,
   amountThb,
-  size = 136,
+  rawPayload,
+  size = 148,
 }: {
-  promptPayId: string;
-  amountThb: number;
+  promptPayId?: string;
+  amountThb?: number;
+  rawPayload?: string;
   size?: number;
 }) {
-  const payload = useMemo(
-    () => generatePromptPayPayload(promptPayId, amountThb),
-    [promptPayId, amountThb]
-  );
+  const payload = useMemo(() => {
+    if (rawPayload) return rawPayload;
+    return generatePromptPayPayload(promptPayId || "0957797971", amountThb);
+  }, [rawPayload, promptPayId, amountThb]);
 
-  const grid = useMemo(() => {
-    const N = 25;
-    const mat: boolean[][] = Array.from({ length: N }, () =>
-      Array(N).fill(false)
-    );
-    const reserved: boolean[][] = Array.from({ length: N }, () =>
-      Array(N).fill(false)
-    );
-
-    const placeFinder = (r0: number, c0: number) => {
-      for (let r = -1; r <= 7; r++) {
-        for (let c = -1; c <= 7; c++) {
-          const rr = r0 + r;
-          const cc = c0 + c;
-          if (rr >= 0 && rr < N && cc >= 0 && cc < N) {
-            reserved[rr][cc] = true;
-            if (r >= 0 && r <= 6 && c >= 0 && c <= 6) {
-              const isBorder = r === 0 || r === 6 || c === 0 || c === 6;
-              const isInner = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-              mat[rr][cc] = isBorder || isInner;
-            }
-          }
-        }
+  const qrMatrix = useMemo(() => {
+    const qr = QRCode.create(payload, {
+      errorCorrectionLevel: "M",
+    });
+    const matrixSize = qr.modules.size;
+    const data = qr.modules.data;
+    const rows: boolean[][] = [];
+    for (let r = 0; r < matrixSize; r++) {
+      const row: boolean[] = [];
+      for (let c = 0; c < matrixSize; c++) {
+        row.push(Boolean(data[r * matrixSize + c]));
       }
-    };
-
-    placeFinder(0, 0);
-    placeFinder(0, N - 7);
-    placeFinder(N - 7, 0);
-
-    // Timing patterns
-    for (let i = 8; i < N - 8; i++) {
-      reserved[6][i] = true;
-      reserved[i][6] = true;
-      mat[6][i] = i % 2 === 0;
-      mat[i][6] = i % 2 === 0;
+      rows.push(row);
     }
-
-    // Center badge reserve (10..14)
-    for (let r = 10; r <= 14; r++) {
-      for (let c = 10; c <= 14; c++) {
-        reserved[r][c] = true;
-      }
-    }
-
-    // Fill data modules deterministically from payload bytes
-    let bitIdx = 0;
-    for (let r = 0; r < N; r++) {
-      for (let c = 0; c < N; c++) {
-        if (reserved[r][c]) continue;
-        const ch = payload.charCodeAt(bitIdx % payload.length);
-        const shift = (r * 7 + c * 3 + bitIdx) % 8;
-        mat[r][c] = ((ch >> shift) & 1) === 1 || (ch + r + c) % 3 === 0;
-        bitIdx++;
-      }
-    }
-    return mat;
+    return { size: matrixSize, rows };
   }, [payload]);
+
+  const quietZone = 2;
+  const totalViewBox = qrMatrix.size + quietZone * 2;
 
   return (
     <div
-      className="relative inline-flex items-center justify-center rounded-[16px] bg-white p-2.5 border border-[var(--color-border)] shrink-0 select-none"
+      className="relative inline-flex items-center justify-center rounded-[16px] bg-white p-2.5 border border-[var(--color-border)] shrink-0 select-none shadow-xs"
       style={{ width: size, height: size }}
     >
       <svg
-        viewBox="0 0 25 25"
-        className="w-full h-full text-[#171717]"
+        viewBox={`${-quietZone} ${-quietZone} ${totalViewBox} ${totalViewBox}`}
+        className="w-full h-full"
         shapeRendering="crispEdges"
+        role="img"
+        aria-label="PromptPay QR Code"
       >
-        {grid.map((row, r) =>
-          row.map((cell, c) =>
-            cell ? (
+        <rect
+          x={-quietZone}
+          y={-quietZone}
+          width={totalViewBox}
+          height={totalViewBox}
+          fill="#FFFFFF"
+        />
+        {qrMatrix.rows.map((row, r) =>
+          row.map((isDark, c) =>
+            isDark ? (
               <rect
                 key={`${r}-${c}`}
                 x={c}
                 y={r}
                 width={1}
                 height={1}
-                fill="currentColor"
+                fill="#000000"
               />
             ) : null
           )
         )}
       </svg>
-      {/* Center PromptPay Badge */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="h-6 w-6 rounded-md bg-[#171717] text-white flex items-center justify-center text-[9px] font-bold tracking-tighter ring-2 ring-white">
-          PP
-        </div>
-      </div>
     </div>
   );
 }
@@ -188,6 +177,7 @@ export interface AutoQrPaymentCardProps {
   slipScanFeedback: string | null;
   onUploadSlip: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSimulateValidSlip: () => void;
+  onChangePromptPayId?: (nextId: string) => void;
 }
 
 /**
@@ -202,25 +192,40 @@ export function AutoQrPaymentCard({
   slipScanFeedback,
   onUploadSlip,
   onSimulateValidSlip,
+  onChangePromptPayId,
 }: AutoQrPaymentCardProps) {
   const [copied, setCopied] = useState(false);
+  const [isEditingId, setIsEditingId] = useState(false);
+  const [customPromptPayId, setCustomPromptPayId] = useState(promptPayId);
+
+  const effectivePromptPayId =
+    customPromptPayId.trim().replace(/\D/g, "").length >= 10
+      ? customPromptPayId.trim()
+      : promptPayId;
 
   const handleCopyId = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(promptPayId);
+      navigator.clipboard.writeText(effectivePromptPayId);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }
   };
 
+  const handleSaveCustomId = () => {
+    setIsEditingId(false);
+    if (onChangePromptPayId && customPromptPayId.trim()) {
+      onChangePromptPayId(customPromptPayId.trim());
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-      {/* Left: Dynamic QR + Account Details */}
+      {/* Left: Dynamic Scannable QR + Account Details */}
       <div className="lg:col-span-6 app-surface-muted p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4">
         <DynamicPromptPayQrSvg
-          promptPayId={promptPayId}
+          promptPayId={effectivePromptPayId}
           amountThb={amountThb}
-          size={132}
+          size={148}
         />
 
         <div className="flex-1 min-w-0 space-y-1.5 text-center sm:text-left">
@@ -231,21 +236,57 @@ export function AutoQrPaymentCard({
 
           <p className="ty-body font-bold truncate">{promptPayAccountName}</p>
 
-          <div className="inline-flex items-center gap-1.5 ty-caption">
-            <span className="font-mono">{promptPayId}</span>
-            <button
-              type="button"
-              onClick={handleCopyId}
-              title={lang === "th" ? "คัดลอกพร้อมเพย์" : "Copy PromptPay ID"}
-              className="h-6 w-6 rounded-full hover:bg-[var(--color-overlay-hover)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
-            >
-              {copied ? (
-                <Check className="w-3.5 h-3.5 text-[var(--color-success)]" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
+          {isEditingId ? (
+            <div className="inline-flex items-center gap-1.5">
+              <input
+                type="tel"
+                value={customPromptPayId}
+                onChange={(e) => setCustomPromptPayId(e.target.value)}
+                placeholder="เบอร์พร้อมเพย์ / เลขผู้เสียภาษี"
+                className="h-7 w-36 rounded-lg border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] px-2 font-mono text-[12px] text-[var(--color-text-primary)] focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSaveCustomId}
+                title={lang === "th" ? "บันทึกเบอร์พร้อมเพย์" : "Save ID"}
+                className="h-7 w-7 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1 ty-caption">
+              <span className="font-mono">{effectivePromptPayId}</span>
+              <button
+                type="button"
+                onClick={handleCopyId}
+                title={lang === "th" ? "คัดลอกพร้อมเพย์" : "Copy PromptPay ID"}
+                className="h-6 w-6 rounded-full hover:bg-[var(--color-overlay-hover)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+              >
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-[var(--color-success)]" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomPromptPayId(effectivePromptPayId);
+                  setIsEditingId(true);
+                }}
+                title={
+                  lang === "th"
+                    ? "เปลี่ยนเบอร์พร้อมเพย์เพื่อทดสอบสแกนจริง"
+                    : "Edit PromptPay ID for live scan test"
+                }
+                className="h-6 w-6 rounded-full hover:bg-[var(--color-overlay-hover)] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition cursor-pointer"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           <div className="pt-1">
             <span className="ty-display">฿{amountThb.toLocaleString()}</span>
@@ -385,12 +426,11 @@ export function DigitalBookingVoucherCard({
           </div>
         </div>
 
-        {/* Right: Mini Check-In Pass QR */}
+        {/* Right: Scannable Check-In Pass QR */}
         <div className="sm:col-span-4 flex flex-col items-center justify-center sm:border-l sm:border-dashed sm:border-[var(--color-border)] sm:pl-4">
           <DynamicPromptPayQrSvg
-            promptPayId={booking.bookingCode}
-            amountThb={booking.totalPriceThb}
-            size={96}
+            rawPayload={`MYHOTEL-CHECKIN:${booking.bookingCode}|ROOM:${booking.roomCode}|IN:${booking.checkIn}|OUT:${booking.checkOut}`}
+            size={104}
           />
           <span className="ty-caption font-mono mt-1.5">CHECK-IN PASS</span>
         </div>

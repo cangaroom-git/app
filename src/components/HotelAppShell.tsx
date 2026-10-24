@@ -1279,55 +1279,136 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           pendingAdminCount={pendingAdminCount}
         />
 
-        {/* 2. STICKY TOP BOOKING NAVBAR — ALWAYS STICKY ON ALL DEVICES FOR BOOK TAB (/ or /room) */}
-        {(activeTab === "book" ||
-          activeTab === "home" ||
-          activeTab === "room") && (
-          <div className="sticky top-0 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-xl">
-            <div className="w-full max-w-[760px] mx-auto px-3 sm:px-4 py-2">
-              <AgodaBookingBar
-                lang={lang}
-                setLang={setLang}
-                checkIn={checkIn}
-                setCheckIn={setCheckIn}
-                checkOut={checkOut}
-                setCheckOut={setCheckOut}
-                guests={guests}
-                setGuests={setGuests}
-                nights={nights}
-                freeCount={totalAvailableUnitsCount}
-                totalRoomsCount={totalInventoryUnitsCount}
-                pendingAdminCount={pendingAdminCount}
-                onOpenDesignSystem={() => {}}
-                getDailyAvailability={getDailyAvailability}
-                onSearchRooms={() =>
-                  document
-                    .getElementById("rooms")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-              />
-            </div>
-          </div>
-        )}
+        {/* 2 & 3. INSTAGRAM 2-COLUMN FLEX LAYOUT FOR BOOK TAB (Feed + Sticky Right Rail — Never Overlaps!) */}
+        {activeTab === "book" ||
+        activeTab === "home" ||
+        activeTab === "room" ? (
+          <div className="w-full max-w-[960px] mx-auto flex justify-center items-start gap-6 xl:gap-8">
+            {/* LEFT/CENTER COLUMN: 760px Main Social Feed + Sticky Booking Bar */}
+            <div className="w-full max-w-[760px] min-w-0 flex-1">
+              <div className="sticky top-0 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-xl">
+                <div className="w-full px-3 sm:px-4 lg:px-6 py-2">
+                  <AgodaBookingBar
+                    lang={lang}
+                    setLang={setLang}
+                    checkIn={checkIn}
+                    setCheckIn={setCheckIn}
+                    checkOut={checkOut}
+                    setCheckOut={setCheckOut}
+                    guests={guests}
+                    setGuests={setGuests}
+                    nights={nights}
+                    freeCount={totalAvailableUnitsCount}
+                    totalRoomsCount={totalInventoryUnitsCount}
+                    pendingAdminCount={pendingAdminCount}
+                    onOpenDesignSystem={() => {}}
+                    getDailyAvailability={getDailyAvailability}
+                    onSearchRooms={() =>
+                      document
+                        .getElementById("rooms")
+                        ?.scrollIntoView({ behavior: "smooth" })
+                    }
+                  />
+                </div>
+              </div>
 
-        {/* 3. ENFORCED CENTERED FEED COLUMN (Facebook / Instagram Standard 760px Width) */}
-        <main
-          className={`relative w-full min-w-0 ${
-            activeTab === "chat" || activeTab === "shorts"
-              ? "pb-0"
-              : "pb-28 lg:pb-14"
-          }`}
-        >
-          <StandardFeedContainer
-            className={
+              <main className="relative w-full min-w-0 pb-28 lg:pb-14">
+                <StandardFeedContainer>{children}</StandardFeedContainer>
+              </main>
+            </div>
+
+            {/* RIGHT COLUMN: Ultra-Minimal Sticky Room Rail (Icon + Room Code + Available/Full Only) */}
+            <aside
+              aria-label={
+                lang === "th"
+                  ? "สถานะห้องว่างและทางลัดห้องพัก"
+                  : "Room availability quick jump"
+              }
+              className="hidden xl:flex w-[148px] shrink-0 sticky top-4 pt-3 pr-2 flex-col gap-3.5 select-none"
+            >
+              {rooms.map((rm) => {
+                const st = roomStatusMap[rm.id];
+                const isAvail =
+                  st?.state === "AVAILABLE" && (st?.availableUnits ?? 0) > 0;
+
+                return (
+                  <button
+                    key={rm.id}
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById(
+                        `room-card-${rm.id}`
+                      );
+                      if (el) {
+                        const top =
+                          el.getBoundingClientRect().top +
+                          window.scrollY -
+                          88;
+                        window.scrollTo({
+                          top: Math.max(0, top),
+                          behavior: "smooth",
+                        });
+                      }
+                    }}
+                    className="group w-full flex items-center gap-3 text-left transition cursor-pointer"
+                  >
+                    <div className="relative h-11 w-11 shrink-0">
+                      <img
+                        src={rm.images[0]?.url}
+                        alt={rm.code}
+                        className="h-11 w-11 rounded-full object-cover bg-[var(--color-background-muted)] transition"
+                      />
+                      <span
+                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--color-background-body)] ${
+                          isAvail ? "bg-emerald-500" : "bg-rose-500"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="ty-body font-bold leading-tight text-[var(--color-text-primary)]">
+                        {rm.code}
+                      </p>
+                      <p
+                        className={`ty-caption font-medium leading-tight mt-0.5 ${
+                          isAvail
+                            ? "text-[var(--color-success)]"
+                            : "text-[var(--color-text-secondary)]"
+                        }`}
+                      >
+                        {isAvail
+                          ? lang === "th"
+                            ? "ว่าง"
+                            : "Available"
+                          : lang === "th"
+                          ? "เต็ม"
+                          : "Full"}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </aside>
+          </div>
+        ) : (
+          <main
+            className={`relative w-full min-w-0 ${
               activeTab === "chat" || activeTab === "shorts"
-                ? "!py-0 lg:!py-3"
-                : ""
-            }
+                ? "pb-0"
+                : "pb-28 lg:pb-14"
+            }`}
           >
-            {children}
-          </StandardFeedContainer>
-        </main>
+            <StandardFeedContainer
+              className={
+                activeTab === "chat" || activeTab === "shorts"
+                  ? "!py-0 lg:!py-3"
+                  : ""
+              }
+            >
+              {children}
+            </StandardFeedContainer>
+          </main>
+        )}
 
         {/* 4. DESKTOP FLOATING AI CHAT BUBBLE (Bottom-Right Corner) */}
         <AiChatDesktopBubble
@@ -2036,6 +2117,15 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
                               slipScanFeedback={slipScanFeedback}
                               onUploadSlip={handleSlipFileUpload}
                               onSimulateValidSlip={handleSimulateValidSlip}
+                              onChangePromptPayId={(nextId) => {
+                                saveStore((prev) => ({
+                                  ...prev,
+                                  propertyConfig: {
+                                    ...prev.propertyConfig,
+                                    promptPayId: nextId,
+                                  },
+                                }));
+                              }}
                             />
                           )}
                         </div>
