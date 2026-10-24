@@ -76,6 +76,57 @@ function formatSliderDayLabel(dateStr: string, lang: "th" | "en" = "th"): string
   }`;
 }
 
+/**
+ * Viewport-gated video player for horizontal Reels strip.
+ * Prevents 6 concurrent MP4 downloads on initial page load by only playing/buffering
+ * videos that are currently visible inside the viewport.
+ */
+function ViewportReelVideo({
+  videoUrl,
+  posterUrl,
+  eager,
+}: {
+  videoUrl: string;
+  posterUrl: string;
+  eager: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          el.play().catch(() => {});
+        } else {
+          el.pause();
+        }
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <video
+      ref={videoRef}
+      src={videoUrl}
+      poster={posterUrl}
+      muted
+      loop
+      playsInline
+      preload={eager ? "metadata" : "none"}
+      className="w-full h-full object-cover"
+    />
+  );
+}
+
 export default function HomePage() {
   const {
     propertyConfig,
@@ -270,7 +321,7 @@ export default function HomePage() {
           />
 
           {/* 2. LARGE PURE VIDEO REELS SLIDER (VIDEO ONLY — NO TEXT, ARROWS ON HOVER ONLY) */}
-          <div className="relative group/reels">
+          <div className="relative group/reels overflow-hidden max-w-full">
             {/* Left Floating Arrow (Hover Only) */}
             <button
               type="button"
@@ -284,7 +335,7 @@ export default function HomePage() {
             {/* Horizontal Slider Track */}
             <div
               ref={reelsSliderRef}
-              className="flex gap-3 ml-5 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth"
+              className="flex gap-3 px-4 sm:px-5 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth"
             >
               {RESORT_SHORTS.map((shortItem, idx) => (
                 <div
@@ -301,14 +352,10 @@ export default function HomePage() {
                   aria-label={shortItem.titleTh}
                   className="relative w-[176px] sm:w-[210px] h-[296px] sm:h-[352px] shrink-0 snap-start rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/reelcard"
                 >
-                  <video
-                    src={shortItem.videoUrl}
-                    poster={shortItem.posterUrl}
-                    muted
-                    loop
-                    playsInline
-                    autoPlay
-                    className="w-full h-full object-cover"
+                  <ViewportReelVideo
+                    videoUrl={shortItem.videoUrl}
+                    posterUrl={shortItem.posterUrl}
+                    eager={idx < 2}
                   />
                 </div>
               ))}
@@ -330,8 +377,8 @@ export default function HomePage() {
       {/* Anchor target for Sticky Booking Bar */}
       <div id="rooms" className="scroll-mt-24 -mb-3 lg:-mb-5" />
 
-      {/* Mobile / Tablet Compact Sticky Room Anchor Strip (< xl) — Icon + Room Code + Available/Full Only */}
-      <div className="xl:hidden sticky top-[60px] z-20 bg-[var(--color-background-body)]/95 backdrop-blur-md px-4 py-2 border-b border-[var(--color-border)] flex items-center gap-2 overflow-x-auto no-scrollbar">
+      {/* Mobile / Tablet Compact Room Anchor Strip (< xl) — Icon + Room Code + Available/Full Only */}
+      <div className="xl:hidden w-full max-w-full bg-[var(--color-background-body)] px-4 py-2 border-b border-[var(--color-border)] flex items-center gap-2 overflow-x-auto no-scrollbar">
         {rooms.map((rm) => {
           const st = roomStatusMap[rm.id];
           const isAvail =
@@ -353,6 +400,8 @@ export default function HomePage() {
                 <img
                   src={rm.images[0]?.url}
                   alt={rm.code}
+                  loading="lazy"
+                  decoding="async"
                   className="h-6 w-6 rounded-full object-cover"
                 />
                 <span
@@ -415,17 +464,17 @@ export default function HomePage() {
           >
           <StandardCard noPadding>
             {/* 1. TOP FACEBOOK POST HEADER & ROOM DETAILS (ABOVE IMAGE) */}
-            <div className="p-4 sm:p-5 space-y-1.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <span className="inline-flex items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 text-[12px] font-bold">
+            <div className="p-4 sm:p-5 space-y-1.5 min-w-0">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="inline-flex items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 text-[12px] font-bold shrink-0">
                     {room.code}
                   </span>
-                  <h3 className="ty-title truncate">
+                  <h3 className="ty-title truncate min-w-0">
                     {lang === "th" ? room.nameTh : room.nameEn}
                   </h3>
                   {room.discountPercent > 0 && (
-                    <span className="rounded-full bg-[var(--color-success-muted)] text-[var(--color-success)] px-2 py-0.5 text-[11px] font-bold">
+                    <span className="hidden sm:inline-flex rounded-full bg-[var(--color-success-muted)] text-[var(--color-success)] px-2 py-0.5 text-[11px] font-bold shrink-0">
                       {lang === "th"
                         ? `ลด ${room.discountPercent}%`
                         : `SAVE ${room.discountPercent}%`}
@@ -550,6 +599,13 @@ export default function HomePage() {
                       src={img.url}
                       alt={img.captionTh || room.nameTh}
                       draggable={false}
+                      fetchPriority={
+                        roomIdx === 0 && imgIdx === 0 ? "high" : "auto"
+                      }
+                      loading={
+                        roomIdx === 0 && imgIdx === 0 ? "eager" : "lazy"
+                      }
+                      decoding="async"
                       className="h-full w-full object-cover object-center select-none"
                     />
                   </div>
@@ -678,10 +734,10 @@ export default function HomePage() {
       {vis.galleryAndReviewsSection && (
         <section
           id="reviews"
-          className="px-3.5 sm:px-4 lg:px-0 pt-2 pb-4 space-y-3.5"
+          className="w-full max-w-full min-w-0 overflow-hidden px-3.5 sm:px-4 lg:px-0 pt-2 pb-4 space-y-3.5"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="fw-head-icon shrink-0">
                 <Star className="w-5 h-5 text-amber-500 fill-current" />
               </div>
@@ -699,7 +755,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 max-w-full">
               <button
                 type="button"
                 onClick={() => navigateToTab("review")}
@@ -775,6 +831,8 @@ export default function HomePage() {
                     <img
                       src={rev.photo}
                       alt={rev.room}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
                   </div>

@@ -21,15 +21,20 @@ import {
 
 const STORAGE_KEY_WL = "white_label_resort_store_v6";
 
+// In-memory cache of parsed store data (vercel-react-best-practices: js-cache-storage)
+let memoryBookingsCache: BookingRecord[] | null = null;
+
 export function getLatestBookingsSnapshot(
   fallbackBookings: BookingRecord[]
 ): BookingRecord[] {
   if (typeof window === "undefined") return fallbackBookings;
+  if (memoryBookingsCache) return memoryBookingsCache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_WL);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<SapanStoreData>;
       if (parsed && Array.isArray(parsed.bookings)) {
+        memoryBookingsCache = parsed.bookings;
         return parsed.bookings;
       }
     }
@@ -695,7 +700,9 @@ export function useSapanStore() {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY_WL && e.newValue) {
         try {
-          setStore(JSON.parse(e.newValue));
+          const parsed = JSON.parse(e.newValue) as SapanStoreData;
+          memoryBookingsCache = parsed.bookings ?? null;
+          setStore(parsed);
         } catch {
           // ignore
         }
@@ -709,6 +716,7 @@ export function useSapanStore() {
     (updater: (prev: SapanStoreData) => SapanStoreData) => {
       setStore((prev) => {
         const next = updater(prev);
+        memoryBookingsCache = next.bookings;
         try {
           localStorage.setItem(STORAGE_KEY_WL, JSON.stringify(next));
         } catch {
@@ -722,6 +730,7 @@ export function useSapanStore() {
 
   const resetStoreToDefault = useCallback(() => {
     const def = getDefaultStore();
+    memoryBookingsCache = def.bookings;
     setStore(def);
     try {
       localStorage.setItem(STORAGE_KEY_WL, JSON.stringify(def));

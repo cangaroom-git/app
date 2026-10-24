@@ -10,6 +10,7 @@ import React, {
   useRef,
 } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -53,10 +54,6 @@ import {
   ResortExperienceItem,
 } from "@/data/rooms";
 import {
-  AutoQrPaymentCard,
-  DigitalBookingVoucherCard,
-} from "@/components/DynamicPromptPayQr";
-import {
   useSapanStore,
   formatDateStr,
   addDaysToDate,
@@ -79,17 +76,40 @@ import {
   useResortWeather,
   LiveWeatherData,
 } from "@/components/ResortWeatherWidget";
-import { RoomGalleryModal } from "@/components/RoomGalleryModal";
 import {
   HOTEL_NAV_TABS,
   MyHotelNav,
   HotelNavTabId,
   getTabIdFromPathname,
 } from "@/components/MyHotelNav";
-import {
-  AiChatDesktopBubble,
-  RoomStatusSummary,
-} from "@/components/AiBookingChatView";
+import type { RoomStatusSummary } from "@/components/AiBookingChatView";
+
+const AutoQrPaymentCard = dynamic(
+  () =>
+    import("@/components/DynamicPromptPayQr").then(
+      (mod) => mod.AutoQrPaymentCard
+    ),
+  { ssr: false }
+);
+const DigitalBookingVoucherCard = dynamic(
+  () =>
+    import("@/components/DynamicPromptPayQr").then(
+      (mod) => mod.DigitalBookingVoucherCard
+    ),
+  { ssr: false }
+);
+const RoomGalleryModal = dynamic(
+  () =>
+    import("@/components/RoomGalleryModal").then((mod) => mod.RoomGalleryModal),
+  { ssr: false }
+);
+const AiChatDesktopBubble = dynamic(
+  () =>
+    import("@/components/AiBookingChatView").then(
+      (mod) => mod.AiChatDesktopBubble
+    ),
+  { ssr: false }
+);
 
 export type Lang = "th" | "en";
 export type ThemeMode = "light" | "dark";
@@ -353,26 +373,56 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   const [lang, setLangState] = useState<Lang>("th");
   const [theme, setThemeState] = useState<ThemeMode>("light");
+  const [isMobileHeaderVisible, setIsMobileHeaderVisible] =
+    useState<boolean>(true);
 
   const applyThemeToDom = useCallback((mode: ThemeMode) => {
     if (typeof document === "undefined") return;
     const isDarkMode = mode === "dark";
-    const bgHex = isDarkMode ? "#1C1C1D" : "#ffffff";
     document.documentElement.classList.toggle("dark", isDarkMode);
-    document.documentElement.style.backgroundColor = bgHex;
-    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
-    if (document.body) {
-      document.body.style.backgroundColor = bgHex;
-    }
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) {
-      metaTheme.setAttribute("content", bgHex);
-    } else {
-      const m = document.createElement("meta");
-      m.name = "theme-color";
-      m.content = bgHex;
-      document.head.appendChild(m);
-    }
+  }, []);
+
+  // Auto-hide sticky top header on mobile scroll down & show on scroll up (matching weglobal.co / my-shop Nav.tsx)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const updateScrollDir = () => {
+      const scrollY = window.scrollY;
+      const maxScrollY =
+        document.documentElement.scrollHeight - window.innerHeight;
+
+      // Ignore iOS Safari rubber-band overscroll
+      if (scrollY < 0 || (maxScrollY > 0 && scrollY > maxScrollY)) {
+        ticking = false;
+        return;
+      }
+
+      if (Math.abs(scrollY - lastScrollY) < 10) {
+        ticking = false;
+        return;
+      }
+
+      if (scrollY > lastScrollY && scrollY > 60) {
+        setIsMobileHeaderVisible(false);
+      } else if (scrollY < lastScrollY) {
+        setIsMobileHeaderVisible(true);
+      }
+
+      lastScrollY = scrollY > 0 ? scrollY : 0;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScrollDir);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // Load saved theme and lang from localStorage on mount
@@ -1310,7 +1360,13 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           <div className="w-full max-w-[960px] mx-auto flex justify-center items-start gap-6 xl:gap-8">
             {/* LEFT/CENTER COLUMN: 760px Main Social Feed + Sticky Booking Bar */}
             <div className="w-full max-w-[760px] min-w-0 flex-1">
-              <div className="sticky top-0 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-xl">
+              <div
+                className={`sticky top-0 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-xl transition-transform duration-300 ${
+                  isMobileHeaderVisible
+                    ? "translate-y-0"
+                    : "-translate-y-full lg:translate-y-0"
+                }`}
+              >
                 <div className="w-full px-3 sm:px-4 lg:px-6 py-2">
                   <AgodaBookingBar
                     lang={lang}

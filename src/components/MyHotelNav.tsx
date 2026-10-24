@@ -246,8 +246,8 @@ export function MyHotelNav({
   pendingAdminCount = 0,
 }: MyHotelNavProps) {
   const [bottomNavHidden, setBottomNavHidden] = useState(false);
+  const [bottomNavRendered, setBottomNavRendered] = useState(true);
   const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
-  const lastScrollYRef = useRef(0);
 
   const brandCodeDisplay = propertyConfig?.brandCode ?? brandCode ?? "SU";
   const nameThDisplay =
@@ -263,24 +263,63 @@ export function MyHotelNav({
   };
 
   useEffect(() => {
-    const handleScroll = () => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    let upScrollAccumulation = 0;
+
+    const updateVisibility = () => {
       const currentY = window.scrollY;
-      const delta = currentY - lastScrollYRef.current;
+      const maxScrollY =
+        document.documentElement.scrollHeight - window.innerHeight;
+
+      // Ignore iOS Safari rubber-band overscroll at top or bottom
+      if (currentY < 0 || (maxScrollY > 0 && currentY > maxScrollY)) {
+        ticking = false;
+        return;
+      }
+
+      const diff = currentY - lastScrollY;
+      const downThreshold = 10;
+      const upAccumulationTarget = 60;
 
       if (currentY < 60) {
         setBottomNavHidden(false);
-      } else if (delta > 8) {
-        setBottomNavHidden(true);
-      } else if (delta < -6) {
-        setBottomNavHidden(false);
+        upScrollAccumulation = 0;
+      } else if (diff > 0) {
+        upScrollAccumulation = 0;
+        if (diff > downThreshold) {
+          setBottomNavHidden(true);
+        }
+      } else if (diff < 0) {
+        upScrollAccumulation += Math.abs(diff);
+        if (upScrollAccumulation > upAccumulationTarget) {
+          setBottomNavHidden(false);
+        }
       }
 
-      lastScrollYRef.current = currentY;
+      lastScrollY = currentY;
+      ticking = false;
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateVisibility);
+        ticking = true;
+      }
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!bottomNavHidden) {
+      setBottomNavRendered(true);
+    } else {
+      const timer = setTimeout(() => setBottomNavRendered(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [bottomNavHidden]);
 
   const isDark = theme === "dark";
   const normalizedActiveTab =
@@ -439,10 +478,10 @@ export function MyHotelNav({
                - Admin (/admin)
       ====================================================================== */}
       <div
-        className={`fixed inset-0 z-50 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-50 overflow-hidden transition-opacity duration-300 ${
           menuDrawerOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+            ? "opacity-100 visible pointer-events-auto"
+            : "opacity-0 invisible pointer-events-none"
         }`}
       >
         <div
@@ -672,15 +711,16 @@ export function MyHotelNav({
       ====================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
-        style={{
-          bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
-        }}
         className={`${
-          normalizedActiveTab === "chat" ? "hidden" : "lg:hidden"
-        } fixed left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[360px] transition-all duration-300 ease-out ${
+          normalizedActiveTab === "chat"
+            ? "hidden"
+            : !bottomNavRendered && bottomNavHidden
+            ? "hidden"
+            : "lg:hidden"
+        } fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[360px] transition-all duration-300 ease-in-out ${
           bottomNavHidden
-            ? "translate-y-24 opacity-0 pointer-events-none"
-            : "translate-y-0 opacity-100"
+            ? "translate-y-2 opacity-0 scale-95 pointer-events-none"
+            : "translate-y-0 opacity-100 scale-100 pointer-events-auto"
         }`}
       >
         <div

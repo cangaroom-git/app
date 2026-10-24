@@ -7,8 +7,6 @@
    3. Standardized Centered Feed Container (760px max-width)
    ============================================================================ */
 :root {
-  color-scheme: light;
-
   /* Core Brand & Accent Tokens (Light Mode) */
   --color-accent: #171717;
   --color-accent-hover: #262626;
@@ -89,8 +87,6 @@
    DARK MODE TOKENS (html.dark)
    ============================================================================ */
 html.dark {
-  color-scheme: dark;
-
   --color-accent: #f5f5f5;
   --color-accent-hover: #ffffff;
   --color-accent-muted: #262627;
@@ -147,12 +143,16 @@ select {
 html {
   background-color: var(--color-background-body);
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
   background-color: var(--color-background-body);
   color: var(--color-text-primary);
   min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: clip;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
   line-height: 1.5;
@@ -254,8 +254,10 @@ h1, h2, h3, h4, .font-serif {
 .app-feed-shell {
   width: 100%;
   max-width: var(--feed-max-width);
+  min-width: 0;
   margin-inline: auto;
   padding-inline: 0;
+  overflow-x: clip;
   overflow-anchor: none;
 }
 @media (min-width: 1024px) {
@@ -265,6 +267,10 @@ h1, h2, h3, h4, .font-serif {
 }
 
 .app-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
   border-radius: 0;
   background-color: var(--color-background-card);
   border: 1px solid var(--color-border);
@@ -436,72 +442,71 @@ html.dark .bg-\[\#00000008\] {
 }
 
 /* ============================================================================
-   GLOBAL CUSTOM SCROLLBAR STANDARD (ALL BROWSERS & CONTAINERS)
-   - 0 background / 100% transparent track across all scrollable elements
-   - 0 border on track and thumb
-   - Modern, sleek 6px rounded pill thumb with gentle hover/active transition
-   - Works across Light & Dark modes, modals, drawers, chat & root page
+   DESKTOP CUSTOM SCROLLBAR STANDARD (SCOPED TO DESKTOP POINTER DEVICES ONLY)
+   - Never override ::-webkit-scrollbar on iOS/mobile touch devices so iPhone
+     Safari retains 100% native UIScrollView full-bleed top/bottom overlay mode!
    ============================================================================ */
-html,
-body,
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-scrollbar-thumb) transparent;
-}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  html,
+  body,
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  }
 
-/* Chromium / Safari / Edge / WebKit Scrollbar Customization */
-::-webkit-scrollbar,
-*::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-  background: transparent !important;
-  background-color: transparent !important;
-}
+  ::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+    background: transparent !important;
+    background-color: transparent !important;
+  }
 
-::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track,
-::-webkit-scrollbar-track-piece,
-*::-webkit-scrollbar-track-piece {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  border-width: 0 !important;
-  box-shadow: none !important;
-  margin: 3px;
-}
+  ::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track-piece,
+  *::-webkit-scrollbar-track-piece {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-width: 0 !important;
+    box-shadow: none !important;
+    margin: 3px;
+  }
 
-::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb {
-  background-color: var(--color-scrollbar-thumb) !important;
-  border-radius: 9999px !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-  transition: background-color 0.2s ease;
-}
+  ::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-scrollbar-thumb) !important;
+    border-radius: 9999px !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    transition: background-color 0.2s ease;
+  }
 
-::-webkit-scrollbar-thumb:hover,
-*::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-scrollbar-thumb-hover) !important;
-}
+  ::-webkit-scrollbar-thumb:hover,
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-scrollbar-thumb-hover) !important;
+  }
 
-::-webkit-scrollbar-thumb:active,
-*::-webkit-scrollbar-thumb:active {
-  background-color: var(--color-scrollbar-thumb-active) !important;
-}
+  ::-webkit-scrollbar-thumb:active,
+  *::-webkit-scrollbar-thumb:active {
+    background-color: var(--color-scrollbar-thumb-active) !important;
+  }
 
-::-webkit-scrollbar-corner,
-*::-webkit-scrollbar-corner {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-}
+  ::-webkit-scrollbar-corner,
+  *::-webkit-scrollbar-corner {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+  }
 
-::-webkit-scrollbar-button,
-*::-webkit-scrollbar-button {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+  ::-webkit-scrollbar-button,
+  *::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
 }
 
 /* Elements that explicitly opt out of scrollbars (e.g. tag pill carousels) */
