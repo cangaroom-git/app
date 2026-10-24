@@ -672,9 +672,12 @@ export function MyHotelNav({
       ====================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
+        style={{
+          bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+        }}
         className={`${
           normalizedActiveTab === "chat" ? "hidden" : "lg:hidden"
-        } fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[360px] transition-all duration-300 ease-out ${
+        } fixed left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[360px] transition-all duration-300 ease-out ${
           bottomNavHidden
             ? "translate-y-24 opacity-0 pointer-events-none"
             : "translate-y-0 opacity-100"

@@ -144,9 +144,15 @@ select {
   font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif !important;
 }
 
+html {
+  background-color: var(--color-background-body);
+  min-height: 100%;
+}
+
 body {
   background-color: var(--color-background-body);
   color: var(--color-text-primary);
+  min-height: 100dvh;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
   line-height: 1.5;

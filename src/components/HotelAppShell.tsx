@@ -354,13 +354,36 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>("th");
   const [theme, setThemeState] = useState<ThemeMode>("light");
 
+  const applyThemeToDom = useCallback((mode: ThemeMode) => {
+    if (typeof document === "undefined") return;
+    const isDarkMode = mode === "dark";
+    const bgHex = isDarkMode ? "#1C1C1D" : "#ffffff";
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.style.backgroundColor = bgHex;
+    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
+    if (document.body) {
+      document.body.style.backgroundColor = bgHex;
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute("content", bgHex);
+    } else {
+      const m = document.createElement("meta");
+      m.name = "theme-color";
+      m.content = bgHex;
+      document.head.appendChild(m);
+    }
+  }, []);
+
   // Load saved theme and lang from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem("my-hotel-theme") as ThemeMode | null;
       if (saved === "dark" || saved === "light") {
         setThemeState(saved);
-        document.documentElement.classList.toggle("dark", saved === "dark");
+        applyThemeToDom(saved);
+      } else {
+        applyThemeToDom("light");
       }
       const savedLang = localStorage.getItem("my-hotel-lang") as Lang | null;
       if (savedLang === "th" || savedLang === "en") {
@@ -369,7 +392,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore storage errors
     }
-  }, []);
+  }, [applyThemeToDom]);
 
   const setLang = useCallback((nextLang: Lang) => {
     setLangState(nextLang);
@@ -380,17 +403,18 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setTheme = useCallback((nextTheme: ThemeMode) => {
-    setThemeState(nextTheme);
-    if (typeof document !== "undefined") {
-      document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    }
-    try {
-      localStorage.setItem("my-hotel-theme", nextTheme);
-    } catch {
-      // ignore
-    }
-  }, []);
+  const setTheme = useCallback(
+    (nextTheme: ThemeMode) => {
+      setThemeState(nextTheme);
+      applyThemeToDom(nextTheme);
+      try {
+        localStorage.setItem("my-hotel-theme", nextTheme);
+      } catch {
+        // ignore
+      }
+    },
+    [applyThemeToDom]
+  );
 
   const toggleTheme = useCallback(() => {
     setTheme(theme === "dark" ? "light" : "dark");
