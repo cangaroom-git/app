@@ -1,35 +1,54 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   MY-HOTEL · UNIFIED DESIGN SYSTEM (FACEBOOK / INSTAGRAM FEED ARCHITECTURE)
-   1. Pure White Light Mode (#ffffff) + Sleek Dark Mode (#0a0a0a)
-   2. Strict 5-Tier Typography Scale (No arbitrary font sizes)
-   3. Standardized Centered Feed Container (760px max-width)
+   MY-HOTEL · UNIFIED DESIGN SYSTEM
+   1. Pure White Light Mode (#ffffff) + Sleek Dark Mode (#1C1C1D / #262627)
+   2. Primary Brand Accent (#1751ae) + Promotion/Discount Accent (#c53829)
+   3. Primary Font: Noto Sans Thai + Strict 5-Tier Typography Scale
+   4. Standardized Centered Feed Container (1140px max-width)
+   5. Unified Right Sidebar Drawers (No centered modals)
    ============================================================================ */
 :root {
-  /* Core Brand & Accent Tokens (Light Mode) */
-  --color-accent: #171717;
-  --color-accent-hover: #262626;
-  --color-accent-muted: #f5f5f5;
+  /* Core Brand Accent Tokens (#1751ae Royal Blue) */
+  --color-accent: #1751ae;
+  --color-accent-hover: #134391;
+  --color-accent-muted: rgba(23, 81, 174, 0.10);
   --color-on-accent: #ffffff;
-  --color-fastwork: #0074e2;
+  --color-tiktok-accent: #1751ae;
+  --color-tiktok-accent-hover: #134391;
+  --color-tiktok-on-accent: #ffffff;
+  --color-tiktok-gray: #F2F4F7;
+  --color-tiktok-gray-hover: #e4e7ec;
+  --color-fastwork: #1751ae;
   --color-on-fastwork: #ffffff;
   --color-neutral: rgba(0, 0, 0, 0.05);
 
-  /* Pure White Page, Sidebar & Card Base (#ffffff in Light Mode) */
-  --color-background-body: #ffffff;
-  --color-background-surface: #ffffff;
-  --color-background-card: #ffffff;
-  --color-background-popover: #ffffff;
-  --color-background-muted: #F2F4F7;
-  --color-background-subtle: #e4e7ec;
-  --color-sidebar-bg: #ffffff;
+  /* Promotion & Discount Tokens (#c53829 Mandatory Standard) */
+  --color-promo: #c53829;
+  --color-promo-hover: #a82e21;
+  --color-on-promo: #ffffff;
+  --color-promo-muted: rgba(197, 56, 41, 0.10);
+  --color-promo-border: rgba(197, 56, 41, 0.26);
+  --color-promo-text: #c53829;
+
+  /* Flat 1-Layer Tonal Surface Hierarchy (Zero Box-in-Box - Light Mode) */
+  --color-background-body: #FFFFFF;
+  --color-background-surface: #FFFFFF;
+  --color-background-card: #FFFFFF;
+  --color-background-popover: #FFFFFF;
+  --color-background-muted: #F5F6F8;
+  --color-background-subtle: #EAECEF;
+  --color-sidebar-bg: #F5F6F8;
+
+  /* Elevation Shadows (Used strictly for floating Drawers, Sticky Header & Popovers) */
+  --shadow-card: 0 2px 14px rgba(15, 23, 42, 0.05);
+  --shadow-popover: 0 12px 36px rgba(15, 23, 42, 0.12);
 
   /* Typography Color Tokens (Light Mode) */
   --color-text-primary: #171717;
   --color-text-secondary: #737373;
   --color-text-disabled: #a3a3a3;
-  --color-text-accent: #171717;
+  --color-text-accent: #1751ae;
 
   /* Borders & Overlays (Light Mode) */
   --color-border: #eaecf0;
@@ -51,14 +70,16 @@
   --color-error-muted: #fee2e2;
   --color-on-error: #ffffff;
 
-  --color-warning: #745b00;
+  --color-warning: #855a00;
   --color-warning-muted: #fef3c7;
   --color-on-warning: #171717;
 
-  /* Standard Layout Width (Facebook/Instagram Centered Feed) */
-  --feed-max-width: 760px;
+  /* Standard Layout Width (1140px Centered Feed) & Unified Right Drawer Width */
+  --feed-max-width: 1140px;
+  --right-drawer-tablet-width: 460px;
+  --right-drawer-desktop-width: 520px;
 
-  /* Radii */
+  /* Unified Border Radii */
   --radius-inner: 8px;
   --radius-element: 12px;
   --radius-container: 16px;
@@ -79,32 +100,49 @@
   --font-size-body: 0.875rem;      /* 14px */
   --font-size-caption: 0.75rem;    /* 12px */
 
-  --font-family-body: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-family-heading: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-family-body: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-heading: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* ============================================================================
    DARK MODE TOKENS (html.dark)
    ============================================================================ */
 html.dark {
-  --color-accent: #f5f5f5;
-  --color-accent-hover: #ffffff;
-  --color-accent-muted: #262627;
-  --color-on-accent: #1C1C1D;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-accent-muted: rgba(59, 130, 246, 0.20);
+  --color-on-accent: #ffffff;
+  --color-tiktok-accent: #3b82f6;
+  --color-tiktok-accent-hover: #2563eb;
+  --color-tiktok-on-accent: #ffffff;
+  --color-tiktok-gray: #323234;
+  --color-tiktok-gray-hover: #3c3c40;
+  --color-fastwork: #3b82f6;
   --color-neutral: rgba(255, 255, 255, 0.08);
 
-  --color-background-body: #1C1C1D;
-  --color-background-surface: #262627;
-  --color-background-card: #262627;
-  --color-background-popover: #262627;
-  --color-background-muted: #323234;
-  --color-background-subtle: #323234;
-  --color-sidebar-bg: #1C1C1D;
+  /* Promotion & Discount Tokens (#c53829 in Dark Mode) */
+  --color-promo: #c53829;
+  --color-promo-hover: #d84333;
+  --color-on-promo: #ffffff;
+  --color-promo-muted: rgba(197, 56, 41, 0.22);
+  --color-promo-border: rgba(242, 107, 94, 0.38);
+  --color-promo-text: #f26b5e;
+
+  --color-background-body: #141416;
+  --color-background-surface: #1B1B1F;
+  --color-background-card: #1B1B1F;
+  --color-background-popover: #222227;
+  --color-background-muted: #202025;
+  --color-background-subtle: #2A2A31;
+  --color-sidebar-bg: #141416;
+
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.28);
+  --shadow-popover: 0 16px 42px rgba(0, 0, 0, 0.48);
 
   --color-text-primary: #f5f5f5;
   --color-text-secondary: #a3a3a3;
   --color-text-disabled: #525252;
-  --color-text-accent: #ffffff;
+  --color-text-accent: #60a5fa;
 
   --color-border: #363638;
   --color-border-emphasized: #48484A;
@@ -132,19 +170,19 @@ html.dark {
   --font-mono: ui-monospace, SFMono-Regular, monospace;
 }
 
+html,
 body,
 button,
 input,
 textarea,
 select {
-  font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif !important;
+  font-family: var(--font-family-body);
 }
 
 html {
   background-color: var(--color-background-body);
   min-height: 100%;
   max-width: 100%;
-  overflow-x: clip;
 }
 
 body {
@@ -225,6 +263,14 @@ h1, h2, h3, h4, .font-serif {
   color: var(--color-on-accent);
 }
 
+.bg-\[var\(--color-promo\)\],
+.bg-\[var\(--color-promo\)\].ty-body,
+.bg-\[var\(--color-promo\)\].ty-caption,
+.bg-\[var\(--color-promo\)\].ty-subtitle,
+.bg-\[var\(--color-promo\)\].ty-title {
+  color: var(--color-on-promo);
+}
+
 /* Clamp non-standard micro/intermediate font sizes to the 5-tier scale */
 .text-\[9px\],
 .text-\[10px\],
@@ -239,9 +285,7 @@ h1, h2, h3, h4, .font-serif {
   line-height: 1.55 !important;
 }
 
-.text-\[17px\],
-.text-\[18px\],
-.text-\[22px\] {
+.text-\[17px\] {
   font-size: var(--font-size-title) !important; /* 18px */
   line-height: 1.4 !important;
 }
@@ -249,16 +293,20 @@ h1, h2, h3, h4, .font-serif {
 /* ============================================================================
    STANDARDIZED FEED CONTAINER & CARD PRIMITIVES
    - Mobile & Tablet (< 1024px): Full-bleed edge-to-edge
-   - Desktop (>= 1024px): Centered 760px feed with rounded-[20px] cards & subtle border
+   - Desktop (>= 1024px): Centered 1140px feed with rounded-[20px] cards & subtle border
    ============================================================================ */
 .app-feed-shell {
   width: 100%;
   max-width: var(--feed-max-width);
   min-width: 0;
   margin-inline: auto;
-  padding-inline: 0;
-  overflow-x: clip;
+  padding-inline: 1rem;
   overflow-anchor: none;
+}
+@media (min-width: 640px) {
+  .app-feed-shell {
+    padding-inline: 1.25rem;
+  }
 }
 @media (min-width: 1024px) {
   .app-feed-shell {
@@ -271,20 +319,11 @@ h1, h2, h3, h4, .font-serif {
   max-width: 100%;
   min-width: 0;
   overflow-x: clip;
-  border-radius: 0;
-  background-color: var(--color-background-card);
-  border: 1px solid var(--color-border);
-  border-left-width: 0;
-  border-right-width: 0;
+  border-radius: var(--radius-page);
+  background-color: var(--color-background-muted);
+  border: none;
   color: var(--color-text-primary);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-@media (min-width: 1024px) {
-  .app-card {
-    border-radius: var(--radius-page);
-    border-left-width: 1px;
-    border-right-width: 1px;
-  }
+  transition: background-color 0.2s ease;
 }
 
 /* Standardized Single-Image Cover Height for All Section Cards */
@@ -304,14 +343,49 @@ h1, h2, h3, h4, .font-serif {
 .app-surface-muted {
   border-radius: var(--radius-container);
   background-color: var(--color-background-muted);
-  border: 1px solid var(--color-border);
+  border: none;
   color: var(--color-text-primary);
 }
 
 /* ============================================================================
-   DARK MODE AUTOMATIC ADAPTATION FOR EXISTING COMPONENT CLASSES
-   Ensures AgodaBookingBar, ResortWeatherWidget, Modals, and Drawers
-   adapt seamlessly when html.dark is active.
+   UNIFIED RIGHT SIDEBAR DRAWER PRIMITIVES
+   - Replaces all centered/bottom-sheet modals across the entire application
+   ============================================================================ */
+.app-right-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+.app-right-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100dvh;
+  max-width: 100%;
+  background-color: var(--color-background-card);
+  color: var(--color-text-primary);
+  border-left: none;
+  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (min-width: 640px) {
+  .app-right-drawer {
+    width: var(--right-drawer-tablet-width);
+  }
+}
+@media (min-width: 1024px) {
+  .app-right-drawer {
+    width: var(--right-drawer-desktop-width);
+  }
+}
+
+/* ============================================================================
+   DARK MODE AUTOMATIC ADAPTATION FOR LEGACY UTILITY CLASSES
    ============================================================================ */
 html.dark .bg-white {
   background-color: var(--color-background-card) !important;
@@ -356,26 +430,58 @@ html.dark .bg-\[\#00000008\] {
 }
 
 /* ============================================================================
-   BUTTON & ROW PRIMITIVES
+   UNIFIED BUTTON, ICON BUTTON & PROMOTION BADGE PRIMITIVES
+   - Standard button height: 40px (2.5rem), pill radius (9999px), 14px semibold
+   - Standard circular icon button: 36x36px (.btn-icon) or 40x40px (.btn-icon-lg)
    ============================================================================ */
 .btn-round-solid {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: 2.5rem;
   border-radius: 9999px;
   background-color: var(--color-accent);
   color: var(--color-on-accent);
-  padding: 0.55rem 1.25rem;
+  padding-inline: 1rem;
   font-size: var(--font-size-body);
   font-weight: 600;
-  border: 1px solid var(--color-accent);
-  transition: opacity 0.15s ease, background-color 0.15s ease;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
   cursor: pointer;
+  user-select: none;
 }
 
 .btn-round-solid:hover:not(:disabled) {
-  opacity: 0.9;
+  background-color: var(--color-accent-hover);
+}
+.btn-round-solid:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-promo-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--color-promo);
+  color: var(--color-on-promo);
+  padding-inline: 1rem;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-promo-solid:hover:not(:disabled) {
+  background-color: var(--color-promo-hover);
+}
+.btn-promo-solid:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-fw-secondary {
@@ -383,19 +489,24 @@ html.dark .bg-\[\#00000008\] {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: 2.5rem;
   border-radius: 9999px;
-  background-color: var(--color-neutral);
+  background-color: var(--color-background-muted);
   color: var(--color-text-primary);
-  padding: 0.5rem 1rem;
+  padding-inline: 1rem;
   font-size: var(--font-size-body);
   font-weight: 600;
-  border: 1px solid transparent;
-  transition: background-color 0.15s ease;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
   cursor: pointer;
+  user-select: none;
 }
 
 .btn-fw-secondary:hover:not(:disabled) {
-  background-color: var(--color-overlay-pressed);
+  background-color: var(--color-background-subtle);
+}
+.btn-fw-secondary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-round-border {
@@ -403,32 +514,224 @@ html.dark .bg-\[\#00000008\] {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  height: 2.5rem;
   border-radius: 9999px;
-  background-color: var(--color-background-card);
+  background-color: var(--color-background-muted);
   color: var(--color-text-primary);
-  padding: 0.5rem 1rem;
+  padding-inline: 1rem;
   font-size: var(--font-size-body);
-  font-weight: 500;
-  border: 1px solid var(--color-border-emphasized);
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  font-weight: 600;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
   cursor: pointer;
+  user-select: none;
 }
 
 .btn-round-border:hover:not(:disabled) {
-  background-color: var(--color-overlay-hover);
-  border-color: var(--color-text-primary);
+  background-color: var(--color-background-subtle);
+}
+.btn-round-border:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;  /* 36px (h-9 w-9) */
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background-color: var(--color-background-muted);
+  color: var(--color-text-primary);
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.btn-icon:hover:not(:disabled) {
+  background-color: var(--color-background-subtle);
+}
+.btn-icon:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.btn-icon-lg {
+  width: 2.5rem;   /* 40px (h-10 w-10) */
+  height: 2.5rem;
+}
+
+.badge-promo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding-inline: 0.625rem;
+  border-radius: 9999px;
+  background-color: var(--color-promo);
+  color: var(--color-on-promo);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.badge-promo-subtle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding-inline: 0.625rem;
+  border-radius: 9999px;
+  background-color: var(--color-promo-muted);
+  color: var(--color-promo-text);
+  border: none;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Unified Profile & Feed Action Buttons (Aligned to Site-Wide Pill & 14px Scale) */
+.btn-tiktok-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding-inline: 1.25rem;
+  border-radius: 9999px;
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.btn-tiktok-primary:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+.btn-tiktok-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-tiktok-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding-inline: 1rem;
+  border-radius: 9999px;
+  background-color: var(--color-background-muted);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.btn-tiktok-secondary:hover:not(:disabled) {
+  background-color: var(--color-background-subtle);
+}
+.btn-tiktok-secondary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-tiktok-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background-color: var(--color-background-muted);
+  color: var(--color-text-primary);
+  border: none;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.btn-tiktok-icon:hover:not(:disabled) {
+  background-color: var(--color-background-subtle);
+}
+.btn-tiktok-icon:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.tiktok-tab-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding-inline: 1.5rem;
+  font-size: var(--font-size-subtitle);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition: color 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.tiktok-tab-item:hover {
+  color: var(--color-text-primary);
+}
+.tiktok-tab-item.active {
+  color: var(--color-text-primary);
+}
+.tiktok-tab-item.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--color-text-primary);
+}
+
+.tiktok-video-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius-container);
+  overflow: hidden;
+  background-color: #121212;
+  cursor: pointer;
 }
 
 .fw-head-icon {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
   color: var(--color-text-primary);
-  background: var(--color-neutral);
-  border-radius: 12px;
+  background: var(--color-background-muted);
+  border: none;
+  border-radius: var(--radius-element);
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.fw-input {
+  height: 2.5rem;
+  border-radius: var(--radius-element);
+  background-color: var(--color-background-muted);
+  color: var(--color-text-primary);
+  padding-inline: 0.875rem;
+  font-size: var(--font-size-body);
+  border: none;
+  outline: none;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.fw-input::placeholder {
+  color: var(--color-text-secondary);
+}
+.fw-input:focus {
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
 }
 
 .fw-setting-row {
@@ -438,20 +741,20 @@ html.dark .bg-\[\#00000008\] {
   gap: 1.25rem;
   min-height: 4.25rem;
   padding-block: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
+  border: none;
 }
 
 /* ============================================================================
    DESKTOP CUSTOM SCROLLBAR STANDARD (SCOPED TO DESKTOP POINTER DEVICES ONLY)
-   - Never override ::-webkit-scrollbar on iOS/mobile touch devices so iPhone
-     Safari retains 100% native UIScrollView full-bleed top/bottom overlay mode!
    ============================================================================ */
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  html,
-  body,
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  @supports not selector(::-webkit-scrollbar) {
+    html,
+    body,
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-scrollbar-thumb) transparent;
+    }
   }
 
   ::-webkit-scrollbar,
@@ -509,7 +812,6 @@ html.dark .bg-\[\#00000008\] {
   }
 }
 
-/* Elements that explicitly opt out of scrollbars (e.g. tag pill carousels) */
 .no-scrollbar {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
@@ -522,10 +824,21 @@ html.dark .bg-\[\#00000008\] {
   background: transparent !important;
 }
 
-/* Modal Bottom Slide-Up Transition (GPU-accelerated 60/120fps) */
+/* ============================================================================
+   DRAWER & STEP TRANSITIONS (GPU-ACCELERATED 60/120FPS)
+   ============================================================================ */
+@keyframes slideInRightDrawer {
+  0% {
+    transform: translate3d(100%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @keyframes slideUpModal {
   0% {
-    transform: translate3d(0, 100%, 0);
+    transform: translate3d(100%, 0, 0);
   }
   100% {
     transform: translate3d(0, 0, 0);
@@ -541,8 +854,9 @@ html.dark .bg-\[\#00000008\] {
   }
 }
 
+.animate-slide-in-right-drawer,
 .animate-slide-up-modal {
-  animation: slideUpModal 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: slideInRightDrawer 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -550,11 +864,10 @@ html.dark .bg-\[\#00000008\] {
 }
 
 .animate-fade-in-backdrop {
-  animation: fadeInBackdrop 0.22s ease-out forwards;
+  animation: fadeInBackdrop 0.2s ease-out forwards;
   will-change: opacity;
 }
 
-/* Smooth Non-Bouncy Horizontal Step Transitions Inside Modal */
 @keyframes modalStepInRight {
   0% {
     opacity: 0;
@@ -597,4 +910,3 @@ html.dark .bg-\[\#00000008\] {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-

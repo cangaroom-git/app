@@ -1,19 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { HotelAppShell } from "@/components/HotelAppShell";
-
-const notoSansThai = Noto_Sans_Thai({
-  subsets: ["thai", "latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  preload: true,
-});
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export const metadata: Metadata = {
@@ -45,14 +38,18 @@ export default function RootLayout({
           href="https://assets.mixkit.co"
           crossOrigin="anonymous"
         />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body
-        className={`${notoSansThai.className} min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)] antialiased selection:bg-[var(--color-accent)]/15`}
-        style={{
-          fontFamily:
-            '"Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif',
-        }}
-      >
+      <body className="min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)] antialiased selection:bg-[var(--color-accent)]/15">
         <HotelAppShell>{children}</HotelAppShell>
       </body>
     </html>

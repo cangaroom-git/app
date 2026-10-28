@@ -9,14 +9,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  Maximize2,
-  Users,
   ArrowRight,
   Globe,
-  MapPin,
 } from "lucide-react";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { StandardCard } from "@/components/ui/standards";
+import { StatusPill } from "@/components/ui/standards";
 
 interface FacebookReviewPost {
   id: string;
@@ -169,30 +166,30 @@ export default function ReviewPage() {
 
   return (
     <>
-      {/* 1. FACEBOOK CUSTOMER REVIEWS HEADER CARD */}
-      <StandardCard>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="h-12 w-12 rounded-[16px] bg-[#1877F2]/12 text-[#1877F2] flex items-center justify-center shrink-0 font-bold text-[20px]">
-              f
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="ty-title truncate">
+      {/* 1. Flat Facebook Reviews Header & Filter Bar (Open Canvas) */}
+      <header className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="ty-title flex items-center gap-2 truncate">
+                <Star className="w-5 h-5 fill-[var(--color-warning)] text-[var(--color-warning)] shrink-0" />
+                <span className="truncate">
                   {lang === "th"
                     ? "โพสต์รีวิวจากลูกค้าบน Facebook"
                     : "Verified Facebook Guest Reviews"}
-                </h1>
-                <span className="rounded-full bg-[var(--color-success-muted)] text-[var(--color-success)] px-2.5 py-0.5 text-[11px] font-bold">
-                  {lang === "th" ? "9.6 / 10 ยอดเยี่ยมมาก" : "9.6 / 10 Exceptional"}
                 </span>
-              </div>
-              <p className="ty-caption mt-0.5">
+              </h1>
+              <StatusPill variant="success">
                 {lang === "th"
-                  ? `ดึงข้อมูลโพสต์สาธารณะจากลูกค้าจริงที่เช็คอิน ${propertyConfig.nameTh} บน Facebook`
-                  : `Public Facebook check-in posts from verified guests at ${propertyConfig.nameEn}`}
-              </p>
+                  ? "9.6 / 10 ยอดเยี่ยมมาก"
+                  : "9.6 / 10 Exceptional"}
+              </StatusPill>
             </div>
+            <p className="ty-caption mt-0.5">
+              {lang === "th"
+                ? `โพสต์สาธารณะจากผู้เข้าพักจริงที่เช็คอิน ${propertyConfig.nameTh}`
+                : `Public check-in posts from verified guests at ${propertyConfig.nameEn}`}
+            </p>
           </div>
 
           <a
@@ -204,18 +201,13 @@ export default function ReviewPage() {
             <span>
               {lang === "th" ? "เพจ Facebook ที่พัก" : "Official Facebook Page"}
             </span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-4 h-4" />
           </a>
         </div>
 
-        {/* Filter Pills by Room Code */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-4 mt-4 border-t border-[var(--color-border)]">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
-            {
-              id: "all",
-              labelTh: "โพสต์ทั้งหมด",
-              labelEn: "All Reviews",
-            },
+            { id: "all", labelTh: "โพสต์ทั้งหมด", labelEn: "All Reviews" },
             {
               id: "A1",
               labelTh: "บ้านพัก A1 · A-Frame",
@@ -238,7 +230,7 @@ export default function ReviewPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedFilter(tab.id)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition cursor-pointer ${
+                className={`shrink-0 h-8 rounded-full px-3.5 ty-caption font-semibold inline-flex items-center justify-center transition cursor-pointer ${
                   active
                     ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                     : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -249,175 +241,147 @@ export default function ReviewPage() {
             );
           })}
         </div>
-      </StandardCard>
+      </header>
 
-      {/* 2. FACEBOOK CUSTOMER POST FEED CARDS (Rendered in our App Window Design) */}
-      {filteredPosts.map((post) => {
-        const linkedRoom =
-          rooms.find((r) => r.id === post.roomId || r.code === post.roomCode) ||
-          rooms[0];
-        const st = linkedRoom ? roomStatusMap[linkedRoom.id] : undefined;
-        const nightlyRate =
-          st?.effectiveNightlyPrice ?? linkedRoom?.basePriceThb ?? 2990;
-        const currentSlide = slideIndexMap[post.id] ?? 0;
-        const totalSlides = post.photos.length;
-        const isLiked = Boolean(likedPosts[post.id]);
-        const likeCount = isLiked ? post.likesCount + 1 : post.likesCount;
+      {/* 2. Flat 1-Layer Social Review Posts (Zero Inner Sub-Boxes) */}
+      <section className="space-y-5">
+        {filteredPosts.map((post) => {
+          const linkedRoom =
+            rooms.find(
+              (r) => r.id === post.roomId || r.code === post.roomCode
+            ) || rooms[0];
+          const st = linkedRoom ? roomStatusMap[linkedRoom.id] : undefined;
+          const nightlyRate =
+            st?.effectiveNightlyPrice ?? linkedRoom?.basePriceThb ?? 2990;
+          const currentSlide = slideIndexMap[post.id] ?? 0;
+          const totalSlides = post.photos.length;
+          const isLiked = Boolean(likedPosts[post.id]);
+          const likeCount = isLiked ? post.likesCount + 1 : post.likesCount;
 
-        return (
-          <StandardCard key={post.id} id={post.id} noPadding>
-            {/* Facebook Post Author Header */}
-            <div className="p-4 sm:p-5 flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <img
-                  src={post.authorAvatar}
-                  alt={post.authorName}
-                  className="h-10 w-10 rounded-full object-cover border border-[var(--color-border)] shrink-0"
-                />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="ty-body font-bold text-[var(--color-text-primary)] truncate">
+          return (
+            <article key={post.id} id={post.id} className="app-card overflow-hidden">
+              {/* Author Header */}
+              <div className="p-4 sm:p-5 pb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={post.authorAvatar}
+                    alt={post.authorName}
+                    className="h-10 w-10 rounded-full object-cover shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="ty-body font-bold text-[var(--color-text-primary)] truncate">
                       {post.authorName}
-                    </span>
-                    <span className="ty-caption">
-                      {lang === "th" ? "เช็คอินที่" : "checked in at"}
-                    </span>
-                    <span className="ty-body font-semibold text-[var(--color-text-primary)] truncate">
-                      {lang === "th"
-                        ? propertyConfig.nameTh
-                        : propertyConfig.nameEn}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 ty-caption mt-0.5">
-                    <span>
-                      {lang === "th" ? post.postedAgoTh : post.postedAgoEn}
-                    </span>
-                    <span>·</span>
-                    <Globe className="w-3 h-3" />
-                    <span>
-                      {lang === "th" ? "โพสต์สาธารณะ Facebook" : "Facebook Public Post"}
-                    </span>
+                    </p>
+                    <p className="flex items-center gap-1.5 ty-caption">
+                      <span>
+                        {lang === "th" ? post.postedAgoTh : post.postedAgoEn}
+                      </span>
+                      <span>·</span>
+                      <Globe className="w-3 h-3" />
+                      <span>Facebook</span>
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="hidden sm:inline-flex items-center gap-0.5 text-amber-500">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                </div>
-                <span className="rounded-full bg-[var(--color-background-muted)] px-2.5 py-1 text-[11px] font-bold text-[var(--color-text-primary)]">
-                  {post.rating}
+                <span className="inline-flex items-center gap-1 ty-body font-bold text-[var(--color-text-primary)] shrink-0">
+                  <Star className="w-4 h-4 fill-[var(--color-warning)] text-[var(--color-warning)]" />
+                  <span>{post.rating}</span>
                 </span>
               </div>
-            </div>
 
-            {/* Customer Post Text & Hashtags */}
-            <div className="px-4 sm:px-5 pb-3.5 space-y-2">
-              <p className="ty-body whitespace-pre-line">
-                {lang === "th" ? post.captionTh : post.captionEn}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {post.hashtags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="ty-caption font-semibold text-[#1877F2]"
-                  >
-                    {tag}
-                  </span>
-                ))}
+              {/* Caption & Hashtags */}
+              <div className="px-4 sm:px-5 pb-3.5 space-y-1.5">
+                <p className="ty-body whitespace-pre-line">
+                  {lang === "th" ? post.captionTh : post.captionEn}
+                </p>
+                <p className="flex flex-wrap gap-2 ty-caption font-semibold text-[var(--color-accent)]">
+                  {post.hashtags.map((tag) => (
+                    <span key={tag}>{tag}</span>
+                  ))}
+                </p>
               </div>
-            </div>
 
-            {/* Tall Swipeable Post Photos (No gradient, no text overlay on image) */}
-            <div
-              onDoubleClick={() =>
-                setLikedPosts((prev) => ({
-                  ...prev,
-                  [post.id]: !prev[post.id],
-                }))
-              }
-              className="relative w-full aspect-[4/5] sm:h-[520px] overflow-hidden bg-black group/fbphoto"
-            >
+              {/* Swipeable Post Photos */}
               <div
-                ref={(el) => {
-                  photoStripRefs.current[post.id] = el;
-                }}
-                onScroll={(e) => {
-                  const el = e.currentTarget;
-                  if (!el.clientWidth) return;
-                  const idx = Math.round(el.scrollLeft / el.clientWidth);
-                  if (idx !== currentSlide) {
-                    setSlideIndexMap((prev) => ({ ...prev, [post.id]: idx }));
-                  }
-                }}
-                className="flex h-full w-full overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth touch-pan-x"
+                onDoubleClick={() =>
+                  setLikedPosts((prev) => ({
+                    ...prev,
+                    [post.id]: !prev[post.id],
+                  }))
+                }
+                className="relative w-full aspect-[4/5] sm:h-[480px] overflow-hidden bg-black group/fbphoto"
               >
-                {post.photos.map((photoUrl, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => linkedRoom && openGalleryModal(linkedRoom)}
-                    className="h-full w-full shrink-0 snap-center overflow-hidden cursor-pointer"
-                  >
+                <div
+                  ref={(el) => {
+                    photoStripRefs.current[post.id] = el;
+                  }}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    if (!el.clientWidth) return;
+                    const idx = Math.round(el.scrollLeft / el.clientWidth);
+                    if (idx !== currentSlide) {
+                      setSlideIndexMap((prev) => ({ ...prev, [post.id]: idx }));
+                    }
+                  }}
+                  className="flex h-full w-full overflow-x-auto snap-x snap-mandatory overscroll-x-contain no-scrollbar scroll-smooth touch-manipulation"
+                >
+                  {post.photos.map((photoUrl, idx) => (
                     <img
+                      key={idx}
                       src={photoUrl}
                       alt={`${post.authorName} review photo ${idx + 1}`}
                       draggable={false}
-                      className="h-full w-full object-cover object-center select-none"
+                      onClick={() => linkedRoom && openGalleryModal(linkedRoom)}
+                      className="h-full w-full shrink-0 snap-center object-cover object-center select-none cursor-pointer"
                     />
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                {totalSlides > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        scrollPostPhoto(
+                          post.id,
+                          (currentSlide - 1 + totalSlides) % totalSlides
+                        )
+                      }
+                      aria-label="Previous photo"
+                      className="hidden lg:flex absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white items-center justify-center opacity-0 group-hover/fbphoto:opacity-100 transition cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        scrollPostPhoto(post.id, (currentSlide + 1) % totalSlides)
+                      }
+                      aria-label="Next photo"
+                      className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white items-center justify-center opacity-0 group-hover/fbphoto:opacity-100 transition cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 pointer-events-none">
+                      {post.photos.map((_, dotIdx) => (
+                        <span
+                          key={dotIdx}
+                          className={`h-1.5 rounded-full transition-all ${
+                            dotIdx === currentSlide
+                              ? "w-4 bg-white"
+                              : "w-1.5 bg-white/55"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {totalSlides > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      scrollPostPhoto(
-                        post.id,
-                        (currentSlide - 1 + totalSlides) % totalSlides
-                      )
-                    }
-                    aria-label="Previous photo"
-                    className="hidden lg:flex absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white items-center justify-center opacity-0 group-hover/fbphoto:opacity-100 transition cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      scrollPostPhoto(post.id, (currentSlide + 1) % totalSlides)
-                    }
-                    aria-label="Next photo"
-                    className="hidden lg:flex absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-black/60 text-white items-center justify-center opacity-0 group-hover/fbphoto:opacity-100 transition cursor-pointer"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 pointer-events-none">
-                    {post.photos.map((_, dotIdx) => (
-                      <span
-                        key={dotIdx}
-                        className={`h-1.5 rounded-full transition-all ${
-                          dotIdx === currentSlide
-                            ? "w-4 bg-white"
-                            : "w-1.5 bg-white/55"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Post Footer: Like / Share Icon + Linked Room Specs & "View This Room" */}
-            <div className="p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-3.5">
+              {/* Single Flat Footer Row (Social Actions + Inline Linked Room CTA) */}
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -427,13 +391,17 @@ export default function ReviewPage() {
                       }))
                     }
                     aria-label="Like review"
-                    className="inline-flex items-center gap-1.5 text-[var(--color-text-primary)] hover:opacity-75 transition cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-[var(--color-text-primary)] cursor-pointer"
                   >
-                    <Heart
-                      className={`w-6 h-6 transition-transform active:scale-125 ${
-                        isLiked ? "fill-rose-500 text-rose-500" : ""
-                      }`}
-                    />
+                    <span className="h-9 w-9 rounded-full hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center transition">
+                      <Heart
+                        className={`w-4 h-4 transition-transform active:scale-125 ${
+                          isLiked
+                            ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
+                            : ""
+                        }`}
+                      />
+                    </span>
                     <span className="ty-body font-semibold">
                       {likeCount.toLocaleString()}
                     </span>
@@ -444,86 +412,56 @@ export default function ReviewPage() {
                     onClick={() => handleSharePost(post)}
                     aria-label="Share review"
                     title={lang === "th" ? "แชร์โพสต์รีวิวนี้" : "Share this review"}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-full text-[var(--color-text-primary)] hover:bg-[var(--color-overlay-hover)] transition cursor-pointer"
+                    className="h-9 w-9 rounded-full hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center transition cursor-pointer"
                   >
                     {sharedPostId === post.id ? (
-                      <Check className="w-5 h-5 text-[var(--color-success)]" />
+                      <Check className="w-4 h-4 text-[var(--color-success)]" />
                     ) : (
-                      <Send className="w-5 h-5 -rotate-12" />
+                      <Send className="w-4 h-4 -rotate-12" />
                     )}
                   </button>
-                </div>
 
-                <a
-                  href={post.facebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 ty-caption font-semibold hover:text-[var(--color-text-primary)] transition"
-                >
-                  <span>
-                    {lang === "th" ? "ดูโพสต์บน Facebook" : "View on Facebook"}
-                  </span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-
-              {linkedRoom && (
-                <div className="pt-3 border-t border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 text-[12px] font-bold">
-                        {linkedRoom.code}
-                      </span>
-                      <h3 className="ty-subtitle truncate">
-                        {lang === "th"
-                          ? linkedRoom.nameTh
-                          : linkedRoom.nameEn}
-                      </h3>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5 ty-body font-medium text-[var(--color-text-secondary)]">
-                      <span className="inline-flex items-center gap-1 text-[var(--color-text-primary)]">
-                        <Maximize2 className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                        <span>
-                          {linkedRoom.sizeSqm} {lang === "th" ? "ตร.ม." : "m²"}
-                        </span>
-                      </span>
-                      <span>·</span>
-                      <span className="inline-flex items-center gap-1 text-[var(--color-text-primary)]">
-                        <Users className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                        <span>
-                          {linkedRoom.baseGuests}–{linkedRoom.maxGuests}{" "}
-                          {lang === "th" ? "ท่าน" : "guests"}
-                        </span>
-                      </span>
-                      <span>·</span>
-                      <span className="inline-flex items-baseline gap-1">
-                        <strong className="ty-subtitle text-[var(--color-text-primary)]">
-                          ฿{nightlyRate.toLocaleString()}
-                        </strong>
-                        <span className="ty-caption">
-                          {lang === "th" ? "/ คืน" : "/ night"}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openRoomDrawer(linkedRoom, "details")}
-                    className="btn-round-solid shrink-0 w-full sm:w-auto"
+                  <a
+                    href={post.facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 ty-caption font-semibold hover:text-[var(--color-accent)] transition"
                   >
-                    <span>
-                      {lang === "th" ? "ดูและจองห้องพักนี้" : "View This Room"}
-                    </span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                    <span>Facebook</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
-              )}
-            </div>
-          </StandardCard>
-        );
-      })}
+
+                {linkedRoom && (
+                  <div className="flex items-center justify-between sm:justify-end gap-3">
+                    <div className="sm:text-right min-w-0">
+                      <p className="ty-body font-bold truncate">
+                        {linkedRoom.code} ·{" "}
+                        {lang === "th" ? linkedRoom.nameTh : linkedRoom.nameEn}
+                      </p>
+                      <p className="ty-caption">
+                        <strong className="text-[var(--color-accent)]">
+                          ฿{nightlyRate.toLocaleString()}
+                        </strong>{" "}
+                        {lang === "th" ? "/ คืน" : "/ night"}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openRoomDrawer(linkedRoom, "calendar")}
+                      className="btn-round-solid shrink-0 cursor-pointer"
+                    >
+                      <span>{lang === "th" ? "จองห้องนี้" : "Book"}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </section>
     </>
   );
 }

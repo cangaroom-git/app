@@ -2,12 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-import { ChevronLeft, Sun, Moon } from "lucide-react";
+import { ChevronLeft, Moon, ShieldCheck, Sun } from "lucide-react";
 import { useSapanStore } from "@/lib/store";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { HotelOwnerStudioPanel } from "@/components/HotelOwnerStudioPanel";
+import { HotelAdminPanel } from "@/components/admin/HotelAdminPanel";
+import { StatusPill } from "@/components/ui/standards";
 
-export default function WhiteLabelAdminDashboardPage() {
+export default function HotelAdminDashboardPage() {
   const { resetStoreToDefault } = useSapanStore();
   const {
     propertyConfig,
@@ -17,66 +18,81 @@ export default function WhiteLabelAdminDashboardPage() {
     bookings,
     pendingAdminCount,
     saveStore,
-    lang,
+    lang: language,
     setLang,
     theme,
     toggleTheme,
   } = useHotelApp();
 
   return (
-    <div className="min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
-      {/* Minimalist App Top Bar for Admin Settings */}
-      <header className="sticky top-0 z-40 h-14 bg-[var(--color-background-card)]/90 backdrop-blur-md border-b border-[var(--color-border)]">
+    <div className="min-h-[100dvh] pt-12 bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
+      {/* Slim Always-Sticky Top Bar for Hotel Admin Settings (h-12 = 48px) */}
+      <header className="fixed top-0 inset-x-0 z-40 h-12 bg-[var(--color-background-body)]/92 backdrop-blur-xl shadow-[0_2px_14px_rgba(15,23,42,0.05)]">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="btn-fw-secondary !py-1.5 !px-3.5">
-              <ChevronLeft className="w-4 h-4" />
-              <span>{lang === "th" ? "กลับหน้าแอป" : "Back to App"}</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Link
+              href="/"
+              className="h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold inline-flex items-center gap-1.5 shrink-0 transition"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>{language === "th" ? "หน้าร้าน" : "Storefront"}</span>
             </Link>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-[10px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold text-[12px]">
-                {propertyConfig.brandCode.slice(0, 2)}
-              </div>
-              <span className="ty-body font-semibold truncate max-w-[180px] sm:max-w-xs">
-                {lang === "th" ? propertyConfig.nameTh : propertyConfig.nameEn}
-              </span>
-              <span className="hidden sm:inline-flex items-center rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 ty-caption font-semibold">
-                Admin Settings
-              </span>
+
+            <div className="h-8 w-8 rounded-[10px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold ty-caption shrink-0">
+              {propertyConfig.brandCode.slice(0, 2)}
             </div>
+            <span className="ty-body font-bold truncate max-w-[160px] sm:max-w-xs">
+              {language === "th"
+                ? propertyConfig.nameTh
+                : propertyConfig.nameEn}
+            </span>
+            <span className="hidden md:inline-flex">
+              <StatusPill variant="accent">Admin Studio</StatusPill>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Link
+              href="/super-admin"
+              className="hidden sm:inline-flex h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold items-center gap-1.5 transition"
+              title="Super Admin Portal"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>SaaS</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setLang(language === "th" ? "en" : "th")}
+              className="btn-icon cursor-pointer ty-caption font-bold"
+              title={
+                language === "th" ? "Switch to English" : "เปลี่ยนเป็นภาษาไทย"
+              }
+              aria-label="Toggle language"
+            >
+              {language === "th" ? "EN" : "TH"}
+            </button>
+
             <button
               type="button"
               onClick={toggleTheme}
-              className="btn-round-border !py-1.5 !px-3"
-              title="Toggle Dark / Light Mode"
+              className="btn-icon cursor-pointer"
+              title={theme === "dark" ? "Light Mode" : "Dark Mode"}
+              aria-label="Toggle Dark or Light Mode"
             >
               {theme === "dark" ? (
                 <Sun className="w-4 h-4" />
               ) : (
                 <Moon className="w-4 h-4" />
               )}
-              <span className="hidden sm:inline">
-                {theme === "dark" ? "Light" : "Dark"}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setLang(lang === "th" ? "en" : "th")}
-              className="btn-round-border !py-1.5 !px-3.5"
-            >
-              <span>{lang === "th" ? "ไทย (TH)" : "English (EN)"}</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Settings Layout */}
-      <main className="py-3 sm:py-5">
-        <HotelOwnerStudioPanel
+      {/* Main Split-Pane Settings Workspace */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <HotelAdminPanel
           propertyConfig={propertyConfig}
           rooms={rooms}
           coupons={coupons}
@@ -85,8 +101,8 @@ export default function WhiteLabelAdminDashboardPage() {
           pendingAdminCount={pendingAdminCount}
           saveStore={saveStore}
           onResetStore={resetStoreToDefault}
-          lang={lang}
-          onChangeLang={setLang}
+          language={language}
+          onChangeLanguage={setLang}
         />
       </main>
     </div>

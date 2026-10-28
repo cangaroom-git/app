@@ -5,9 +5,10 @@ import React from "react";
 /* ============================================================================
    MY-HOTEL · UNIFIED UI, LAYOUT & TYPOGRAPHY STANDARDS
    Enforces:
-   1. Single Centered Feed Layout (`max-w-[760px] mx-auto`) — Facebook/Instagram style
+   1. Single Centered Feed Layout (`max-w-[1140px] mx-auto`)
    2. Strict 5-Tier Font Scale (`ty-display`, `ty-title`, `ty-subtitle`, `ty-body`, `ty-caption`)
-   3. Automatic Light Mode (#ffffff) & Dark Mode (#0a0a0a / #141414) surfaces
+   3. Unified Pill Buttons, Circular Icon Buttons, Inputs & `#c53829` Promo Tokens
+   4. Automatic Light Mode (#ffffff) & Dark Mode (#1C1C1D / #262627) surfaces
    ============================================================================ */
 
 export function StandardFeedContainer({
@@ -19,7 +20,7 @@ export function StandardFeedContainer({
 }) {
   return (
     <div
-      className={`app-feed-shell py-0 lg:py-6 flex flex-col gap-2.5 lg:gap-5 ${className}`}
+      className={`app-feed-shell py-4 lg:py-6 flex flex-col gap-6 lg:gap-8 ${className}`}
     >
       {children}
     </div>
@@ -41,7 +42,7 @@ export function StandardCard({
     <section
       id={id}
       className={`app-card ${
-        noPadding ? "overflow-hidden" : "p-4 sm:p-6"
+        noPadding ? "overflow-hidden" : "p-4 sm:p-5"
       } ${className}`}
     >
       {children}
@@ -65,27 +66,31 @@ export function StandardSectionHeader({
   className?: string;
 }) {
   return (
-    <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)] ${className}`}
+    <header
+      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${className}`}
     >
-      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-        {icon && <div className="fw-head-icon shrink-0">{icon}</div>}
-        <div className="min-w-0">
-          {eyebrow && (
-            <span className="ty-caption font-semibold uppercase tracking-wider block mb-0.5">
-              {eyebrow}
+      <div className="min-w-0">
+        {eyebrow && (
+          <span className="ty-caption font-semibold uppercase tracking-wider block mb-0.5">
+            {eyebrow}
+          </span>
+        )}
+        <h2 className="ty-title flex items-center gap-2 min-w-0">
+          {icon && (
+            <span className="text-[var(--color-accent)] shrink-0 [&_svg]:w-5 [&_svg]:h-5">
+              {icon}
             </span>
           )}
-          <h2 className="ty-title truncate">{title}</h2>
-          {description && <p className="ty-body-muted mt-0.5">{description}</p>}
-        </div>
+          <span className="truncate">{title}</span>
+        </h2>
+        {description && <p className="ty-caption mt-0.5">{description}</p>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
-    </div>
+      {action}
+    </header>
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "outline" | "subtle";
+type ButtonVariant = "primary" | "promo" | "secondary" | "outline" | "subtle";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface StandardButtonProps
@@ -104,27 +109,71 @@ export function StandardButton({
   ...props
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: "h-9 px-3.5 text-[14px]",
-    md: "h-10 px-4 text-[14px]",
-    lg: "h-11 px-5 text-[14px]",
+    sm: "h-8 px-3 text-[12px] leading-[1.4] [&_svg]:w-3.5 [&_svg]:h-3.5",
+    md: "h-10 px-4 text-[14px] leading-[1.5] [&_svg]:w-4 [&_svg]:h-4",
+    lg: "h-11 px-5 text-[14px] leading-[1.5] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:opacity-90 border border-[var(--color-accent)]",
+      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
+    promo:
+      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
     secondary:
-      "bg-[var(--color-neutral)] text-[var(--color-text-primary)] hover:bg-[var(--color-overlay-pressed)] border border-transparent",
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-transparent text-[var(--color-text-primary)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-overlay-hover)]",
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     subtle:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:opacity-90 border border-[var(--color-border)]",
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
   };
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer ${
+      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+interface StandardIconButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  size?: "sm" | "md";
+  variant?: "subtle" | "outline" | "primary" | "promo" | "ghost";
+}
+
+export function StandardIconButton({
+  size = "sm",
+  variant = "subtle",
+  className = "",
+  children,
+  ...props
+}: StandardIconButtonProps) {
+  const sizeMap = {
+    sm: "h-9 w-9 [&_svg]:w-4 [&_svg]:h-4",
+    md: "h-10 w-10 [&_svg]:w-5 [&_svg]:h-5",
+  };
+
+  const variantMap = {
+    subtle:
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+    outline:
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+    primary:
+      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
+    promo:
+      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
+    ghost:
+      "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-overlay-hover)] hover:text-[var(--color-text-primary)]",
+  };
+
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center justify-center shrink-0 rounded-full transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${sizeMap[size]} ${variantMap[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -147,59 +196,101 @@ export function StandardInput({
 }: StandardInputProps) {
   const generatedId = React.useId();
   const inputId = id || generatedId;
+  const hasCustomBg = className.includes("bg-");
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <label
-          htmlFor={inputId}
-          className="ty-body font-semibold text-[var(--color-text-primary)]"
-        >
-          {label}
-        </label>
-        {optionalText && <span className="ty-caption">{optionalText}</span>}
-      </div>
+    <label htmlFor={inputId} className="flex flex-col gap-1.5">
+      <span className="flex items-center justify-between ty-body font-semibold text-[var(--color-text-primary)]">
+        <span>{label}</span>
+        {optionalText && (
+          <span className="ty-caption font-normal">{optionalText}</span>
+        )}
+      </span>
       <input
         id={inputId}
-        className={`h-10 w-full rounded-[12px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] px-3.5 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:border-[var(--color-text-primary)] focus:outline-none ${className}`}
+        className={`h-10 w-full rounded-[12px] ${
+          hasCustomBg ? "" : "bg-[var(--color-background-muted)]"
+        } px-3.5 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 ${className}`}
         {...props}
       />
-    </div>
+    </label>
   );
 }
 
-type RoomStatusType = "available" | "last_unit" | "booked";
+type RoomStatusType = "available" | "last_unit" | "booked" | "promo";
+type StatusPillVariant =
+  | "success"
+  | "warning"
+  | "error"
+  | "promo"
+  | "accent"
+  | "neutral";
+
+interface StatusPillProps {
+  status?: RoomStatusType;
+  label?: string;
+  variant?: StatusPillVariant;
+  children?: React.ReactNode;
+  className?: string;
+}
 
 export function StatusPill({
   status,
   label,
-}: {
-  status: RoomStatusType;
-  label: string;
-}) {
-  const styles: Record<RoomStatusType, { wrapper: string; dot: string }> = {
+  variant = "neutral",
+  children,
+  className = "",
+}: StatusPillProps) {
+  const statusStyles: Record<RoomStatusType, { wrapper: string; dot: string }> = {
     available: {
-      wrapper: "bg-[#dcfce7] text-[#15803d] dark:bg-emerald-950/80 dark:text-emerald-300",
-      dot: "bg-[#15803d] dark:bg-emerald-400",
+      wrapper:
+        "bg-[var(--color-success-muted)] text-[var(--color-success)]",
+      dot: "bg-[var(--color-success)]",
     },
     last_unit: {
-      wrapper: "bg-[#fef3c7] text-[#92400e] dark:bg-amber-950/80 dark:text-amber-300",
-      dot: "bg-[#92400e] dark:bg-amber-400 animate-pulse",
+      wrapper:
+        "bg-[var(--color-warning-muted)] text-[var(--color-warning)]",
+      dot: "bg-[var(--color-warning)] animate-pulse",
     },
     booked: {
-      wrapper: "bg-[#fee2e2] text-[#b91c1c] dark:bg-rose-950/80 dark:text-rose-300",
-      dot: "bg-[#b91c1c] dark:bg-rose-400",
+      wrapper:
+        "bg-[var(--color-error-muted)] text-[var(--color-error)]",
+      dot: "bg-[var(--color-error)]",
+    },
+    promo: {
+      wrapper:
+        "bg-[var(--color-promo)] text-[var(--color-on-promo)]",
+      dot: "bg-[var(--color-on-promo)]",
     },
   };
 
-  const current = styles[status];
+  if (status) {
+    const current = statusStyles[status];
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-6 ty-caption font-semibold leading-none ${current.wrapper} ${className}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${current.dot}`} />
+        <span>{label ?? children}</span>
+      </span>
+    );
+  }
+
+  const variantClasses: Record<StatusPillVariant, string> = {
+    success: "bg-[var(--color-success-muted)] text-[var(--color-success)]",
+    warning: "bg-[var(--color-warning-muted)] text-[var(--color-warning)]",
+    error: "bg-[var(--color-error-muted)] text-[var(--color-error)]",
+    promo: "bg-[var(--color-promo)] text-[var(--color-on-promo)]",
+    accent: "bg-[var(--color-accent-muted)] text-[var(--color-accent)]",
+    neutral:
+      "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]",
+  };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-7 text-[12px] font-semibold ${current.wrapper}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-6 ty-caption font-semibold leading-none ${variantClasses[variant]} ${className}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${current.dot}`} />
-      <span>{label}</span>
+      {children ?? label}
     </span>
   );
 }

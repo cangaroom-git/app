@@ -19,7 +19,7 @@ import {
   BookingRecord,
 } from "@/data/rooms";
 
-const STORAGE_KEY_WL = "white_label_resort_store_v6";
+const RESORT_STORE_STORAGE_KEY = "white_label_resort_store_v6";
 
 // In-memory cache of parsed store data (vercel-react-best-practices: js-cache-storage)
 let memoryBookingsCache: BookingRecord[] | null = null;
@@ -30,12 +30,12 @@ export function getLatestBookingsSnapshot(
   if (typeof window === "undefined") return fallbackBookings;
   if (memoryBookingsCache) return memoryBookingsCache;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_WL);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SapanStoreData>;
-      if (parsed && Array.isArray(parsed.bookings)) {
-        memoryBookingsCache = parsed.bookings;
-        return parsed.bookings;
+    const rawStoreJson = localStorage.getItem(RESORT_STORE_STORAGE_KEY);
+    if (rawStoreJson) {
+      const parsedStore = JSON.parse(rawStoreJson) as Partial<SapanStoreData>;
+      if (parsedStore && Array.isArray(parsedStore.bookings)) {
+        memoryBookingsCache = parsedStore.bookings;
+        return parsedStore.bookings;
       }
     }
   } catch {
@@ -56,21 +56,21 @@ export interface SapanStoreData {
 }
 
 export function formatDateStr(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  const fullYear = date.getFullYear();
+  const monthNumber = String(date.getMonth() + 1).padStart(2, "0");
+  const dayOfMonth = String(date.getDate()).padStart(2, "0");
+  return `${fullYear}-${monthNumber}-${dayOfMonth}`;
 }
 
-export function addDaysToDate(base: Date, days: number): Date {
-  const copy = new Date(base);
-  copy.setDate(copy.getDate() + days);
-  return copy;
+export function addDaysToDate(baseDate: Date, daysToAdd: number): Date {
+  const nextDate = new Date(baseDate);
+  nextDate.setDate(nextDate.getDate() + daysToAdd);
+  return nextDate;
 }
 
 export function isWeekendNight(dateStr: string): boolean {
-  const d = new Date(dateStr + "T00:00:00").getDay();
-  return d === 5 || d === 6; // Friday or Saturday
+  const dayOfWeek = new Date(dateStr + "T00:00:00").getDay();
+  return dayOfWeek === 5 || dayOfWeek === 6; // Friday or Saturday
 }
 
 /**
@@ -79,13 +79,13 @@ export function isWeekendNight(dateStr: string): boolean {
  * - HOLD_15_MIN bookings that have passed holdExpiresAtIso no longer lock inventory.
  */
 export function isBookingLockingInventory(
-  bk: BookingRecord,
-  nowMs: number = Date.now()
+  booking: BookingRecord,
+  currentTimestampMs: number = Date.now()
 ): boolean {
-  if (bk.status === "CANCELLED") return false;
-  if (bk.status === "HOLD_15_MIN" && bk.holdExpiresAtIso) {
-    const expMs = new Date(bk.holdExpiresAtIso).getTime();
-    if (!isNaN(expMs) && expMs <= nowMs) {
+  if (booking.status === "CANCELLED") return false;
+  if (booking.status === "HOLD_15_MIN" && booking.holdExpiresAtIso) {
+    const expirationTimestampMs = new Date(booking.holdExpiresAtIso).getTime();
+    if (!isNaN(expirationTimestampMs) && expirationTimestampMs <= currentTimestampMs) {
       return false;
     }
   }
@@ -190,6 +190,30 @@ export function calculateNightlyRateForDate(
 /**
  * Calculates full multi-night stay pricing breakdown
  */
+export interface StayPricingBreakdown {
+  nights: number;
+  nightlyBreakdown: NightlyRateDetail[];
+  nightlyPrice: number;
+  roomSubtotal: number;
+  extraGuests: number;
+  extraBedTotal: number;
+  addonsTotal: number;
+  couponDiscount: number;
+  netTotal: number;
+}
+
+export interface RoomInventoryStatus {
+  state: "AVAILABLE" | "HELD" | "BOOKED" | "MAINTENANCE";
+  totalUnits: number;
+  availableUnits: number;
+  conflictDates: string[];
+  capacityOk: boolean;
+  effectiveNightlyPrice: number;
+  totalStayRoomPrice: number;
+  activeRateBadgeTh: string;
+  hasSpecialOrSeasonalRate: boolean;
+}
+
 export function calculateStayPricingBreakdown(params: {
   room: RoomLodge;
   checkIn: string;
@@ -203,7 +227,7 @@ export function calculateStayPricingBreakdown(params: {
   addonQuantities?: Record<string, number>;
   coupons: PromoCoupon[];
   appliedCouponCode: string | null;
-}) {
+}): StayPricingBreakdown {
   const {
     room,
     checkIn,
@@ -321,12 +345,12 @@ export function getRoomInventoryForRange(
     };
   }
 
-  const nowMs = Date.now();
-  const overlapping = (bookings || []).filter(
-    (b) =>
-      b.roomId === room.id &&
-      isBookingLockingInventory(b, nowMs) &&
-      datesOverlap(startStr, endStr, b.checkIn, b.checkOut)
+  const currentTimestampMs = Date.now();
+  const overlappingBookings = (bookings || []).filter(
+    (booking) =>
+      booking.roomId === room.id &&
+      isBookingLockingInventory(booking, currentTimestampMs) &&
+      datesOverlap(startStr, endStr, booking.checkIn, booking.checkOut)
   );
 
   const startDate = new Date(startStr + "T00:00:00");
@@ -341,51 +365,58 @@ export function getRoomInventoryForRange(
   let peakHeldUnits = 0;
   const conflictDates: string[] = [];
 
-  for (let i = 0; i < nightsCount; i++) {
-    const nightStart = formatDateStr(addDaysToDate(startDate, i));
-    const nightEnd = formatDateStr(addDaysToDate(startDate, i + 1));
+  for (let nightIndex = 0; nightIndex < nightsCount; nightIndex++) {
+    const nightStart = formatDateStr(addDaysToDate(startDate, nightIndex));
+    const nightEnd = formatDateStr(addDaysToDate(startDate, nightIndex + 1));
 
-    let nightBooked = 0;
-    let nightHeld = 0;
+    let nightBookedUnits = 0;
+    let nightHeldUnits = 0;
 
-    for (const bk of overlapping) {
-      if (datesOverlap(nightStart, nightEnd, bk.checkIn, bk.checkOut)) {
-        const units = Math.max(1, bk.unitsBooked ?? 1);
-        if (bk.status === "HOLD_15_MIN" || bk.status === "PENDING_ADMIN") {
-          nightHeld += units;
-        } else if (bk.status === "CONFIRMED") {
-          nightBooked += units;
+    for (const booking of overlappingBookings) {
+      if (datesOverlap(nightStart, nightEnd, booking.checkIn, booking.checkOut)) {
+        const bookedUnitsCount = Math.max(1, booking.unitsBooked ?? 1);
+        if (
+          booking.status === "HOLD_15_MIN" ||
+          booking.status === "PENDING_ADMIN"
+        ) {
+          nightHeldUnits += bookedUnitsCount;
+        } else if (booking.status === "CONFIRMED") {
+          nightBookedUnits += bookedUnitsCount;
         }
       }
     }
 
-    const nightAvail = Math.max(0, totalUnits - nightBooked - nightHeld);
-    if (nightAvail < minAvailableUnits) {
-      minAvailableUnits = nightAvail;
+    const nightAvailableUnits = Math.max(
+      0,
+      totalUnits - nightBookedUnits - nightHeldUnits
+    );
+    if (nightAvailableUnits < minAvailableUnits) {
+      minAvailableUnits = nightAvailableUnits;
     }
-    if (nightBooked > peakBookedUnits) {
-      peakBookedUnits = nightBooked;
+    if (nightBookedUnits > peakBookedUnits) {
+      peakBookedUnits = nightBookedUnits;
     }
-    if (nightHeld > peakHeldUnits) {
-      peakHeldUnits = nightHeld;
+    if (nightHeldUnits > peakHeldUnits) {
+      peakHeldUnits = nightHeldUnits;
     }
-    if (nightAvail === 0) {
+    if (nightAvailableUnits === 0) {
       conflictDates.push(nightStart);
     }
   }
 
-  let state: "AVAILABLE" | "HELD" | "BOOKED" = "AVAILABLE";
+  let availabilityState: "AVAILABLE" | "HELD" | "BOOKED" = "AVAILABLE";
   if (minAvailableUnits === 0) {
-    state = peakHeldUnits > 0 && peakBookedUnits < totalUnits ? "HELD" : "BOOKED";
+    availabilityState =
+      peakHeldUnits > 0 && peakBookedUnits < totalUnits ? "HELD" : "BOOKED";
   }
 
   return {
-    state,
+    state: availabilityState,
     totalUnits,
     availableUnits: minAvailableUnits,
     bookedUnits: peakBookedUnits,
     heldUnits: peakHeldUnits,
-    overlappingBookings: overlapping,
+    overlappingBookings,
     conflictDates,
   };
 }
@@ -654,86 +685,98 @@ function getDefaultStore(): SapanStoreData {
 
 export function useSapanStore() {
   const [store, setStore] = useState<SapanStoreData>(getDefaultStore);
-  const [hydrated, setHydrated] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_WL);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<SapanStoreData>;
-        if (parsed && Array.isArray(parsed.rooms)) {
-          const def = getDefaultStore();
+      const rawStoreJson = localStorage.getItem(RESORT_STORE_STORAGE_KEY);
+      if (rawStoreJson) {
+        const parsedStore = JSON.parse(rawStoreJson) as Partial<SapanStoreData>;
+        if (parsedStore && Array.isArray(parsedStore.rooms)) {
+          const defaultStore = getDefaultStore();
           setStore({
             propertyConfig: {
-              ...def.propertyConfig,
-              ...(parsed.propertyConfig || {}),
+              ...defaultStore.propertyConfig,
+              ...(parsedStore.propertyConfig || {}),
               sectionsVisibility: {
-                ...def.propertyConfig.sectionsVisibility,
-                ...(parsed.propertyConfig?.sectionsVisibility || {}),
+                ...defaultStore.propertyConfig.sectionsVisibility,
+                ...(parsedStore.propertyConfig?.sectionsVisibility || {}),
               },
             },
-            rooms: parsed.rooms.map((rm) => {
-              const defRoom = def.rooms.find((dr) => dr.id === rm.id);
-              return defRoom
+            rooms: parsedStore.rooms.map((room) => {
+              const defaultRoom = defaultStore.rooms.find(
+                (candidateRoom) => candidateRoom.id === room.id
+              );
+              return defaultRoom
                 ? {
-                    ...rm,
-                    amenitiesEn: rm.amenitiesEn ?? defRoom.amenitiesEn,
+                    ...room,
+                    amenitiesEn: room.amenitiesEn ?? defaultRoom.amenitiesEn,
                   }
-                : rm;
+                : room;
             }),
-            seasonalRates: parsed.seasonalRates ?? def.seasonalRates,
-            specialDateRates: parsed.specialDateRates ?? def.specialDateRates,
-            addons: parsed.addons ?? def.addons,
-            coupons: parsed.coupons ?? def.coupons,
-            experiences: parsed.experiences ?? def.experiences,
-            bookings: parsed.bookings ?? def.bookings,
+            seasonalRates: parsedStore.seasonalRates ?? defaultStore.seasonalRates,
+            specialDateRates:
+              parsedStore.specialDateRates ?? defaultStore.specialDateRates,
+            addons: parsedStore.addons ?? defaultStore.addons,
+            coupons: parsedStore.coupons ?? defaultStore.coupons,
+            experiences: parsedStore.experiences ?? defaultStore.experiences,
+            bookings: parsedStore.bookings ?? defaultStore.bookings,
           });
         }
       } else {
-        localStorage.setItem(STORAGE_KEY_WL, JSON.stringify(getDefaultStore()));
+        localStorage.setItem(
+          RESORT_STORE_STORAGE_KEY,
+          JSON.stringify(getDefaultStore())
+        );
       }
     } catch {
       // ignore storage errors
     }
-    setHydrated(true);
+    setIsHydrated(true);
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY_WL && e.newValue) {
+    const handleStorageSync = (event: StorageEvent) => {
+      if (event.key === RESORT_STORE_STORAGE_KEY && event.newValue) {
         try {
-          const parsed = JSON.parse(e.newValue) as SapanStoreData;
-          memoryBookingsCache = parsed.bookings ?? null;
-          setStore(parsed);
+          const parsedStore = JSON.parse(event.newValue) as SapanStoreData;
+          memoryBookingsCache = parsedStore.bookings ?? null;
+          setStore(parsedStore);
         } catch {
           // ignore
         }
       }
     };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("storage", handleStorageSync);
+    return () => window.removeEventListener("storage", handleStorageSync);
   }, []);
 
   const saveStore = useCallback(
-    (updater: (prev: SapanStoreData) => SapanStoreData) => {
-      setStore((prev) => {
-        const next = updater(prev);
-        memoryBookingsCache = next.bookings;
+    (updater: (previousStore: SapanStoreData) => SapanStoreData) => {
+      setStore((previousStore) => {
+        const nextStore = updater(previousStore);
+        memoryBookingsCache = nextStore.bookings;
         try {
-          localStorage.setItem(STORAGE_KEY_WL, JSON.stringify(next));
+          localStorage.setItem(
+            RESORT_STORE_STORAGE_KEY,
+            JSON.stringify(nextStore)
+          );
         } catch {
           // ignore quota errors
         }
-        return next;
+        return nextStore;
       });
     },
     []
   );
 
   const resetStoreToDefault = useCallback(() => {
-    const def = getDefaultStore();
-    memoryBookingsCache = def.bookings;
-    setStore(def);
+    const defaultStore = getDefaultStore();
+    memoryBookingsCache = defaultStore.bookings;
+    setStore(defaultStore);
     try {
-      localStorage.setItem(STORAGE_KEY_WL, JSON.stringify(def));
+      localStorage.setItem(
+        RESORT_STORE_STORAGE_KEY,
+        JSON.stringify(defaultStore)
+      );
     } catch {
       // ignore
     }
@@ -741,7 +784,8 @@ export function useSapanStore() {
 
   return {
     store,
-    hydrated,
+    hydrated: isHydrated,
+    isHydrated,
     saveStore,
     resetStoreToDefault,
   };
