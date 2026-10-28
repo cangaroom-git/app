@@ -150,7 +150,7 @@ export default function GuidePage() {
           </a>
         </header>
 
-        <div className="h-[240px] sm:h-[300px] w-full rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
+        <div className="-mx-4 w-[calc(100%+2rem)] rounded-none sm:mx-0 sm:w-full sm:rounded-[20px] h-[240px] sm:h-[300px] overflow-hidden bg-[var(--color-background-muted)]">
           <iframe
             title="Resort Google Map"
             src={`https://maps.google.com/maps?q=${propertyConfig.latitude},${propertyConfig.longitude}&hl=${lang}&z=14&output=embed`}

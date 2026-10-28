@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { Compass, Star } from "lucide-react";
+import { Compass, Sparkles, Star } from "lucide-react";
 
 export type HotelNavTabId =
-  | "book"
   | "home"
+  | "book"
   | "room"
   | "shorts"
   | "chat"
@@ -15,23 +15,27 @@ export type HotelNavTabId =
   | "setting";
 
 export const HOTEL_NAV_TABS: ReadonlyArray<{
-  id: "book" | "shorts" | "chat" | "deal";
+  id: "home" | "book" | "chat" | "shorts" | "deal";
   href: string;
   labelEn: string;
   labelTh: string;
 }> = [
-  { id: "book", href: "/", labelEn: "Book", labelTh: "จองห้องพัก" },
+  { id: "home", href: "/", labelEn: "Home", labelTh: "หน้าแรก" },
+  { id: "book", href: "/booking", labelEn: "Book", labelTh: "จองห้อง" },
+  { id: "chat", href: "/chat", labelEn: "Ask AI", labelTh: "ถาม AI" },
   {
     id: "shorts",
     href: "/shorts",
-    labelEn: "Short Video",
+    labelEn: "Shorts",
     labelTh: "วิดีโอสั้น",
   },
-  { id: "chat", href: "/chat", labelEn: "Chat", labelTh: "AI แชท" },
   { id: "deal", href: "/deal", labelEn: "Deals", labelTh: "โปรโมชั่น" },
 ];
 
 export function getTabIdFromPathname(pathname: string): HotelNavTabId {
+  if (pathname.startsWith("/booking") || pathname.startsWith("/room")) {
+    return "book";
+  }
   if (pathname.startsWith("/shorts")) {
     return "shorts";
   }
@@ -50,7 +54,7 @@ export function getTabIdFromPathname(pathname: string): HotelNavTabId {
   if (pathname.startsWith("/setting")) {
     return "setting";
   }
-  return "book";
+  return "home";
 }
 
 export function HotelNavTabIcon({
@@ -65,8 +69,39 @@ export function HotelNavTabIcon({
   className?: string;
 }) {
   switch (id) {
-    case "book":
     case "home":
+      return isActive ? (
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+          <path
+            d="M11.15 2.72a1.35 1.35 0 0 1 1.7 0l8.1 6.62c.35.29.55.72.55 1.18V19.5A2.5 2.5 0 0 1 19 22H5a2.5 2.5 0 0 1-2.5-2.5v-8.98c0-.46.2-.89.55-1.18l8.1-6.62Z"
+            fill="currentColor"
+          />
+          <rect
+            x="9.5"
+            y="13.5"
+            width="5"
+            height="8.5"
+            rx="1.5"
+            fill={cutoutColor}
+          />
+        </svg>
+      ) : (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={className}
+          aria-hidden="true"
+        >
+          <path d="M3 10.5 12 3l9 7.5V19.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" />
+          <path d="M9.5 21.5v-7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v7" />
+        </svg>
+      );
+
+    case "book":
     case "room":
       return isActive ? (
         <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -140,33 +175,7 @@ export function HotelNavTabIcon({
       );
 
     case "chat":
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-          <path
-            d="M12 3C6.8 3 2.7 6.6 2.7 11.2c0 2.3 1 4.4 2.7 5.9-.2 1.2-.8 2.4-1.5 3.1-.3.3-.1.8.4.8 1.8 0 3.5-.6 4.7-1.3.9.2 1.9.4 3 .4 5.2 0 9.3-3.6 9.3-8.2S17.2 3 12 3Z"
-            fill="currentColor"
-          />
-          <circle cx="8.8" cy="11.4" r="1.25" fill={cutoutColor} />
-          <circle cx="12" cy="11.4" r="1.25" fill={cutoutColor} />
-          <circle cx="15.2" cy="11.4" r="1.25" fill={cutoutColor} />
-        </svg>
-      ) : (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.9}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={className}
-          aria-hidden="true"
-        >
-          <path d="M12 3.2c-5 0-9 3.5-9 7.9 0 2.2 1 4.2 2.6 5.6-.2 1.1-.7 2.2-1.4 2.9-.3.3-.1.8.4.8 1.7 0 3.3-.5 4.5-1.2.9.2 1.9.3 2.9.3 5 0 9-3.5 9-7.9S17 3.2 12 3.2Z" />
-          <circle cx="8.8" cy="11.2" r="1" fill="currentColor" />
-          <circle cx="12" cy="11.2" r="1" fill="currentColor" />
-          <circle cx="15.2" cy="11.2" r="1" fill="currentColor" />
-        </svg>
-      );
+      return <Sparkles className={className} />;
 
     case "deal":
       return isActive ? (

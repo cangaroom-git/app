@@ -413,7 +413,7 @@ export function CouponWalletDrawer({
         </div>
 
         {/* Sticky Drawer Footer */}
-        <footer className="px-4 sm:px-5 py-3 bg-[var(--color-background-card)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] flex items-center justify-between gap-3 shrink-0">
+        <footer className="px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-[var(--color-background-card)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] flex items-center justify-between gap-3 shrink-0">
           <div className="min-w-0">
             <span className="ty-caption block">
               {language === "th" ? "คูปองที่เลือกใช้" : "Applied Coupon"}

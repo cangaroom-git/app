@@ -315,15 +315,30 @@ h1, h2, h3, h4, .font-serif {
 }
 
 .app-card {
-  width: 100%;
-  max-width: 100%;
+  width: calc(100% + 2rem);
+  max-width: none;
+  margin-inline: -1rem;
   min-width: 0;
   overflow-x: clip;
-  border-radius: var(--radius-page);
-  background-color: var(--color-background-muted);
+  border-radius: 0;
+  background-color: transparent;
   border: none;
+  border-bottom: 1px solid var(--color-border);
   color: var(--color-text-primary);
   transition: background-color 0.2s ease;
+}
+.app-card:last-child {
+  border-bottom: none;
+}
+@media (min-width: 640px) {
+  .app-card {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+    border-radius: var(--radius-page);
+    background-color: var(--color-background-muted);
+    border-bottom: none;
+  }
 }
 
 /* Standardized Single-Image Cover Height for All Section Cards */
@@ -363,7 +378,6 @@ h1, h2, h3, h4, .font-serif {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 100dvh;
   max-width: 100%;
   background-color: var(--color-background-card);
   color: var(--color-text-primary);
@@ -742,6 +756,49 @@ html.dark .bg-\[\#00000008\] {
   min-height: 4.25rem;
   padding-block: 0.75rem;
   border: none;
+}
+
+/* ============================================================================
+   MOBILE & TABLET ZERO-SCROLLBAR APP MODE (< 1024px OR TOUCH/COARSE POINTER)
+   - Hides scrollbars across root viewport (html/body) and every nested scroll
+     container (drawers, chat, carousels, calendars, admin) on phones & tablets
+     (including iPad Pro >= 1024px) for a 100% native app feel
+   ============================================================================ */
+@media (max-width: 1023.98px), (hover: none), (pointer: coarse) {
+  :root,
+  html,
+  body,
+  * {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+
+  :root::-webkit-scrollbar,
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  ::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    -webkit-appearance: none !important;
+  }
+
+  :root::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-track,
+  :root::-webkit-scrollbar-thumb,
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb,
+  *::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    border: none !important;
+  }
 }
 
 /* ============================================================================

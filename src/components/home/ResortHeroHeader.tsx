@@ -151,10 +151,10 @@ export function ResortHeroHeader({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLdSchema) }}
       />
 
-      {/* 1. Resort Hero Photo — Opens Resort-Wide Photo & Video Gallery Drawer */}
+      {/* 1. Resort Hero Photo — Full-bleed edge-to-edge on Mobile (< 640px), rounded-[20px] on Tablet/Desktop */}
       <div
         onClick={() => openGalleryModal(null)}
-        className="relative w-full aspect-[16/8] sm:aspect-[21/9] min-h-[210px] max-h-[420px] rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/resorthereo"
+        className="relative -mt-4 -mx-4 w-[calc(100%+2rem)] rounded-none sm:mt-0 sm:mx-0 sm:w-full sm:rounded-[20px] aspect-[16/10] sm:aspect-[21/9] min-h-[228px] max-h-[420px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/resorthereo"
       >
         <img
           src={heroBannerImageUrl}

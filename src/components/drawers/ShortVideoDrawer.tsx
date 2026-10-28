@@ -520,7 +520,7 @@ export function ShortVideoDrawer({
         </div>
 
         {/* Sticky Bottom Zone: Add Comment Pill Form + Linked Room CTA */}
-        <div className="bg-[var(--color-background-card)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] shrink-0">
+        <div className="bg-[var(--color-background-card)] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] shrink-0">
           <form
             onSubmit={handleCommentFormSubmit}
             className="px-4 sm:px-5 pt-2.5 pb-2 flex items-center gap-2"

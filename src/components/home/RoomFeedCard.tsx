@@ -109,10 +109,10 @@ export function RoomFeedCard({
       id={`room-card-${room.id}`}
       className="app-card overflow-hidden grid grid-cols-1 md:grid-cols-12 items-stretch scroll-mt-16"
     >
-      {/* 1. Native Scroll-Snap Photo Stage — Tapping Photo Opens Unified Room Photos & Details Drawer */}
+      {/* 1. Native Scroll-Snap Photo Stage — Full-bleed edge-to-edge on Mobile, Tapping Opens Photos & Details Drawer */}
       <div
         onClick={() => onOpenRoomDetails(activePhotoIndex)}
-        className="md:col-span-5 relative w-full aspect-[16/10] md:aspect-auto md:min-h-[252px] overflow-hidden bg-[var(--color-background-subtle)] cursor-pointer group/hero select-none"
+        className="md:col-span-5 relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-auto md:min-h-[252px] overflow-hidden bg-[var(--color-background-subtle)] cursor-pointer group/hero select-none"
       >
         <div
           ref={photoTrackRef}

@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import dynamic from "next/dynamic";
@@ -211,6 +212,18 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const applyThemeClassToDocument = useCallback((mode: ThemeMode) => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("dark", mode === "dark");
+    const themeColorValue = mode === "dark" ? "#141416" : "#ffffff";
+    const metaThemeTags = document.querySelectorAll('meta[name="theme-color"]');
+    if (metaThemeTags.length > 0) {
+      metaThemeTags.forEach((tag) =>
+        tag.setAttribute("content", themeColorValue)
+      );
+    } else {
+      const metaTag = document.createElement("meta");
+      metaTag.name = "theme-color";
+      metaTag.content = themeColorValue;
+      document.head.appendChild(metaTag);
+    }
   }, []);
 
   // Hydrate persisted theme, language, and saved coupons bag on client mount
@@ -323,6 +336,24 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const activeTab = getTabIdFromPathname(pathname);
+  const previousPathnameRef = useRef<string>(pathname);
+
+  // Close open drawers cleanly when user swipes back/forward across browser history
+  useEffect(() => {
+    const previousPathname = previousPathnameRef.current;
+    if (previousPathname === pathname) {
+      return;
+    }
+    previousPathnameRef.current = pathname;
+
+    const cameFromChatDeepLink = previousPathname.startsWith("/chat");
+    if (!pathname.startsWith("/chat") && !cameFromChatDeepLink) {
+      setIsChatDrawerOpen(false);
+      setActiveBookingRoom(null);
+      setIsCouponWalletOpen(false);
+      setIsGalleryDrawerOpen(false);
+    }
+  }, [pathname]);
 
   const navigateToTab = useCallback(
     (targetTab: HotelNavTabId) => {
@@ -351,13 +382,15 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
         router.push("/review");
         return;
       }
-      if (
-        targetTab === "book" ||
-        targetTab === "home" ||
-        targetTab === "room"
-      ) {
+      if (targetTab === "home") {
         if (pathname !== "/") {
           router.push("/");
+        }
+        return;
+      }
+      if (targetTab === "book" || targetTab === "room") {
+        if (!pathname.startsWith("/booking")) {
+          router.push("/booking");
         } else if (targetTab === "room") {
           document
             .getElementById("rooms")
@@ -1350,8 +1383,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeBookingStep === "calendar" &&
     calendarOrigin === "navbar";
 
-  const isBookingRoute =
-    activeTab === "book" || activeTab === "home" || activeTab === "room";
+  const isBookingRoute = activeTab === "book" || activeTab === "room";
 
   return (
     <HotelAppContext.Provider value={contextValue}>

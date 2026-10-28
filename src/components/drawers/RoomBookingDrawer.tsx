@@ -441,7 +441,7 @@ export function RoomBookingDrawer({
         </div>
 
         {/* Sticky Bottom Footer */}
-        <footer className="shrink-0 bg-[var(--color-background-card)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] px-4 sm:px-5 py-3 z-20 flex items-center justify-between gap-3">
+        <footer className="shrink-0 bg-[var(--color-background-card)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-20 flex items-center justify-between gap-3">
           {activeStep === "calendar" ? (
             <>
               <div className="min-w-0">

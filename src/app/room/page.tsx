@@ -1,5 +1,5 @@
 "use client";
 
-import HomePage from "@/app/page";
+import BookingPage from "@/app/booking/page";
 
-export default HomePage;
+export default BookingPage;
