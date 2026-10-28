@@ -49,7 +49,6 @@ export interface RoomBookingDrawerProps {
   calendarOrigin: BookingCalendarOrigin;
   onChangeCalendarOrigin: (origin: BookingCalendarOrigin) => void;
   onClose: () => void;
-  onOpenPhotoGallery?: (room: RoomLodge) => void;
   language: LanguageCode;
   propertyConfig: WhiteLabelPropertyConfig;
   todayDate: Date;
@@ -105,7 +104,6 @@ export function RoomBookingDrawer({
   calendarOrigin,
   onChangeCalendarOrigin,
   onClose,
-  onOpenPhotoGallery,
   language,
   propertyConfig,
   todayDate,
@@ -207,7 +205,8 @@ export function RoomBookingDrawer({
     activeStep === "calendar" && calendarOrigin === "navbar";
   const canNavigateBack =
     (activeStep === "checkout" && !activeHoldBooking) ||
-    (activeStep === "calendar" && calendarOrigin === "details");
+    (activeStep === "calendar" && calendarOrigin === "details") ||
+    (activeStep === "details" && calendarOrigin !== "details");
 
   const handleBackNavigation = () => {
     if (activeStep === "checkout" && !activeHoldBooking) {
@@ -216,13 +215,14 @@ export function RoomBookingDrawer({
     }
     if (activeStep === "calendar" && calendarOrigin === "details") {
       onChangeStep("details");
+      return;
+    }
+    if (activeStep === "details" && calendarOrigin !== "details") {
+      onChangeStep("calendar");
     }
   };
 
   const handleOpenCalendarFromStep = () => {
-    if (activeStep === "details") {
-      onChangeCalendarOrigin("details");
-    }
     onChangeStep("calendar");
   };
 
@@ -256,8 +256,8 @@ export function RoomBookingDrawer({
         : `Checkout (${room.code})`;
     }
     return language === "th"
-      ? `รายละเอียดห้องพัก (${room.code})`
-      : `Room Details (${room.code})`;
+      ? `รูปภาพ & รายละเอียด (${room.code})`
+      : `Photos & Details (${room.code})`;
   })();
 
   const stepBadgeLabel =
@@ -380,7 +380,13 @@ export function RoomBookingDrawer({
               specialDateRates={specialDateRates}
               weather={weather}
               todayDate={todayDate}
-              onOpenPhotoGallery={onOpenPhotoGallery}
+              onOpenPhotoGallery={(targetRoom) => {
+                if (targetRoom.id !== room.id) {
+                  onSelectRoom(targetRoom);
+                }
+                onChangeSlideImageIndex(0);
+                onChangeStep("details");
+              }}
             />
           ) : activeStep === "checkout" ? (
             <BookingCheckoutStep
@@ -429,7 +435,6 @@ export function RoomBookingDrawer({
               pricingBreakdown={pricingBreakdown}
               slideImageIndex={slideImageIndex}
               onChangeSlideImageIndex={onChangeSlideImageIndex}
-              onOpenPhotoGallery={onOpenPhotoGallery}
               scrollContainerRef={detailsScrollContainerRef}
             />
           )}

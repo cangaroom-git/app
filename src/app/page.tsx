@@ -72,7 +72,6 @@ export default function HomePage() {
     roomStatusMap,
     findNextAvailableRangeForRoom,
     openRoomDrawer,
-    openGalleryModal,
     navigateToTab,
     openShortsAt,
   } = useHotelApp();
@@ -238,8 +237,9 @@ export default function HomePage() {
                 setCheckIn(nextCheckIn);
                 setCheckOut(nextCheckOut);
               }}
-              onOpenRoomDetails={() => openRoomDrawer(room, "details")}
-              onOpenPhotoGallery={() => openGalleryModal(room)}
+              onOpenRoomDetails={(initialPhotoIndex) =>
+                openRoomDrawer(room, "details", initialPhotoIndex ?? 0)
+              }
               onBookRoom={() => openRoomDrawer(room, "calendar")}
             />
           );

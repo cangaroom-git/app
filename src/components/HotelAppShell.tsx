@@ -158,7 +158,8 @@ export interface HotelAppContextValue {
   openCalendarDrawer: () => void;
   openRoomDrawer: (
     room: RoomLodge,
-    initialStep?: RoomBookingDrawerStep
+    initialStep?: RoomBookingDrawerStep,
+    initialSlideIndex?: number
   ) => void;
   openGalleryModal: (room: RoomLodge | null) => void;
   navigateToTab: (tab: HotelNavTabId) => void;
@@ -833,7 +834,11 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   ]);
 
   const openRoomDrawer = useCallback(
-    (room: RoomLodge, initialStep: RoomBookingDrawerStep = "calendar") => {
+    (
+      room: RoomLodge,
+      initialStep: RoomBookingDrawerStep = "calendar",
+      initialSlideIndex = 0
+    ) => {
       const latestBookings = getLatestBookingsSnapshot(bookings);
       const existingHoldBooking = latestBookings.find(
         (booking) =>
@@ -852,7 +857,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       setDisplayedBookingRoom(room);
       setActiveBookingRoom(room);
       setUnitsToBook(1);
-      setDrawerSlideImageIndex(0);
+      setDrawerSlideImageIndex(initialSlideIndex);
       setSlipVerificationFeedback(null);
       setBookingConflictError(null);
 
@@ -1458,7 +1463,6 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           onClose={() => {
             setActiveBookingRoom(null);
           }}
-          onOpenPhotoGallery={(room) => openGalleryModal(room)}
           language={lang}
           propertyConfig={propertyConfig}
           todayDate={today}

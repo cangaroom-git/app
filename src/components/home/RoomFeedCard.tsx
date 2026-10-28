@@ -33,8 +33,7 @@ export interface RoomFeedCardProps {
   onToggleLike: () => void;
   onShareRoom: () => void;
   onSelectNextAvailableDates: (checkIn: string, checkOut: string) => void;
-  onOpenRoomDetails: () => void;
-  onOpenPhotoGallery: () => void;
+  onOpenRoomDetails: (initialPhotoIndex?: number) => void;
   onBookRoom: () => void;
 }
 
@@ -51,7 +50,6 @@ export function RoomFeedCard({
   onShareRoom,
   onSelectNextAvailableDates,
   onOpenRoomDetails,
-  onOpenPhotoGallery,
   onBookRoom,
 }: RoomFeedCardProps) {
   const photoTrackRef = useRef<HTMLDivElement | null>(null);
@@ -111,9 +109,9 @@ export function RoomFeedCard({
       id={`room-card-${room.id}`}
       className="app-card overflow-hidden grid grid-cols-1 md:grid-cols-12 items-stretch scroll-mt-16"
     >
-      {/* 1. Native Scroll-Snap Photo Stage (Smooth Mobile/Tablet Swipe + Zero Vertical Scroll Conflict) */}
+      {/* 1. Native Scroll-Snap Photo Stage — Tapping Photo Opens Unified Room Photos & Details Drawer */}
       <div
-        onClick={onOpenPhotoGallery}
+        onClick={() => onOpenRoomDetails(activePhotoIndex)}
         className="md:col-span-5 relative w-full aspect-[16/10] md:aspect-auto md:min-h-[252px] overflow-hidden bg-[var(--color-background-subtle)] cursor-pointer group/hero select-none"
       >
         <div
@@ -205,7 +203,7 @@ export function RoomFeedCard({
               </div>
 
               <h3
-                onClick={onOpenRoomDetails}
+                onClick={() => onOpenRoomDetails(activePhotoIndex)}
                 className="ty-title text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition cursor-pointer leading-snug"
               >
                 {language === "th" ? room.nameTh : room.nameEn}
@@ -331,10 +329,12 @@ export function RoomFeedCard({
 
             <button
               type="button"
-              onClick={onOpenRoomDetails}
+              onClick={() => onOpenRoomDetails(activePhotoIndex)}
               className="ty-caption font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
             >
-              {language === "th" ? "รายละเอียด →" : "Details →"}
+              {language === "th"
+                ? "ดูรูป & รายละเอียด →"
+                : "Photos & Details →"}
             </button>
           </div>
 

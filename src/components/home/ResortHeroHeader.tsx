@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   BedDouble,
   Check,
+  Images,
   MapPin,
   MessageCircle,
   Share2,
@@ -33,6 +34,7 @@ export function ResortHeroHeader({
     propertyConfig,
     lang: language,
     openRoomDrawer,
+    openGalleryModal,
     navigateToTab,
     rooms,
     coupons,
@@ -149,14 +151,33 @@ export function ResortHeroHeader({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLdSchema) }}
       />
 
-      {/* 1. Clean Hero Photo (Single rounded media element — no dark overlay) */}
-      <img
-        src={heroBannerImageUrl}
-        alt={`${propertyConfig.nameTh} (${propertyConfig.nameEn})`}
-        loading="eager"
-        decoding="async"
-        className="w-full aspect-[16/8] sm:aspect-[21/9] min-h-[210px] max-h-[420px] rounded-[20px] object-cover object-center bg-[var(--color-background-muted)]"
-      />
+      {/* 1. Resort Hero Photo — Opens Resort-Wide Photo & Video Gallery Drawer */}
+      <div
+        onClick={() => openGalleryModal(null)}
+        className="relative w-full aspect-[16/8] sm:aspect-[21/9] min-h-[210px] max-h-[420px] rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/resorthereo"
+      >
+        <img
+          src={heroBannerImageUrl}
+          alt={language === "th" ? propertyConfig.nameTh : propertyConfig.nameEn}
+          loading="eager"
+          decoding="async"
+          className="w-full h-full object-cover object-center transition-transform duration-500 group-hover/resorthereo:scale-[1.015]"
+        />
+
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            openGalleryModal(null);
+          }}
+          className="absolute bottom-3 right-3 rounded-full bg-black/65 hover:bg-black/80 backdrop-blur-md text-white px-3.5 h-8 inline-flex items-center gap-1.5 ty-caption font-semibold transition cursor-pointer"
+        >
+          <Images className="w-3.5 h-3.5" />
+          <span>
+            {language === "th" ? "ดูภาพที่พักทั้งหมด" : "All Resort Photos"}
+          </span>
+        </button>
+      </div>
 
       {/* 2. Flat Open Property Header (Zero Wrapper Cards, Zero Nested Boxes) */}
       <div className="space-y-3 pt-1">

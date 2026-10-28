@@ -78,6 +78,8 @@ export function RoomAvailabilityCalendarGrid({
   fillContainerHeight = false,
 }: RoomAvailabilityCalendarGridProps) {
   const calendarScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const leftRoomsScrollRef = useRef<HTMLDivElement | null>(null);
+  const rightRatesScrollRef = useRef<HTMLDivElement | null>(null);
   const isDraggingCalendarRef = useRef(false);
   const hasDraggedCalendarRef = useRef(false);
   const dragStartXRef = useRef(0);
@@ -286,6 +288,24 @@ export function RoomAvailabilityCalendarGrid({
     isDraggingCalendarRef.current = false;
   };
 
+  const handleLeftVerticalScroll = () => {
+    const leftElement = leftRoomsScrollRef.current;
+    const rightElement = rightRatesScrollRef.current;
+    if (!leftElement || !rightElement) return;
+    if (Math.abs(rightElement.scrollTop - leftElement.scrollTop) > 0.5) {
+      rightElement.scrollTop = leftElement.scrollTop;
+    }
+  };
+
+  const handleRightVerticalScroll = () => {
+    const leftElement = leftRoomsScrollRef.current;
+    const rightElement = rightRatesScrollRef.current;
+    if (!leftElement || !rightElement) return;
+    if (Math.abs(leftElement.scrollTop - rightElement.scrollTop) > 0.5) {
+      leftElement.scrollTop = rightElement.scrollTop;
+    }
+  };
+
   const handleJumpToToday = () => {
     onChangeCalendarMonth(minimumMonthDate);
     if (focusedRoom) {
@@ -381,45 +401,109 @@ export function RoomAvailabilityCalendarGrid({
         </div>
       </div>
 
-      {/* Unified 2D Sticky Availability Matrix (Exact Column Symmetry + Scales to 30-50 Rooms) */}
+      {/* True Frozen Split-Pane Matrix:
+          - Left Column (Room Axis) sits OUTSIDE horizontal scroll -> 0px movement on scroll-x
+          - Top Date Row sits ABOVE vertical scroll -> 0px movement on scroll-y
+          - Separate X and Y scroll containers enforce native mobile directional axis-locking */}
       <div
-        ref={calendarScrollContainerRef}
-        onMouseDown={handleCalendarMouseDown}
-        onMouseMove={handleCalendarMouseMove}
-        onMouseUp={handleCalendarMouseUpOrLeave}
-        onMouseLeave={handleCalendarMouseUpOrLeave}
-        className={`${
-          fillContainerHeight
-            ? "flex-1 min-h-0 overflow-auto overscroll-contain"
-            : "overflow-x-auto"
-        } select-none cursor-grab active:cursor-grabbing no-scrollbar`}
+        role="grid"
+        className={`flex items-stretch select-none ${
+          fillContainerHeight ? "flex-1 min-h-0 overflow-hidden" : ""
+        }`}
       >
-        <div role="grid" className="min-w-max pr-4 pb-4 flex flex-col">
-          {/* Sticky Top Date Header Row — Open Canvas (No Card Boxes, Visually Distinct from Price Tiles) */}
+        {/* 1. FROZEN LEFT PANE (Column 1 — Physically Outside Horizontal Scroller) */}
+        <div className="shrink-0 flex flex-col bg-[var(--color-background-card)] border-r border-[var(--color-border)] z-10">
+          {/* Top-Left Static Corner (Never Scrolls X or Y) */}
           <div
-            role="row"
-            className="sticky top-0 z-20 flex items-stretch bg-[var(--color-background-card)] pb-2"
+            role="columnheader"
+            className="h-[64px] shrink-0 pl-4 pr-2 pb-2 border-b border-[var(--color-border)] flex items-end"
           >
-            {/* Top-Left Pinned Axis Label (Open Canvas) */}
             <div
-              role="columnheader"
-              className="sticky left-0 z-30 pl-4 pr-1.5 bg-[var(--color-background-card)] shrink-0 flex items-end"
+              className={`${ROOM_COLUMN_WIDTH_CLASS} h-[56px] pl-2.5 pr-1 pb-1 flex flex-col justify-end`}
             >
-              <div
-                className={`${ROOM_COLUMN_WIDTH_CLASS} h-[56px] px-1.5 pb-1 flex flex-col justify-end`}
-              >
-                <span className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-text-secondary)]">
-                  <BedDouble className="w-3.5 h-3.5 shrink-0" />
-                  <span>{language === "th" ? "ห้องพัก" : "Rooms"}</span>
-                </span>
-                <span className="ty-caption font-medium text-[var(--color-text-secondary)]/80 tabular-nums">
-                  {rooms.length} {language === "th" ? "รายการ" : "listed"}
-                </span>
-              </div>
+              <span className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-text-secondary)]">
+                <BedDouble className="w-3.5 h-3.5 shrink-0" />
+                <span>{language === "th" ? "ห้องพัก" : "Rooms"}</span>
+              </span>
+              <span className="ty-caption font-medium text-[var(--color-text-secondary)]/80 tabular-nums">
+                {rooms.length} {language === "th" ? "รายการ" : "listed"}
+              </span>
             </div>
+          </div>
 
-            {/* Day Column Headers — Clean Typographic Axis on Open Canvas */}
-            <div className="flex items-stretch gap-1.5">
+          {/* Left Room Rows (Scrolls ONLY Vertically in Lockstep with Right Rates Pane) */}
+          <div
+            ref={leftRoomsScrollRef}
+            onScroll={handleLeftVerticalScroll}
+            className={`${
+              fillContainerHeight
+                ? "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none"
+                : "overflow-hidden"
+            } touch-pan-y no-scrollbar`}
+          >
+            {rooms.length > 0 && (
+              <div className="flex flex-col gap-1.5 pt-2 pb-4 pl-4 pr-2">
+                {rooms.map((room) => {
+                  const isFocusedRoom = focusedRoom?.id === room.id;
+
+                  return (
+                    <button
+                      key={room.id}
+                      type="button"
+                      role="rowheader"
+                      onClick={() => onSelectRoomId(room.id)}
+                      className={`${ROOM_COLUMN_WIDTH_CLASS} relative h-[50px] rounded-[10px] pl-3 pr-2 text-left flex flex-col justify-center transition cursor-pointer ${
+                        isFocusedRoom
+                          ? "bg-[var(--color-accent-muted)]/70"
+                          : "bg-transparent hover:bg-[var(--color-overlay-hover)]"
+                      }`}
+                    >
+                      {isFocusedRoom && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-0.5 top-2 bottom-2 w-1 rounded-full bg-[var(--color-accent)]"
+                        />
+                      )}
+                      <span
+                        className={`ty-body font-bold leading-tight truncate ${
+                          isFocusedRoom
+                            ? "text-[var(--color-accent)]"
+                            : "text-[var(--color-text-primary)]"
+                        }`}
+                      >
+                        {room.code}
+                      </span>
+                      <span className="ty-caption whitespace-nowrap leading-tight mt-0.5 tabular-nums">
+                        {room.baseGuests}–{room.maxGuests}{" "}
+                        {language === "th" ? "ท่าน" : "guests"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2. HORIZONTAL SCROLL PANE (Dates & Nightly Prices Only — Axis-Locked X) */}
+        <div
+          ref={calendarScrollContainerRef}
+          onMouseDown={handleCalendarMouseDown}
+          onMouseMove={handleCalendarMouseMove}
+          onMouseUp={handleCalendarMouseUpOrLeave}
+          onMouseLeave={handleCalendarMouseUpOrLeave}
+          className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden overscroll-none md:cursor-grab md:active:cursor-grabbing no-scrollbar"
+        >
+          <div
+            className={`min-w-max flex flex-col ${
+              fillContainerHeight ? "h-full" : ""
+            }`}
+          >
+            {/* Top Date Header Row — Physically Above Vertical Scroller (Never Scrolls Y) */}
+            <div
+              role="row"
+              className="h-[64px] shrink-0 pl-2 pr-4 pb-2 border-b border-[var(--color-border)] bg-[var(--color-background-card)] flex items-end gap-1.5 touch-pan-x"
+            >
               {visibleMonthDays.map((dayColumn) => {
                 const isDateWithinStayRange =
                   Boolean(checkInDate && checkOutDate) &&
@@ -450,7 +534,7 @@ export function RoomAvailabilityCalendarGrid({
                       {dayColumn.dayOfWeekLabel}
                     </span>
                     <span
-                      className={`my-0.5 h-6 min-w-6 px-3 rounded-full inline-flex items-center justify-center ty-body font-bold tabular-nums leading-none transition ${
+                      className={`my-0.5 h-6 min-w-6 px-2 rounded-full inline-flex items-center justify-center ty-body font-bold tabular-nums leading-none transition ${
                         isDateWithinStayRange
                           ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-2xs"
                           : dayColumn.isToday
@@ -467,124 +551,98 @@ export function RoomAvailabilityCalendarGrid({
                 );
               })}
             </div>
-          </div>
 
-          {/* Room Nightly Rate Rows */}
-          {rooms.length === 0 ? (
-            <div className="px-4 py-8 text-center ty-body-muted">
-              {language === "th"
-                ? "ไม่พบห้องว่างในช่วงวันที่เลือก ลองเลื่อนเลือกวันอื่นด้านบน"
-                : "No available rooms match this filter. Try another date above."}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {rooms.map((room) => {
-                const isFocusedRoom = focusedRoom?.id === room.id;
+            {/* Nightly Rate Cells — Scrolls Vertically in Exact Lockstep with Left Room Column */}
+            <div
+              ref={rightRatesScrollRef}
+              onScroll={handleRightVerticalScroll}
+              className={`${
+                fillContainerHeight
+                  ? "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none"
+                  : "overflow-hidden"
+              } no-scrollbar`}
+            >
+              {rooms.length === 0 ? (
+                <div className="px-4 py-8 ty-body-muted">
+                  {language === "th"
+                    ? "ไม่พบห้องว่างในช่วงวันที่เลือก ลองเลื่อนเลือกวันอื่นด้านบน"
+                    : "No available rooms match this filter. Try another date above."}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5 pt-2 pb-4 pl-2 pr-4">
+                  {rooms.map((room) => {
+                    const isFocusedRoom = focusedRoom?.id === room.id;
 
-                return (
-                  <div
-                    key={room.id}
-                    role="row"
-                    className="flex items-stretch"
-                  >
-                    {/* Sticky Left Room Row Header — Clean Open-Canvas Label + Active Accent Indicator */}
-                    <div className="sticky left-0 z-10 pl-4 pr-1.5 bg-[var(--color-background-card)] shrink-0">
-                      <button
-                        type="button"
-                        role="rowheader"
-                        onClick={() => onSelectRoomId(room.id)}
-                        className={`${ROOM_COLUMN_WIDTH_CLASS} relative h-[70px] pl-3 pr-3 text-left flex flex-col justify-center transition cursor-pointer ${
-                          isFocusedRoom
-                            ? ""
-                            : "bg-transparent hover:bg-[var(--color-overlay-hover)]"
-                        }`}
+                    return (
+                      <div
+                        key={room.id}
+                        role="row"
+                        className="flex items-stretch gap-1.5 h-[50px]"
                       >
-                        {isFocusedRoom && (
-                          <span
-                            aria-hidden="true"
-                            className="absolute left-0.5 top-2 bottom-2 w-1 rounded-full bg-[var(--color-accent)]"
-                          />
-                        )}
-                        <span
-                          className={`ty-body font-bold leading-tight truncate ${
-                            isFocusedRoom
-                              ? "text-[var(--color-accent)]"
-                              : "text-[var(--color-text-primary)]"
-                          }`}
-                        >
-                          {room.code}
-                        </span>
-                        <span className="ty-caption whitespace-nowrap leading-tight mt-0.5 tabular-nums">
-                          {room.baseGuests}–{room.maxGuests}{" "}
-                          {language === "th" ? "ท่าน" : "guests"}
-                        </span>
-                      </button>
-                    </div>
+                        {visibleMonthDays.map((dayColumn) => {
+                          const dayInventory = getRoomInventoryForRange(
+                            room,
+                            dayColumn.dateStr,
+                            dayColumn.nextDateStr,
+                            bookings
+                          );
+                          const isDayAvailable =
+                            dayInventory.state === "AVAILABLE" &&
+                            dayInventory.availableUnits > 0;
+                          const isCellSelected =
+                            isFocusedRoom &&
+                            Boolean(checkInDate && checkOutDate) &&
+                            dayColumn.dateStr >= checkInDate &&
+                            dayColumn.dateStr < checkOutDate;
+                          const nightlyRateBreakdown =
+                            calculateNightlyRateForDate(
+                              room,
+                              dayColumn.dateStr,
+                              seasonalRates,
+                              specialDateRates
+                            );
 
-                    {/* Nightly Rate Cells — ONLY Selectable Data Cells Render as Tonal Tiles */}
-                    <div className="flex items-stretch gap-1.5 mt-2">
-                      {visibleMonthDays.map((dayColumn) => {
-                        const dayInventory = getRoomInventoryForRange(
-                          room,
-                          dayColumn.dateStr,
-                          dayColumn.nextDateStr,
-                          bookings
-                        );
-                        const isDayAvailable =
-                          dayInventory.state === "AVAILABLE" &&
-                          dayInventory.availableUnits > 0;
-                        const isCellSelected =
-                          isFocusedRoom &&
-                          Boolean(checkInDate && checkOutDate) &&
-                          dayColumn.dateStr >= checkInDate &&
-                          dayColumn.dateStr < checkOutDate;
-                        const nightlyRateBreakdown = calculateNightlyRateForDate(
-                          room,
-                          dayColumn.dateStr,
-                          seasonalRates,
-                          specialDateRates
-                        );
-
-                        return (
-                          <button
-                            key={`${room.id}-${dayColumn.dateStr}`}
-                            type="button"
-                            role="gridcell"
-                            disabled={!isDayAvailable}
-                            onClick={() =>
-                              handleSelectRoomAndDate(room, dayColumn.date)
-                            }
-                            className={`${DATE_COLUMN_WIDTH_CLASS} h-[50px] rounded-[12px] p-1.5 flex items-center justify-center text-center transition ${
-                              !isDayAvailable
-                                ? "bg-[var(--color-background-muted)]/45 cursor-not-allowed"
-                                : isCellSelected
-                                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-2xs cursor-pointer"
-                                : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] cursor-pointer"
-                            }`}
-                          >
-                            {isDayAvailable ? (
-                              <span
-                                className={`ty-caption tabular-nums leading-none ${
-                                  isCellSelected
-                                    ? "font-bold !text-[var(--color-on-accent)]"
-                                    : "font-medium text-[var(--color-text-primary)]"
-                                }`}
-                              >
-                                ฿
-                                {nightlyRateBreakdown.finalNightlyRate.toLocaleString()}
-                              </span>
-                            ) : (
-                              <span className="h-2 w-2 rounded-full bg-[var(--color-error)] shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                          return (
+                            <button
+                              key={`${room.id}-${dayColumn.dateStr}`}
+                              type="button"
+                              role="gridcell"
+                              disabled={!isDayAvailable}
+                              onClick={() =>
+                                handleSelectRoomAndDate(room, dayColumn.date)
+                              }
+                              className={`${DATE_COLUMN_WIDTH_CLASS} h-[50px] rounded-[12px] p-1.5 flex items-center justify-center text-center transition ${
+                                !isDayAvailable
+                                  ? "bg-[var(--color-background-muted)]/45 cursor-not-allowed"
+                                  : isCellSelected
+                                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-2xs cursor-pointer"
+                                  : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] cursor-pointer"
+                              }`}
+                            >
+                              {isDayAvailable ? (
+                                <span
+                                  className={`ty-caption tabular-nums leading-none ${
+                                    isCellSelected
+                                      ? "font-bold !text-[var(--color-on-accent)]"
+                                      : "font-medium text-[var(--color-text-primary)]"
+                                  }`}
+                                >
+                                  ฿
+                                  {nightlyRateBreakdown.finalNightlyRate.toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="h-2 w-2 rounded-full bg-[var(--color-error)] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -113,7 +113,6 @@ export default function ReviewPage() {
     roomStatusMap,
     lang,
     openRoomDrawer,
-    openGalleryModal,
   } = useHotelApp();
 
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
@@ -331,7 +330,9 @@ export default function ReviewPage() {
                       src={photoUrl}
                       alt={`${post.authorName} review photo ${idx + 1}`}
                       draggable={false}
-                      onClick={() => linkedRoom && openGalleryModal(linkedRoom)}
+                      onClick={() =>
+                        linkedRoom && openRoomDrawer(linkedRoom, "details")
+                      }
                       className="h-full w-full shrink-0 snap-center object-cover object-center select-none cursor-pointer"
                     />
                   ))}

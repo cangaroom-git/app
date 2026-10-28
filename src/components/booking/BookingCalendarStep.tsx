@@ -176,7 +176,7 @@ export function BookingCalendarStep({
       <div className="px-4 pt-0.5 pb-2 shrink-0 space-y-2.5">
         <div
           onClick={() => onOpenPhotoGallery?.(selectedRoom)}
-          className={`relative w-full h-[252px] sm:h-[252px] rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] select-none ${
+          className={`relative w-full h-[150px] sm:h-[180px] rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] select-none ${
             onOpenPhotoGallery ? "cursor-pointer group/calhero" : ""
           }`}
         >
