@@ -1,165 +1,171 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   CANGAROOM · FACEBOOK COMET INSPIRED DESIGN SYSTEM
-   1. Warm, Familiar Social UI: Soft Wash (#F2F4F7) + Crisp White Cards (#FFFFFF)
-   2. Dark Mode: Facebook Dark Wash (#18191A) + Elevated Cards (#242526)
-   3. Primary Brand Blue (#0866FF) + Promotion/Discount Red (#C53829)
-   4. Native Thai + English Font Stack (SF Pro / Segoe UI / Noto Sans Thai)
-   5. Facebook 5-Tier Typography Scale (24px / 20px / 17px / 15px / 13px)
+   CANGAROOM · MINIMAL ENTERPRISE UI + FACEBOOK NATIVE THAI/ENGLISH TYPOGRAPHY
+   1. Pure White Canvas (#FFFFFF) + Hairline 1px Borders (#E5E7EB), Zero Clutter
+   2. Crisp Near-Black Primary CTA (#111111) + Clean 1px Outline Secondary Buttons
+   3. Exact Facebook Native OS Font Stack (Thonburi / SF Pro on macOS, Leelawadee / Segoe UI on Windows)
+   4. All component primitives inside @layer components so Tailwind responsive
+      utilities (`hidden`, `lg:hidden`, `sm:inline-flex`) ALWAYS win!
    ============================================================================ */
 :root {
-  /* Core Brand Accent Tokens (Facebook Friendly Blue #0866FF) */
-  --color-accent: #0866ff;
-  --color-accent-hover: #075ce5;
-  --color-accent-muted: #ebf5ff;
+  /* Primary Action Accent (Crisp Minimal Charcoal-Black like GoDaddy Console) */
+  --color-accent: #111111;
+  --color-accent-hover: #2b2b2b;
+  --color-accent-muted: #f3f4f6;
   --color-on-accent: #ffffff;
-  --color-tiktok-accent: #0866ff;
-  --color-tiktok-accent-hover: #075ce5;
-  --color-tiktok-on-accent: #ffffff;
-  --color-tiktok-gray: #e4e6eb;
-  --color-tiktok-gray-hover: #d8dadf;
-  --color-fastwork: #0866ff;
-  --color-on-fastwork: #ffffff;
-  --color-neutral: rgba(0, 0, 0, 0.05);
 
-  /* Promotion & Discount Tokens (#c53829) */
+  /* Link / Interactive Highlight Accent */
+  --color-link: #0969da;
+
+  /* Legacy alias variables */
+  --color-tiktok-accent: #111111;
+  --color-tiktok-accent-hover: #2b2b2b;
+  --color-tiktok-on-accent: #ffffff;
+  --color-tiktok-gray: #f3f4f6;
+  --color-tiktok-gray-hover: #e5e7eb;
+  --color-fastwork: #111111;
+  --color-on-fastwork: #ffffff;
+  --color-neutral: rgba(0, 0, 0, 0.04);
+
+  /* Promotion & Discount Accent (#c53829) */
   --color-promo: #c53829;
   --color-promo-hover: #a82e21;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #fdeceb;
-  --color-promo-border: rgba(197, 56, 41, 0.24);
+  --color-promo-muted: #fef2f2;
+  --color-promo-border: #fecaca;
   --color-promo-text: #c53829;
 
-  /* Facebook Comet Surface Hierarchy (Light Mode) */
-  --color-background-body: #f2f4f7;      /* --web-wash */
-  --color-background-surface: #ffffff;   /* --surface-background */
-  --color-background-card: #ffffff;      /* Crisp white post/room card */
+  /* Pure Minimal Surface Hierarchy (Light Mode) */
+  --color-background-body: #ffffff;
+  --color-background-surface: #ffffff;
+  --color-background-card: #ffffff;
   --color-background-popover: #ffffff;
-  --color-background-muted: #f0f2f5;     /* --comment-background / inputs */
-  --color-background-subtle: #e4e6eb;    /* --secondary-button-background */
-  --color-sidebar-bg: #f2f4f7;
+  --color-background-muted: #f8f9fa;
+  --color-background-subtle: #f1f3f5;
+  --color-sidebar-bg: #f9fafb;
 
-  /* Authentic Facebook Card & Popover Shadows */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.12);
-  --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.16), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  /* Minimal Shadows (Only for floating popovers/drawers, ZERO card shadows) */
+  --shadow-card: none;
+  --shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
 
-  /* Facebook Typography Color Tokens (Light Mode) */
-  --color-text-primary: #080809;         /* --primary-text */
-  --color-text-secondary: #65686c;       /* --secondary-text */
-  --color-text-disabled: #bcc0c4;
-  --color-text-accent: #0866ff;
+  /* Typography Color Tokens (Light Mode) */
+  --color-text-primary: #111111;
+  --color-text-secondary: #5e636e;
+  --color-text-disabled: #9ca3af;
+  --color-text-accent: #111111;
 
-  /* Dividers & Overlays (Light Mode) */
-  --color-border: #dfe2e7;
-  --color-border-emphasized: #ced0d4;
-  --color-overlay-hover: rgba(0, 0, 0, 0.05);
-  --color-overlay-pressed: rgba(0, 0, 0, 0.10);
+  /* Hairline Borders (Light Mode) */
+  --color-border: #e5e7eb;
+  --color-border-emphasized: #d1d5db;
+  --color-overlay-hover: rgba(0, 0, 0, 0.04);
+  --color-overlay-pressed: rgba(0, 0, 0, 0.08);
 
-  /* Custom Scrollbar Tokens */
-  --color-scrollbar-thumb: rgba(0, 0, 0, 0.22);
-  --color-scrollbar-thumb-hover: rgba(0, 0, 0, 0.38);
-  --color-scrollbar-thumb-active: rgba(0, 0, 0, 0.55);
+  /* Scrollbar Tokens */
+  --color-scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --color-scrollbar-thumb-hover: rgba(0, 0, 0, 0.34);
+  --color-scrollbar-thumb-active: rgba(0, 0, 0, 0.5);
 
-  /* Semantic Status Tokens */
-  --color-success: #1b873f;
-  --color-success-muted: #e6f4ea;
+  /* Semantic Statuses */
+  --color-success: #15803d;
+  --color-success-muted: #f0fdf4;
   --color-on-success: #ffffff;
 
-  --color-error: #d93025;
-  --color-error-muted: #fce8e6;
+  --color-error: #dc2626;
+  --color-error-muted: #fef2f2;
   --color-on-error: #ffffff;
 
-  --color-warning: #b06000;
-  --color-warning-muted: #fef7e0;
-  --color-on-warning: #080809;
+  --color-warning: #b45309;
+  --color-warning-muted: #fffbeb;
+  --color-on-warning: #111111;
 
-  /* Feed & Right Drawer Dimensions */
-  --feed-max-width: 980px;
+  /* Layout Dimensions */
+  --feed-max-width: 1060px;
   --right-drawer-tablet-width: 460px;
   --right-drawer-desktop-width: 520px;
 
-  /* Facebook Comet Border Radii */
-  --radius-inner: 6px;
-  --radius-button: 8px;
-  --radius-element: 8px;
-  --radius-container: 12px;
-  --radius-page: 12px;
+  /* Crisp Minimal Border Radii (Matches GoDaddy Console) */
+  --radius-inner: 4px;
+  --radius-button: 6px;
+  --radius-element: 6px;
+  --radius-container: 8px;
+  --radius-page: 8px;
   --radius-full: 9999px;
 
   /* ==========================================================================
-     FACEBOOK COMET 5-TIER TYPOGRAPHY SCALE (THAI + ENGLISH)
-     1. Display (Page / Resort Title): 24px (1.5rem)
-     2. Title (Section Heading): 20px (1.25rem)
-     3. Subtitle (Card / Author / Room Title): 17px (1.0625rem)
-     4. Body (Posts / Buttons / Inputs): 15px (0.9375rem)
-     5. Caption (Timestamps / Secondary Meta): 13px (0.8125rem)
+     EXACT FACEBOOK NATIVE FONT STACK (THAI + ENGLISH)
+     - No custom webfont override before `sans-serif`, so macOS renders native
+       SF Pro + Thonburi (100% identical to facebook.com on Mac) and Windows
+       renders Segoe UI + Leelawadee UI / Tahoma (100% identical to facebook.com on PC).
      ========================================================================== */
   --font-size-display: 1.5rem;      /* 24px */
-  --font-size-title: 1.25rem;       /* 20px */
-  --font-size-subtitle: 1.0625rem;  /* 17px */
-  --font-size-body: 0.9375rem;      /* 15px */
-  --font-size-caption: 0.8125rem;   /* 13px */
+  --font-size-title: 1.1875rem;     /* 19px */
+  --font-size-subtitle: 1rem;       /* 16px */
+  --font-size-body: 0.9375rem;      /* 15px (Facebook .9375rem base) */
+  --font-size-caption: 0.8125rem;   /* 13px (Facebook .8125rem meta) */
 
-  --font-family-body: -apple-system, BlinkMacSystemFont, "Segoe UI Historic", "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans Thai", sans-serif;
-  --font-family-heading: -apple-system, BlinkMacSystemFont, "Segoe UI Historic", "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans Thai", sans-serif;
+  --font-family-body: system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-family-heading: system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 /* ============================================================================
-   FACEBOOK COMET DARK MODE TOKENS (html.dark)
+   MINIMAL DARK MODE TOKENS (html.dark)
    ============================================================================ */
 html.dark {
-  --color-accent: #0866ff;
-  --color-accent-hover: #2d88ff;
-  --color-accent-muted: rgba(45, 136, 255, 0.20);
-  --color-on-accent: #ffffff;
-  --color-tiktok-accent: #0866ff;
-  --color-tiktok-accent-hover: #2d88ff;
-  --color-tiktok-on-accent: #ffffff;
-  --color-tiktok-gray: #3a3b3c;
-  --color-tiktok-gray-hover: #4e4f50;
-  --color-fastwork: #0866ff;
-  --color-neutral: rgba(255, 255, 255, 0.08);
+  --color-accent: #f3f4f6;
+  --color-accent-hover: #ffffff;
+  --color-accent-muted: #26272b;
+  --color-on-accent: #111111;
+  --color-link: #58a6ff;
+
+  --color-tiktok-accent: #f3f4f6;
+  --color-tiktok-accent-hover: #ffffff;
+  --color-tiktok-on-accent: #111111;
+  --color-tiktok-gray: #26272b;
+  --color-tiktok-gray-hover: #32343a;
+  --color-fastwork: #f3f4f6;
+  --color-on-fastwork: #111111;
+  --color-neutral: rgba(255, 255, 255, 0.06);
 
   --color-promo: #c53829;
   --color-promo-hover: #d84333;
   --color-on-promo: #ffffff;
-  --color-promo-muted: rgba(197, 56, 41, 0.24);
-  --color-promo-border: rgba(242, 107, 94, 0.38);
+  --color-promo-muted: rgba(197, 56, 41, 0.2);
+  --color-promo-border: rgba(242, 107, 94, 0.35);
   --color-promo-text: #ff7b6e;
 
-  --color-background-body: #18191a;      /* Facebook dark --web-wash */
-  --color-background-surface: #242526;   /* Facebook dark --surface-background */
-  --color-background-card: #242526;
-  --color-background-popover: #242526;
-  --color-background-muted: #3a3b3c;     /* Facebook dark --secondary-button-background */
-  --color-background-subtle: #4e4f50;
-  --color-sidebar-bg: #18191a;
+  --color-background-body: #141517;
+  --color-background-surface: #1b1c1f;
+  --color-background-card: #1b1c1f;
+  --color-background-popover: #222327;
+  --color-background-muted: #222327;
+  --color-background-subtle: #2b2d32;
+  --color-sidebar-bg: #17181b;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.50), 0 2px 4px 0 rgba(0, 0, 0, 0.25);
+  --shadow-card: none;
+  --shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.5);
 
-  --color-text-primary: #e4e6eb;
-  --color-text-secondary: #b0b3b8;
-  --color-text-disabled: #606366;
-  --color-text-accent: #4599ff;
+  --color-text-primary: #f3f4f6;
+  --color-text-secondary: #9ca3af;
+  --color-text-disabled: #52525b;
+  --color-text-accent: #f3f4f6;
 
-  --color-border: #393a3b;
-  --color-border-emphasized: #4e4f50;
-  --color-overlay-hover: rgba(255, 255, 255, 0.08);
-  --color-overlay-pressed: rgba(255, 255, 255, 0.14);
+  --color-border: #2b2d32;
+  --color-border-emphasized: #3f424a;
+  --color-overlay-hover: rgba(255, 255, 255, 0.06);
+  --color-overlay-pressed: rgba(255, 255, 255, 0.12);
 
-  --color-scrollbar-thumb: rgba(255, 255, 255, 0.24);
-  --color-scrollbar-thumb-hover: rgba(255, 255, 255, 0.42);
+  --color-scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --color-scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
   --color-scrollbar-thumb-active: rgba(255, 255, 255, 0.6);
 
-  --color-success: #45bd62;
-  --color-success-muted: rgba(69, 189, 98, 0.18);
+  --color-success: #4ade80;
+  --color-success-muted: rgba(34, 197, 94, 0.15);
   --color-on-success: #052e16;
-  --color-error: #f02849;
-  --color-error-muted: rgba(240, 40, 73, 0.18);
-  --color-warning: #f7b928;
-  --color-warning-muted: rgba(247, 185, 40, 0.18);
+  --color-error: #f87171;
+  --color-error-muted: rgba(239, 68, 68, 0.15);
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(245, 158, 11, 0.15);
 }
 
 @theme inline {
@@ -167,89 +173,426 @@ html.dark {
   --color-foreground: var(--color-text-primary);
   --font-sans: var(--font-family-body);
   --font-serif: var(--font-family-body);
-  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-html,
-body,
-button,
-input,
-textarea,
-select {
-  font-family: var(--font-family-body);
-}
+@layer base {
+  html,
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    font-family: var(--font-family-body);
+  }
 
-html {
-  background-color: var(--color-background-body);
-  min-height: 100%;
-  max-width: 100%;
-}
+  html {
+    background-color: var(--color-background-body);
+    min-height: 100%;
+    max-width: 100%;
+  }
 
-body {
-  background-color: var(--color-background-body);
-  color: var(--color-text-primary);
-  min-height: 100dvh;
-  max-width: 100%;
-  overflow-x: clip;
-  font-family: var(--font-family-body);
-  font-size: var(--font-size-body);
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  letter-spacing: normal;
-  transition: background-color 0.18s ease, color 0.18s ease;
-}
+  body {
+    background-color: var(--color-background-body);
+    color: var(--color-text-primary);
+    min-height: 100dvh;
+    max-width: 100%;
+    overflow-x: clip;
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-body);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-h1, h2, h3, h4, .font-serif {
-  font-family: var(--font-family-heading);
-  letter-spacing: normal;
-}
-
-/* ============================================================================
-   5-TIER FACEBOOK COMET TYPOGRAPHY CLASSES
-   ============================================================================ */
-.ty-display {
-  font-size: 1.375rem; /* 22px mobile */
-  line-height: 1.24;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-@media (min-width: 640px) {
-  .ty-display {
-    font-size: var(--font-size-display); /* 24px desktop */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-family-heading);
+    letter-spacing: -0.01em;
   }
 }
 
-.ty-title {
-  font-size: var(--font-size-title); /* 20px */
-  line-height: 1.28;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
+/* ============================================================================
+   COMPONENT PRIMITIVES (@layer components — NEVER overrides Tailwind `lg:hidden`!)
+   ============================================================================ */
+@layer components {
+  .ty-display {
+    font-size: 1.375rem;
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+  @media (min-width: 640px) {
+    .ty-display {
+      font-size: var(--font-size-display);
+    }
+  }
 
-.ty-subtitle {
-  font-size: var(--font-size-subtitle); /* 17px */
-  line-height: 1.32;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
+  .ty-title {
+    font-size: var(--font-size-title);
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
 
-.ty-body {
-  font-size: var(--font-size-body); /* 15px */
-  line-height: 1.45;
-  color: var(--color-text-primary);
-}
+  .ty-subtitle {
+    font-size: var(--font-size-subtitle);
+    line-height: 1.35;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
 
-.ty-body-muted {
-  font-size: var(--font-size-body); /* 15px */
-  line-height: 1.45;
-  color: var(--color-text-secondary);
-}
+  .ty-body {
+    font-size: var(--font-size-body);
+    line-height: 1.45;
+    color: var(--color-text-primary);
+  }
 
-.ty-caption {
-  font-size: var(--font-size-caption); /* 13px */
-  line-height: 1.35;
-  color: var(--color-text-secondary);
+  .ty-body-muted {
+    font-size: var(--font-size-body);
+    line-height: 1.45;
+    color: var(--color-text-secondary);
+  }
+
+  .ty-caption {
+    font-size: var(--font-size-caption);
+    line-height: 1.38;
+    color: var(--color-text-secondary);
+  }
+
+  .app-feed-shell {
+    width: 100%;
+    max-width: var(--feed-max-width);
+    min-width: 0;
+    margin-inline: auto;
+    padding-inline: 1rem;
+    overflow-anchor: none;
+  }
+  @media (min-width: 640px) {
+    .app-feed-shell {
+      padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .app-feed-shell {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* Minimal Hairline Card (GoDaddy Console style: pure white + 1px border, no heavy shadow) */
+  .app-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+    border-radius: var(--radius-page);
+    background-color: var(--color-background-card);
+    border: 1px solid var(--color-border);
+    box-shadow: none;
+    color: var(--color-text-primary);
+  }
+
+  .app-card-media {
+    position: relative;
+    width: 100%;
+    height: 240px;
+    overflow: hidden;
+    background-color: var(--color-background-muted);
+  }
+  @media (min-width: 640px) {
+    .app-card-media {
+      height: 300px;
+    }
+  }
+
+  .app-surface-muted {
+    border-radius: var(--radius-container);
+    background-color: var(--color-background-muted);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+  }
+
+  /* Right Sidebar Drawer */
+  .app-right-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+
+  .app-right-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    background-color: var(--color-background-card);
+    color: var(--color-text-primary);
+    border-left: 1px solid var(--color-border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  @media (min-width: 640px) {
+    .app-right-drawer {
+      width: var(--right-drawer-tablet-width);
+    }
+  }
+  @media (min-width: 1024px) {
+    .app-right-drawer {
+      width: var(--right-drawer-desktop-width);
+    }
+  }
+
+  /* GoDaddy-Style Minimal Solid & Outline Buttons */
+  .btn-round-solid {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.25rem; /* 36px */
+    border-radius: var(--radius-button);
+    background-color: var(--color-accent);
+    color: var(--color-on-accent);
+    padding-inline: 0.95rem;
+    font-size: var(--font-size-body);
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: background-color 0.14s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn-round-solid:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
+  }
+
+  .btn-promo-solid {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.25rem;
+    border-radius: var(--radius-button);
+    background-color: var(--color-promo);
+    color: var(--color-on-promo);
+    padding-inline: 0.95rem;
+    font-size: var(--font-size-body);
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: background-color 0.14s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn-promo-solid:hover:not(:disabled) {
+    background-color: var(--color-promo-hover);
+  }
+
+  /* Clean 1px Bordered White Button (Matches GoDaddy Secondary Button) */
+  .btn-fw-secondary,
+  .btn-round-border {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.25rem; /* 36px */
+    border-radius: var(--radius-button);
+    background-color: var(--color-background-card);
+    color: var(--color-text-primary);
+    padding-inline: 0.9rem;
+    font-size: var(--font-size-body);
+    font-weight: 500;
+    border: 1px solid var(--color-border-emphasized);
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn-fw-secondary:hover:not(:disabled),
+  .btn-round-border:hover:not(:disabled) {
+    background-color: var(--color-background-muted);
+    border-color: var(--color-text-primary);
+  }
+
+  /* Minimal Ghost Icon Button (Zero noisy gray circles!) */
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-button);
+    background-color: transparent;
+    color: var(--color-text-primary);
+    border: none;
+    transition: background-color 0.14s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .btn-icon:hover:not(:disabled) {
+    background-color: var(--color-background-subtle);
+  }
+
+  .btn-icon-lg {
+    width: 2.375rem;
+    height: 2.375rem;
+  }
+
+  .badge-promo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    height: 1.375rem;
+    padding-inline: 0.5rem;
+    border-radius: var(--radius-inner);
+    background-color: var(--color-promo);
+    color: var(--color-on-promo);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .badge-promo-subtle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    height: 1.375rem;
+    padding-inline: 0.5rem;
+    border-radius: var(--radius-inner);
+    background-color: var(--color-promo-muted);
+    color: var(--color-promo-text);
+    border: 1px solid var(--color-promo-border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .btn-tiktok-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.25rem;
+    padding-inline: 1rem;
+    border-radius: var(--radius-button);
+    background-color: var(--color-accent);
+    color: var(--color-on-accent);
+    font-size: var(--font-size-body);
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-tiktok-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    height: 2.25rem;
+    padding-inline: 0.9rem;
+    border-radius: var(--radius-button);
+    background-color: var(--color-background-card);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
+    font-weight: 500;
+    border: 1px solid var(--color-border-emphasized);
+    cursor: pointer;
+  }
+
+  .btn-tiktok-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    border-radius: var(--radius-button);
+    background-color: transparent;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+  }
+
+  .tiktok-tab-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    padding-inline: 1rem;
+    font-size: var(--font-size-body);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+  }
+  .tiktok-tab-item.active {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+  .tiktok-tab-item.active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--color-text-primary);
+  }
+
+  .tiktok-video-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius-container);
+    overflow: hidden;
+    background-color: #18191a;
+    cursor: pointer;
+  }
+
+  .fw-head-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    color: var(--color-text-primary);
+    background: var(--color-background-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-element);
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fw-input {
+    height: 2.375rem;
+    border-radius: var(--radius-element);
+    background-color: var(--color-background-card);
+    color: var(--color-text-primary);
+    padding-inline: 0.75rem;
+    font-size: var(--font-size-body);
+    border: 1px solid var(--color-border-emphasized);
+    outline: none;
+    transition: border-color 0.14s ease;
+  }
+  .fw-input::placeholder {
+    color: var(--color-text-secondary);
+  }
+  .fw-input:focus {
+    border-color: var(--color-text-primary);
+  }
+
+  .fw-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    min-height: 4rem;
+    padding-block: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
 }
 
 .bg-\[var\(--color-accent\)\],
@@ -281,417 +624,12 @@ h1, h2, h3, h4, .font-serif {
   color: #ffffff;
 }
 
-.text-\[9px\],
-.text-\[10px\],
-.text-\[11px\],
-.text-\[12px\] {
-  font-size: var(--font-size-caption) !important; /* 13px */
-  line-height: 1.35 !important;
-}
-
-.text-\[13px\],
-.text-\[14px\],
-.text-\[15px\] {
-  font-size: var(--font-size-body) !important; /* 15px */
-  line-height: 1.45 !important;
-}
-
-.text-\[17px\] {
-  font-size: var(--font-size-subtitle) !important; /* 17px */
-  line-height: 1.32 !important;
-}
-
-/* ============================================================================
-   FACEBOOK FEED CONTAINER & CRISP ELEVATED CARDS
-   ============================================================================ */
-.app-feed-shell {
-  width: 100%;
-  max-width: var(--feed-max-width);
-  min-width: 0;
-  margin-inline: auto;
-  padding-inline: 0.75rem;
-  overflow-anchor: none;
-}
-@media (min-width: 640px) {
-  .app-feed-shell {
-    padding-inline: 1.25rem;
-  }
-}
-@media (min-width: 1024px) {
-  .app-feed-shell {
-    padding-inline: 1.5rem;
-  }
-}
-
-.app-card {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: clip;
-  border-radius: var(--radius-page);
-  background-color: var(--color-background-card);
-  box-shadow: var(--shadow-card);
-  border: none;
-  color: var(--color-text-primary);
-  transition: background-color 0.18s ease;
-}
-
-.app-card-media {
-  position: relative;
-  width: 100%;
-  height: 240px;
-  overflow: hidden;
-  background-color: #000000;
-}
-@media (min-width: 640px) {
-  .app-card-media {
-    height: 300px;
-  }
-}
-
-.app-surface-muted {
-  border-radius: var(--radius-container);
-  background-color: var(--color-background-muted);
-  border: none;
-  color: var(--color-text-primary);
-}
-
-/* ============================================================================
-   UNIFIED RIGHT SIDEBAR DRAWER PRIMITIVES
-   ============================================================================ */
-.app-right-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.app-right-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  max-width: 100%;
-  background-color: var(--color-background-card);
-  color: var(--color-text-primary);
-  border-left: 1px solid var(--color-border);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.18);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-@media (min-width: 640px) {
-  .app-right-drawer {
-    width: var(--right-drawer-tablet-width);
-  }
-}
-@media (min-width: 1024px) {
-  .app-right-drawer {
-    width: var(--right-drawer-desktop-width);
-  }
-}
-
-/* ============================================================================
-   DARK MODE AUTOMATIC ADAPTATION
-   ============================================================================ */
+/* Dark Mode Fallbacks */
 html.dark .bg-white {
   background-color: var(--color-background-card) !important;
 }
-html.dark .bg-white\/95,
-html.dark .bg-white\/90,
-html.dark .bg-white\/85 {
-  background-color: rgba(36, 37, 38, 0.94) !important;
-}
-html.dark .bg-\[\#f1f1f1\],
-html.dark .bg-\[\#fafafa\],
-html.dark .bg-\[\#fbfbfb\],
-html.dark .bg-stone-50,
-html.dark .bg-stone-100 {
-  background-color: var(--color-background-muted) !important;
-}
-html.dark .text-\[\#171717\],
-html.dark .text-stone-900,
-html.dark .text-stone-800 {
-  color: var(--color-text-primary) !important;
-}
-html.dark .text-\[\#737373\],
-html.dark .text-stone-600,
-html.dark .text-stone-500 {
-  color: var(--color-text-secondary) !important;
-}
-html.dark .border-\[\#ebebeb\],
-html.dark .border-stone-200,
-html.dark .border-stone-100 {
-  border-color: var(--color-border) !important;
-}
-html.dark .border-\[\#d4d4d4\],
-html.dark .border-stone-300 {
-  border-color: var(--color-border-emphasized) !important;
-}
 
-/* ============================================================================
-   FACEBOOK COMET BUTTONS, ICON CIRCLES & BADGES
-   - Primary/Secondary Buttons: 36px/40px height, 8px border-radius, 15px semibold
-   - Icon Circles: 36px/40px circular (#E4E6EB Light / #3A3B3C Dark)
-   ============================================================================ */
-.btn-round-solid {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  height: 2.375rem; /* 38px */
-  border-radius: var(--radius-button);
-  background-color: var(--color-accent);
-  color: var(--color-on-accent);
-  padding-inline: 1rem;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  transition: background-color 0.14s ease, transform 0.14s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.btn-round-solid:hover:not(:disabled) {
-  background-color: var(--color-accent-hover);
-}
-.btn-round-solid:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn-promo-solid {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  height: 2.375rem;
-  border-radius: var(--radius-button);
-  background-color: var(--color-promo);
-  color: var(--color-on-promo);
-  padding-inline: 1rem;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  transition: background-color 0.14s ease, transform 0.14s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.btn-promo-solid:hover:not(:disabled) {
-  background-color: var(--color-promo-hover);
-}
-.btn-promo-solid:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn-fw-secondary,
-.btn-round-border {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  height: 2.375rem; /* 38px */
-  border-radius: var(--radius-button);
-  background-color: var(--color-background-subtle);
-  color: var(--color-text-primary);
-  padding-inline: 0.9rem;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  transition: filter 0.14s ease, background-color 0.14s ease, transform 0.14s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.btn-fw-secondary:hover:not(:disabled),
-.btn-round-border:hover:not(:disabled) {
-  filter: brightness(0.96);
-}
-.btn-fw-secondary:active:not(:disabled),
-.btn-round-border:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;  /* 36px */
-  height: 2.25rem;
-  flex-shrink: 0;
-  border-radius: 9999px;
-  background-color: var(--color-background-subtle);
-  color: var(--color-text-primary);
-  border: none;
-  transition: filter 0.14s ease, transform 0.14s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.btn-icon:hover:not(:disabled) {
-  filter: brightness(0.95);
-}
-.btn-icon:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.btn-icon-lg {
-  width: 2.5rem;   /* 40px Facebook Top Bar Icon Circle */
-  height: 2.5rem;
-}
-
-.badge-promo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  height: 1.5rem;
-  padding-inline: 0.625rem;
-  border-radius: 9999px;
-  background-color: var(--color-promo);
-  color: var(--color-on-promo);
-  font-size: var(--font-size-caption);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.badge-promo-subtle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  height: 1.5rem;
-  padding-inline: 0.625rem;
-  border-radius: 9999px;
-  background-color: var(--color-promo-muted);
-  color: var(--color-promo-text);
-  border: none;
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  line-height: 1;
-}
-
-.btn-tiktok-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  height: 2.375rem;
-  padding-inline: 1.125rem;
-  border-radius: var(--radius-button);
-  background-color: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-}
-.btn-tiktok-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  height: 2.375rem;
-  padding-inline: 1rem;
-  border-radius: var(--radius-button);
-  background-color: var(--color-background-subtle);
-  color: var(--color-text-primary);
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-}
-.btn-tiktok-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  flex-shrink: 0;
-  border-radius: 9999px;
-  background-color: var(--color-background-subtle);
-  color: var(--color-text-primary);
-  border: none;
-  cursor: pointer;
-}
-
-.tiktok-tab-item {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
-  padding-inline: 1.25rem;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-.tiktok-tab-item.active {
-  color: var(--color-accent);
-}
-.tiktok-tab-item.active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  border-radius: 3px 3px 0 0;
-  background-color: var(--color-accent);
-}
-
-.tiktok-video-card {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 9 / 16;
-  border-radius: var(--radius-container);
-  overflow: hidden;
-  background-color: #18191a;
-  cursor: pointer;
-}
-
-.fw-head-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  color: var(--color-text-primary);
-  background: var(--color-background-muted);
-  border: none;
-  border-radius: var(--radius-element);
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fw-input {
-  height: 2.5rem;
-  border-radius: var(--radius-element);
-  background-color: var(--color-background-muted);
-  color: var(--color-text-primary);
-  padding-inline: 0.875rem;
-  font-size: var(--font-size-body);
-  border: 1px solid var(--color-border);
-  outline: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-.fw-input::placeholder {
-  color: var(--color-text-secondary);
-}
-.fw-input:focus {
-  border-color: var(--color-accent);
-  background-color: var(--color-background-card);
-}
-
-.fw-setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.25rem;
-  min-height: 4.25rem;
-  padding-block: 0.75rem;
-  border: none;
-}
-
-/* ============================================================================
-   MOBILE & TABLET ZERO-SCROLLBAR APP MODE
-   ============================================================================ */
+/* Zero-Scrollbar Mobile & Tablet */
 @media (max-width: 1023.98px), (hover: none), (pointer: coarse) {
   :root,
   html,
@@ -700,51 +638,15 @@ html.dark .border-stone-300 {
     -ms-overflow-style: none !important;
     scrollbar-width: none !important;
   }
-
   :root::-webkit-scrollbar,
   html::-webkit-scrollbar,
   body::-webkit-scrollbar,
   ::-webkit-scrollbar,
-  *::-webkit-scrollbar,
-  :root::-webkit-scrollbar-track,
-  html::-webkit-scrollbar-track,
-  body::-webkit-scrollbar-track,
-  ::-webkit-scrollbar-track,
-  *::-webkit-scrollbar-track,
-  :root::-webkit-scrollbar-thumb,
-  html::-webkit-scrollbar-thumb,
-  body::-webkit-scrollbar-thumb,
-  ::-webkit-scrollbar-thumb,
-  *::-webkit-scrollbar-thumb {
+  *::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
     background: transparent !important;
-    border: none !important;
-    -webkit-appearance: none !important;
-  }
-}
-
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  ::-webkit-scrollbar,
-  *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-    background: transparent !important;
-  }
-  ::-webkit-scrollbar-track,
-  *::-webkit-scrollbar-track {
-    background: transparent !important;
-    margin: 3px;
-  }
-  ::-webkit-scrollbar-thumb,
-  *::-webkit-scrollbar-thumb {
-    background-color: var(--color-scrollbar-thumb) !important;
-    border-radius: 9999px !important;
-  }
-  ::-webkit-scrollbar-thumb:hover,
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-scrollbar-thumb-hover) !important;
   }
 }
 
@@ -757,22 +659,9 @@ html.dark .border-stone-300 {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
-  background: transparent !important;
 }
 
-/* ============================================================================
-   DRAWER & STEP TRANSITIONS
-   ============================================================================ */
 @keyframes slideInRightDrawer {
-  0% {
-    transform: translate3d(100%, 0, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes slideUpModal {
   0% {
     transform: translate3d(100%, 0, 0);
   }
@@ -792,21 +681,18 @@ html.dark .border-stone-300 {
 
 .animate-slide-in-right-drawer,
 .animate-slide-up-modal {
-  animation: slideInRightDrawer 0.26s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: slideInRightDrawer 0.24s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   will-change: transform;
-  backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
 }
 
 .animate-fade-in-backdrop {
-  animation: fadeInBackdrop 0.18s ease-out forwards;
-  will-change: opacity;
+  animation: fadeInBackdrop 0.16s ease-out forwards;
 }
 
 @keyframes modalStepInRight {
   0% {
     opacity: 0;
-    transform: translate3d(24px, 0, 0);
+    transform: translate3d(20px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -817,7 +703,7 @@ html.dark .border-stone-300 {
 @keyframes modalStepInLeft {
   0% {
     opacity: 0;
-    transform: translate3d(-24px, 0, 0);
+    transform: translate3d(-20px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -826,13 +712,13 @@ html.dark .border-stone-300 {
 }
 
 .animate-modal-step-in-right {
-  animation: modalStepInRight 0.22s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: modalStepInRight 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .animate-modal-step-in-left {
-  animation: modalStepInLeft 0.22s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: modalStepInLeft 0.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .modal-slide-track {
-  transition: transform 0.26s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 0.24s cubic-bezier(0.25, 1, 0.5, 1);
 }

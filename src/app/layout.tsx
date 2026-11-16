@@ -8,7 +8,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#242526" },
+    { media: "(prefers-color-scheme: dark)", color: "#141517" },
   ],
 };
 
@@ -33,26 +33,16 @@ export default function RootLayout({
         />
         <link
           rel="preconnect"
+          href="https://res.cloudinary.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preconnect"
           href="https://images.unsplash.com"
           crossOrigin="anonymous"
         />
-        <link
-          rel="preconnect"
-          href="https://assets.mixkit.co"
-          crossOrigin="anonymous"
-        />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
       </head>
-      <body className="min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)] antialiased selection:bg-[var(--color-accent)]/15">
+      <body className="min-h-screen bg-[var(--color-background-body)] text-[var(--color-text-primary)] antialiased">
         <HotelAppShell>{children}</HotelAppShell>
       </body>
     </html>

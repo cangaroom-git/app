@@ -110,26 +110,26 @@ export function StandardButton({
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
     sm: "h-8 px-3 text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
-    md: "h-9 px-4 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
-    lg: "h-10 px-5 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    md: "h-9 px-3.5 text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    lg: "h-10 px-4.5 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
+      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)] border border-transparent",
     promo:
-      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
+      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)] border border-transparent",
     secondary:
-      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
+      "bg-[var(--color-background-card)] text-[var(--color-text-primary)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-background-muted)] hover:border-[var(--color-text-primary)]",
     outline:
-      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
+      "bg-[var(--color-background-card)] text-[var(--color-text-primary)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-background-muted)] hover:border-[var(--color-text-primary)]",
     subtle:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] border border-[var(--color-border)] hover:bg-[var(--color-background-subtle)]",
   };
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-[8px] font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
+      className={`inline-flex items-center justify-center gap-2 rounded-[6px] font-medium transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}

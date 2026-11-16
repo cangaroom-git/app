@@ -112,8 +112,8 @@ export function useAuthenticatedProfile() {
 
 export function UserAvatarCircle({
   user,
-  sizeClass = "h-9 w-9",
-  iconSizeClass = "w-5 h-5",
+  sizeClass = "h-8 w-8",
+  iconSizeClass = "w-[18px] h-[18px]",
 }: {
   user: AuthenticatedProfileUser | null;
   sizeClass?: string;
@@ -132,18 +132,21 @@ export function UserAvatarCircle({
         alt={user.name || user.email}
         referrerPolicy="no-referrer"
         onError={() => setImgFailed(true)}
-        className={`${sizeClass} rounded-full object-cover shrink-0`}
+        className={`${sizeClass} rounded-full object-cover shrink-0 border border-[var(--color-border)]`}
       />
     );
   }
 
   if (user) {
-    const initial = (user.name?.[0] || user.email?.[0] || "U").toUpperCase();
+    const initials = (user.name || user.email || "U")
+      .trim()
+      .slice(0, 2)
+      .toUpperCase();
     return (
       <span
-        className={`${sizeClass} rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center ty-caption font-bold shrink-0`}
+        className={`${sizeClass} rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center text-[12px] font-bold shrink-0`}
       >
-        {initial}
+        {initials}
       </span>
     );
   }
@@ -226,45 +229,23 @@ export function UserProfileDropdown({
       ? `/admin?tenant=${encodeURIComponent(user.tenantSlug)}`
       : "/admin";
 
-  const roleBadgeLabel =
-    user?.role === "SUPER_ADMIN"
-      ? "Super Admin"
-      : user?.role === "HOTEL_ADMIN"
-      ? "เจ้าของที่พัก"
-      : language === "th"
-      ? "ผู้เข้าพัก"
-      : "Guest";
-
   return (
     <div ref={dropdownWrapperRef} className="relative">
       <button
         type="button"
         onClick={() => setIsDropdownOpen((prevOpen) => !prevOpen)}
-        aria-label={language === "th" ? "โปรไฟล์และเมนู" : "Profile and menu"}
+        aria-label={language === "th" ? "บัญชีและเมนู" : "Account menu"}
         aria-expanded={isDropdownOpen}
         aria-haspopup="menu"
-        title={
-          user
-            ? `${user.name} (${user.email})`
-            : language === "th"
-            ? "โปรไฟล์ & เมนู"
-            : "Profile & Menu"
-        }
-        className={`btn-icon btn-icon-lg relative overflow-visible ${
-          user?.image ? "!p-0" : ""
-        } ${
-          isDropdownOpen
-            ? "ring-2 ring-[var(--color-accent)]"
-            : ""
-        }`}
+        className="h-9 w-9 rounded-full inline-flex items-center justify-center hover:bg-[var(--color-background-subtle)] transition cursor-pointer relative"
       >
         <UserAvatarCircle
           user={user}
-          sizeClass="h-10 w-10"
-          iconSizeClass="w-5 h-5"
+          sizeClass="h-8 w-8"
+          iconSizeClass="w-[18px] h-[18px]"
         />
         {isHotelOrSuperAdmin && pendingAdminCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[var(--color-promo)] ring-2 ring-[var(--color-background-card)]" />
+          <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-[var(--color-promo)] ring-2 ring-[var(--color-background-card)]" />
         )}
       </button>
 
@@ -272,296 +253,220 @@ export function UserProfileDropdown({
         <div
           role="menu"
           aria-label={language === "th" ? "เมนูผู้ใช้" : "User menu"}
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[312px] rounded-[12px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] select-none"
+          className="absolute right-0 top-[calc(100%+6px)] z-50 w-[256px] rounded-[8px] bg-[var(--color-background-popover)] p-1.5 shadow-[var(--shadow-popover)] border border-[var(--color-border)] select-none"
         >
-          {/* 1. FACEBOOK-STYLE IDENTITY CARD */}
+          {/* 1. Minimal Identity Header */}
           {user ? (
-            <div className="rounded-[8px] p-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.08)] bg-[var(--color-background-card)] border border-[var(--color-border)] mb-2">
-              <div className="flex items-center gap-3">
-                <UserAvatarCircle user={user} sizeClass="h-10 w-10" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <p className="ty-body font-bold text-[var(--color-text-primary)] truncate">
-                      {user.name}
-                    </p>
-                    <span className="shrink-0 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold leading-none">
-                      {roleBadgeLabel}
-                    </span>
-                  </div>
-                  <p className="ty-caption truncate">{user.email}</p>
-                </div>
-              </div>
+            <div className="px-2.5 py-2 border-b border-[var(--color-border)] mb-1">
+              <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
+                {user.name}
+              </p>
+              <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                {user.email}
+              </p>
             </div>
           ) : (
-            <div className="p-1 mb-1 space-y-1.5">
+            <div className="p-1 border-b border-[var(--color-border)] mb-1">
               <Link
                 href="/login"
                 role="menuitem"
                 onClick={() => setIsDropdownOpen(false)}
-                className="w-full h-10 px-3.5 rounded-[8px] bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 ty-body font-semibold transition"
+                className="w-full h-9 px-3 rounded-[6px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 text-[14px] font-medium transition"
               >
                 <LogIn className="w-4 h-4" />
                 <span>
-                  {language === "th"
-                    ? "เข้าสู่ระบบด้วย Google"
-                    : "Sign in with Google"}
+                  {language === "th" ? "เข้าสู่ระบบ" : "Sign In"}
                 </span>
               </Link>
             </div>
           )}
 
-          {/* 2. GUEST ACTIONS */}
-          <div className="space-y-0.5">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => handleNavigateMenuTab("setting")}
-              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                activeTab === "setting"
-                  ? "bg-[var(--color-background-muted)] font-semibold"
-                  : "hover:bg-[var(--color-background-muted)]"
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                  <CalendarCheck className="w-4 h-4 text-[var(--color-text-primary)]" />
-                </span>
-                <span>
-                  {language === "th" ? "การจองของฉัน" : "My Bookings"}
-                </span>
-              </span>
-            </button>
+          {/* 2. Flat Minimal Menu Rows (Zero Heavy Icon Circles) */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => handleNavigateMenuTab("setting")}
+            className={`w-full h-9 px-2.5 rounded-[6px] flex items-center gap-2.5 text-[14px] transition cursor-pointer ${
+              activeTab === "setting"
+                ? "bg-[var(--color-background-subtle)] font-medium"
+                : "hover:bg-[var(--color-background-muted)]"
+            }`}
+          >
+            <CalendarCheck className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+            <span>{language === "th" ? "การจองของฉัน" : "My Bookings"}</span>
+          </button>
 
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setIsDropdownOpen(false);
-                onOpenCouponWallet();
-              }}
-              className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
-            >
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                  <TicketPercent className="w-4 h-4 text-[var(--color-promo-text)]" />
-                </span>
-                <span>
-                  {language === "th" ? "คูปองส่วนลด" : "Coupon Wallet"}
-                </span>
-              </span>
-              {savedCouponsCount > 0 && (
-                <span className="badge-promo">{savedCouponsCount}</span>
-              )}
-            </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setIsDropdownOpen(false);
+              onOpenCouponWallet();
+            }}
+            className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] transition cursor-pointer"
+          >
+            <span className="flex items-center gap-2.5">
+              <TicketPercent className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+              <span>{language === "th" ? "คูปองส่วนลด" : "Coupons"}</span>
+            </span>
+            {savedCouponsCount > 0 && (
+              <span className="badge-promo">{savedCouponsCount}</span>
+            )}
+          </button>
 
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => handleNavigateMenuTab("review")}
-              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                activeTab === "review"
-                  ? "bg-[var(--color-background-muted)] font-semibold"
-                  : "hover:bg-[var(--color-background-muted)]"
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                  <Star className="w-4 h-4 text-[var(--color-text-primary)]" />
-                </span>
-                <span>
-                  {language === "th" ? "รีวิวผู้เข้าพัก" : "Guest Reviews"}
-                </span>
-              </span>
-            </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => handleNavigateMenuTab("review")}
+            className={`w-full h-9 px-2.5 rounded-[6px] flex items-center gap-2.5 text-[14px] transition cursor-pointer ${
+              activeTab === "review"
+                ? "bg-[var(--color-background-subtle)] font-medium"
+                : "hover:bg-[var(--color-background-muted)]"
+            }`}
+          >
+            <Star className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+            <span>{language === "th" ? "รีวิวผู้เข้าพัก" : "Reviews"}</span>
+          </button>
 
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => handleNavigateMenuTab("guide")}
-              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                activeTab === "guide"
-                  ? "bg-[var(--color-background-muted)] font-semibold"
-                  : "hover:bg-[var(--color-background-muted)]"
-              }`}
-            >
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                  <Compass className="w-4 h-4 text-[var(--color-text-primary)]" />
-                </span>
-                <span>
-                  {language === "th" ? "แผนที่ & ที่เที่ยวใกล้เคียง" : "Map & Local Guide"}
-                </span>
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => handleNavigateMenuTab("guide")}
+            className={`w-full h-9 px-2.5 rounded-[6px] flex items-center gap-2.5 text-[14px] transition cursor-pointer ${
+              activeTab === "guide"
+                ? "bg-[var(--color-background-subtle)] font-medium"
+                : "hover:bg-[var(--color-background-muted)]"
+            }`}
+          >
+            <Compass className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+            <span>{language === "th" ? "แผนที่ & ที่เที่ยว" : "Local Guide"}</span>
+          </button>
 
-          <div className="my-1.5 border-t border-[var(--color-border)]" />
+          <div className="my-1 border-t border-[var(--color-border)]" />
 
-          {/* 3. HOTEL OWNER / ADMIN OR 30-DAY FREE TRIAL */}
-          <div className="space-y-0.5">
-            {isHotelOrSuperAdmin ? (
-              <>
-                {onToggleEditMode && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      onToggleEditMode();
-                    }}
-                    className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                      isEditMode
-                        ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] font-semibold"
-                        : "hover:bg-[var(--color-background-muted)]"
-                    }`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                        <Pencil className="w-4 h-4 text-[var(--color-accent)]" />
-                      </span>
-                      <span>
-                        {language === "th"
-                          ? "แก้ไขหน้าเว็บตรงจุด"
-                          : "Edit Live Page"}
-                      </span>
-                    </span>
-                    <span className="ty-caption font-semibold">
-                      {isEditMode ? "เปิดอยู่" : "ปิด"}
-                    </span>
-                  </button>
-                )}
-
-                <Link
-                  href={adminHref}
+          {/* 3. Admin Workspace OR 30-Day Trial */}
+          {isHotelOrSuperAdmin ? (
+            <>
+              {onToggleEditMode && (
+                <button
+                  type="button"
                   role="menuitem"
-                  onClick={() => setIsDropdownOpen(false)}
-                  className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    onToggleEditMode();
+                  }}
+                  className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] transition cursor-pointer"
                 >
-                  <span className="flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                      <LayoutDashboard className="w-4 h-4 text-[var(--color-text-primary)]" />
-                    </span>
+                  <span className="flex items-center gap-2.5">
+                    <Pencil className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
                     <span>
-                      {language === "th" ? "จัดการที่พัก (Admin)" : "Hotel Admin"}
+                      {language === "th" ? "แก้ไขหน้าเว็บ" : "Edit Page"}
                     </span>
                   </span>
-                  {pendingAdminCount > 0 && (
-                    <span className="badge-promo">{pendingAdminCount}</span>
-                  )}
-                </Link>
+                  <span className="text-[12px] text-[var(--color-text-secondary)]">
+                    {isEditMode ? "ON" : "OFF"}
+                  </span>
+                </button>
+              )}
 
-                {isSuperAdmin && (
-                  <Link
-                    href="/super-admin"
-                    role="menuitem"
-                    onClick={() => setIsDropdownOpen(false)}
-                    className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] inline-flex items-center justify-center">
-                        <Crown className="w-4 h-4 text-[var(--color-accent)]" />
-                      </span>
-                      <span>
-                        {language === "th"
-                          ? "ระบบจัดการแพลตฟอร์ม (Super Admin)"
-                          : "Super Admin"}
-                      </span>
-                    </span>
-                  </Link>
-                )}
-              </>
-            ) : (
               <Link
-                href="/register-hotel"
+                href={adminHref}
                 role="menuitem"
                 onClick={() => setIsDropdownOpen(false)}
-                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-semibold text-[var(--color-accent)] transition"
+                className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] transition"
               >
-                <span className="flex items-center gap-3">
-                  <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] inline-flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-[var(--color-accent)]" />
-                  </span>
+                <span className="flex items-center gap-2.5">
+                  <LayoutDashboard className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
                   <span>
-                    {language === "th"
-                      ? "สร้างเว็บที่พักฟรี 30 วัน"
-                      : "Start 30-Day Free Trial"}
+                    {language === "th" ? "จัดการที่พัก" : "Hotel Admin"}
                   </span>
                 </span>
+                {pendingAdminCount > 0 && (
+                  <span className="badge-promo">{pendingAdminCount}</span>
+                )}
               </Link>
-            )}
-          </div>
 
-          <div className="my-1.5 border-t border-[var(--color-border)]" />
+              {isSuperAdmin && (
+                <Link
+                  href="/super-admin"
+                  role="menuitem"
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] transition"
+                >
+                  <Crown className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+                  <span>Super Admin</span>
+                </Link>
+              )}
+            </>
+          ) : (
+            <Link
+              href="/register-hotel"
+              role="menuitem"
+              onClick={() => setIsDropdownOpen(false)}
+              className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] font-medium transition"
+            >
+              <Building2 className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+              <span>
+                {language === "th"
+                  ? "ทดลองเปิดเว็บที่พัก 30 วัน"
+                  : "Start 30-Day Trial"}
+              </span>
+            </Link>
+          )}
 
-          {/* 4. PREFERENCES & SIGN OUT */}
-          <div className="space-y-0.5">
-            {onToggleTheme && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={onToggleTheme}
-                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                    {isDarkTheme ? (
-                      <Moon className="w-4 h-4 text-[var(--color-text-primary)]" />
-                    ) : (
-                      <Sun className="w-4 h-4 text-[var(--color-text-primary)]" />
-                    )}
-                  </span>
-                  <span>
-                    {language === "th" ? "การแสดงผลหน้าจอ" : "Display & Theme"}
-                  </span>
-                </span>
-                <span className="ty-caption font-semibold">
-                  {language === "th"
-                    ? isDarkTheme
-                      ? "โหมดมืด"
-                      : "โหมดสว่าง"
-                    : isDarkTheme
-                    ? "Dark"
-                    : "Light"}
-                </span>
-              </button>
-            )}
+          <div className="my-1 border-t border-[var(--color-border)]" />
 
+          {/* 4. Minimal Preferences & Sign Out */}
+          {onToggleTheme && (
             <button
               type="button"
               role="menuitem"
-              onClick={onToggleLanguage}
-              className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+              onClick={onToggleTheme}
+              className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] transition cursor-pointer"
             >
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                  <Globe className="w-4 h-4 text-[var(--color-text-primary)]" />
-                </span>
-                <span>{language === "th" ? "ภาษา" : "Language"}</span>
+              <span className="flex items-center gap-2.5">
+                {isDarkTheme ? (
+                  <Moon className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+                ) : (
+                  <Sun className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+                )}
+                <span>{language === "th" ? "โหมดสี" : "Theme"}</span>
               </span>
-              <span className="ty-caption font-semibold">
-                {language === "th" ? "ภาษาไทย" : "English"}
+              <span className="text-[12px] text-[var(--color-text-secondary)]">
+                {isDarkTheme ? "Dark" : "Light"}
               </span>
             </button>
+          )}
 
-            {user && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={async () => {
-                  await signOutUser();
-                  setIsDropdownOpen(false);
-                }}
-                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
-                    <LogOut className="w-4 h-4 text-[var(--color-text-primary)]" />
-                  </span>
-                  <span>{language === "th" ? "ออกจากระบบ" : "Log Out"}</span>
-                </span>
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onToggleLanguage}
+            className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] transition cursor-pointer"
+          >
+            <span className="flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+              <span>{language === "th" ? "ภาษา" : "Language"}</span>
+            </span>
+            <span className="text-[12px] text-[var(--color-text-secondary)]">
+              {language === "th" ? "TH" : "EN"}
+            </span>
+          </button>
+
+          {user && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={async () => {
+                await signOutUser();
+                setIsDropdownOpen(false);
+              }}
+              className="w-full h-9 px-2.5 rounded-[6px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] text-[var(--color-error)] transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 shrink-0" />
+              <span>{language === "th" ? "ออกจากระบบ" : "Log Out"}</span>
+            </button>
+          )}
         </div>
       )}
     </div>
