@@ -6,18 +6,20 @@ import { motion } from "framer-motion";
 import {
   Bot,
   Calendar,
+  CalendarCheck,
   Compass,
+  Crown,
   Globe,
+  LayoutDashboard,
   LogIn,
+  LogOut,
   Moon,
   Pencil,
-  Settings,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Star,
   Sun,
-  User,
+  TicketPercent,
   X,
 } from "lucide-react";
 import { WhiteLabelPropertyConfig } from "@/data/rooms";
@@ -29,7 +31,11 @@ import {
   HotelNavTabIcon,
   HotelNavTabId,
 } from "@/components/navigation/NavigationIcons";
-import { UserProfileDropdown } from "@/components/navigation/UserProfileDropdown";
+import {
+  UserAvatarCircle,
+  UserProfileDropdown,
+  useAuthenticatedProfile,
+} from "@/components/navigation/UserProfileDropdown";
 
 export interface PrimaryNavigationProps {
   activeTab: HotelNavTabId;
@@ -83,6 +89,7 @@ export function PrimaryNavigation({
   const [isPageScrolled, setIsPageScrolled] = useState(false);
   const [isMobileProfileDrawerOpen, setIsMobileProfileDrawerOpen] =
     useState(false);
+  const { user, refreshProfile, signOutUser } = useAuthenticatedProfile();
 
   const brandBadgeCode = (
     propertyConfig?.brandCode ??
@@ -298,17 +305,28 @@ export function PrimaryNavigation({
             <button
               type="button"
               aria-label={language === "th" ? "โปรไฟล์และเมนู" : "Profile menu"}
-              title={language === "th" ? "โปรไฟล์ & ตั้งค่า" : "Profile & Menu"}
-              onClick={() =>
-                setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen)
+              title={
+                user
+                  ? `${user.name} (${user.email})`
+                  : language === "th"
+                  ? "โปรไฟล์ & ตั้งค่า"
+                  : "Profile & Menu"
               }
+              onClick={() => {
+                refreshProfile();
+                setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen);
+              }}
               className={`lg:hidden inline-flex h-10 w-10 rounded-full items-center justify-center shrink-0 transition cursor-pointer relative ${
                 isProfileSectionActive
                   ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
                   : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
               }`}
             >
-              <User className="w-[19px] h-[19px]" />
+              <UserAvatarCircle
+                user={user}
+                sizeClass="h-8 w-8"
+                iconSizeClass="w-[19px] h-[19px]"
+              />
               {pendingAdminCount > 0 && (
                 <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-[var(--color-accent)] ring-2 ring-[var(--color-background-body)]" />
               )}
@@ -350,24 +368,46 @@ export function PrimaryNavigation({
           />
 
           <aside className="app-right-drawer z-10 px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] justify-between animate-slide-in-right-drawer">
-            <div className="flex items-center justify-between gap-3 pb-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold ty-body shrink-0">
-                  {brandBadgeCode}
+            {/* ZONE 1: IDENTITY HEADER */}
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]">
+              {user ? (
+                <div className="flex items-center gap-3 min-w-0">
+                  <UserAvatarCircle user={user} sizeClass="h-10 w-10" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="ty-subtitle truncate">{user.name}</h2>
+                      <span className="shrink-0 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold leading-none">
+                        {user.role === "SUPER_ADMIN"
+                          ? "Super Admin"
+                          : user.role === "HOTEL_ADMIN"
+                          ? "Hotel Admin"
+                          : language === "th"
+                          ? "สมาชิก"
+                          : "Member"}
+                      </span>
+                    </div>
+                    <p className="ty-caption truncate">{user.email}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h2 className="ty-subtitle truncate">
-                    {language === "th"
-                      ? propertyConfig?.nameTh ?? "บัญชีและเมนูหลัก"
-                      : propertyConfig?.nameEn ?? "Account & Menu"}
-                  </h2>
-                  <p className="ty-caption truncate">
-                    {language === "th"
-                      ? "คูปองส่วนลด รีวิว คู่มือ และการจอง"
-                      : "Coupons, reviews, guide & bookings"}
-                  </p>
+              ) : (
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center font-bold ty-body shrink-0">
+                    {brandBadgeCode}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="ty-subtitle truncate">
+                      {language === "th"
+                        ? propertyConfig?.nameTh ?? "บัญชีและเมนูหลัก"
+                        : propertyConfig?.nameEn ?? "Account & Menu"}
+                    </h2>
+                    <p className="ty-caption truncate">
+                      {language === "th"
+                        ? "เข้าสู่ระบบด้วย Gmail เพื่อจัดการการจอง"
+                        : "Sign in with Gmail to manage stays"}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
               <button
                 type="button"
                 onClick={() => setIsMobileProfileDrawerOpen(false)}
@@ -379,23 +419,67 @@ export function PrimaryNavigation({
             </div>
 
             <nav className="flex-1 overflow-y-auto py-3 space-y-1">
+              {!user && (
+                <Link
+                  href="/login"
+                  onClick={() => setIsMobileProfileDrawerOpen(false)}
+                  className="w-full h-11 px-3.5 rounded-[12px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-between ty-body font-semibold transition mb-2"
+                >
+                  <span className="flex items-center gap-3">
+                    <LogIn className="w-5 h-5" />
+                    <span>
+                      {language === "th"
+                        ? "เข้าสู่ระบบ / สมัครสมาชิก"
+                        : "Sign in / Register"}
+                    </span>
+                  </span>
+                  <span className="ty-caption !text-white/85 font-medium">
+                    Gmail
+                  </span>
+                </Link>
+              )}
+
+              {/* ZONE 2: GUEST STAY & EXPLORE */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectTab("setting");
+                  setIsMobileProfileDrawerOpen(false);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={`w-full h-11 px-3 rounded-[12px] flex items-center gap-3.5 ty-body font-medium transition cursor-pointer ${
+                  normalizedActiveTab === "setting"
+                    ? "bg-[var(--color-background-muted)] font-semibold text-[var(--color-text-primary)]"
+                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                }`}
+              >
+                <CalendarCheck className="w-5 h-5 text-[var(--color-text-secondary)]" />
+                <span>
+                  {language === "th" ? "การจองของฉัน" : "My Bookings"}
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setIsMobileProfileDrawerOpen(false);
                   onOpenCouponWallet();
                 }}
-                className="w-full h-12 px-3 rounded-[12px] bg-[var(--color-promo-muted)] hover:opacity-90 flex items-center justify-between ty-body font-semibold text-[var(--color-promo-text)] transition cursor-pointer mb-2"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 <span className="flex items-center gap-3.5">
-                  <ShoppingBag className="w-5 h-5" />
+                  <TicketPercent className="w-5 h-5 text-[var(--color-promo-text)]" />
                   <span>
-                    {language === "th" ? "กระเป๋าคูปอง" : "Coupon Bag"}
+                    {language === "th" ? "กระเป๋าคูปองส่วนลด" : "Coupon Wallet"}
                   </span>
                 </span>
-                <span className="rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] px-2.5 py-0.5 ty-caption font-bold">
-                  {savedCouponsCount}
-                </span>
+                {savedCouponsCount > 0 ? (
+                  <span className="badge-promo">{savedCouponsCount}</span>
+                ) : (
+                  <span className="ty-caption font-semibold text-[var(--color-text-secondary)]">
+                    0
+                  </span>
+                )}
               </button>
 
               <button
@@ -432,29 +516,92 @@ export function PrimaryNavigation({
               >
                 <Compass className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
-                  {language === "th" ? "คู่มือท่องเที่ยวสะปัน" : "Sapan Guide"}
+                  {language === "th"
+                    ? "คู่มือท่องเที่ยว & แผนที่"
+                    : "Local Guide & Map"}
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectTab("setting");
-                  setIsMobileProfileDrawerOpen(false);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className={`w-full h-11 px-3 rounded-[12px] flex items-center gap-3.5 ty-body font-medium transition cursor-pointer ${
-                  normalizedActiveTab === "setting"
-                    ? "bg-[var(--color-background-muted)] font-semibold text-[var(--color-text-primary)]"
-                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                }`}
+              <div className="my-2 border-t border-[var(--color-border)]" />
+
+              {/* ZONE 3: WORKSPACE & ADMIN MANAGEMENT */}
+              {onToggleEditMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileProfileDrawerOpen(false);
+                    onToggleEditMode();
+                  }}
+                  className={`w-full h-11 px-3 rounded-[12px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+                    isEditMode
+                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold"
+                      : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <span className="flex items-center gap-3.5">
+                    <Pencil
+                      className={`w-5 h-5 ${
+                        isEditMode
+                          ? "text-[var(--color-on-accent)]"
+                          : "text-[var(--color-accent)]"
+                      }`}
+                    />
+                    <span>
+                      {language === "th"
+                        ? "แก้ไขหน้าเว็บตรงจุด"
+                        : "Edit Live Page"}
+                    </span>
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 ty-caption font-bold leading-none ${
+                      isEditMode
+                        ? "bg-white/20 !text-white"
+                        : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
+                    }`}
+                  >
+                    {isEditMode ? "ON" : "OFF"}
+                  </span>
+                </button>
+              )}
+
+              <Link
+                href="/admin"
+                onClick={() => setIsMobileProfileDrawerOpen(false)}
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition"
               >
-                <Settings className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                <span>
-                  {language === "th" ? "ตั้งค่า & การจอง" : "My Bookings"}
+                <span className="flex items-center gap-3.5">
+                  <LayoutDashboard className="w-5 h-5 text-[var(--color-text-secondary)]" />
+                  <span>
+                    {language === "th" ? "จัดการที่พัก (Admin)" : "Hotel Admin"}
+                  </span>
                 </span>
-              </button>
+                {pendingAdminCount > 0 && (
+                  <span className="rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 ty-caption font-semibold">
+                    {pendingAdminCount}
+                  </span>
+                )}
+              </Link>
 
+              {user?.role === "SUPER_ADMIN" && (
+                <Link
+                  href="/super-admin"
+                  onClick={() => setIsMobileProfileDrawerOpen(false)}
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition"
+                >
+                  <span className="flex items-center gap-3.5">
+                    <Crown className="w-5 h-5 text-[var(--color-accent)]" />
+                    <span>
+                      {language === "th"
+                        ? "ศูนย์ควบคุม (Super Admin)"
+                        : "Super Admin"}
+                    </span>
+                  </span>
+                </Link>
+              )}
+
+              <div className="my-2 border-t border-[var(--color-border)]" />
+
+              {/* ZONE 4: PREFERENCES & SIGN OUT */}
               {onToggleTheme && (
                 <button
                   type="button"
@@ -463,13 +610,15 @@ export function PrimaryNavigation({
                 >
                   <span className="flex items-center gap-3.5">
                     {isDarkTheme ? (
-                      <Sun className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                    ) : (
                       <Moon className="w-5 h-5 text-[var(--color-text-secondary)]" />
+                    ) : (
+                      <Sun className="w-5 h-5 text-[var(--color-text-secondary)]" />
                     )}
-                    <span>{language === "th" ? "โหมดสี" : "Appearance"}</span>
+                    <span>
+                      {language === "th" ? "โหมดหน้าจอ" : "Appearance"}
+                    </span>
                   </span>
-                  <span className="ty-caption font-semibold text-[var(--color-text-secondary)]">
+                  <span className="inline-flex items-center rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 ty-caption font-semibold text-[var(--color-text-primary)]">
                     {language === "th"
                       ? isDarkTheme
                         ? "มืด"
@@ -490,64 +639,29 @@ export function PrimaryNavigation({
                   <Globe className="w-5 h-5 text-[var(--color-text-secondary)]" />
                   <span>{language === "th" ? "ภาษา" : "Language"}</span>
                 </span>
-                <span className="ty-caption font-semibold text-[var(--color-text-secondary)]">
-                  {language === "th" ? "ไทย (TH)" : "English (EN)"}
+                <span className="inline-flex items-center rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 ty-caption font-semibold text-[var(--color-text-primary)]">
+                  {language === "th" ? "ไทย · TH" : "ENG · EN"}
                 </span>
               </button>
 
-              <Link
-                href="/login"
-                onClick={() => setIsMobileProfileDrawerOpen(false)}
-                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3.5 ty-body font-medium text-[var(--color-text-primary)] transition"
-              >
-                <LogIn className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                <span>{language === "th" ? "เข้าสู่ระบบ" : "Sign In"}</span>
-              </Link>
-
-              {onToggleEditMode && (
+              {user && (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    await signOutUser();
                     setIsMobileProfileDrawerOpen(false);
-                    onToggleEditMode();
                   }}
-                  className={`w-full h-11 px-3 rounded-[12px] flex items-center gap-3.5 ty-body font-semibold transition cursor-pointer ${
-                    isEditMode
-                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                      : "hover:bg-[var(--color-background-muted)] text-[var(--color-accent)]"
-                  }`}
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-error-muted)] flex items-center gap-3.5 ty-body font-medium text-[var(--color-error)] transition cursor-pointer"
                 >
-                  <Pencil className="w-5 h-5" />
+                  <LogOut className="w-5 h-5" />
                   <span>
-                    {isEditMode
-                      ? language === "th"
-                        ? "ปิดโหมดแก้ไขหน้าเว็บ"
-                        : "Exit Edit Mode"
-                      : language === "th"
-                      ? "แก้ไขหน้าเว็บจริง"
-                      : "Edit Live Page"}
+                    {language === "th" ? "ออกจากระบบ" : "Sign Out"}
                   </span>
                 </button>
               )}
-
-              <Link
-                href="/admin"
-                onClick={() => setIsMobileProfileDrawerOpen(false)}
-                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition"
-              >
-                <span className="flex items-center gap-3.5">
-                  <ShieldCheck className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                  <span>Admin</span>
-                </span>
-                {pendingAdminCount > 0 && (
-                  <span className="rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 ty-caption font-semibold">
-                    {pendingAdminCount}
-                  </span>
-                )}
-              </Link>
             </nav>
 
-            <p className="ty-caption flex items-center justify-between pt-3">
+            <p className="ty-caption flex items-center justify-between pt-3 border-t border-[var(--color-border)]">
               <span>
                 {language === "th" ? "ระบบจองตรงที่พัก" : "Direct Booking App"}
               </span>
