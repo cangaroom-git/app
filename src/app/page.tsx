@@ -1,31 +1,67 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import {
-  BadgeCheck,
-  Calendar,
-  Clock,
-  Coffee,
-  Heart,
-  MapPin,
-  MessageCircle,
-  Phone,
-  Play,
-  Share2,
-  Star,
-} from "lucide-react";
+import { BedDouble, Grid3X3, Heart, Play, Sparkles, UserCheck } from "lucide-react";
 import { pickLocalizedText } from "@/data/cmsDefaults";
+import { RoomLodge } from "@/data/rooms";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { ResortHeroHeader } from "@/components/home/ResortHeroHeader";
-import { ShortVideoCard } from "@/components/home/ShortVideoCard";
+
+type GridFilterTab = "all" | "reels" | "rooms" | "reviews";
+
+interface MixedMediaTile {
+  id: string;
+  kind: "video" | "carousel" | "photo" | "review";
+  imageUrl: string;
+  title: string;
+  subtitle?: string;
+  metricLabel?: string;
+  isPinned?: boolean;
+  onSelect: () => void;
+  onEdit?: () => void;
+}
+
+/** Exact Instagram Top-Right Multi-Photo Carousel Icon */
+function IgCarouselBadgeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-[19px] h-[19px] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M19 5.5H8.5A2.5 2.5 0 0 0 6 8v10.5A2.5 2.5 0 0 0 8.5 21H19a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 19 5.5Z" />
+      <path
+        d="M4.5 16.5V6A2.5 2.5 0 0 1 7 3.5h10.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** Exact Instagram Top-Right Video / Reel Rounded Play Badge Icon */
+function IgVideoBadgeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-[19px] h-[19px] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M17.5 3.5h-11A3 3 0 0 0 3.5 6.5v11a3 3 0 0 0 3 3h11a3 3 0 0 0 3-3v-11a3 3 0 0 0-3-3Zm-7.25 12.1V8.4a.65.65 0 0 1 .98-.56l6.1 3.6a.65.65 0 0 1 0 1.12l-6.1 3.6a.65.65 0 0 1-.98-.56Z" />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   const {
-    propertyConfig,
     rooms,
     lang: language,
-    totalAvailableUnitsCount,
+    openRoomDrawer,
     openGalleryModal,
     navigateToTab,
     openShortsAt,
@@ -34,493 +70,281 @@ export default function HomePage() {
     openCmsEditor,
   } = useHotelApp();
 
-  const [likedPostIds, setLikedPostIds] = useState<Record<string, boolean>>({});
+  const [activeGridTab, setActiveGridTab] = useState<GridFilterTab>("all");
 
-  const homeCms = cms.home;
-  const brandBadgeCode = (propertyConfig.brandCode || "SU").slice(0, 2);
-  const propertyShortName = pickLocalizedText(
+  const activeShorts = useMemo(
+    () => cms.shortsPage.videos.filter((video) => video.isActive !== false),
+    [cms.shortsPage.videos]
+  );
+
+  // Build unified mixed Instagram-style media tiles (Videos + Room Carousels + Gallery Photos + Guest Reviews)
+  const allMixedTiles = useMemo<MixedMediaTile[]>(() => {
+    const videoTiles: MixedMediaTile[] = activeShorts.map((vid, idx) => {
+      const originalIdx = cms.shortsPage.videos.findIndex(
+        (v) => v.id === vid.id
+      );
+      const linkedRoom =
+        rooms.find((r) => r.id === vid.roomId) ?? rooms[vid.roomIndex];
+      return {
+        id: `vid-${vid.id}`,
+        kind: "video",
+        imageUrl: vid.posterUrl,
+        title: pickLocalizedText(language, vid.titleTh, vid.titleEn),
+        subtitle: linkedRoom
+          ? `${linkedRoom.code} · ฿${linkedRoom.basePriceThb.toLocaleString()}`
+          : undefined,
+        metricLabel: vid.views,
+        isPinned: Boolean(vid.isPinned),
+        onSelect: () => openShortsAt(originalIdx >= 0 ? originalIdx : idx),
+        onEdit: () =>
+          openCmsEditor({ type: "short-video", videoId: vid.id }),
+      };
+    });
+
+    const roomTiles: MixedMediaTile[] = rooms.map((room: RoomLodge) => ({
+      id: `room-${room.id}`,
+      kind: "carousel",
+      imageUrl: room.images[0]?.url || "",
+      title: pickLocalizedText(language, room.nameTh, room.nameEn),
+      subtitle: `฿${room.basePriceThb.toLocaleString()} / ${
+        language === "th" ? "คืน" : "night"
+      }`,
+      metricLabel: `${room.images.length} ${
+        language === "th" ? "รูป" : "photos"
+      }`,
+      onSelect: () => openRoomDrawer(room, "details", 0),
+      onEdit: () => openCmsEditor({ type: "room", roomId: room.id }),
+    }));
+
+    const reviewTiles: MixedMediaTile[] = cms.reviews
+      .filter((rev) => Boolean(rev.photos[0]))
+      .map((rev) => ({
+        id: `rev-${rev.id}`,
+        kind: rev.photos.length > 1 ? "carousel" : "review",
+        imageUrl: rev.photos[0],
+        title: pickLocalizedText(language, rev.captionTh, rev.captionEn),
+        subtitle: `${pickLocalizedText(
+          language,
+          rev.authorNameTh,
+          rev.authorNameEn
+        )} · ★ ${rev.rating}`,
+        metricLabel: `${rev.likesCount}`,
+        onSelect: () => navigateToTab("review"),
+        onEdit: () => openCmsEditor({ type: "review", reviewId: rev.id }),
+      }));
+
+    const galleryTiles: MixedMediaTile[] = cms.gallery.photos.map((photo) => ({
+      id: `gal-${photo.id}`,
+      kind: "photo",
+      imageUrl: photo.url,
+      title: pickLocalizedText(language, photo.captionTh, photo.captionEn),
+      onSelect: () => openGalleryModal(null),
+      onEdit: () => openCmsEditor({ type: "gallery-photos" }),
+    }));
+
+    // Interleave naturally so videos, carousels, and photos blend organically like a real Instagram grid
+    const interleaved: MixedMediaTile[] = [];
+    const maxLen = Math.max(
+      videoTiles.length,
+      roomTiles.length,
+      reviewTiles.length,
+      galleryTiles.length
+    );
+
+    const seenUrls = new Set<string>();
+    const pushUnique = (tile?: MixedMediaTile) => {
+      if (!tile || !tile.imageUrl) return;
+      // Keep room & video tiles always; deduplicate extra gallery URLs if identical
+      if (tile.kind === "photo" && seenUrls.has(tile.imageUrl)) return;
+      seenUrls.add(tile.imageUrl);
+      interleaved.push(tile);
+    };
+
+    for (let i = 0; i < maxLen; i++) {
+      pushUnique(roomTiles[i]);
+      pushUnique(videoTiles[i]);
+      pushUnique(reviewTiles[i]);
+      pushUnique(galleryTiles[i]);
+    }
+
+    return interleaved;
+  }, [
+    activeShorts,
+    cms.gallery.photos,
+    cms.reviews,
+    cms.shortsPage.videos,
     language,
-    propertyConfig.nameTh.split("(")[0].trim(),
-    propertyConfig.nameEn
-  );
+    navigateToTab,
+    openCmsEditor,
+    openGalleryModal,
+    openRoomDrawer,
+    openShortsAt,
+    rooms,
+  ]);
 
-  const activeShorts = cms.shortsPage.videos.filter(
-    (video) => video.isActive !== false
-  );
-  const featuredShorts = [...activeShorts]
-    .sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)))
-    .slice(0, 3);
-
-  const visibleStories = homeCms.stories.filter(
-    (story) => story.isVisible !== false
-  );
-
-  const featuredReviews = cms.reviews
-    .filter((reviewItem) => reviewItem.isFeaturedOnBooking !== false)
-    .slice(0, 3);
-
-  // Build 9-photo Facebook "Photos" grid from gallery + rooms
-  const nineGridPhotos = useMemo(() => {
-    const urls: string[] = [];
-    for (const item of cms.gallery.photos) {
-      if (item.url && !urls.includes(item.url)) urls.push(item.url);
-      if (urls.length >= 9) break;
+  const displayedTiles = useMemo(() => {
+    if (activeGridTab === "reels") {
+      return allMixedTiles.filter((t) => t.kind === "video");
     }
-    if (urls.length < 9) {
-      for (const room of rooms) {
-        for (const img of room.images) {
-          if (img.url && !urls.includes(img.url)) urls.push(img.url);
-          if (urls.length >= 9) break;
-        }
-        if (urls.length >= 9) break;
-      }
+    if (activeGridTab === "rooms") {
+      return allMixedTiles.filter((t) => t.id.startsWith("room-"));
     }
-    return urls.slice(0, 9);
-  }, [cms.gallery.photos, rooms]);
+    if (activeGridTab === "reviews") {
+      return allMixedTiles.filter((t) => t.id.startsWith("rev-"));
+    }
+    return allMixedTiles;
+  }, [activeGridTab, allMixedTiles]);
 
-  const toggleLikePost = (postId: string) => {
-    setLikedPostIds((prev) => ({ ...prev, [postId]: !prev[postId] }));
-  };
+  const filterTabs: Array<{
+    id: GridFilterTab;
+    labelTh: string;
+    labelEn: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      id: "all",
+      labelTh: "ทั้งหมด",
+      labelEn: "Posts",
+      icon: <Grid3X3 className="w-4 h-4" />,
+    },
+    {
+      id: "reels",
+      labelTh: "Reels",
+      labelEn: "Reels",
+      icon: <Play className="w-4 h-4" />,
+    },
+    {
+      id: "rooms",
+      labelTh: "ห้องพัก",
+      labelEn: "Rooms",
+      icon: <BedDouble className="w-4 h-4" />,
+    },
+    {
+      id: "reviews",
+      labelTh: "รีวิวผู้เข้าพัก",
+      labelEn: "Tagged",
+      icon: <UserCheck className="w-4 h-4" />,
+    },
+  ];
 
   return (
-    <div className="w-full min-w-0 flex flex-col gap-4 select-none">
-      {/* 1. FACEBOOK PAGE COVER & PROFILE HEADER */}
+    <div className="w-full min-w-0 flex flex-col gap-3 select-none">
+      {/* 1. PROFILE HEADER CARD */}
       <ResortHeroHeader
         cmsEditType="home-hero"
         onBookClick={() => navigateToTab("book")}
         onChatClick={() => navigateToTab("chat")}
       />
 
-      {/* 2. AUTHENTIC FACEBOOK 2-COLUMN PAGE TIMELINE
-             - Left Column: Sticky "แนะนำตัว (Intro)" + "รูปภาพ (3x3 Photos)"
-             - Right Column: Reels + Resort Posts + Guest Check-in Reviews */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* LEFT COLUMN (Intro & Photos) */}
-        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-[72px]">
-          {/* Intro Card */}
-          <section className="app-card p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="ty-title">
-                {language === "th" ? "แนะนำที่พัก" : "Intro"}
-              </h2>
-              {canShowEditControls && (
-                <EditSpotButton
-                  label="แก้ไขข้อมูลแนะนำ"
-                  onClick={() => openCmsEditor({ type: "home-manifesto" })}
-                />
-              )}
-            </div>
-
-            <p className="ty-body text-[var(--color-text-primary)]">
-              {pickLocalizedText(
-                language,
-                homeCms.manifestoDescTh,
-                homeCms.manifestoDescEn
-              )}
-            </p>
-
-            <div className="pt-2 border-t border-[var(--color-border)] space-y-2.5 ty-body">
-              <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0 mt-0.5" />
-                <span>
-                  {pickLocalizedText(
-                    language,
-                    propertyConfig.locationTh,
-                    propertyConfig.locationEn
-                  )}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                <span>
-                  {language === "th"
-                    ? `เช็กอิน ${propertyConfig.checkInTime} · เช็กเอาท์ ${propertyConfig.checkOutTime}`
-                    : `Check-in ${propertyConfig.checkInTime} · Check-out ${propertyConfig.checkOutTime}`}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Coffee className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                <span>
-                  {language === "th"
-                    ? `ฟรีอาหารเช้า (${propertyConfig.breakfastTime})`
-                    : `Free Breakfast (${propertyConfig.breakfastTime})`}
-                </span>
-              </div>
-
-              {propertyConfig.phones[0] && (
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                  <span>{propertyConfig.phones.join(" , ")}</span>
-                </div>
-              )}
-
-              {propertyConfig.lineId && (
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                  <span>LINE: {propertyConfig.lineId}</span>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigateToTab("book")}
-              className="w-full h-10 rounded-[8px] bg-[var(--color-accent-muted)] hover:brightness-95 text-[var(--color-accent)] ty-body font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer"
-            >
-              <Calendar className="w-4 h-4" />
-              <span>
-                {language === "th"
-                  ? totalAvailableUnitsCount > 0
-                    ? `เช็กห้องว่างวันนี้ (ว่าง ${totalAvailableUnitsCount} หลัง)`
-                    : "เช็กตารางห้องว่างและราคา"
-                  : "Check Room Availability & Rates"}
-              </span>
-            </button>
-          </section>
-
-          {/* 3x3 Facebook Photos Card */}
-          {nineGridPhotos.length > 0 && (
-            <section className="app-card p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="ty-title">
-                  {language === "th" ? "รูปภาพ" : "Photos"}
-                </h2>
+      {/* 2. INSTAGRAM-STYLE MIXED PHOTO & VIDEO GRID */}
+      <section className="app-card overflow-hidden">
+        {/* Clean Instagram Tab Strip */}
+        <div className="px-3 sm:px-5 border-b border-[var(--color-border)] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-4 overflow-x-auto no-scrollbar">
+            {filterTabs.map((tab) => {
+              const isActive = activeGridTab === tab.id;
+              return (
                 <button
+                  key={tab.id}
                   type="button"
-                  onClick={() => openGalleryModal(null)}
-                  className="ty-body text-[var(--color-accent)] hover:underline cursor-pointer"
+                  onClick={() => setActiveGridTab(tab.id)}
+                  className={`relative h-12 px-3 inline-flex items-center gap-2 ty-body transition cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? "font-semibold text-[var(--color-text-primary)]"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
                 >
-                  {language === "th" ? "ดูรูปภาพทั้งหมด" : "See all photos"}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1 rounded-[8px] overflow-hidden">
-                {nineGridPhotos.map((photoUrl, idx) => (
-                  <button
-                    key={`grid-photo-${idx}`}
-                    type="button"
-                    onClick={() => openGalleryModal(null)}
-                    className="relative aspect-square bg-[var(--color-background-muted)] overflow-hidden cursor-pointer group"
-                  >
-                    <img
-                      src={photoUrl}
-                      alt={`${propertyShortName} ${idx + 1}`}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:brightness-95 transition"
-                    />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN (Reels + Resort Timeline Posts + Guest Reviews) */}
-        <div className="lg:col-span-7 space-y-4 min-w-0">
-          {/* Reels Card */}
-          {featuredShorts.length > 0 && (
-            <section className="app-card p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="ty-subtitle font-bold flex items-center gap-2">
-                  <Play className="w-4 h-4 fill-[var(--color-accent)] text-[var(--color-accent)] shrink-0" />
+                  {tab.icon}
                   <span>
-                    {language === "th" ? "Reels และคลิปสั้น" : "Reels"}
+                    {language === "th" ? tab.labelTh : tab.labelEn}
                   </span>
-                </h2>
-
-                <div className="flex items-center gap-2">
-                  {canShowEditControls && (
-                    <EditSpotButton
-                      icon="add"
-                      label="เพิ่มคลิป"
-                      onClick={() => openCmsEditor({ type: "short-video" })}
-                    />
+                  {isActive && (
+                    <span className="absolute bottom-0 inset-x-0 h-[2px] bg-[var(--color-text-primary)]" />
                   )}
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab("shorts")}
-                    className="ty-body text-[var(--color-accent)] hover:underline cursor-pointer"
-                  >
-                    {language === "th" ? "ดูทั้งหมด" : "See all"}
-                  </button>
-                </div>
-              </div>
+                </button>
+              );
+            })}
+          </div>
 
-              <div className="grid grid-cols-3 gap-2.5">
-                {featuredShorts.map((shortVideo, videoIndex) => {
-                  const linkedRoom =
-                    rooms.find((r) => r.id === shortVideo.roomId) ??
-                    rooms[shortVideo.roomIndex] ??
-                    rooms[0];
-                  const originalIdx = cms.shortsPage.videos.findIndex(
-                    (v) => v.id === shortVideo.id
-                  );
-
-                  return (
-                    <div key={shortVideo.id} className="relative">
-                      <ShortVideoCard
-                        id={shortVideo.id}
-                        title={pickLocalizedText(
-                          language,
-                          shortVideo.titleTh,
-                          shortVideo.titleEn
-                        )}
-                        roomCode={linkedRoom?.code}
-                        posterUrl={shortVideo.posterUrl}
-                        viewsCount={shortVideo.views}
-                        priceThb={linkedRoom?.basePriceThb}
-                        discountPercent={linkedRoom?.discountPercent}
-                        isPinned={Boolean(shortVideo.isPinned || videoIndex === 0)}
-                        onCardClick={() =>
-                          openShortsAt(originalIdx >= 0 ? originalIdx : videoIndex)
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Admin Add Story Bar */}
           {canShowEditControls && (
-            <div className="app-card px-4 py-3 flex items-center justify-between gap-2">
-              <span className="ty-body font-semibold">
-                โพสต์เรื่องราวบนหน้าแรก ({visibleStories.length})
-              </span>
+            <div className="flex items-center gap-1.5 shrink-0 py-1.5">
               <EditSpotButton
                 icon="add"
-                label="เขียนโพสต์ใหม่"
-                onClick={() => openCmsEditor({ type: "home-story" })}
+                label="เพิ่มรูป"
+                onClick={() => openCmsEditor({ type: "gallery-photos" })}
+              />
+              <EditSpotButton
+                icon="add"
+                label="เพิ่มคลิป"
+                onClick={() => openCmsEditor({ type: "short-video" })}
               />
             </div>
           )}
+        </div>
 
-          {/* Resort Story Posts (Facebook Timeline Post Format) */}
-          {visibleStories.map((story) => {
-            const isLiked = Boolean(likedPostIds[story.id]);
-            return (
-              <article key={story.id} className="app-card overflow-hidden">
-                {/* Post Author Header */}
-                <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0">
-                      {brandBadgeCode}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1">
-                        <span className="ty-body font-bold truncate">
-                          {propertyShortName}
-                        </span>
-                        <BadgeCheck className="w-4 h-4 fill-[var(--color-accent)] text-white shrink-0" />
-                      </div>
-                      <p className="ty-caption">
-                        {language === "th" ? "โพสต์แนะนำ" : "Featured"} ·{" "}
-                        {pickLocalizedText(
-                          language,
-                          homeCms.heroLocationTh,
-                          homeCms.heroLocationEn
-                        )}
-                      </p>
-                    </div>
-                  </div>
+        {/* Tight 3-to-4 Column Portrait Media Grid (4:5 Instagram Ratio, Mixing Videos & Photos) */}
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-[2px] sm:gap-[3px] bg-[var(--color-background-body)]">
+          {displayedTiles.map((tile, index) => (
+            <div
+              key={tile.id}
+              onClick={tile.onSelect}
+              className="group relative aspect-[4/5] w-full overflow-hidden bg-[var(--color-background-muted)] cursor-pointer"
+            >
+              <img
+                src={tile.imageUrl}
+                alt={tile.title}
+                loading={index < 8 ? "eager" : "lazy"}
+                decoding="async"
+                draggable={false}
+                className="h-full w-full object-cover object-center transition-transform duration-300 lg:group-hover:scale-[1.03]"
+              />
 
-                  {canShowEditControls && (
-                    <EditSpotButton
-                      label="แก้ไขโพสต์"
-                      onClick={() =>
-                        openCmsEditor({
-                          type: "home-story",
-                          storyId: story.id,
-                        })
-                      }
-                    />
-                  )}
-                </div>
+              {/* Top-Right Minimal Instagram Media Type Icon (Video Reel vs Carousel) */}
+              <div className="absolute top-2.5 right-2.5 pointer-events-none">
+                {tile.kind === "video" ? (
+                  <IgVideoBadgeIcon />
+                ) : tile.kind === "carousel" ? (
+                  <IgCarouselBadgeIcon />
+                ) : null}
+              </div>
 
-                {/* Post Text */}
-                <div className="px-4 pb-3 space-y-1">
-                  <h3 className="ty-subtitle font-bold">
-                    {pickLocalizedText(language, story.titleTh, story.titleEn)}
-                  </h3>
-                  <p className="ty-body">
-                    {pickLocalizedText(language, story.descTh, story.descEn)}
-                  </p>
-                </div>
-
-                {/* Post 16:9 Photo */}
-                <div className="relative w-full aspect-[16/9] bg-[var(--color-background-muted)] overflow-hidden">
-                  <img
-                    src={story.imageUrl}
-                    alt={pickLocalizedText(
-                      language,
-                      story.titleTh,
-                      story.titleEn
+              {/* Clean Desktop Hover Overlay (Zero Clutter at Rest!) */}
+              <div className="hidden lg:flex absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-col items-center justify-center p-3 text-center text-white pointer-events-none">
+                {tile.metricLabel && (
+                  <div className="inline-flex items-center gap-1.5 ty-body font-bold !text-white mb-1">
+                    {tile.kind === "video" ? (
+                      <Play className="w-4 h-4 fill-white text-white" />
+                    ) : tile.kind === "review" ? (
+                      <Heart className="w-4 h-4 fill-white text-white" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-white" />
                     )}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Facebook Post Action Row */}
-                <div className="px-2 py-1.5 border-t border-[var(--color-border)] grid grid-cols-3 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleLikePost(story.id)}
-                    className={`h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold transition cursor-pointer ${
-                      isLiked
-                        ? "text-[var(--color-promo)]"
-                        : "text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    <Heart
-                      className={`w-[18px] h-[18px] ${
-                        isLiked ? "fill-current" : ""
-                      }`}
-                    />
-                    <span>{language === "th" ? "ถูกใจ" : "Like"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab("chat")}
-                    className="h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold text-[var(--color-text-secondary)] transition cursor-pointer"
-                  >
-                    <MessageCircle className="w-[18px] h-[18px]" />
-                    <span>{language === "th" ? "สอบถาม" : "Ask"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab(story.ctaTargetTab || "book")}
-                    className="h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold text-[var(--color-accent)] transition cursor-pointer"
-                  >
-                    <Calendar className="w-[18px] h-[18px]" />
-                    <span>
-                      {language === "th" ? "เช็กห้องว่าง" : "Book Now"}
-                    </span>
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-
-          {/* Guest Check-in Review Posts */}
-          {featuredReviews.map((rev) => {
-            const isLiked = Boolean(likedPostIds[rev.id]);
-            return (
-              <article key={rev.id} className="app-card overflow-hidden">
-                <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={rev.authorAvatar}
-                      alt={rev.authorNameTh}
-                      loading="lazy"
-                      className="h-10 w-10 rounded-full object-cover bg-[var(--color-background-muted)] shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <p className="ty-body truncate">
-                        <strong className="font-bold">
-                          {pickLocalizedText(
-                            language,
-                            rev.authorNameTh,
-                            rev.authorNameEn
-                          )}
-                        </strong>{" "}
-                        <span className="text-[var(--color-text-secondary)]">
-                          {language === "th" ? "ได้รีวิว" : "reviewed"}{" "}
-                        </span>
-                        <strong className="font-semibold">
-                          {propertyShortName}
-                        </strong>
-                      </p>
-                      <p className="ty-caption flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-0.5 font-semibold text-[var(--color-warning)]">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          {rev.rating}
-                        </span>
-                        <span>·</span>
-                        <span>{rev.roomLabel}</span>
-                        <span>·</span>
-                        <span>
-                          {pickLocalizedText(
-                            language,
-                            rev.postedAgoTh,
-                            rev.postedAgoEn
-                          )}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {canShowEditControls && (
-                    <EditSpotButton
-                      onClick={() =>
-                        openCmsEditor({ type: "review", reviewId: rev.id })
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="px-4 pb-3">
-                  <p className="ty-body">
-                    {pickLocalizedText(language, rev.captionTh, rev.captionEn)}
-                  </p>
-                </div>
-
-                {rev.photos[0] && (
-                  <div
-                    onClick={() => navigateToTab("review")}
-                    className="relative w-full aspect-[16/9] bg-[var(--color-background-muted)] overflow-hidden cursor-pointer"
-                  >
-                    <img
-                      src={rev.photos[0]}
-                      alt={rev.roomLabel}
-                      loading="lazy"
-                      className="w-full h-full object-cover"
-                    />
+                    <span>{tile.metricLabel}</span>
                   </div>
                 )}
+                <p className="ty-caption font-semibold !text-white line-clamp-2">
+                  {tile.title}
+                </p>
+                {tile.subtitle && (
+                  <p className="ty-caption !text-white/85 mt-0.5">
+                    {tile.subtitle}
+                  </p>
+                )}
+              </div>
 
-                <div className="px-2 py-1.5 border-t border-[var(--color-border)] grid grid-cols-2 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleLikePost(rev.id)}
-                    className={`h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold transition cursor-pointer ${
-                      isLiked
-                        ? "text-[var(--color-promo)]"
-                        : "text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    <Heart
-                      className={`w-[18px] h-[18px] ${
-                        isLiked ? "fill-current" : ""
-                      }`}
-                    />
-                    <span>
-                      {language === "th" ? "ถูกใจ" : "Like"} (
-                      {rev.likesCount + (isLiked ? 1 : 0)})
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab("review")}
-                    className="h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold text-[var(--color-text-secondary)] transition cursor-pointer"
-                  >
-                    <Share2 className="w-[18px] h-[18px]" />
-                    <span>
-                      {language === "th" ? "ดูรีวิวทั้งหมด" : "All Reviews"}
-                    </span>
-                  </button>
+              {/* Admin On-Page Edit Button */}
+              {canShowEditControls && tile.onEdit && (
+                <div
+                  className="absolute bottom-2 right-2 z-20"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <EditSpotButton onClick={tile.onEdit} />
                 </div>
-              </article>
-            );
-          })}
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
