@@ -25,6 +25,41 @@ import {
 
 const RESORT_STORE_STORAGE_KEY = "white_label_resort_store_v7";
 
+export function getActiveClientTenantSlug(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const qTenant = params
+      .get("tenant")
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "");
+    if (qTenant && qTenant !== "sapanunseen" && qTenant !== "default") {
+      return qTenant;
+    }
+    const host = window.location.hostname.toLowerCase();
+    if (host.endsWith(".cangaroom.com")) {
+      const sub = host.slice(0, -".cangaroom.com".length).replace(/^www\./, "");
+      if (sub && sub !== "www" && sub !== "app" && sub !== "sapanunseen") {
+        return sub;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function getScopedStorageKey(): string {
+  const slug = getActiveClientTenantSlug();
+  return slug ? `${RESORT_STORE_STORAGE_KEY}:${slug}` : RESORT_STORE_STORAGE_KEY;
+}
+
+function getCmsApiEndpoint(): string {
+  const slug = getActiveClientTenantSlug();
+  return slug ? `/api/cms?tenant=${encodeURIComponent(slug)}` : "/api/cms";
+}
+
 // In-memory cache of parsed store data (vercel-react-best-practices: js-cache-storage)
 let memoryBookingsCache: BookingRecord[] | null = null;
 
@@ -34,7 +69,7 @@ export function getLatestBookingsSnapshot(
   if (typeof window === "undefined") return fallbackBookings;
   if (memoryBookingsCache) return memoryBookingsCache;
   try {
-    const rawStoreJson = localStorage.getItem(RESORT_STORE_STORAGE_KEY);
+    const rawStoreJson = localStorage.getItem(getScopedStorageKey());
     if (rawStoreJson) {
       const parsedStore = JSON.parse(rawStoreJson) as Partial<SapanStoreData>;
       if (parsedStore && Array.isArray(parsedStore.bookings)) {
@@ -769,7 +804,7 @@ export function useSapanStore() {
       window.clearTimeout(syncTimerRef.current);
     }
     syncTimerRef.current = window.setTimeout(() => {
-      fetch("/api/cms", {
+      fetch(getCmsApiEndpoint(), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(snapshot),
@@ -781,9 +816,10 @@ export function useSapanStore() {
 
   useEffect(() => {
     let isCancelled = false;
+    const storageKey = getScopedStorageKey();
 
     try {
-      const rawStoreJson = localStorage.getItem(RESORT_STORE_STORAGE_KEY);
+      const rawStoreJson = localStorage.getItem(storageKey);
       if (rawStoreJson) {
         const parsedStore = JSON.parse(rawStoreJson) as Partial<SapanStoreData>;
         const mergedLocal = mergeWithDefaultStore(parsedStore);
@@ -791,7 +827,7 @@ export function useSapanStore() {
         setStore(mergedLocal);
       } else {
         localStorage.setItem(
-          RESORT_STORE_STORAGE_KEY,
+          storageKey,
           JSON.stringify(getDefaultStore())
         );
       }
@@ -801,7 +837,7 @@ export function useSapanStore() {
     setIsHydrated(true);
 
     // Fetch authoritative server/database snapshot so edits appear across all devices & browsers
-    fetch("/api/cms", { cache: "no-store" })
+    fetch(getCmsApiEndpoint(), { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { store?: Partial<SapanStoreData> | null } | null) => {
         if (isCancelled || !data?.store) return;
@@ -810,7 +846,7 @@ export function useSapanStore() {
         setStore(mergedServer);
         try {
           localStorage.setItem(
-            RESORT_STORE_STORAGE_KEY,
+            storageKey,
             JSON.stringify(mergedServer)
           );
         } catch {
@@ -822,7 +858,7 @@ export function useSapanStore() {
       });
 
     const handleStorageSync = (event: StorageEvent) => {
-      if (event.key === RESORT_STORE_STORAGE_KEY && event.newValue) {
+      if (event.key === storageKey && event.newValue) {
         try {
           const parsedStore = JSON.parse(event.newValue) as Partial<SapanStoreData>;
           const merged = mergeWithDefaultStore(parsedStore);
@@ -850,7 +886,7 @@ export function useSapanStore() {
         memoryBookingsCache = nextStore.bookings;
         try {
           localStorage.setItem(
-            RESORT_STORE_STORAGE_KEY,
+            getScopedStorageKey(),
             JSON.stringify(nextStore)
           );
         } catch {
@@ -869,7 +905,7 @@ export function useSapanStore() {
     setStore(defaultStore);
     try {
       localStorage.setItem(
-        RESORT_STORE_STORAGE_KEY,
+        getScopedStorageKey(),
         JSON.stringify(defaultStore)
       );
     } catch {

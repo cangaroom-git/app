@@ -293,7 +293,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const applyThemeClassToDocument = useCallback((mode: ThemeMode) => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("dark", mode === "dark");
-    const themeColorValue = mode === "dark" ? "#141416" : "#ffffff";
+    const themeColorValue = mode === "dark" ? "#242526" : "#ffffff";
     const metaThemeTags = document.querySelectorAll('meta[name="theme-color"]');
     if (metaThemeTags.length > 0) {
       metaThemeTags.forEach((tag) =>
@@ -1458,11 +1458,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     ]
   );
 
-  // Admin Console (/admin), Super Admin (/super-admin) & Login (/login) render dedicated workspaces
+  // Admin Console (/admin), Super Admin (/super-admin), Login (/login) & Hotel Trial Onboarding (/register-hotel) render dedicated workspaces
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/super-admin") ||
-    pathname.startsWith("/login")
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register-hotel")
   ) {
     return (
       <HotelAppContext.Provider value={contextValue}>
@@ -1476,15 +1477,9 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeBookingStep === "calendar" &&
     calendarOrigin === "navbar";
 
-  const isBookingRoute = activeTab === "book" || activeTab === "room";
-
   return (
     <HotelAppContext.Provider value={contextValue}>
-      <div
-        className={`min-h-screen ${
-          isBookingRoute ? "pt-14" : "pt-0"
-        } bg-[var(--color-background-body)] text-[var(--color-text-primary)] lg:pl-[72px] transition-colors duration-200`}
-      >
+      <div className="min-h-screen pt-14 bg-[var(--color-background-body)] text-[var(--color-text-primary)] lg:pl-[244px] transition-colors duration-200">
         {/* 1. Primary Navigation (Desktop Left Sidebar + Top Navbar + Mobile Bottom Bar & Profile Drawer) */}
         <PrimaryNavigation
           activeTab={activeTab}

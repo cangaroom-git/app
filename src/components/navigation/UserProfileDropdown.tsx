@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Building2,
   CalendarCheck,
   Compass,
   Crown,
@@ -31,6 +32,7 @@ export interface AuthenticatedProfileUser {
   email: string;
   image?: string | null;
   role: AppUserRole;
+  tenantSlug?: string | null;
 }
 
 export function useAuthenticatedProfile() {
@@ -42,15 +44,36 @@ export function useAuthenticatedProfile() {
       const res = await authClient.getSession();
       const rawUser = res?.data?.user;
       if (rawUser?.email) {
+        let resolvedRole = resolveRoleFromEmail(rawUser.email);
+        let resolvedTenantSlug: string | null = null;
+
+        try {
+          const meRes = await fetch("/api/platform/me", { cache: "no-store" });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData?.user?.role) {
+              resolvedRole = meData.user.role;
+            }
+            if (meData?.user?.tenantSlug) {
+              resolvedTenantSlug = meData.user.tenantSlug;
+            } else if (meData?.tenant?.slug) {
+              resolvedTenantSlug = meData.tenant.slug;
+            }
+          }
+        } catch {
+          // fallback to email-based role
+        }
+
         setUser({
           id: rawUser.id,
           name:
             rawUser.name?.trim() ||
             rawUser.email.split("@")[0] ||
-            "Cangaroom User",
+            "ผู้ใช้งาน",
           email: rawUser.email,
           image: rawUser.image || null,
-          role: resolveRoleFromEmail(rawUser.email),
+          role: resolvedRole,
+          tenantSlug: resolvedTenantSlug,
         });
       } else {
         setUser(null);
@@ -64,9 +87,7 @@ export function useAuthenticatedProfile() {
 
   useEffect(() => {
     refreshProfile();
-    const handleFocus = () => {
-      refreshProfile();
-    };
+    const handleFocus = () => refreshProfile();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [refreshProfile]);
@@ -91,8 +112,8 @@ export function useAuthenticatedProfile() {
 
 export function UserAvatarCircle({
   user,
-  sizeClass = "h-8 w-8",
-  iconSizeClass = "w-[18px] h-[18px]",
+  sizeClass = "h-9 w-9",
+  iconSizeClass = "w-5 h-5",
 }: {
   user: AuthenticatedProfileUser | null;
   sizeClass?: string;
@@ -111,7 +132,7 @@ export function UserAvatarCircle({
         alt={user.name || user.email}
         referrerPolicy="no-referrer"
         onError={() => setImgFailed(true)}
-        className={`${sizeClass} rounded-full object-cover shrink-0 ring-1 ring-[var(--color-border)]`}
+        className={`${sizeClass} rounded-full object-cover shrink-0`}
       />
     );
   }
@@ -190,9 +211,6 @@ export function UserProfileDropdown({
     };
   }, [isDropdownOpen, refreshProfile]);
 
-  const isSecondaryRouteActive =
-    activeTab === "review" || activeTab === "guide" || activeTab === "setting";
-
   const handleNavigateMenuTab = (targetTab: HotelNavTabId) => {
     setIsDropdownOpen(false);
     onSelectTab(targetTab);
@@ -200,14 +218,22 @@ export function UserProfileDropdown({
   };
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isHotelOrSuperAdmin =
+    user?.role === "HOTEL_ADMIN" || user?.role === "SUPER_ADMIN";
+
+  const adminHref =
+    user?.tenantSlug && user.tenantSlug !== "sapanunseen"
+      ? `/admin?tenant=${encodeURIComponent(user.tenantSlug)}`
+      : "/admin";
+
   const roleBadgeLabel =
     user?.role === "SUPER_ADMIN"
       ? "Super Admin"
       : user?.role === "HOTEL_ADMIN"
-      ? "Hotel Admin"
+      ? "เจ้าของที่พัก"
       : language === "th"
-      ? "สมาชิก"
-      : "Member";
+      ? "ผู้เข้าพัก"
+      : "Guest";
 
   return (
     <div ref={dropdownWrapperRef} className="relative">
@@ -225,20 +251,20 @@ export function UserProfileDropdown({
             : "Profile & Menu"
         }
         className={`btn-icon btn-icon-lg relative overflow-visible ${
-          user?.image ? "!p-0.5" : ""
+          user?.image ? "!p-0" : ""
         } ${
-          isDropdownOpen || isSecondaryRouteActive
-            ? "!bg-[var(--color-accent-muted)] !text-[var(--color-accent)]"
+          isDropdownOpen
+            ? "ring-2 ring-[var(--color-accent)]"
             : ""
         }`}
       >
         <UserAvatarCircle
           user={user}
-          sizeClass="h-8 w-8"
+          sizeClass="h-10 w-10"
           iconSizeClass="w-5 h-5"
         />
-        {pendingAdminCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[var(--color-accent)] ring-2 ring-[var(--color-background-card)]" />
+        {isHotelOrSuperAdmin && pendingAdminCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[var(--color-promo)] ring-2 ring-[var(--color-background-card)]" />
         )}
       </button>
 
@@ -246,67 +272,60 @@ export function UserProfileDropdown({
         <div
           role="menu"
           aria-label={language === "th" ? "เมนูผู้ใช้" : "User menu"}
-          className="absolute right-0 top-[calc(100%+10px)] z-50 w-[284px] rounded-[20px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] select-none"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[312px] rounded-[12px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] select-none"
         >
-          {/* ===============================================================
-              ZONE 1: IDENTITY HEADER (Google Profile / Sign-In CTA)
-          ================================================================ */}
+          {/* 1. FACEBOOK-STYLE IDENTITY CARD */}
           {user ? (
-            <div className="px-3 py-2.5 flex items-center gap-3">
-              <UserAvatarCircle user={user} sizeClass="h-10 w-10" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <p className="ty-body font-bold text-[var(--color-text-primary)] truncate">
-                    {user.name}
-                  </p>
-                  <span className="shrink-0 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold leading-none">
-                    {roleBadgeLabel}
-                  </span>
+            <div className="rounded-[8px] p-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.08)] bg-[var(--color-background-card)] border border-[var(--color-border)] mb-2">
+              <div className="flex items-center gap-3">
+                <UserAvatarCircle user={user} sizeClass="h-10 w-10" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="ty-body font-bold text-[var(--color-text-primary)] truncate">
+                      {user.name}
+                    </p>
+                    <span className="shrink-0 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold leading-none">
+                      {roleBadgeLabel}
+                    </span>
+                  </div>
+                  <p className="ty-caption truncate">{user.email}</p>
                 </div>
-                <p className="ty-caption truncate mt-0.5">{user.email}</p>
               </div>
             </div>
           ) : (
-            <div className="p-1.5">
+            <div className="p-1 mb-1 space-y-1.5">
               <Link
                 href="/login"
                 role="menuitem"
                 onClick={() => setIsDropdownOpen(false)}
-                className="w-full h-10 px-3.5 rounded-[12px] bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-on-accent)] flex items-center justify-between ty-body font-semibold transition"
+                className="w-full h-10 px-3.5 rounded-[8px] bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 ty-body font-semibold transition"
               >
-                <span className="flex items-center gap-2.5">
-                  <LogIn className="w-4 h-4" />
-                  <span>
-                    {language === "th"
-                      ? "เข้าสู่ระบบ / สมัครสมาชิก"
-                      : "Sign in / Register"}
-                  </span>
-                </span>
-                <span className="ty-caption !text-white/85 font-medium">
-                  Gmail
+                <LogIn className="w-4 h-4" />
+                <span>
+                  {language === "th"
+                    ? "เข้าสู่ระบบด้วย Google"
+                    : "Sign in with Google"}
                 </span>
               </Link>
             </div>
           )}
 
-          <div className="my-1 border-t border-[var(--color-border)]" />
-
-          {/* ===============================================================
-              ZONE 2: GUEST STAY & EXPLORE
-          ================================================================ */}
+          {/* 2. GUEST ACTIONS */}
           <div className="space-y-0.5">
             <button
               type="button"
               role="menuitem"
               onClick={() => handleNavigateMenuTab("setting")}
-              className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
                 activeTab === "setting"
-                  ? "bg-[var(--color-background-muted)] font-semibold text-[var(--color-text-primary)]"
-                  : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                  ? "bg-[var(--color-background-muted)] font-semibold"
+                  : "hover:bg-[var(--color-background-muted)]"
               }`}
             >
               <span className="flex items-center gap-3">
-                <CalendarCheck className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <CalendarCheck className="w-4 h-4 text-[var(--color-text-primary)]" />
+                </span>
                 <span>
                   {language === "th" ? "การจองของฉัน" : "My Bookings"}
                 </span>
@@ -320,20 +339,18 @@ export function UserProfileDropdown({
                 setIsDropdownOpen(false);
                 onOpenCouponWallet();
               }}
-              className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
+              className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
             >
               <span className="flex items-center gap-3">
-                <TicketPercent className="w-4 h-4 text-[var(--color-promo-text)]" />
+                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <TicketPercent className="w-4 h-4 text-[var(--color-promo-text)]" />
+                </span>
                 <span>
-                  {language === "th" ? "กระเป๋าคูปองส่วนลด" : "Coupon Wallet"}
+                  {language === "th" ? "คูปองส่วนลด" : "Coupon Wallet"}
                 </span>
               </span>
-              {savedCouponsCount > 0 ? (
+              {savedCouponsCount > 0 && (
                 <span className="badge-promo">{savedCouponsCount}</span>
-              ) : (
-                <span className="ty-caption font-semibold text-[var(--color-text-secondary)]">
-                  0
-                </span>
               )}
             </button>
 
@@ -341,14 +358,16 @@ export function UserProfileDropdown({
               type="button"
               role="menuitem"
               onClick={() => handleNavigateMenuTab("review")}
-              className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
                 activeTab === "review"
-                  ? "bg-[var(--color-background-muted)] font-semibold text-[var(--color-text-primary)]"
-                  : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                  ? "bg-[var(--color-background-muted)] font-semibold"
+                  : "hover:bg-[var(--color-background-muted)]"
               }`}
             >
               <span className="flex items-center gap-3">
-                <Star className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <Star className="w-4 h-4 text-[var(--color-text-primary)]" />
+                </span>
                 <span>
                   {language === "th" ? "รีวิวผู้เข้าพัก" : "Guest Reviews"}
                 </span>
@@ -359,133 +378,147 @@ export function UserProfileDropdown({
               type="button"
               role="menuitem"
               onClick={() => handleNavigateMenuTab("guide")}
-              className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+              className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
                 activeTab === "guide"
-                  ? "bg-[var(--color-background-muted)] font-semibold text-[var(--color-text-primary)]"
-                  : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                  ? "bg-[var(--color-background-muted)] font-semibold"
+                  : "hover:bg-[var(--color-background-muted)]"
               }`}
             >
               <span className="flex items-center gap-3">
-                <Compass className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <Compass className="w-4 h-4 text-[var(--color-text-primary)]" />
+                </span>
                 <span>
-                  {language === "th"
-                    ? "คู่มือท่องเที่ยว & แผนที่"
-                    : "Local Guide & Map"}
+                  {language === "th" ? "แผนที่ & ที่เที่ยวใกล้เคียง" : "Map & Local Guide"}
                 </span>
               </span>
             </button>
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)]" />
+          <div className="my-1.5 border-t border-[var(--color-border)]" />
 
-          {/* ===============================================================
-              ZONE 3: WORKSPACE & ADMIN MANAGEMENT
-          ================================================================ */}
+          {/* 3. HOTEL OWNER / ADMIN OR 30-DAY FREE TRIAL */}
           <div className="space-y-0.5">
-            {onToggleEditMode && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setIsDropdownOpen(false);
-                  onToggleEditMode();
-                }}
-                className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                  isEditMode
-                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)] font-semibold"
-                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                }`}
-              >
-                <span className="flex items-center gap-3">
-                  <Pencil
-                    className={`w-4 h-4 ${
+            {isHotelOrSuperAdmin ? (
+              <>
+                {onToggleEditMode && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onToggleEditMode();
+                    }}
+                    className={`w-full h-10 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
                       isEditMode
-                        ? "text-[var(--color-on-accent)]"
-                        : "text-[var(--color-accent)]"
+                        ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] font-semibold"
+                        : "hover:bg-[var(--color-background-muted)]"
                     }`}
-                  />
-                  <span>
-                    {language === "th"
-                      ? "แก้ไขหน้าเว็บตรงจุด"
-                      : "Edit Live Page"}
-                  </span>
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 ty-caption font-bold leading-none ${
-                    isEditMode
-                      ? "bg-white/20 !text-white"
-                      : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
-                  }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                        <Pencil className="w-4 h-4 text-[var(--color-accent)]" />
+                      </span>
+                      <span>
+                        {language === "th"
+                          ? "แก้ไขหน้าเว็บตรงจุด"
+                          : "Edit Live Page"}
+                      </span>
+                    </span>
+                    <span className="ty-caption font-semibold">
+                      {isEditMode ? "เปิดอยู่" : "ปิด"}
+                    </span>
+                  </button>
+                )}
+
+                <Link
+                  href={adminHref}
+                  role="menuitem"
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
                 >
-                  {isEditMode ? "ON" : "OFF"}
-                </span>
-              </button>
-            )}
+                  <span className="flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                      <LayoutDashboard className="w-4 h-4 text-[var(--color-text-primary)]" />
+                    </span>
+                    <span>
+                      {language === "th" ? "จัดการที่พัก (Admin)" : "Hotel Admin"}
+                    </span>
+                  </span>
+                  {pendingAdminCount > 0 && (
+                    <span className="badge-promo">{pendingAdminCount}</span>
+                  )}
+                </Link>
 
-            <Link
-              href="/admin"
-              role="menuitem"
-              onClick={() => setIsDropdownOpen(false)}
-              className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition"
-            >
-              <span className="flex items-center gap-3">
-                <LayoutDashboard className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                <span>
-                  {language === "th" ? "จัดการที่พัก (Admin)" : "Hotel Admin"}
-                </span>
-              </span>
-              {pendingAdminCount > 0 && (
-                <span className="rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 py-0.5 ty-caption font-bold leading-none">
-                  {pendingAdminCount}
-                </span>
-              )}
-            </Link>
-
-            {isSuperAdmin && (
+                {isSuperAdmin && (
+                  <Link
+                    href="/super-admin"
+                    role="menuitem"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] inline-flex items-center justify-center">
+                        <Crown className="w-4 h-4 text-[var(--color-accent)]" />
+                      </span>
+                      <span>
+                        {language === "th"
+                          ? "ระบบจัดการแพลตฟอร์ม (Super Admin)"
+                          : "Super Admin"}
+                      </span>
+                    </span>
+                  </Link>
+                )}
+              </>
+            ) : (
               <Link
-                href="/super-admin"
+                href="/register-hotel"
                 role="menuitem"
                 onClick={() => setIsDropdownOpen(false)}
-                className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition"
+                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-semibold text-[var(--color-accent)] transition"
               >
                 <span className="flex items-center gap-3">
-                  <Crown className="w-4 h-4 text-[var(--color-accent)]" />
+                  <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] inline-flex items-center justify-center">
+                    <Building2 className="w-4 h-4 text-[var(--color-accent)]" />
+                  </span>
                   <span>
                     {language === "th"
-                      ? "ศูนย์ควบคุม (Super Admin)"
-                      : "Super Admin"}
+                      ? "สร้างเว็บที่พักฟรี 30 วัน"
+                      : "Start 30-Day Free Trial"}
                   </span>
                 </span>
               </Link>
             )}
           </div>
 
-          <div className="my-1 border-t border-[var(--color-border)]" />
+          <div className="my-1.5 border-t border-[var(--color-border)]" />
 
-          {/* ===============================================================
-              ZONE 4: PREFERENCES & SIGN OUT
-          ================================================================ */}
+          {/* 4. PREFERENCES & SIGN OUT */}
           <div className="space-y-0.5">
             {onToggleTheme && (
               <button
                 type="button"
                 role="menuitem"
                 onClick={onToggleTheme}
-                className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
+                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
               >
                 <span className="flex items-center gap-3">
-                  {isDarkTheme ? (
-                    <Moon className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                  ) : (
-                    <Sun className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                  )}
-                  <span>{language === "th" ? "โหมดหน้าจอ" : "Appearance"}</span>
+                  <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                    {isDarkTheme ? (
+                      <Moon className="w-4 h-4 text-[var(--color-text-primary)]" />
+                    ) : (
+                      <Sun className="w-4 h-4 text-[var(--color-text-primary)]" />
+                    )}
+                  </span>
+                  <span>
+                    {language === "th" ? "การแสดงผลหน้าจอ" : "Display & Theme"}
+                  </span>
                 </span>
-                <span className="inline-flex items-center rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 ty-caption font-semibold text-[var(--color-text-primary)]">
+                <span className="ty-caption font-semibold">
                   {language === "th"
                     ? isDarkTheme
-                      ? "มืด"
-                      : "สว่าง"
+                      ? "โหมดมืด"
+                      : "โหมดสว่าง"
                     : isDarkTheme
                     ? "Dark"
                     : "Light"}
@@ -497,14 +530,16 @@ export function UserProfileDropdown({
               type="button"
               role="menuitem"
               onClick={onToggleLanguage}
-              className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
+              className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
             >
               <span className="flex items-center gap-3">
-                <Globe className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <Globe className="w-4 h-4 text-[var(--color-text-primary)]" />
+                </span>
                 <span>{language === "th" ? "ภาษา" : "Language"}</span>
               </span>
-              <span className="inline-flex items-center rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 ty-caption font-semibold text-[var(--color-text-primary)]">
-                {language === "th" ? "ไทย · TH" : "ENG · EN"}
+              <span className="ty-caption font-semibold">
+                {language === "th" ? "ภาษาไทย" : "English"}
               </span>
             </button>
 
@@ -516,13 +551,13 @@ export function UserProfileDropdown({
                   await signOutUser();
                   setIsDropdownOpen(false);
                 }}
-                className="w-full h-10 px-3 rounded-[12px] hover:bg-[var(--color-error-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-error)] transition cursor-pointer"
+                className="w-full h-10 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 <span className="flex items-center gap-3">
-                  <LogOut className="w-4 h-4" />
-                  <span>
-                    {language === "th" ? "ออกจากระบบ" : "Sign Out"}
+                  <span className="h-8 w-8 rounded-full bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                    <LogOut className="w-4 h-4 text-[var(--color-text-primary)]" />
                   </span>
+                  <span>{language === "th" ? "ออกจากระบบ" : "Log Out"}</span>
                 </span>
               </button>
             )}

@@ -1,20 +1,32 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Loader2,
+  LogOut,
+  Moon,
+  ShieldCheck,
+  Sun,
+} from "lucide-react";
 import {
   authClient,
   resolveDestinationByEmail,
-  resolveRoleFromEmail,
 } from "@/lib/auth/client";
 import { useHotelApp } from "@/components/HotelAppShell";
+import {
+  UserAvatarCircle,
+  useAuthenticatedProfile,
+} from "@/components/navigation/UserProfileDropdown";
 import { StandardButton, StatusPill } from "@/components/ui/standards";
 
 export default function LoginPage() {
   const router = useRouter();
   const { lang, setLang, theme, toggleTheme } = useHotelApp();
+  const { user, signOutUser, refreshProfile } = useAuthenticatedProfile();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,19 +34,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    authClient
-      .getSession()
-      .then((res) => {
-        const userEmail = res?.data?.user?.email;
-        if (userEmail) {
-          setCurrentUserEmail(userEmail);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -84,10 +83,8 @@ export default function LoginPage() {
           setIsLoading(false);
           return;
         }
-        const target = resolveDestinationByEmail(
-          data?.user?.email || email.trim()
-        );
-        router.push(target);
+        await refreshProfile();
+        router.push(resolveDestinationByEmail(data?.user?.email || email.trim()));
         return;
       }
 
@@ -99,17 +96,15 @@ export default function LoginPage() {
       if (error) {
         setErrorMessage(
           lang === "th"
-            ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง (หากยังไม่มีบัญชี กดสมัครสมาชิกด้านล่าง)"
+            ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
             : "Invalid email or password"
         );
         setIsLoading(false);
         return;
       }
 
-      const target = resolveDestinationByEmail(
-        data?.user?.email || email.trim()
-      );
-      router.push(target);
+      await refreshProfile();
+      router.push(resolveDestinationByEmail(data?.user?.email || email.trim()));
     } catch {
       setErrorMessage(
         lang === "th" ? "เกิดข้อผิดพลาด กรุณาลองใหม่" : "Authentication error"
@@ -120,29 +115,33 @@ export default function LoginPage() {
 
   const handleSignOut = async () => {
     setIsLoading(true);
-    await authClient.signOut().catch(() => {});
-    setCurrentUserEmail(null);
+    await signOutUser();
     setIsLoading(false);
   };
 
-  const activeRole = resolveRoleFromEmail(currentUserEmail);
+  const destinationHref =
+    user?.role === "SUPER_ADMIN"
+      ? "/super-admin"
+      : user?.role === "HOTEL_ADMIN"
+      ? user.tenantSlug && user.tenantSlug !== "sapanunseen"
+        ? `/admin?tenant=${encodeURIComponent(user.tenantSlug)}`
+        : "/admin"
+      : "/";
 
   return (
     <div className="min-h-[100dvh] w-full bg-[var(--color-background-body)] text-[var(--color-text-primary)] flex flex-col justify-between select-none">
-      {/* Top Minimal Header Bar */}
-      <header className="w-full max-w-[1140px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between">
-        <Link href="/" className="btn-fw-secondary">
+      {/* Top Bar */}
+      <header className="w-full h-14 bg-[var(--color-background-card)] border-b border-[var(--color-border)] px-4 sm:px-6 flex items-center justify-between">
+        <Link href="/" className="btn-fw-secondary !h-9">
           <ArrowLeft className="w-4 h-4" />
-          <span>{lang === "th" ? "กลับหน้าหลัก" : "Back to Home"}</span>
+          <span>{lang === "th" ? "กลับหน้าแรก" : "Home"}</span>
         </Link>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setLang(lang === "th" ? "en" : "th")}
-            className="btn-icon cursor-pointer ty-caption font-bold"
-            title={lang === "th" ? "Switch to English" : "เปลี่ยนเป็นภาษาไทย"}
-            aria-label={lang === "th" ? "Switch language" : "เปลี่ยนภาษา"}
+            className="btn-icon ty-caption font-bold"
           >
             {lang === "th" ? "EN" : "TH"}
           </button>
@@ -150,11 +149,8 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="btn-icon cursor-pointer"
-            title={theme === "dark" ? "Light Mode" : "Dark Mode"}
-            aria-label={
-              theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"
-            }
+            className="btn-icon"
+            aria-label="Toggle theme"
           >
             {theme === "dark" ? (
               <Sun className="w-4 h-4" />
@@ -165,80 +161,93 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Open-Canvas Centered Auth Form */}
-      <main className="w-full max-w-[360px] mx-auto px-4 py-8 flex flex-col items-center">
-        <h1 className="ty-display text-center mb-1.5">
-          {lang === "th" ? "เข้าสู่ระบบ / สมัครสมาชิก" : "Log in or sign up"}
-        </h1>
-        <p className="ty-caption text-center mb-6">
-          {lang === "th"
-            ? "เชื่อมต่อด้วย Gmail แยกสิทธิ์ลูกค้า แอดมินที่พัก และ Super Admin อัตโนมัติ"
-            : "Sign in with Gmail for automatic Guest, Hotel Admin & Super Admin access"}
-        </p>
-
-        {currentUserEmail ? (
-          <div className="w-full rounded-[16px] bg-[var(--color-background-muted)] p-5 space-y-4 text-center">
-            <div className="flex justify-center">
-              <StatusPill variant="accent">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>{activeRole}</span>
-              </StatusPill>
-            </div>
-            <div>
-              <p className="ty-caption">เข้าสู่ระบบในชื่อ</p>
-              <p className="ty-body font-bold text-[var(--color-text-primary)] truncate mt-0.5">
-                {currentUserEmail}
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-1">
-              <StandardButton
-                type="button"
-                variant="primary"
-                size="md"
-                fullWidth
-                onClick={() =>
-                  router.push(resolveDestinationByEmail(currentUserEmail))
-                }
-              >
-                <span>
-                  {activeRole === "SUPER_ADMIN"
-                    ? "เข้าสู่หน้า Super Admin →"
-                    : activeRole === "HOTEL_ADMIN"
-                    ? "เข้าสู่หน้า Admin ที่พัก →"
-                    : "กลับสู่หน้าจองห้องพัก →"}
-                </span>
-              </StandardButton>
-
-              <StandardButton
-                type="button"
-                variant="secondary"
-                size="md"
-                fullWidth
-                disabled={isLoading}
-                onClick={handleSignOut}
-              >
-                <LogOut className="w-4 h-4" />
-                <span>ออกจากระบบ</span>
-              </StandardButton>
-            </div>
+      {/* Facebook-Style Centered Login Card */}
+      <main className="w-full max-w-[400px] mx-auto px-4 py-8 space-y-4">
+        <div className="app-card p-5 sm:p-6 space-y-4">
+          <div className="text-center space-y-1">
+            <h1 className="ty-display text-[var(--color-accent)]">Cangaroom</h1>
+            <p className="ty-body-muted">
+              {lang === "th"
+                ? "เข้าสู่ระบบจองห้องพัก หรือจัดการเว็บไซต์ที่พักของคุณ"
+                : "Sign in to manage bookings or run your property site"}
+            </p>
           </div>
-        ) : (
-          <>
-            {/* Google (Gmail) OAuth Primary Button */}
-            <div className="w-full space-y-2.5">
+
+          {user ? (
+            <div className="space-y-4 pt-1">
+              <div className="rounded-[10px] bg-[var(--color-background-muted)] p-3.5 flex items-center gap-3">
+                <UserAvatarCircle user={user} sizeClass="h-12 w-12" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="ty-subtitle font-bold truncate">
+                      {user.name}
+                    </p>
+                    <StatusPill variant="accent">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>{user.role}</span>
+                    </StatusPill>
+                  </div>
+                  <p className="ty-caption truncate">{user.email}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <StandardButton
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={() => router.push(destinationHref)}
+                >
+                  <span>
+                    {user.role === "SUPER_ADMIN"
+                      ? "เข้าสู่หน้า Super Admin"
+                      : user.role === "HOTEL_ADMIN"
+                      ? "เข้าจัดการหลังบ้านที่พัก"
+                      : "กลับหน้าจองห้องพัก"}
+                  </span>
+                </StandardButton>
+
+                {user.role === "GUEST" && (
+                  <StandardButton
+                    type="button"
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
+                    onClick={() => router.push("/register-hotel")}
+                  >
+                    <Building2 className="w-4 h-4 text-[var(--color-accent)]" />
+                    <span>เปิดเว็บที่พักทดลองใช้ฟรี 30 วัน</span>
+                  </StandardButton>
+                )}
+
+                <StandardButton
+                  type="button"
+                  variant="subtle"
+                  size="md"
+                  fullWidth
+                  disabled={isLoading}
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>ออกจากระบบ</span>
+                </StandardButton>
+              </div>
+            </div>
+          ) : (
+            <>
               <button
                 type="button"
                 disabled={isLoading}
                 onClick={handleGoogleLogin}
-                className="w-full h-11 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
+                className="w-full h-11 rounded-[8px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 transition cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <svg
                     viewBox="0 0 24 24"
-                    className="w-4 h-4 shrink-0"
+                    className="w-5 h-5 shrink-0"
                     aria-hidden="true"
                   >
                     <path
@@ -261,105 +270,121 @@ export default function LoginPage() {
                 )}
                 <span>
                   {lang === "th"
-                    ? "ดำเนินการต่อด้วย Google (Gmail)"
+                    ? "ดำเนินการต่อด้วย Google"
                     : "Continue with Google"}
                 </span>
               </button>
-            </div>
 
-            <span className="my-4 ty-caption uppercase tracking-wider text-[var(--color-text-secondary)]">
-              {lang === "th" ? "หรือใช้อีเมลและรหัสผ่าน" : "OR WITH EMAIL"}
-            </span>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-[var(--color-border)]" />
+                <span className="ty-caption">
+                  {lang === "th" ? "หรือใช้อีเมล" : "or"}
+                </span>
+                <div className="h-px flex-1 bg-[var(--color-border)]" />
+              </div>
 
-            {errorMessage && (
-              <p className="w-full mb-3 rounded-[12px] bg-[var(--color-error-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-error)] text-center">
-                {errorMessage}
-              </p>
-            )}
-
-            <form onSubmit={handleEmailAuth} className="w-full space-y-2.5">
-              {mode === "signup" && (
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={lang === "th" ? "ชื่อผู้ใช้งาน" : "Your name"}
-                  className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] px-3.5 ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:outline-none transition"
-                />
+              {errorMessage && (
+                <p className="w-full rounded-[8px] bg-[var(--color-error-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-error)] text-center">
+                  {errorMessage}
+                </p>
               )}
 
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={
-                  lang === "th" ? "อีเมล (เช่น cangaroomapp@gmail.com)" : "Email address"
-                }
-                className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] px-3.5 ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:outline-none transition"
-              />
+              <form onSubmit={handleEmailAuth} className="space-y-3">
+                {mode === "signup" && (
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={lang === "th" ? "ชื่อผู้ใช้งาน" : "Your name"}
+                    className="fw-input w-full"
+                  />
+                )}
 
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={
-                  lang === "th" ? "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)" : "Password"
-                }
-                className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] px-3.5 ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:ring-2 focus:ring-[var(--color-accent)]/30 focus:outline-none transition"
-              />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={lang === "th" ? "อีเมล" : "Email address"}
+                  className="fw-input w-full"
+                />
 
-              <StandardButton
-                type="submit"
-                variant="primary"
-                size="md"
-                disabled={isLoading}
-                className="w-full"
-              >
-                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={
+                    lang === "th"
+                      ? "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)"
+                      : "Password"
+                  }
+                  className="fw-input w-full"
+                />
+
+                <StandardButton
+                  type="submit"
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>
+                    {mode === "signin"
+                      ? lang === "th"
+                        ? "เข้าสู่ระบบ"
+                        : "Log In"
+                      : lang === "th"
+                      ? "สร้างบัญชีใหม่"
+                      : "Create Account"}
+                  </span>
+                </StandardButton>
+              </form>
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === "signin" ? "signup" : "signin");
+                    setErrorMessage(null);
+                  }}
+                  className="ty-caption font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+                >
                   {mode === "signin"
                     ? lang === "th"
-                      ? "เข้าสู่ระบบ"
-                      : "Sign in"
+                      ? "สร้างบัญชีใหม่ด้วยอีเมล"
+                      : "Create new email account"
                     : lang === "th"
-                    ? "สมัครสมาชิก"
-                    : "Create account"}
-                </span>
-              </StandardButton>
-            </form>
+                    ? "มีบัญชีอยู่แล้ว? เข้าสู่ระบบ"
+                    : "Already have an account? Log in"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin");
-                setErrorMessage(null);
-              }}
-              className="mt-4 ty-caption font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
-            >
-              {mode === "signin"
-                ? lang === "th"
-                  ? "ยังไม่มีรหัสผ่าน? กดสมัครสมาชิกที่นี่"
-                  : "Need an account? Sign up"
-                : lang === "th"
-                ? "มีบัญชีแล้ว? กดเข้าสู่ระบบ"
-                : "Already have an account? Sign in"}
-            </button>
-          </>
-        )}
+        {/* Hotel Owner 30-Day Trial Card (Just like Facebook's "Create a Page for a celebrity, brand or business" footer!) */}
+        <div className="text-center">
+          <Link
+            href="/register-hotel"
+            className="ty-body text-[var(--color-text-secondary)] hover:underline"
+          >
+            <strong className="text-[var(--color-text-primary)]">
+              {lang === "th"
+                ? "เปิดเว็บไซต์จองที่พักฟรี 30 วัน"
+                : "Create a Hotel Site"}
+            </strong>{" "}
+            {lang === "th"
+              ? "สำหรับโรงแรม รีสอร์ท และพูลวิลล่าของคุณ"
+              : "for your resort, hotel, or pool villa."}
+          </Link>
+        </div>
       </main>
 
-      {/* Bottom Legal Links */}
-      <footer className="w-full py-6 px-4 flex items-center justify-center gap-3 ty-caption text-[var(--color-text-secondary)]">
-        <Link href="/" className="hover:underline">
-          {lang === "th" ? "เงื่อนไขการใช้งาน" : "Terms of use"}
-        </Link>
-        <span>|</span>
-        <Link href="/" className="hover:underline">
-          {lang === "th" ? "นโยบายความเป็นส่วนตัว" : "Privacy policy"}
-        </Link>
+      <footer className="w-full py-5 px-4 text-center ty-caption">
+        Cangaroom © {new Date().getFullYear()} · Direct Booking Platform
       </footer>
     </div>
   );

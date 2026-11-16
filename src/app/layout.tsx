@@ -8,14 +8,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#141416" },
+    { media: "(prefers-color-scheme: dark)", color: "#242526" },
   ],
 };
 
 export const metadata: Metadata = {
-  title: "my-hotel · Sapan Unseen — ระบบเว็บไซต์และจองที่พักโดยตรงสำหรับโรงแรม",
+  title: "Cangaroom — เว็บไซต์และระบบจองที่พักโดยตรงสำหรับโรงแรมและพูลวิลล่า",
   description:
-    "my-hotel แพลตฟอร์มเว็บไซต์และระบบจองห้องพักโดยตรงยุคใหม่ พร้อม AI Concierge, จัดการห้องพัก โปรโมชั่น คูปอง และเรทราคาตามฤดูกาล",
+    "Cangaroom แพลตฟอร์มเว็บไซต์และระบบจองห้องพักโดยตรง ใช้งานง่าย ทดลองใช้ฟรี 30 วัน พร้อมระบบล็อกห้องอัตโนมัติ คูปองส่วนลด และผู้ช่วย AI",
 };
 
 export default function RootLayout({

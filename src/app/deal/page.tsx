@@ -198,12 +198,10 @@ export default function DealPage() {
                 onClick={() =>
                   handleCouponActionClick(couponItem.code, isSavedInBag)
                 }
-                className={`group snap-start shrink-0 w-[268px] sm:w-[292px] lg:w-auto rounded-[16px] overflow-hidden flex flex-col justify-between cursor-pointer transition ${
+                className={`group snap-start shrink-0 w-[268px] sm:w-[292px] lg:w-auto app-card overflow-hidden flex flex-col justify-between cursor-pointer transition ${
                   !couponItem.isActive ? "opacity-60" : ""
                 } ${
-                  isApplied
-                    ? "ring-2 ring-[var(--color-promo)] bg-[var(--color-promo-muted)]/35"
-                    : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75"
+                  isApplied ? "ring-2 ring-[var(--color-promo)]" : ""
                 }`}
               >
                 <div className="relative h-36 w-full overflow-hidden bg-[var(--color-background-subtle)]">

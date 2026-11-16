@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { Pool } from "pg";
 import { z } from "zod";
+import {
+  ensurePlatformTables,
+  extractTenantSlugFromHost,
+} from "@/lib/db";
 
-const LOCAL_STORE_FILE_PATH = path.resolve(
-  process.cwd(),
-  ".data",
-  "cms-store.json"
-);
+const LOCAL_STORE_DIR = path.resolve(process.cwd(), ".data");
 
-// Loose top-level envelope validation (prevents arbitrary garbage payloads while allowing rich nested store arrays)
 const StoreEnvelopeSchema = z
   .object({
     propertyConfig: z.record(z.string(), z.unknown()),
@@ -25,39 +23,66 @@ const StoreEnvelopeSchema = z
   })
   .passthrough();
 
-declare global {
-  var __myHotelPgPool: Pool | undefined;
+async function resolveStoreRecordId(request: Request): Promise<string> {
+  const url = new URL(request.url);
+  const queryTenant = url.searchParams
+    .get("tenant")
+    ?.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "");
+
+  if (queryTenant && queryTenant !== "sapanunseen" && queryTenant !== "default") {
+    return `tenant:${queryTenant}`;
+  }
+
+  const hostHeader =
+    request.headers.get("x-forwarded-host") || request.headers.get("host");
+  const subdomainSlug = extractTenantSlugFromHost(hostHeader);
+
+  if (subdomainSlug && subdomainSlug !== "sapanunseen") {
+    return `tenant:${subdomainSlug}`;
+  }
+
+  // Also check custom_domain match in platform_tenants if host is an external custom domain
+  if (hostHeader) {
+    const cleanHost = hostHeader.split(":")[0].trim().toLowerCase();
+    if (
+      cleanHost &&
+      cleanHost !== "localhost" &&
+      cleanHost !== "127.0.0.1" &&
+      cleanHost !== "cangaroom.com" &&
+      cleanHost !== "www.cangaroom.com" &&
+      !cleanHost.endsWith(".cangaroom.com") &&
+      !cleanHost.endsWith(".vercel.app")
+    ) {
+      const pool = await ensurePlatformTables();
+      if (pool) {
+        const res = await pool
+          .query<{ slug: string }>(
+            `SELECT slug FROM public.platform_tenants
+             WHERE LOWER(custom_domain) = $1 OR LOWER(custom_domain) = $2
+             LIMIT 1`,
+            [cleanHost, cleanHost.replace(/^www\./, "")]
+          )
+          .catch(() => null);
+        const foundSlug = res?.rows[0]?.slug;
+        if (foundSlug && foundSlug !== "sapanunseen") {
+          return `tenant:${foundSlug}`;
+        }
+      }
+    }
+  }
+
+  return "default";
 }
 
-function getPgPool(): Pool | null {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    return null;
-  }
-  if (!global.__myHotelPgPool) {
-    global.__myHotelPgPool = new Pool({
-      connectionString,
-      max: 4,
-      connectionTimeoutMillis: 3000,
-    });
-  }
-  return global.__myHotelPgPool;
-}
-
-async function readStoreFromPostgres(): Promise<unknown | null> {
-  const pool = getPgPool();
+async function readStoreFromPostgres(recordId: string): Promise<unknown | null> {
+  const pool = await ensurePlatformTables();
   if (!pool) return null;
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS site_cms_state (
-        id TEXT PRIMARY KEY,
-        payload JSONB NOT NULL,
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
     const res = await pool.query<{ payload: unknown }>(
-      `SELECT payload FROM site_cms_state WHERE id = $1 LIMIT 1`,
-      ["default"]
+      `SELECT payload FROM public.site_cms_state WHERE id = $1 LIMIT 1`,
+      [recordId]
     );
     return res.rows[0]?.payload ?? null;
   } catch {
@@ -65,23 +90,19 @@ async function readStoreFromPostgres(): Promise<unknown | null> {
   }
 }
 
-async function writeStoreToPostgres(payload: unknown): Promise<boolean> {
-  const pool = getPgPool();
+async function writeStoreToPostgres(
+  recordId: string,
+  payload: unknown
+): Promise<boolean> {
+  const pool = await ensurePlatformTables();
   if (!pool) return false;
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS site_cms_state (
-        id TEXT PRIMARY KEY,
-        payload JSONB NOT NULL,
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
     await pool.query(
-      `INSERT INTO site_cms_state (id, payload, "updatedAt")
+      `INSERT INTO public.site_cms_state (id, payload, "updatedAt")
        VALUES ($1, $2::jsonb, NOW())
        ON CONFLICT (id) DO UPDATE
        SET payload = EXCLUDED.payload, "updatedAt" = NOW()`,
-      ["default", JSON.stringify(payload)]
+      [recordId, JSON.stringify(payload)]
     );
     return true;
   } catch {
@@ -89,41 +110,65 @@ async function writeStoreToPostgres(payload: unknown): Promise<boolean> {
   }
 }
 
-async function readStoreFromLocalFile(): Promise<unknown | null> {
+function getLocalFilePath(recordId: string): string {
+  const safeFile =
+    recordId === "default"
+      ? "cms-store.json"
+      : `cms-store-${recordId.replace(/[^a-z0-9_-]/gi, "_")}.json`;
+  return path.join(LOCAL_STORE_DIR, safeFile);
+}
+
+async function readStoreFromLocalFile(recordId: string): Promise<unknown | null> {
   try {
-    const raw = await readFile(LOCAL_STORE_FILE_PATH, "utf8");
+    const raw = await readFile(getLocalFilePath(recordId), "utf8");
     return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
-async function writeStoreToLocalFile(payload: unknown): Promise<void> {
-  const dir = path.dirname(LOCAL_STORE_FILE_PATH);
-  await mkdir(dir, { recursive: true });
+async function writeStoreToLocalFile(
+  recordId: string,
+  payload: unknown
+): Promise<void> {
+  await mkdir(LOCAL_STORE_DIR, { recursive: true });
   await writeFile(
-    LOCAL_STORE_FILE_PATH,
+    getLocalFilePath(recordId),
     JSON.stringify(payload, null, 2),
     "utf8"
   );
 }
 
-export async function GET() {
-  const dbData = await readStoreFromPostgres();
+export async function GET(request: Request) {
+  const recordId = await resolveStoreRecordId(request);
+  const dbData = await readStoreFromPostgres(recordId);
   if (dbData) {
-    return NextResponse.json({ store: dbData, source: "postgres" });
+    return NextResponse.json({
+      store: dbData,
+      source: "postgres",
+      tenantKey: recordId,
+    });
   }
 
-  const fileData = await readStoreFromLocalFile();
+  const fileData = await readStoreFromLocalFile(recordId);
   if (fileData) {
-    return NextResponse.json({ store: fileData, source: "file" });
+    return NextResponse.json({
+      store: fileData,
+      source: "file",
+      tenantKey: recordId,
+    });
   }
 
-  return NextResponse.json({ store: null, source: "default" });
+  return NextResponse.json({
+    store: null,
+    source: "default",
+    tenantKey: recordId,
+  });
 }
 
 export async function PUT(request: Request) {
   try {
+    const recordId = await resolveStoreRecordId(request);
     const rawBody = await request.json();
     const parsed = StoreEnvelopeSchema.safeParse(rawBody);
     if (!parsed.success) {
@@ -133,14 +178,13 @@ export async function PUT(request: Request) {
       );
     }
 
-    const savedToDb = await writeStoreToPostgres(parsed.data);
-    await writeStoreToLocalFile(parsed.data).catch(() => {
-      // Non-fatal on read-only serverless filesystems when Postgres is primary
-    });
+    const savedToDb = await writeStoreToPostgres(recordId, parsed.data);
+    await writeStoreToLocalFile(recordId, parsed.data).catch(() => {});
 
     return NextResponse.json({
       ok: true,
       storage: savedToDb ? "postgres" : "file",
+      tenantKey: recordId,
     });
   } catch {
     return NextResponse.json(
@@ -149,4 +193,3 @@ export async function PUT(request: Request) {
     );
   }
 }
-

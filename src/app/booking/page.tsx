@@ -184,11 +184,11 @@ export default function BookingPage() {
         </section>
       )}
 
-      {/* 3. Centered 1140px Room Feed Cards */}
-      <section id="rooms" className="scroll-mt-16 space-y-5 sm:space-y-4">
+      {/* 3. Centered Room Feed Cards */}
+      <section id="rooms" className="scroll-mt-16 space-y-3.5 sm:space-y-4">
         {canShowEditControls && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="ty-subtitle">
+          <div className="app-card px-4 py-3 flex items-center justify-between gap-2">
+            <span className="ty-subtitle font-bold">
               จัดการรายการห้องพัก ({rooms.length} หลัง)
             </span>
             <EditSpotButton

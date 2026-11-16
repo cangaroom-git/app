@@ -20,7 +20,7 @@ export function StandardFeedContainer({
 }) {
   return (
     <div
-      className={`app-feed-shell py-4 lg:py-6 flex flex-col gap-6 lg:gap-8 ${className}`}
+      className={`app-feed-shell py-3 sm:py-4 flex flex-col gap-3.5 sm:gap-4 ${className}`}
     >
       {children}
     </div>
@@ -109,9 +109,9 @@ export function StandardButton({
   ...props
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: "h-8 px-3 text-[12px] leading-[1.4] [&_svg]:w-3.5 [&_svg]:h-3.5",
-    md: "h-10 px-4 text-[14px] leading-[1.5] [&_svg]:w-4 [&_svg]:h-4",
-    lg: "h-11 px-5 text-[14px] leading-[1.5] [&_svg]:w-4 [&_svg]:h-4",
+    sm: "h-8 px-3 text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
+    md: "h-9 px-4 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    lg: "h-10 px-5 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
@@ -120,16 +120,16 @@ export function StandardButton({
     promo:
       "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
     secondary:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
     outline:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
   };
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
+      className={`inline-flex items-center justify-center gap-2 rounded-[8px] font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
@@ -208,9 +208,9 @@ export function StandardInput({
       </span>
       <input
         id={inputId}
-        className={`h-10 w-full rounded-[12px] ${
+        className={`h-10 w-full rounded-[8px] border border-[var(--color-border)] ${
           hasCustomBg ? "" : "bg-[var(--color-background-muted)]"
-        } px-3.5 text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30 ${className}`}
+        } px-3.5 text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:bg-[var(--color-background-card)] ${className}`}
         {...props}
       />
     </label>
