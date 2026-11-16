@@ -381,7 +381,7 @@ export function RoomGalleryDrawer({
             alt={pickLocalizedText(language, photo.captionTh, photo.captionEn)}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover object-center hover:scale-[1.02] transition-transform duration-300"
+            className="h-full w-full object-cover object-center"
           />
         </article>
       ))}

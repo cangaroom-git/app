@@ -218,7 +218,7 @@ export default function DealPage() {
                       couponItem.titleEn
                     )}
                     draggable={false}
-                    className="w-full h-full object-cover select-none pointer-events-none transition-transform duration-300 lg:group-hover:scale-105"
+                    className="w-full h-full object-cover select-none pointer-events-none"
                   />
 
                   {canShowEditControls && (
@@ -409,7 +409,7 @@ export default function DealPage() {
                       addonPromo.nameEn
                     )}
                     draggable={false}
-                    className="h-full w-full object-cover select-none pointer-events-none transition-transform duration-300 lg:group-hover:scale-105"
+                    className="h-full w-full object-cover select-none pointer-events-none"
                   />
 
                   {canShowEditControls && (

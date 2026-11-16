@@ -15,7 +15,7 @@ import { pickLocalizedText } from "@/data/cmsDefaults";
 import { RESORT_SHORTS, ShortVideoComment } from "@/data/shortsData";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
-import { ShortVideoDrawer } from "@/components/drawers/ShortVideoDrawer";
+import { PureMediaViewer } from "@/components/cms/PureMediaViewer";
 
 export { RESORT_SHORTS };
 export type { ShortVideoComment };
@@ -260,7 +260,7 @@ export default function ShortsPage() {
                   )}
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="w-full h-full object-cover"
                 />
 
                 <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-1.5 pointer-events-none z-10">
@@ -342,43 +342,21 @@ export default function ShortsPage() {
         })}
       </section>
 
-      {/* 3. Unified Standard-Width Right Sidebar Video Player Drawer */}
-      <ShortVideoDrawer
-        activeVideo={activeVideo}
-        videoIndex={Math.max(0, selectedVideoIndex)}
-        totalVideosCount={activeShortsList.length}
-        linkedRoom={linkedRoom}
-        language={language}
-        channelHandle={shortsCms.channelHandle}
-        channelAvatarUrl={shortsCms.channelAvatarUrl}
-        canEdit={canShowEditControls}
-        onEditActiveVideo={
+      {/* 3. Pure Distraction-Free Video Viewer */}
+      <PureMediaViewer
+        slides={
           activeVideo
-            ? () => {
-                const targetId = activeVideo.id;
-                setSelectedVideoId(null);
-                openCmsEditor({ type: "short-video", videoId: targetId });
-              }
-            : undefined
+            ? activeShortsList.map((v) => ({
+                type: "video" as const,
+                url: v.videoUrl,
+                posterUrl: v.posterUrl,
+                aspectRatio: "9/16" as const,
+                caption: pickLocalizedText(language, v.titleTh, v.titleEn),
+              }))
+            : null
         }
-        isLiked={Boolean(activeVideo && likedVideoById[activeVideo.id])}
-        isBookmarked={Boolean(
-          activeVideo && bookmarkedVideoById[activeVideo.id]
-        )}
-        isCouponSavedInBag={isActiveVideoCouponSaved}
-        comments={activeVideoComments}
+        initialIndex={Math.max(0, selectedVideoIndex)}
         onClose={() => setSelectedVideoId(null)}
-        onNavigateVideo={handleNavigateVideo}
-        onToggleLike={handleToggleLike}
-        onToggleBookmark={handleToggleBookmark}
-        onClaimCouponToBag={(couponCode) => {
-          claimAndApplyCoupon(couponCode);
-        }}
-        onAddComment={handleAddComment}
-        onBookLinkedRoom={(room) => {
-          setSelectedVideoId(null);
-          openRoomDrawer(room, "calendar");
-        }}
       />
     </>
   );

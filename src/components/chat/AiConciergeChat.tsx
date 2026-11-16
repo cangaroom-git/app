@@ -185,7 +185,7 @@ function ChatRoomRecommendationSlider({
           onClick={() => handleScrollSlider("left")}
           aria-label={language === "th" ? "ห้องก่อนหน้า" : "Previous room"}
           title={language === "th" ? "ก่อนหน้า" : "Previous"}
-          className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+          className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] items-center justify-center transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -197,7 +197,7 @@ function ChatRoomRecommendationSlider({
           onClick={() => handleScrollSlider("right")}
           aria-label={language === "th" ? "ห้องถัดไป" : "Next room"}
           title={language === "th" ? "ถัดไป" : "Next"}
-          className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+          className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] items-center justify-center transition-colors cursor-pointer"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -1560,7 +1560,7 @@ export function AiChatDesktopDrawer(props: AiChatDesktopDrawerProps) {
               ? "แชทกับ AI Concierge"
               : "Chat with AI Concierge"
           }
-          className="group relative h-14 w-14 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+          className="group relative h-14 w-14 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-on-accent)] shadow-lg transition-colors flex items-center justify-center cursor-pointer"
         >
           <AnimatedAiBotAvatar size="lg" isActive={false} isSpeaking={false} />
           <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-[var(--color-success)] ring-2 ring-[var(--color-background-body)]" />

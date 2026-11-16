@@ -102,7 +102,7 @@ export function UniversalVideoPlayer({
           type="button"
           onClick={handleTogglePlay}
           aria-label="Play video"
-          className="absolute inset-0 m-auto h-14 w-14 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md hover:scale-105 transition cursor-pointer"
+          className="absolute inset-0 m-auto h-14 w-14 rounded-full bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer"
         >
           <Play className="w-6 h-6 fill-white ml-0.5" />
         </button>

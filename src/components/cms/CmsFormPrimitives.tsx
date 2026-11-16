@@ -245,7 +245,7 @@ export function SmartImageUploader({
           <img
             src={imageUrl}
             alt={label}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-[var(--color-text-secondary)]">

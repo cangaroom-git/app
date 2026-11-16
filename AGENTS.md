@@ -1,21 +1,15 @@
-# Mandatory Agent Guidelines for `my-hotel`
+# Mandatory Agent Guidelines for `my-hotel` (Cangaroom)
 
 > **CRITICAL RULE (บังคับอ่านทุกครั้งก่อนเขียนหรือแก้ไขโค้ด):**
 > Every time you implement, create, or modify any UI component, page, or feature in this repository, you **MUST** first read and strictly follow the design system skill at:
 > `.agents/skills/my-hotel-design-system/SKILL.md`
 
 ## Core Summary of Mandatory Design Rules
-1. **Icon-First & Minimal Text (เน้น Icon ไม่เน้น Text เยอะ):**
-   - Do NOT clutter cards, headers, or input bars with long paragraphs, noisy badges, or multi-row text chips.
-   - Use clean `lucide-react` icons and circular icon buttons (`h-9 w-9` / `h-10 w-10 rounded-full`) with concise labels or tooltips.
-2. **Strict Brand & Promotion Palette:**
-   - Never use cartoon/neon colors or arbitrary gradients.
-   - Always use CSS variables from `src/app/globals.css`: `var(--color-accent)` (`#1751ae`), `var(--color-on-accent)` (`#ffffff`), `var(--color-promo)` (`#c53829` for all promotions, coupons, and discounts), `var(--color-on-promo)` (`#ffffff`), `var(--color-background-card)`, `var(--color-background-muted)`, `var(--color-border)`, `var(--color-text-primary)`, `var(--color-text-secondary)`.
-3. **Single Centered Feed (`1140px`), Right Sidebar Drawers & Fastwork Settings (`/admin`):**
-   - Storefront uses a single centered `StandardFeedContainer` (`max-w-[1140px] mx-auto`) and `StandardCard`.
-   - All overlays, calendars, room galleries, booking steps, and video drawers open exclusively as **Right Sidebar Drawers** (`fixed inset-y-0 right-0 h-[100dvh]`) — never centered modals.
-   - Backoffice (`/admin` & `/super-admin`) uses clean `.fw-setting-row` split-pane settings with full Dark Mode token support.
-4. **Unified Font (`Noto Sans Thai`), Controls & Strict 5-Tier Typography Scale:**
-   - Primary font across the entire app is `Noto Sans Thai`.
-   - Only use `.ty-display` (24px), `.ty-title` (18px), `.ty-subtitle` (16px), `.ty-body` (14px), and `.ty-caption` (12px).
-   - Standardize buttons (`rounded-full`, `h-8` / `h-10` / `h-11`), circular icon buttons (`h-9 w-9` / `h-10 w-10 rounded-full`), inputs (`h-10 rounded-[12px]`), and card radii (`20px` page card, `16px` container/video, `12px` element, `8px` thumbnail).
+1. **STRICT FORBIDDEN RULE — NO HOVER SCALE ANYWHERE (ห้ามใช้ `hover` แล้ว `scale` ทั้งเว็บเด็ดขาด):**
+   - **NEVER** use `hover:scale-*`, `group-hover:scale-*`, or CSS `transform: scale(...)` on `:hover` on ANY image, card, button, or icon anywhere in the application. Hover feedback may only use subtle color, background, or opacity changes.
+2. **Pure Media Viewing Only (กดรูปหรือวิดีโอ ต้องเปิดดูแค่รูป/วิดีโอเท่านั้น):**
+   - Clicking a photo, photo album/carousel, or video thumbnail MUST open a pure, distraction-free media viewer (photo/video only) — **NEVER** force-open room specification details, countdown timers, or booking checkout drawers when the user simply wants to view media. Booking actions belong strictly on the `/booking` flow.
+3. **Facebook Comet Palette & Instagram Mixed Media Grid:**
+   - Always use CSS variables from `src/app/globals.css`: `--color-accent` (`#0866ff`), `--color-promo` (`#c53829`), `--color-background-body` (`#f2f4f7` Light / `#18191a` Dark), `--color-background-card` (`#ffffff` Light / `#242526` Dark), `--color-text-primary`, `--color-text-secondary`.
+4. **Native System Font Stack & 5-Tier Scale:**
+   - Use Facebook's native `system-ui` font stack (`SF Pro + ThonburiUI` on macOS/iOS, `Segoe UI + Leelawadee UI` on Windows) and the 5-tier classes: `.ty-display` (24px), `.ty-title` (20px), `.ty-subtitle` (17px), `.ty-body` (15px), and `.ty-caption` (13px).

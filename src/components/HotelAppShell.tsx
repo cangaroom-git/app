@@ -1479,7 +1479,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <HotelAppContext.Provider value={contextValue}>
-      <div className="min-h-screen pt-16 bg-[var(--color-background-body)] text-[var(--color-text-primary)] transition-colors duration-200">
+      <div className="min-h-screen pt-14 bg-[var(--color-background-body)] text-[var(--color-text-primary)] lg:pl-[244px] transition-colors duration-200">
         {/* 1. Primary Navigation (Desktop Left Sidebar + Top Navbar + Mobile Bottom Bar & Profile Drawer) */}
         <PrimaryNavigation
           activeTab={activeTab}

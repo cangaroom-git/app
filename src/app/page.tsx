@@ -6,6 +6,10 @@ import { pickLocalizedText } from "@/data/cmsDefaults";
 import { RoomLodge } from "@/data/rooms";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
+import {
+  PureMediaSlide,
+  PureMediaViewer,
+} from "@/components/cms/PureMediaViewer";
 import { ResortHeroHeader } from "@/components/home/ResortHeroHeader";
 
 type GridFilterTab = "all" | "reels" | "rooms" | "reviews";
@@ -61,88 +65,113 @@ export default function HomePage() {
   const {
     rooms,
     lang: language,
-    openRoomDrawer,
-    openGalleryModal,
     navigateToTab,
-    openShortsAt,
     cms,
     canShowEditControls,
     openCmsEditor,
   } = useHotelApp();
 
   const [activeGridTab, setActiveGridTab] = useState<GridFilterTab>("all");
+  const [viewerState, setViewerState] = useState<{
+    slides: PureMediaSlide[];
+    initialIndex: number;
+  } | null>(null);
 
   const activeShorts = useMemo(
     () => cms.shortsPage.videos.filter((video) => video.isActive !== false),
     [cms.shortsPage.videos]
   );
 
-  // Build unified mixed Instagram-style media tiles (Videos + Room Carousels + Gallery Photos + Guest Reviews)
+  // Build unified mixed Instagram-style media tiles (Pure Photo / Carousel / Video Viewing Only!)
   const allMixedTiles = useMemo<MixedMediaTile[]>(() => {
-    const videoTiles: MixedMediaTile[] = activeShorts.map((vid, idx) => {
-      const originalIdx = cms.shortsPage.videos.findIndex(
-        (v) => v.id === vid.id
-      );
-      const linkedRoom =
-        rooms.find((r) => r.id === vid.roomId) ?? rooms[vid.roomIndex];
+    const allVideoSlides: PureMediaSlide[] = activeShorts.map((vid) => ({
+      type: "video",
+      url: vid.videoUrl,
+      posterUrl: vid.posterUrl,
+      aspectRatio: "9/16",
+      caption: pickLocalizedText(language, vid.titleTh, vid.titleEn),
+    }));
+
+    const videoTiles: MixedMediaTile[] = activeShorts.map((vid, idx) => ({
+      id: `vid-${vid.id}`,
+      kind: "video",
+      imageUrl: vid.posterUrl,
+      title: pickLocalizedText(language, vid.titleTh, vid.titleEn),
+      metricLabel: vid.views,
+      isPinned: Boolean(vid.isPinned),
+      onSelect: () =>
+        setViewerState({ slides: allVideoSlides, initialIndex: idx }),
+      onEdit: () =>
+        openCmsEditor({ type: "short-video", videoId: vid.id }),
+    }));
+
+    const roomTiles: MixedMediaTile[] = rooms.map((room: RoomLodge) => {
+      const roomAlbumSlides: PureMediaSlide[] = room.images.map((img) => ({
+        type: "image",
+        url: img.url,
+        caption: pickLocalizedText(
+          language,
+          img.captionTh || room.nameTh,
+          img.captionEn || room.nameEn
+        ),
+      }));
+
       return {
-        id: `vid-${vid.id}`,
-        kind: "video",
-        imageUrl: vid.posterUrl,
-        title: pickLocalizedText(language, vid.titleTh, vid.titleEn),
-        subtitle: linkedRoom
-          ? `${linkedRoom.code} · ฿${linkedRoom.basePriceThb.toLocaleString()}`
-          : undefined,
-        metricLabel: vid.views,
-        isPinned: Boolean(vid.isPinned),
-        onSelect: () => openShortsAt(originalIdx >= 0 ? originalIdx : idx),
-        onEdit: () =>
-          openCmsEditor({ type: "short-video", videoId: vid.id }),
+        id: `room-${room.id}`,
+        kind: room.images.length > 1 ? "carousel" : "photo",
+        imageUrl: room.images[0]?.url || "",
+        title: pickLocalizedText(language, room.nameTh, room.nameEn),
+        metricLabel: `${room.images.length} ${
+          language === "th" ? "รูป" : "photos"
+        }`,
+        onSelect: () =>
+          setViewerState({ slides: roomAlbumSlides, initialIndex: 0 }),
+        onEdit: () => openCmsEditor({ type: "room", roomId: room.id }),
       };
     });
 
-    const roomTiles: MixedMediaTile[] = rooms.map((room: RoomLodge) => ({
-      id: `room-${room.id}`,
-      kind: "carousel",
-      imageUrl: room.images[0]?.url || "",
-      title: pickLocalizedText(language, room.nameTh, room.nameEn),
-      subtitle: `฿${room.basePriceThb.toLocaleString()} / ${
-        language === "th" ? "คืน" : "night"
-      }`,
-      metricLabel: `${room.images.length} ${
-        language === "th" ? "รูป" : "photos"
-      }`,
-      onSelect: () => openRoomDrawer(room, "details", 0),
-      onEdit: () => openCmsEditor({ type: "room", roomId: room.id }),
-    }));
-
     const reviewTiles: MixedMediaTile[] = cms.reviews
       .filter((rev) => Boolean(rev.photos[0]))
-      .map((rev) => ({
-        id: `rev-${rev.id}`,
-        kind: rev.photos.length > 1 ? "carousel" : "review",
-        imageUrl: rev.photos[0],
-        title: pickLocalizedText(language, rev.captionTh, rev.captionEn),
-        subtitle: `${pickLocalizedText(
-          language,
-          rev.authorNameTh,
-          rev.authorNameEn
-        )} · ★ ${rev.rating}`,
-        metricLabel: `${rev.likesCount}`,
-        onSelect: () => navigateToTab("review"),
-        onEdit: () => openCmsEditor({ type: "review", reviewId: rev.id }),
-      }));
+      .map((rev) => {
+        const revSlides: PureMediaSlide[] = rev.photos.map((photoUrl) => ({
+          type: "image",
+          url: photoUrl,
+          caption: pickLocalizedText(language, rev.captionTh, rev.captionEn),
+        }));
+        return {
+          id: `rev-${rev.id}`,
+          kind: rev.photos.length > 1 ? "carousel" : "review",
+          imageUrl: rev.photos[0],
+          title: pickLocalizedText(language, rev.captionTh, rev.captionEn),
+          subtitle: `${pickLocalizedText(
+            language,
+            rev.authorNameTh,
+            rev.authorNameEn
+          )} · ★ ${rev.rating}`,
+          metricLabel: `${rev.likesCount}`,
+          onSelect: () => setViewerState({ slides: revSlides, initialIndex: 0 }),
+          onEdit: () => openCmsEditor({ type: "review", reviewId: rev.id }),
+        };
+      });
 
-    const galleryTiles: MixedMediaTile[] = cms.gallery.photos.map((photo) => ({
-      id: `gal-${photo.id}`,
-      kind: "photo",
-      imageUrl: photo.url,
-      title: pickLocalizedText(language, photo.captionTh, photo.captionEn),
-      onSelect: () => openGalleryModal(null),
-      onEdit: () => openCmsEditor({ type: "gallery-photos" }),
+    const allGallerySlides: PureMediaSlide[] = cms.gallery.photos.map((p) => ({
+      type: "image",
+      url: p.url,
+      caption: pickLocalizedText(language, p.captionTh, p.captionEn),
     }));
 
-    // Interleave naturally so videos, carousels, and photos blend organically like a real Instagram grid
+    const galleryTiles: MixedMediaTile[] = cms.gallery.photos.map(
+      (photo, gIdx) => ({
+        id: `gal-${photo.id}`,
+        kind: "photo",
+        imageUrl: photo.url,
+        title: pickLocalizedText(language, photo.captionTh, photo.captionEn),
+        onSelect: () =>
+          setViewerState({ slides: allGallerySlides, initialIndex: gIdx }),
+        onEdit: () => openCmsEditor({ type: "gallery-photos" }),
+      })
+    );
+
     const interleaved: MixedMediaTile[] = [];
     const maxLen = Math.max(
       videoTiles.length,
@@ -154,7 +183,6 @@ export default function HomePage() {
     const seenUrls = new Set<string>();
     const pushUnique = (tile?: MixedMediaTile) => {
       if (!tile || !tile.imageUrl) return;
-      // Keep room & video tiles always; deduplicate extra gallery URLs if identical
       if (tile.kind === "photo" && seenUrls.has(tile.imageUrl)) return;
       seenUrls.add(tile.imageUrl);
       interleaved.push(tile);
@@ -172,13 +200,8 @@ export default function HomePage() {
     activeShorts,
     cms.gallery.photos,
     cms.reviews,
-    cms.shortsPage.videos,
     language,
-    navigateToTab,
     openCmsEditor,
-    openGalleryModal,
-    openRoomDrawer,
-    openShortsAt,
     rooms,
   ]);
 
@@ -215,7 +238,7 @@ export default function HomePage() {
     },
     {
       id: "rooms",
-      labelTh: "ห้องพัก",
+      labelTh: "อัลบั้มห้องพัก",
       labelEn: "Rooms",
       icon: <BedDouble className="w-4 h-4" />,
     },
@@ -236,9 +259,8 @@ export default function HomePage() {
         onChatClick={() => navigateToTab("chat")}
       />
 
-      {/* 2. INSTAGRAM-STYLE MIXED PHOTO & VIDEO GRID */}
+      {/* 2. INSTAGRAM-STYLE MIXED PHOTO & VIDEO GRID (Zero Hover Scale, Pure Media Viewer!) */}
       <section className="app-card overflow-hidden">
-        {/* Clean Instagram Tab Strip */}
         <div className="px-3 sm:px-5 border-b border-[var(--color-border)] flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 sm:gap-4 overflow-x-auto no-scrollbar">
             {filterTabs.map((tab) => {
@@ -282,7 +304,6 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Tight 3-to-4 Column Portrait Media Grid (4:5 Instagram Ratio, Mixing Videos & Photos) */}
         <div className="grid grid-cols-3 md:grid-cols-4 gap-[2px] sm:gap-[3px] bg-[var(--color-background-body)]">
           {displayedTiles.map((tile, index) => (
             <div
@@ -296,10 +317,10 @@ export default function HomePage() {
                 loading={index < 8 ? "eager" : "lazy"}
                 decoding="async"
                 draggable={false}
-                className="h-full w-full object-cover object-center transition-transform duration-300 lg:group-hover:scale-[1.03]"
+                className="h-full w-full object-cover object-center"
               />
 
-              {/* Top-Right Minimal Instagram Media Type Icon (Video Reel vs Carousel) */}
+              {/* Top-Right Minimal Instagram Media Type Icon */}
               <div className="absolute top-2.5 right-2.5 pointer-events-none">
                 {tile.kind === "video" ? (
                   <IgVideoBadgeIcon />
@@ -308,8 +329,8 @@ export default function HomePage() {
                 ) : null}
               </div>
 
-              {/* Clean Desktop Hover Overlay (Zero Clutter at Rest!) */}
-              <div className="hidden lg:flex absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-col items-center justify-center p-3 text-center text-white pointer-events-none">
+              {/* Subtle Desktop Dim Overlay (NO hover scale!) */}
+              <div className="hidden lg:flex absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-col items-center justify-center p-3 text-center text-white pointer-events-none">
                 {tile.metricLabel && (
                   <div className="inline-flex items-center gap-1.5 ty-body font-bold !text-white mb-1">
                     {tile.kind === "video" ? (
@@ -325,14 +346,8 @@ export default function HomePage() {
                 <p className="ty-caption font-semibold !text-white line-clamp-2">
                   {tile.title}
                 </p>
-                {tile.subtitle && (
-                  <p className="ty-caption !text-white/85 mt-0.5">
-                    {tile.subtitle}
-                  </p>
-                )}
               </div>
 
-              {/* Admin On-Page Edit Button */}
               {canShowEditControls && tile.onEdit && (
                 <div
                   className="absolute bottom-2 right-2 z-20"
@@ -345,6 +360,13 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Pure Photo / Carousel / Video Lightbox (Zero Details / Zero Booking Clutter) */}
+      <PureMediaViewer
+        slides={viewerState?.slides ?? null}
+        initialIndex={viewerState?.initialIndex ?? 0}
+        onClose={() => setViewerState(null)}
+      />
     </div>
   );
 }
