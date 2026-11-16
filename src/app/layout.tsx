@@ -38,7 +38,7 @@ export default function RootLayout({
         />
         <link
           rel="preconnect"
-          href="https://assets.mixkit.co"
+          href="https://res.cloudinary.com"
           crossOrigin="anonymous"
         />
       </head>

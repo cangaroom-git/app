@@ -1,37 +1,39 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { CalendarCheck, SlidersHorizontal } from "lucide-react";
+import { Calendar, Check, Tag, Users } from "lucide-react";
 import { pickLocalizedText } from "@/data/cmsDefaults";
-import { useHotelApp } from "@/components/HotelAppShell";
+import { formatShortDate, useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
-import { StayDatePickerBar } from "@/components/booking/StayDatePickerBar";
 import { RoomFeedCard } from "@/components/home/RoomFeedCard";
+import { StandardButton } from "@/components/ui/standards";
 
 export default function BookingPage() {
   const {
     propertyConfig,
     rooms,
+    coupons,
     lang: language,
     checkIn,
     checkOut,
-    guests,
     setCheckIn,
     setCheckOut,
+    guests,
     nights: stayNights,
     roomStatusMap,
     totalAvailableUnitsCount,
     findNextAvailableRangeForRoom,
     openCalendarDrawer,
     openRoomDrawer,
+    navigateToTab,
     cms,
     canShowEditControls,
     openCmsEditor,
   } = useHotelApp();
 
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>(
-    "all"
-  );
+  const [selectedCategoryFilter, setSelectedCategoryFilter] =
+    useState<string>("all");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [likedRoomsById, setLikedRoomsById] = useState<Record<string, boolean>>(
     {}
   );
@@ -92,13 +94,18 @@ export default function BookingPage() {
     setTimeout(() => setRecentlySharedRoomId(null), 1800);
   };
 
+  const activeCouponsCount = coupons.filter((c) => c.isActive).length;
+
   const filteredRooms = rooms.filter((room) => {
-    if (selectedCategoryFilter === "all") {
-      return true;
+    if (onlyAvailable) {
+      const st = roomStatusMap[room.id];
+      const isAvail =
+        st?.state === "AVAILABLE" && (st?.availableUnits ?? 0) > 0;
+      if (!isAvail) return false;
     }
-    if (selectedCategoryFilter === "available-only") {
-      const status = roomStatusMap[room.id];
-      return status?.state === "AVAILABLE" && (status?.availableUnits ?? 0) > 0;
+
+    if (!selectedCategoryFilter || selectedCategoryFilter === "all") {
+      return true;
     }
     const matchingChip = cms.bookingPage.categoryChips.find(
       (chip) => chip.id === selectedCategoryFilter
@@ -111,20 +118,13 @@ export default function BookingPage() {
     return true;
   });
 
-  const filterChips = [
+  const categoryChips = [
     {
       id: "all",
       label:
         language === "th"
-          ? `ห้องพักทั้งหมด (${rooms.length})`
-          : `All Rooms (${rooms.length})`,
-    },
-    {
-      id: "available-only",
-      label:
-        language === "th"
-          ? `เฉพาะห้องว่าง (${totalAvailableUnitsCount})`
-          : `Available (${totalAvailableUnitsCount})`,
+          ? `ทั้งหมด (${rooms.length})`
+          : `All (${rooms.length})`,
     },
     ...cms.bookingPage.categoryChips.map((chip) => ({
       id: chip.id,
@@ -133,42 +133,89 @@ export default function BookingPage() {
   ];
 
   return (
-    <div className="w-full min-w-0 flex flex-col gap-3.5 sm:gap-4 select-none">
-      {/* 1. DEDICATED SEARCH & AVAILABILITY CONTROL CARD (No duplicate Hero Cover!) */}
+    <div className="w-full min-w-0 space-y-4 select-none">
+      {/* 1. DEDICATED DIRECT BOOKING SEARCH & FILTER HEADER CARD (No Duplicate Cover Photo!) */}
       <section className="app-card p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="ty-title flex items-center gap-2">
-              <CalendarCheck className="w-5 h-5 text-[var(--color-accent)] shrink-0" />
-              <span>
-                {language === "th"
-                  ? "เช็กวันว่าง & เลือกห้องพัก"
-                  : "Select Stay Dates & Room"}
-              </span>
+            <h1 className="ty-display">
+              {language === "th"
+                ? "เช็กห้องว่างและจองตรงกับที่พัก"
+                : "Available Rooms & Direct Rates"}
             </h1>
             <p className="ty-caption mt-0.5">
               {language === "th"
-                ? `ราคาตรงจากที่พัก · ล็อกห้องอัตโนมัติ 15 นาทีระหว่างชำระเงิน`
-                : `Official direct rates · Instant 15-minute room hold`}
+                ? totalAvailableUnitsCount > 0
+                  ? `มีห้องว่างพร้อมจอง ${totalAvailableUnitsCount} หลัง สำหรับวันที่เลือก · ล็อกห้องอัตโนมัติ 15 นาที`
+                  : "วันที่เลือกเต็มแล้ว · กดเปลี่ยนวันเข้าพักด้านขวาเพื่อดูวันว่างถัดไป"
+                : `${totalAvailableUnitsCount} villas available for your dates · Instant 15-min hold`}
             </p>
           </div>
 
-          <StayDatePickerBar
-            language={language}
-            checkInDate={checkIn}
-            checkOutDate={checkOut}
-            guestCount={guests}
-            stayNights={stayNights}
-            availableRoomUnitsCount={totalAvailableUnitsCount}
-            onOpenCalendarDrawer={openCalendarDrawer}
-          />
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {canShowEditControls && (
+              <EditSpotButton
+                icon="add"
+                label="เพิ่มห้องพักใหม่"
+                onClick={() => openCmsEditor({ type: "room" })}
+              />
+            )}
+
+            {activeCouponsCount > 0 && (
+              <button
+                type="button"
+                onClick={() => navigateToTab("deal")}
+                className="h-9 px-3 rounded-[8px] bg-[var(--color-promo-muted)] text-[var(--color-promo-text)] ty-caption font-semibold inline-flex items-center gap-1.5 hover:opacity-90 transition cursor-pointer"
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span>
+                  {language === "th"
+                    ? `เก็บคูปองลดเพิ่ม (${activeCouponsCount})`
+                    : `Coupons (${activeCouponsCount})`}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Category & Availability Filter Pills */}
-        <div className="pt-3 border-t border-[var(--color-border)] flex items-center justify-between gap-2">
+        {/* Interactive Date & Guest Selector Row */}
+        <div className="rounded-[10px] bg-[var(--color-background-muted)] p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 ty-body">
+            <span className="inline-flex items-center gap-2 font-semibold">
+              <Calendar className="w-4 h-4 text-[var(--color-accent)]" />
+              <span>
+                {formatShortDate(checkIn, language)} –{" "}
+                {formatShortDate(checkOut, language)} ({stayNights}{" "}
+                {language === "th" ? "คืน" : "nights"})
+              </span>
+            </span>
+
+            <span className="inline-flex items-center gap-1.5 text-[var(--color-text-secondary)]">
+              <Users className="w-4 h-4" />
+              <span>
+                {guests} {language === "th" ? "ท่าน" : "guests"}
+              </span>
+            </span>
+          </div>
+
+          <StandardButton
+            variant="primary"
+            size="md"
+            onClick={openCalendarDrawer}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>
+              {language === "th"
+                ? "เปลี่ยนวันเข้าพัก / ผู้เข้าพัก"
+                : "Change Dates / Guests"}
+            </span>
+          </StandardButton>
+        </div>
+
+        {/* Category & Availability Filter Chips */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <SlidersHorizontal className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0 mr-0.5" />
-            {filterChips.map((chip) => {
+            {categoryChips.map((chip) => {
               const isActive = selectedCategoryFilter === chip.id;
               return (
                 <button
@@ -177,8 +224,8 @@ export default function BookingPage() {
                   onClick={() => setSelectedCategoryFilter(chip.id)}
                   className={`h-8 px-3.5 rounded-full ty-caption font-semibold inline-flex items-center justify-center transition cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                      : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                      : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background-subtle)]"
                   }`}
                 >
                   {chip.label}
@@ -187,32 +234,55 @@ export default function BookingPage() {
             })}
           </div>
 
-          {canShowEditControls && (
-            <EditSpotButton
-              icon="add"
-              label="เพิ่มห้องพัก"
-              onClick={() => openCmsEditor({ type: "room" })}
-            />
-          )}
+          <button
+            type="button"
+            onClick={() => setOnlyAvailable((v) => !v)}
+            className={`h-8 px-3 rounded-full ty-caption font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
+              onlyAvailable
+                ? "bg-[var(--color-success-muted)] text-[var(--color-success)]"
+                : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background-subtle)]"
+            }`}
+          >
+            {onlyAvailable && <Check className="w-3.5 h-3.5" />}
+            <span>
+              {language === "th" ? "แสดงเฉพาะห้องว่าง" : "Available only"}
+            </span>
+          </button>
         </div>
       </section>
 
-      {/* 2. ROOM AVAILABILITY CARDS */}
-      <section id="rooms" className="space-y-3.5 sm:space-y-4">
+      {/* 2. FILTERED ROOM CARDS */}
+      <section id="rooms" className="scroll-mt-16 space-y-4">
         {filteredRooms.length === 0 ? (
-          <div className="app-card p-8 text-center space-y-2">
+          <div className="app-card p-8 text-center space-y-3">
             <p className="ty-subtitle font-bold">
               {language === "th"
-                ? "ไม่มีห้องว่างในตัวกรองที่เลือก"
-                : "No rooms match your filter"}
+                ? "ไม่พบห้องว่างในเงื่อนไขที่เลือก"
+                : "No available rooms match your filter"}
             </p>
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryFilter("all")}
-              className="ty-body font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
-            >
-              {language === "th" ? "แสดงห้องพักทั้งหมด" : "Show all rooms"}
-            </button>
+            <p className="ty-caption">
+              {language === "th"
+                ? "ลองเปลี่ยนวันเข้าพักหรือปิดตัวกรอง “แสดงเฉพาะห้องว่าง” เพื่อดูวันว่างถัดไปของแต่ละบ้านพัก"
+                : "Try selecting different dates or showing all villas."}
+            </p>
+            <div className="flex justify-center gap-2">
+              <StandardButton
+                variant="secondary"
+                size="md"
+                onClick={() => setOnlyAvailable(false)}
+              >
+                <span>{language === "th" ? "แสดงทุกห้อง" : "Show All"}</span>
+              </StandardButton>
+              <StandardButton
+                variant="primary"
+                size="md"
+                onClick={openCalendarDrawer}
+              >
+                <span>
+                  {language === "th" ? "เลือกวันใหม่" : "Change Dates"}
+                </span>
+              </StandardButton>
+            </div>
           </div>
         ) : (
           filteredRooms.map((room, roomIndex) => {
