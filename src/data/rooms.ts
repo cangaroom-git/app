@@ -258,7 +258,7 @@ export const INITIAL_PROPERTY_CONFIG: WhiteLabelPropertyConfig = {
   taglineEn:
     "Designed for slower stays and deeper connection with the misty Sapan valley landscape in Bo Kluea, Nan.",
   heroImageUrl:
-    "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=2000&q=85",
+    "https://res.cloudinary.com/ztlfsfvo/image/upload/v1794838919/my-hotel/hero/obxqa4pz2mbziitzrgop.webp",
   storyTitleTh:
     "พักผ่อนท่ามกลางอ้อมกอดขุนเขาและสายหมอก ณ หมู่บ้านสะปัน อ.บ่อเกลือ จ.น่าน",
   storyTitleEn:

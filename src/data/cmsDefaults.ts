@@ -268,7 +268,7 @@ const ROOM_INDEX_TO_DEFAULT_ROOM_ID = [
 export const INITIAL_SITE_CMS_CONTENT: SiteCmsContent = {
   home: {
     heroImageUrl:
-      "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=2000&q=85",
+      "https://res.cloudinary.com/ztlfsfvo/image/upload/v1794838919/my-hotel/hero/obxqa4pz2mbziitzrgop.webp",
     heroLocationTh: "บ้านสะปัน จ.น่าน",
     heroLocationEn: "Ban Sapan, Nan",
     ratingBadgeTh: "4.9 ★ · บ้านพักไพรเวทกลางหุบเขาสะปัน",
@@ -417,7 +417,7 @@ export const INITIAL_SITE_CMS_CONTENT: SiteCmsContent = {
 
   bookingPage: {
     heroBannerUrl:
-      "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=2000&q=85",
+      "https://res.cloudinary.com/ztlfsfvo/image/upload/v1794838920/my-hotel/hero/sfn2spnfudhdxyowumvi.webp",
     ratingScore: "4.9",
     reviewCountTh: "1,280+ รีวิว",
     reviewCountEn: "1,280+ reviews",
