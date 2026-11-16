@@ -121,43 +121,20 @@ export function PrimaryNavigation({
       ? propertyConfig?.nameTh?.split("(")[0]?.trim() || "สะปัน อันซีน"
       : propertyConfig?.nameEn || "Sapan Unseen";
 
-  const leftRailSecondaryItems: Array<{
-    id: HotelNavTabId;
-    labelTh: string;
-    labelEn: string;
-    icon: React.ReactNode;
-  }> = [
-    {
-      id: "review",
-      labelTh: "รีวิวผู้เข้าพัก",
-      labelEn: "Guest Reviews",
-      icon: <Star className="w-[18px] h-[18px]" />,
-    },
-    {
-      id: "guide",
-      labelTh: "แผนที่ & ที่เที่ยว",
-      labelEn: "Map & Guide",
-      icon: <Compass className="w-[18px] h-[18px]" />,
-    },
-    {
-      id: "setting",
-      labelTh: "การจองของฉัน",
-      labelEn: "My Bookings",
-      icon: <CalendarCheck className="w-[18px] h-[18px]" />,
-    },
-  ];
+  const desktopPrimaryTabs = HOTEL_NAV_TABS.filter((t) => t.id !== "chat");
 
   return (
     <>
       {/* =====================================================================
-          1. FACEBOOK-STYLE ALWAYS-FIXED TOP BAR (h-14 = 56px)
+          1. CANGAROOM SIGNATURE TOP NAVBAR (Airbnb × Instagram Clean Header)
+             - Centered max-w-[1120px], symmetric open-canvas balance
       ====================================================================== */}
       <header
         aria-label="Top navigation bar"
-        className="fixed top-0 inset-x-0 z-40 h-14 bg-[var(--color-background-card)] border-b border-[var(--color-border)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] pr-[var(--scrollbar-compensation,0px)]"
+        className="fixed top-0 inset-x-0 z-40 h-16 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] pr-[var(--scrollbar-compensation,0px)]"
       >
-        <div className="w-full h-full px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-2">
-          {/* LEFT: Facebook-Style Brand Circle + Resort Title */}
+        <div className="w-full max-w-[1120px] mx-auto h-full px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-2">
+          {/* LEFT: Brand Mark + Property Name */}
           <Link
             href="/"
             onClick={(event) => {
@@ -169,18 +146,58 @@ export function PrimaryNavigation({
               }
             }}
             aria-label="Home"
-            className="inline-flex items-center gap-2.5 min-w-0 shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-2.5 min-w-0 shrink-0 cursor-pointer group/brand"
           >
-            <span className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0">
+            <span className="h-9 w-9 rounded-[10px] bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0 transition-transform group-hover/brand:scale-105">
               {brandBadgeCode}
             </span>
-            <span className="hidden sm:block ty-subtitle font-bold text-[var(--color-text-primary)] truncate max-w-[200px] lg:max-w-[240px]">
+            <span className="hidden sm:block ty-subtitle font-bold text-[var(--color-text-primary)] truncate max-w-[180px] xl:max-w-[220px]">
               {propertyShortName}
             </span>
           </Link>
 
-          {/* CENTER: Compact Date Search Pill (Always accessible like Facebook Search) */}
-          <div className="flex-1 max-w-[440px] flex items-center justify-center min-w-0">
+          {/* CENTER (Desktop >= lg): Clean Airbnb-Style Navigation Tabs */}
+          <nav
+            aria-label="Primary tabs"
+            className="hidden lg:flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] p-1 border border-[var(--color-border)]"
+          >
+            {desktopPrimaryTabs.map((tab) => {
+              const isTabActive = normalizedActiveTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectTab(tab.id);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`h-9 px-4 rounded-full inline-flex items-center gap-2 ty-body transition cursor-pointer ${
+                    isTabActive
+                      ? "bg-[var(--color-background-card)] text-[var(--color-text-primary)] font-semibold shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
+                  }`}
+                >
+                  <span>
+                    {language === "th" ? tab.labelTh : tab.labelEn}
+                  </span>
+                  {tab.id === "book" && freeRoomCount > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${
+                        isTabActive
+                          ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                          : "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                      }`}
+                    >
+                      {freeRoomCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* CENTER (< lg Mobile/Tablet): Compact Date Search Pill */}
+          <div className="flex lg:hidden flex-1 max-w-[320px] items-center justify-center min-w-0">
             {checkInDate && checkOutDate ? (
               <StayDatePickerBar
                 isCompact
@@ -197,9 +214,9 @@ export function PrimaryNavigation({
               <button
                 type="button"
                 onClick={() => onSelectTab("book")}
-                className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-medium inline-flex items-center gap-2 cursor-pointer"
+                className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <Calendar className="w-4 h-4 text-[var(--color-accent)]" />
+                <Calendar className="w-3.5 h-3.5 text-[var(--color-accent)]" />
                 <span>
                   {language === "th" ? "เลือกวันเข้าพัก" : "Select Dates"}
                 </span>
@@ -207,15 +224,31 @@ export function PrimaryNavigation({
             )}
           </div>
 
-          {/* RIGHT: Facebook Action Circles (Messenger AI, Coupon Bag, Profile Avatar) */}
+          {/* RIGHT: Date Trigger (xl) + AI Concierge + Coupon Bag + Single Profile Avatar */}
           <div className="flex items-center justify-end gap-2 shrink-0">
+            {checkInDate && checkOutDate && (
+              <div className="hidden xl:block">
+                <StayDatePickerBar
+                  isCompact
+                  language={language}
+                  checkInDate={checkInDate}
+                  checkOutDate={checkOutDate}
+                  guestCount={guestCount}
+                  stayNights={stayNights}
+                  availableRoomUnitsCount={freeRoomCount}
+                  isCalendarOpen={isCalendarDrawerOpen}
+                  onOpenCalendarDrawer={onOpenCalendarDrawer || (() => {})}
+                />
+              </div>
+            )}
+
             {/* Desktop AI Chat Circle */}
             <div className="hidden sm:block shrink-0">
               <button
                 type="button"
                 onClick={() => onSelectTab("chat")}
-                aria-label={language === "th" ? "ทักแชท AI" : "AI Messenger"}
-                title={language === "th" ? "ทักแชทถามที่พัก" : "Ask AI Concierge"}
+                aria-label={language === "th" ? "ทักแชท AI" : "AI Concierge"}
+                title={language === "th" ? "ถามผู้ช่วยที่พัก" : "Ask AI Concierge"}
                 className={`btn-icon btn-icon-lg relative ${
                   isChatOpen
                     ? "!bg-[var(--color-accent-muted)] !text-[var(--color-accent)]"
@@ -250,7 +283,9 @@ export function PrimaryNavigation({
             <div className="lg:hidden shrink-0">
               <button
                 type="button"
-                aria-label={language === "th" ? "โปรไฟล์และเมนู" : "Profile menu"}
+                aria-label={
+                  language === "th" ? "โปรไฟล์และเมนู" : "Profile menu"
+                }
                 onClick={() => {
                   refreshProfile();
                   setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen);
@@ -270,7 +305,7 @@ export function PrimaryNavigation({
               </button>
             </div>
 
-            {/* Desktop (>= lg): Facebook Profile Dropdown */}
+            {/* Desktop (>= lg): Single Profile Dropdown */}
             <div className="hidden lg:block shrink-0">
               <UserProfileDropdown
                 language={language}
@@ -291,139 +326,7 @@ export function PrimaryNavigation({
       </header>
 
       {/* =====================================================================
-          2. FACEBOOK-STYLE DESKTOP LEFT NAVIGATION RAIL (>= lg, w-[244px])
-             - Always readable, sits cleanly on #F2F4F7 wash without hover-jumping
-      ====================================================================== */}
-      <aside
-        aria-label="Primary sidebar navigation"
-        className="hidden lg:flex fixed top-14 bottom-0 left-0 z-30 w-[244px] flex-col justify-between bg-[var(--color-background-body)] py-3 px-2.5 overflow-y-auto select-none"
-      >
-        <div className="space-y-1">
-          {HOTEL_NAV_TABS.filter((tab) => tab.id !== "chat").map((tab) => {
-            const isTabActive = normalizedActiveTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  onSelectTab(tab.id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className={`w-full h-11 rounded-[8px] flex items-center justify-between px-2.5 ty-body transition-colors cursor-pointer ${
-                  isTabActive
-                    ? "bg-[var(--color-background-subtle)] font-semibold text-[var(--color-accent)]"
-                    : "hover:bg-[var(--color-overlay-hover)] font-medium text-[var(--color-text-primary)]"
-                }`}
-              >
-                <span className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                      isTabActive
-                        ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                        : "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    <HotelNavTabIcon
-                      id={tab.id}
-                      isActive={false}
-                      cutoutColor="transparent"
-                      className="w-[18px] h-[18px]"
-                    />
-                  </span>
-                  <span className="truncate">
-                    {language === "th" ? tab.labelTh : tab.labelEn}
-                  </span>
-                </span>
-
-                {tab.id === "book" && freeRoomCount > 0 && (
-                  <span className="rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold">
-                    {freeRoomCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div className="my-2 border-t border-[var(--color-border)] mx-2" />
-
-          {leftRailSecondaryItems.map((item) => {
-            const isTabActive = normalizedActiveTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  onSelectTab(item.id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className={`w-full h-11 rounded-[8px] flex items-center gap-3 px-2.5 ty-body transition-colors cursor-pointer ${
-                  isTabActive
-                    ? "bg-[var(--color-background-subtle)] font-semibold text-[var(--color-accent)]"
-                    : "hover:bg-[var(--color-overlay-hover)] font-medium text-[var(--color-text-primary)]"
-                }`}
-              >
-                <span
-                  className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                    isTabActive
-                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                      : "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">
-                  {language === "th" ? item.labelTh : item.labelEn}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Bottom Platform CTA / Admin Quick Link */}
-        <div className="pt-3 border-t border-[var(--color-border)] px-1 space-y-2">
-          {isHotelOrSuperAdmin ? (
-            <Link
-              href={adminHref}
-              className="w-full h-10 px-3 rounded-[8px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] shadow-[var(--shadow-card)] flex items-center justify-between ty-body font-semibold text-[var(--color-text-primary)] transition"
-            >
-              <span className="flex items-center gap-2.5">
-                <LayoutDashboard className="w-4 h-4 text-[var(--color-accent)]" />
-                <span>
-                  {language === "th" ? "จัดการที่พัก" : "Hotel Admin"}
-                </span>
-              </span>
-              {pendingAdminCount > 0 && (
-                <span className="badge-promo">{pendingAdminCount}</span>
-              )}
-            </Link>
-          ) : (
-            <Link
-              href="/register-hotel"
-              className="w-full px-3 py-2.5 rounded-[10px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] shadow-[var(--shadow-card)] flex items-center gap-2.5 transition"
-            >
-              <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="ty-caption font-bold text-[var(--color-text-primary)] truncate">
-                  {language === "th"
-                    ? "สำหรับเจ้าของที่พัก"
-                    : "For Hotel Owners"}
-                </p>
-                <p className="ty-caption text-[var(--color-accent)] font-semibold truncate">
-                  {language === "th"
-                    ? "ทดลองเปิดเว็บฟรี 30 วัน"
-                    : "30-Day Free Trial"}
-                </p>
-              </div>
-            </Link>
-          )}
-          <p className="px-2 ty-caption">Cangaroom · Direct Booking</p>
-        </div>
-      </aside>
-
-      {/* =====================================================================
-          3. MOBILE PROFILE & MENU RIGHT SIDEBAR DRAWER
+          2. MOBILE PROFILE & MENU RIGHT SIDEBAR DRAWER
       ====================================================================== */}
       {isMobileProfileDrawerOpen && (
         <div
@@ -470,7 +373,7 @@ export function PrimaryNavigation({
                 <Link
                   href="/login"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-10 px-3.5 rounded-[8px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
+                  className="w-full h-10 px-3.5 rounded-[10px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>
@@ -488,7 +391,7 @@ export function PrimaryNavigation({
                   setIsMobileProfileDrawerOpen(false);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
               >
                 <CalendarCheck className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -502,7 +405,7 @@ export function PrimaryNavigation({
                   setIsMobileProfileDrawerOpen(false);
                   onOpenCouponWallet();
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
               >
                 <span className="flex items-center gap-3">
                   <TicketPercent className="w-5 h-5 text-[var(--color-promo-text)]" />
@@ -522,7 +425,7 @@ export function PrimaryNavigation({
                   setIsMobileProfileDrawerOpen(false);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
               >
                 <Star className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -537,7 +440,7 @@ export function PrimaryNavigation({
                   setIsMobileProfileDrawerOpen(false);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
               >
                 <Compass className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -556,7 +459,7 @@ export function PrimaryNavigation({
                         setIsMobileProfileDrawerOpen(false);
                         onToggleEditMode();
                       }}
-                      className={`w-full h-11 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+                      className={`w-full h-11 px-2.5 rounded-[10px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
                         isEditMode
                           ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] font-semibold"
                           : "hover:bg-[var(--color-background-muted)]"
@@ -579,7 +482,7 @@ export function PrimaryNavigation({
                   <Link
                     href={adminHref}
                     onClick={() => setIsMobileProfileDrawerOpen(false)}
-                    className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
+                    className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
                   >
                     <span className="flex items-center gap-3">
                       <LayoutDashboard className="w-5 h-5 text-[var(--color-text-secondary)]" />
@@ -598,7 +501,7 @@ export function PrimaryNavigation({
                     <Link
                       href="/super-admin"
                       onClick={() => setIsMobileProfileDrawerOpen(false)}
-                      className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition"
+                      className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition"
                     >
                       <Crown className="w-5 h-5 text-[var(--color-accent)]" />
                       <span>
@@ -613,7 +516,7 @@ export function PrimaryNavigation({
                 <Link
                   href="/register-hotel"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold text-[var(--color-accent)] transition"
+                  className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold text-[var(--color-accent)] transition"
                 >
                   <Building2 className="w-5 h-5" />
                   <span>
@@ -630,7 +533,7 @@ export function PrimaryNavigation({
                 <button
                   type="button"
                   onClick={onToggleTheme}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                  className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
                 >
                   <span className="flex items-center gap-3">
                     {isDarkTheme ? (
@@ -657,7 +560,7 @@ export function PrimaryNavigation({
               <button
                 type="button"
                 onClick={handleToggleLanguage}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
               >
                 <span className="flex items-center gap-3">
                   <Globe className="w-5 h-5 text-[var(--color-text-secondary)]" />
@@ -675,7 +578,7 @@ export function PrimaryNavigation({
                     await signOutUser();
                     setIsMobileProfileDrawerOpen(false);
                   }}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium text-[var(--color-error)] transition cursor-pointer"
+                  className="w-full h-11 px-2.5 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium text-[var(--color-error)] transition cursor-pointer"
                 >
                   <LogOut className="w-5 h-5" />
                   <span>
@@ -689,8 +592,7 @@ export function PrimaryNavigation({
       )}
 
       {/* =====================================================================
-          4. CLEAN FACEBOOK-STYLE MOBILE BOTTOM TAB BAR (< lg)
-             - Flat, clean, zero floating cartoon bubbles
+          3. MOBILE BOTTOM TAB BAR (< lg)
       ====================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
@@ -698,7 +600,7 @@ export function PrimaryNavigation({
           normalizedActiveTab === "chat" ? "hidden" : "lg:hidden"
         } fixed inset-x-0 bottom-0 z-40 bg-[var(--color-background-card)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)] select-none`}
       >
-        <div className="max-w-[540px] mx-auto px-1 h-[54px] grid grid-cols-5 items-stretch">
+        <div className="max-w-[540px] mx-auto px-1 h-[56px] grid grid-cols-5 items-stretch">
           {HOTEL_NAV_TABS.map((tab) => {
             const effectiveActiveTab: HotelNavTabId = isChatOpen
               ? "chat"
@@ -724,9 +626,6 @@ export function PrimaryNavigation({
                     : "text-[var(--color-text-secondary)]"
                 }`}
               >
-                {isTabActive && (
-                  <span className="absolute top-0 inset-x-3 h-[2.5px] rounded-b-full bg-[var(--color-accent)]" />
-                )}
                 <span className="relative flex items-center justify-center h-6">
                   {tab.id === "chat" ? (
                     <MessageCircle className="w-[21px] h-[21px]" />

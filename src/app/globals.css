@@ -31,30 +31,30 @@
   --color-promo-border: rgba(197, 56, 41, 0.24);
   --color-promo-text: #c53829;
 
-  /* Facebook Comet Surface Hierarchy (Light Mode) */
-  --color-background-body: #f2f4f7;      /* --web-wash */
-  --color-background-surface: #ffffff;   /* --surface-background */
-  --color-background-card: #ffffff;      /* Crisp white post/room card */
+  /* Cangaroom Signature Open-Canvas Hierarchy (Airbnb × Instagram Light Mode) */
+  --color-background-body: #ffffff;
+  --color-background-surface: #ffffff;
+  --color-background-card: #ffffff;
   --color-background-popover: #ffffff;
-  --color-background-muted: #f0f2f5;     /* --comment-background / inputs */
-  --color-background-subtle: #e4e6eb;    /* --secondary-button-background */
-  --color-sidebar-bg: #f2f4f7;
+  --color-background-muted: #f7f7f8;
+  --color-background-subtle: #efefef;
+  --color-sidebar-bg: #ffffff;
 
-  /* Authentic Facebook Card & Popover Shadows */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.12);
-  --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.16), 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  /* Subtle Modern Shadows */
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.035);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05);
 
-  /* Facebook Typography Color Tokens (Light Mode) */
-  --color-text-primary: #080809;         /* --primary-text */
-  --color-text-secondary: #65686c;       /* --secondary-text */
+  /* Crisp Typography Color Tokens (Light Mode) */
+  --color-text-primary: #080809;
+  --color-text-secondary: #65686c;
   --color-text-disabled: #bcc0c4;
   --color-text-accent: #0866ff;
 
-  /* Dividers & Overlays (Light Mode) */
-  --color-border: #dfe2e7;
-  --color-border-emphasized: #ced0d4;
-  --color-overlay-hover: rgba(0, 0, 0, 0.05);
-  --color-overlay-pressed: rgba(0, 0, 0, 0.10);
+  /* Clean Hairline Dividers (Light Mode) */
+  --color-border: #ebebeb;
+  --color-border-emphasized: #dddddd;
+  --color-overlay-hover: rgba(0, 0, 0, 0.04);
+  --color-overlay-pressed: rgba(0, 0, 0, 0.08);
 
   /* Custom Scrollbar Tokens */
   --color-scrollbar-thumb: rgba(0, 0, 0, 0.22);
@@ -75,16 +75,16 @@
   --color-on-warning: #080809;
 
   /* Feed & Right Drawer Dimensions */
-  --feed-max-width: 980px;
+  --feed-max-width: 1120px;
   --right-drawer-tablet-width: 460px;
   --right-drawer-desktop-width: 520px;
 
-  /* Facebook Comet Border Radii */
-  --radius-inner: 6px;
-  --radius-button: 8px;
-  --radius-element: 8px;
-  --radius-container: 12px;
-  --radius-page: 12px;
+  /* Cangaroom Signature Border Radii */
+  --radius-inner: 8px;
+  --radius-button: 10px;
+  --radius-element: 10px;
+  --radius-container: 16px;
+  --radius-page: 16px;
   --radius-full: 9999px;
 
   /* ==========================================================================
@@ -330,10 +330,10 @@ h1, h2, h3, h4, .font-serif {
   overflow-x: clip;
   border-radius: var(--radius-page);
   background-color: var(--color-background-card);
+  border: 1px solid var(--color-border);
   box-shadow: var(--shadow-card);
-  border: none;
   color: var(--color-text-primary);
-  transition: background-color 0.18s ease;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
 .app-card-media {

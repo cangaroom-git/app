@@ -2,24 +2,26 @@
 
 import React, { useState } from "react";
 import {
+  ArrowRight,
   BadgeCheck,
-  Clock,
-  Heart,
+  Calendar,
+  Check,
+  CloudSun,
+  Grid,
+  Images,
   MapPin,
   MessageCircle,
-  Phone,
-  Pin,
   Play,
   Share2,
+  ShieldCheck,
   Star,
   TicketPercent,
+  Users,
 } from "lucide-react";
 import { pickLocalizedText } from "@/data/cmsDefaults";
-import { useHotelApp } from "@/components/HotelAppShell";
+import { formatShortDate, useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { CmsDynamicIcon } from "@/components/cms/CmsIconRegistry";
-import { ResortHeroHeader } from "@/components/home/ResortHeroHeader";
-import { ShortVideoCard } from "@/components/home/ShortVideoCard";
 import { StandardButton } from "@/components/ui/standards";
 
 export default function HomePage() {
@@ -27,8 +29,15 @@ export default function HomePage() {
     propertyConfig,
     rooms,
     coupons,
+    weather,
     lang: language,
+    checkIn,
+    checkOut,
+    guests,
+    nights: stayNights,
     totalAvailableUnitsCount,
+    openCalendarDrawer,
+    openRoomDrawer,
     openGalleryModal,
     navigateToTab,
     openShortsAt,
@@ -38,141 +47,467 @@ export default function HomePage() {
     openCmsEditor,
   } = useHotelApp();
 
-  const [likedPostIds, setLikedPostIds] = useState<Record<string, boolean>>({});
+  const [copiedShare, setCopiedShare] = useState(false);
 
   const homeCms = cms.home;
-  const brandBadgeCode = (propertyConfig.brandCode || "SU").slice(0, 2);
+  const bookingCms = cms.bookingPage;
+
   const propertyShortName = pickLocalizedText(
     language,
     propertyConfig.nameTh.split("(")[0].trim(),
     propertyConfig.nameEn
   );
 
-  // Collect 6 preview photos for the Facebook Page "Photos" sidebar grid
-  const galleryPreviewPhotos = Array.from(
+  const liveTempCelsius = weather?.currentTemp
+    ? Math.round(weather.currentTemp)
+    : 19;
+
+  // Build 5-Photo Bento Mosaic (Hero + 4 distinct resort angles)
+  const heroMainPhoto =
+    homeCms.heroImageUrl ||
+    propertyConfig.heroImageUrl ||
+    rooms[0]?.images[0]?.url ||
+    "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=2000&q=85";
+
+  const candidateSidePhotos = Array.from(
     new Set([
-      homeCms.heroImageUrl,
-      ...rooms.flatMap((r) => r.images.slice(0, 2).map((img) => img.url)),
+      rooms[0]?.images[1]?.url,
+      rooms[1]?.images[0]?.url,
+      rooms[2]?.images[0]?.url,
+      rooms[3]?.images[0]?.url,
       ...homeCms.stories.map((s) => s.imageUrl),
+      ...rooms.flatMap((r) => r.images.map((img) => img.url)),
     ])
-  )
-    .filter(Boolean)
-    .slice(0, 6);
+  ).filter((url): url is string => Boolean(url) && url !== heroMainPhoto);
+
+  const bentoSidePhotos = [0, 1, 2, 3].map(
+    (idx) => candidateSidePhotos[idx] || heroMainPhoto
+  );
 
   const activeShorts = cms.shortsPage.videos.filter(
-    (video) => video.isActive !== false
+    (v) => v.isActive !== false
   );
-  const featuredShorts = [...activeShorts]
-    .sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)))
-    .slice(0, 3);
+  const sortedShorts = [...activeShorts].sort(
+    (a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned))
+  );
 
-  const activePromoCoupon = coupons.find((c) => c.isActive) || null;
-  const visibleStories = homeCms.stories.filter((s) => s.isVisible !== false);
+  const activeCoupon = coupons.find((c) => c.isActive) || null;
+
+  const lowestNightlyPrice = rooms.reduce(
+    (minPrice, r) => Math.min(minPrice, r.basePriceThb),
+    rooms[0]?.basePriceThb || 3900
+  );
+
+  const highestDiscountPercent = Math.max(
+    rooms.reduce((m, r) => Math.max(m, r.discountPercent || 0), 0),
+    coupons
+      .filter((c) => c.isActive && c.discountType === "PERCENT")
+      .reduce((m, c) => Math.max(m, c.discountValue), 0)
+  );
+
   const featuredReviews = cms.reviews
     .filter((r) => r.isFeaturedOnBooking !== false)
-    .slice(0, 2);
+    .slice(0, 3);
 
-  const togglePostLike = (postId: string) => {
-    setLikedPostIds((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  const handleSharePage = async () => {
+    const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: propertyConfig.nameTh,
+          text: propertyConfig.taglineTh,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // fallback to clipboard
+      }
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard && shareUrl) {
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedShare(true);
+      window.setTimeout(() => setCopiedShare(false), 2000);
+    }
   };
 
   return (
-    <div className="w-full min-w-0 flex flex-col gap-3.5 sm:gap-4 select-none">
-      {/* 1. FACEBOOK PAGE COVER & PROFILE HEADER */}
-      <ResortHeroHeader
-        cmsEditType="home-hero"
-        onBookClick={() => navigateToTab("book")}
-        onChatClick={() => navigateToTab("chat")}
-      />
-
-      {/* 2. AUTHENTIC 2-COLUMN FACEBOOK PAGE TIMELINE LAYOUT
-             - Left Column: Intro Card + 3x2 Photos Grid
-             - Right Column: Reels Strip + Pinned Promo Post + Story Posts + Guest Review Posts */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-start">
-        {/* =================================================================
-            LEFT COLUMN (Intro & Photos — Sticky on Desktop)
-        ================================================================== */}
-        <aside className="lg:col-span-5 space-y-3.5 sm:space-y-4 lg:sticky lg:top-18">
-          {/* INTRO CARD */}
-          <section className="app-card p-4 space-y-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="ty-title">
-                {language === "th" ? "แนะนำที่พัก" : "Intro"}
-              </h2>
-              {canShowEditControls && (
-                <EditSpotButton
-                  label="แก้ไขข้อมูลแนะนำ"
-                  onClick={() => openCmsEditor({ type: "home-manifesto" })}
-                />
-              )}
+    <div className="w-full min-w-0 flex flex-col gap-8 sm:gap-10 pb-4 select-none">
+      {/* =====================================================================
+          SECTION 1: AIRBNB-STYLE TITLE BAR + 5-PHOTO BENTO MOSAIC
+      ====================================================================== */}
+      <section className="space-y-3.5">
+        {/* Title + Meta + Quick Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="ty-display truncate">{propertyShortName}</h1>
+              <BadgeCheck className="w-5 h-5 fill-[var(--color-accent)] text-white shrink-0" />
             </div>
 
-            <p className="ty-body text-[var(--color-text-primary)]">
-              {pickLocalizedText(
-                language,
-                homeCms.manifestoDescTh,
-                homeCms.manifestoDescEn
-              )}
-            </p>
-
-            <div className="border-t border-[var(--color-border)] pt-3 space-y-2.5 ty-body">
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 ty-body text-[var(--color-text-secondary)]">
+              <button
+                type="button"
+                onClick={() => navigateToTab("review")}
+                className="inline-flex items-center gap-1 font-semibold text-[var(--color-text-primary)] hover:underline cursor-pointer"
+              >
+                <Star className="w-4 h-4 fill-[var(--color-text-primary)] text-[var(--color-text-primary)]" />
+                <span>{bookingCms.ratingScore}</span>
+                <span className="underline underline-offset-2 font-medium">
+                  (
+                  {pickLocalizedText(
+                    language,
+                    bookingCms.reviewCountTh,
+                    bookingCms.reviewCountEn
+                  )}
+                  )
+                </span>
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => navigateToTab("guide")}
+                className="inline-flex items-center gap-1 hover:underline cursor-pointer"
+              >
+                <MapPin className="w-4 h-4" />
                 <span>
                   {pickLocalizedText(
                     language,
-                    propertyConfig.locationTh,
-                    propertyConfig.locationEn
+                    homeCms.heroLocationTh,
+                    homeCms.heroLocationEn
                   )}
                 </span>
-              </div>
+              </button>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1">
+                <CloudSun className="w-4 h-4 text-[var(--color-accent)]" />
+                <span>{liveTempCelsius}°C</span>
+              </span>
+            </div>
+          </div>
 
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                <span>
-                  {language === "th"
-                    ? `เช็กอิน ${propertyConfig.checkInTime} · เช็กเอาท์ ${propertyConfig.checkOutTime}`
-                    : `Check-in ${propertyConfig.checkInTime} · Check-out ${propertyConfig.checkOutTime}`}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {canShowEditControls && (
+              <EditSpotButton
+                label="เปลี่ยนรูปปก & พิกัด"
+                onClick={() => openCmsEditor({ type: "home-hero" })}
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={() => navigateToTab("chat")}
+              className="h-9 px-3 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold transition cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 text-[var(--color-accent)]" />
+              <span>{language === "th" ? "ถามที่พัก" : "Ask Host"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSharePage}
+              className="h-9 px-3 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold transition cursor-pointer"
+            >
+              {copiedShare ? (
+                <Check className="w-4 h-4 text-[var(--color-success)]" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+              <span>
+                {copiedShare
+                  ? language === "th"
+                    ? "คัดลอกแล้ว"
+                    : "Copied"
+                  : language === "th"
+                  ? "แชร์"
+                  : "Share"}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* 5-Photo Bento Grid */}
+        <div className="relative rounded-[16px] sm:rounded-[20px] overflow-hidden grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-2 h-[260px] sm:h-[370px] lg:h-[430px] bg-[var(--color-background-muted)]">
+          {/* Primary Hero Tile (Left 50%) */}
+          <div
+            onClick={() => openGalleryModal(null)}
+            className="md:col-span-2 md:row-span-2 relative w-full h-full overflow-hidden cursor-pointer group"
+          >
+            <img
+              src={heroMainPhoto}
+              alt={propertyShortName}
+              loading="eager"
+              decoding="async"
+              className="w-full h-full object-cover transition duration-300 group-hover:brightness-95"
+            />
+          </div>
+
+          {/* 4 Right Mosaic Tiles */}
+          {bentoSidePhotos.map((photoUrl, idx) => (
+            <div
+              key={`bento-tile-${idx}`}
+              onClick={() => openGalleryModal(null)}
+              className="hidden md:block relative w-full h-full overflow-hidden cursor-pointer group"
+            >
+              <img
+                src={photoUrl}
+                alt={`${propertyShortName} highlight ${idx + 1}`}
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover transition duration-300 group-hover:brightness-95"
+              />
+            </div>
+          ))}
+
+          {/* Airbnb-Style Bottom-Right "Show All Photos" Button */}
+          <button
+            type="button"
+            onClick={() => openGalleryModal(null)}
+            className="absolute bottom-3.5 right-3.5 z-10 rounded-[8px] bg-white hover:bg-neutral-100 text-[#080809] border border-black/15 shadow-sm px-3.5 h-9 inline-flex items-center gap-2 ty-caption font-semibold transition cursor-pointer"
+          >
+            <Grid className="w-3.5 h-3.5" />
+            <span>
+              {language === "th" ? "แสดงรูปภาพทั้งหมด" : "Show all photos"}
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          SECTION 2: INSTAGRAM STORY HIGHLIGHTS ROW (9:16 Video Stories + Promo)
+      ====================================================================== */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="ty-caption font-semibold text-[var(--color-text-secondary)]">
+            {language === "th"
+              ? "ไฮไลต์บรรยากาศจริง (กดดูคลิปสั้น)"
+              : "Story Highlights"}
+          </span>
+          {canShowEditControls && (
+            <EditSpotButton
+              icon="add"
+              label="เพิ่มคลิป Story"
+              onClick={() => openCmsEditor({ type: "short-video" })}
+            />
+          )}
+        </div>
+
+        <div className="flex items-start gap-4 sm:gap-6 overflow-x-auto no-scrollbar py-1">
+          {/* Promo Coupon Story Highlight */}
+          {activeCoupon && (
+            <button
+              type="button"
+              onClick={() => {
+                claimAndApplyCoupon(activeCoupon.code);
+                navigateToTab("deal");
+              }}
+              className="flex flex-col items-center gap-1.5 w-[76px] shrink-0 group cursor-pointer"
+            >
+              <span className="p-[2.5px] rounded-full bg-gradient-to-tr from-[#c53829] via-[#ff5a5f] to-[#ffb400] transition-transform duration-200 group-hover:scale-105">
+                <span className="h-[66px] w-[66px] rounded-full bg-[var(--color-background-card)] p-[2px] flex items-center justify-center">
+                  <span className="h-full w-full rounded-full bg-[var(--color-promo-muted)] text-[var(--color-promo-text)] flex flex-col items-center justify-center">
+                    <TicketPercent className="w-5 h-5" />
+                    <span className="text-[11px] font-bold leading-none mt-0.5">
+                      {activeCoupon.discountType === "PERCENT"
+                        ? `-${activeCoupon.discountValue}%`
+                        : `฿${activeCoupon.discountValue}`}
+                    </span>
+                  </span>
+                </span>
+              </span>
+              <span className="ty-caption font-medium text-[var(--color-text-primary)] truncate w-full text-center">
+                {language === "th" ? "คูปองส่วนลด" : "Deals"}
+              </span>
+            </button>
+          )}
+
+          {/* Video Story Circles */}
+          {sortedShorts.map((video, idx) => {
+            const originalIdx = cms.shortsPage.videos.findIndex(
+              (v) => v.id === video.id
+            );
+            const shortTitle = pickLocalizedText(
+              language,
+              video.titleTh,
+              video.titleEn
+            );
+
+            return (
+              <button
+                key={video.id}
+                type="button"
+                onClick={() =>
+                  openShortsAt(originalIdx >= 0 ? originalIdx : idx)
+                }
+                className="flex flex-col items-center gap-1.5 w-[76px] shrink-0 group cursor-pointer"
+              >
+                <span className="relative p-[2.5px] rounded-full bg-gradient-to-tr from-[#0866ff] via-[#4599ff] to-[#00c6ff] transition-transform duration-200 group-hover:scale-105">
+                  <span className="block h-[66px] w-[66px] rounded-full bg-[var(--color-background-card)] p-[2px] overflow-hidden">
+                    <img
+                      src={video.posterUrl}
+                      alt={shortTitle}
+                      loading="lazy"
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  </span>
+                  <span className="absolute bottom-0 right-0 h-5 w-5 rounded-full bg-[var(--color-accent)] text-white ring-2 ring-[var(--color-background-body)] flex items-center justify-center">
+                    <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
+                  </span>
+                </span>
+                <span className="ty-caption font-medium text-[var(--color-text-primary)] truncate w-full text-center">
+                  {shortTitle}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* All Gallery Story Circle */}
+          <button
+            type="button"
+            onClick={() => openGalleryModal(null)}
+            className="flex flex-col items-center gap-1.5 w-[76px] shrink-0 group cursor-pointer"
+          >
+            <span className="p-[2px] rounded-full border border-[var(--color-border-emphasized)] transition-transform duration-200 group-hover:scale-105">
+              <span className="h-[66px] w-[66px] rounded-full bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)]">
+                <Images className="w-6 h-6" />
+              </span>
+            </span>
+            <span className="ty-caption font-medium text-[var(--color-text-primary)] truncate w-full text-center">
+              {language === "th" ? "อัลบั้มรูป" : "Gallery"}
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* =====================================================================
+          SECTION 3: AIRBNB SPLIT OVERVIEW + STICKY DIRECT RESERVE WIDGET
+      ====================================================================== */}
+      <section className="pt-2 border-t border-[var(--color-border)] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        {/* Left: Host Bio & Clean Highlights */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="ty-title">
+                {pickLocalizedText(
+                  language,
+                  homeCms.manifestoTitleTh,
+                  homeCms.manifestoTitleEn
+                )}
+              </h2>
+              <p className="ty-body text-[var(--color-text-secondary)]">
+                {language === "th"
+                  ? `วิลล่าส่วนตัว ${rooms.length} หลัง · ฟรีอาหารเช้า · เช็กอิน ${propertyConfig.checkInTime}`
+                  : `${rooms.length} private villas · Free breakfast · Check-in ${propertyConfig.checkInTime}`}
+              </p>
+            </div>
+
+            {canShowEditControls && (
+              <EditSpotButton
+                label="แก้ไขคำแนะนำ"
+                onClick={() => openCmsEditor({ type: "home-manifesto" })}
+              />
+            )}
+          </div>
+
+          {/* Clean Icon Highlights (Airbnb Listing Style — Zero Grey Boxes) */}
+          <div className="border-y border-[var(--color-border)] py-5 space-y-4">
+            {homeCms.pillars.map((pillar) => (
+              <div key={pillar.id} className="flex items-start gap-4">
+                <CmsDynamicIcon
+                  iconKey={pillar.iconKey}
+                  className="w-6 h-6 text-[var(--color-text-primary)] shrink-0 mt-0.5"
+                />
+                <div>
+                  <h3 className="ty-body font-semibold text-[var(--color-text-primary)]">
+                    {pickLocalizedText(
+                      language,
+                      pillar.titleTh,
+                      pillar.titleEn
+                    )}
+                  </h3>
+                  <p className="ty-caption mt-0.5">
+                    {pickLocalizedText(
+                      language,
+                      pillar.captionTh,
+                      pillar.captionEn
+                    )}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Concise Story Description */}
+          <p className="ty-body text-[var(--color-text-primary)] leading-relaxed">
+            {pickLocalizedText(
+              language,
+              homeCms.manifestoDescTh,
+              homeCms.manifestoDescEn
+            )}
+          </p>
+        </div>
+
+        {/* Right: Sticky Direct Booking Summary Card */}
+        <aside className="lg:col-span-5 lg:sticky lg:top-24">
+          <div className="rounded-[16px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] p-5 sm:p-6 shadow-[0_6px_24px_rgba(0,0,0,0.07)] space-y-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline gap-1.5">
+                <span className="ty-caption">
+                  {language === "th" ? "เริ่มต้น" : "From"}
+                </span>
+                <span className="ty-display">
+                  ฿{lowestNightlyPrice.toLocaleString()}
+                </span>
+                <span className="ty-body text-[var(--color-text-secondary)]">
+                  / {language === "th" ? "คืน" : "night"}
                 </span>
               </div>
 
-              {propertyConfig.phones[0] && (
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                  <span>{propertyConfig.phones.join(" , ")}</span>
-                </div>
-              )}
-
-              {propertyConfig.lineId && (
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="w-5 h-5 text-[var(--color-text-secondary)] shrink-0" />
-                  <span>LINE Official: {propertyConfig.lineId}</span>
-                </div>
+              {highestDiscountPercent > 0 && (
+                <span className="badge-promo">
+                  {language === "th"
+                    ? `ลดสูงสุด ${highestDiscountPercent}%`
+                    : `Save ${highestDiscountPercent}%`}
+                </span>
               )}
             </div>
 
-            {homeCms.pillars.length > 0 && (
-              <div className="border-t border-[var(--color-border)] pt-3 grid grid-cols-2 gap-2.5">
-                {homeCms.pillars.map((pillar) => (
-                  <div
-                    key={pillar.id}
-                    className="rounded-[8px] bg-[var(--color-background-muted)] px-2.5 py-2 flex items-center gap-2 min-w-0"
-                  >
-                    <CmsDynamicIcon
-                      iconKey={pillar.iconKey}
-                      className="w-4 h-4 text-[var(--color-accent)] shrink-0"
-                    />
-                    <span className="ty-caption font-semibold text-[var(--color-text-primary)] truncate">
-                      {pickLocalizedText(
-                        language,
-                        pillar.titleTh,
-                        pillar.titleEn
-                      )}
-                    </span>
-                  </div>
-                ))}
+            {/* Airbnb-Style Interactive Date & Guest Selector Box */}
+            <button
+              type="button"
+              onClick={openCalendarDrawer}
+              className="w-full rounded-[12px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] transition text-left overflow-hidden cursor-pointer"
+            >
+              <div className="grid grid-cols-2 border-b border-[var(--color-border)]">
+                <div className="p-3 border-r border-[var(--color-border)]">
+                  <span className="block text-[11px] font-bold uppercase text-[var(--color-text-secondary)]">
+                    {language === "th" ? "เช็กอิน" : "Check-in"}
+                  </span>
+                  <span className="ty-body font-semibold">
+                    {formatShortDate(checkIn, language)}
+                  </span>
+                </div>
+                <div className="p-3">
+                  <span className="block text-[11px] font-bold uppercase text-[var(--color-text-secondary)]">
+                    {language === "th" ? "เช็กเอาท์" : "Check-out"}
+                  </span>
+                  <span className="ty-body font-semibold">
+                    {formatShortDate(checkOut, language)}
+                  </span>
+                </div>
               </div>
-            )}
+              <div className="p-3 flex items-center justify-between">
+                <div>
+                  <span className="block text-[11px] font-bold uppercase text-[var(--color-text-secondary)]">
+                    {language === "th" ? "ผู้เข้าพัก" : "Guests"}
+                  </span>
+                  <span className="ty-body font-semibold">
+                    {guests} {language === "th" ? "ท่าน" : "guests"} ·{" "}
+                    {stayNights} {language === "th" ? "คืน" : "nights"}
+                  </span>
+                </div>
+                <Calendar className="w-4 h-4 text-[var(--color-text-secondary)]" />
+              </div>
+            </button>
 
             <StandardButton
               variant="primary"
@@ -183,354 +518,194 @@ export default function HomePage() {
               <span>
                 {language === "th"
                   ? totalAvailableUnitsCount > 0
-                    ? `เช็กวันว่าง & จองห้องพัก (ว่าง ${totalAvailableUnitsCount} หลัง)`
-                    : "เช็กวันว่าง & จองห้องพัก"
-                  : "Check Dates & Book"}
+                    ? `เช็กห้องว่าง (${totalAvailableUnitsCount} หลังพร้อมจอง)`
+                    : "ดูตารางห้องว่าง & ราคา"
+                  : "Check Room Availability"}
               </span>
             </StandardButton>
-          </section>
 
-          {/* PHOTOS GRID CARD (Facebook 3x2 Page Photos Box) */}
-          <section className="app-card p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="ty-title">
-                {language === "th" ? "รูปภาพ" : "Photos"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => openGalleryModal(null)}
-                className="ty-body text-[var(--color-accent)] hover:underline cursor-pointer"
-              >
-                {language === "th" ? "ดูรูปภาพทั้งหมด" : "See all photos"}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5 rounded-[8px] overflow-hidden">
-              {galleryPreviewPhotos.map((photoUrl, idx) => (
-                <button
-                  key={`preview-photo-${idx}`}
-                  type="button"
-                  onClick={() => openGalleryModal(null)}
-                  className="aspect-square bg-[var(--color-background-muted)] overflow-hidden cursor-pointer hover:opacity-90 transition"
-                >
-                  <img
-                    src={photoUrl}
-                    alt={`${propertyShortName} ${idx + 1}`}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
-            </div>
-          </section>
+            <p className="ty-caption text-center flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-[var(--color-success)] shrink-0" />
+              <span>
+                {language === "th"
+                  ? "จองตรงกับที่พัก · ไม่บวกค่าธรรมเนียม OTA"
+                  : "Official direct booking · Zero OTA fees"}
+              </span>
+            </p>
+          </div>
         </aside>
+      </section>
 
-        {/* =================================================================
-            RIGHT COLUMN (Facebook Page Timeline Feed)
-        ================================================================== */}
-        <div className="lg:col-span-7 space-y-3.5 sm:space-y-4">
-          {/* 1. REELS STRIP CARD */}
-          {featuredShorts.length > 0 && (
-            <section className="app-card p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="ty-subtitle font-bold flex items-center gap-2">
-                  <Play className="w-4 h-4 fill-[var(--color-accent)] text-[var(--color-accent)] shrink-0" />
-                  <span>
-                    {language === "th" ? "Reels และคลิปสั้น" : "Reels"}
-                  </span>
-                </h2>
+      {/* =====================================================================
+          SECTION 4: CLEAN FRAMELESS VILLA SHOWCASE (Airbnb Card Grid)
+      ====================================================================== */}
+      <section className="pt-6 border-t border-[var(--color-border)] space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="ty-title">
+              {pickLocalizedText(
+                language,
+                homeCms.villasTitleTh,
+                homeCms.villasTitleEn
+              )}
+            </h2>
+            <p className="ty-caption">
+              {language === "th"
+                ? "คลิกที่บ้านพักเพื่อดูรูปมุมต่างๆ และรายละเอียดภายในห้อง"
+                : "Tap any villa to explore photos and amenities"}
+            </p>
+          </div>
 
-                <div className="flex items-center gap-2">
-                  {canShowEditControls && (
-                    <EditSpotButton
-                      icon="add"
-                      label="เพิ่มคลิป"
-                      onClick={() => openCmsEditor({ type: "short-video" })}
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab("shorts")}
-                    className="ty-body text-[var(--color-accent)] hover:underline cursor-pointer"
-                  >
-                    {language === "th" ? "ดูทั้งหมด" : "See all"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                {featuredShorts.map((shortVideo, videoIndex) => {
-                  const linkedRoom =
-                    rooms.find((r) => r.id === shortVideo.roomId) ??
-                    rooms[shortVideo.roomIndex] ??
-                    rooms[0];
-                  const originalIdx = cms.shortsPage.videos.findIndex(
-                    (v) => v.id === shortVideo.id
-                  );
-
-                  return (
-                    <div key={shortVideo.id} className="relative">
-                      <ShortVideoCard
-                        id={shortVideo.id}
-                        title={pickLocalizedText(
-                          language,
-                          shortVideo.titleTh,
-                          shortVideo.titleEn
-                        )}
-                        roomCode={linkedRoom?.code}
-                        posterUrl={shortVideo.posterUrl}
-                        viewsCount={shortVideo.views}
-                        priceThb={linkedRoom?.basePriceThb}
-                        discountPercent={linkedRoom?.discountPercent}
-                        isPinned={Boolean(shortVideo.isPinned)}
-                        onCardClick={() =>
-                          openShortsAt(
-                            originalIdx >= 0 ? originalIdx : videoIndex
-                          )
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* 2. PINNED PROMO POST */}
-          {activePromoCoupon && (
-            <article className="app-card p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0">
-                    {brandBadgeCode}
-                  </span>
-                  <div>
-                    <p className="ty-body font-bold flex items-center gap-1">
-                      <span>{propertyShortName}</span>
-                      <BadgeCheck className="w-4 h-4 fill-[var(--color-accent)] text-white shrink-0" />
-                    </p>
-                    <p className="ty-caption flex items-center gap-1">
-                      <Pin className="w-3 h-3" />
-                      <span>
-                        {language === "th" ? "โพสต์ปักหมุด · โปรโมชั่นจองตรง" : "Pinned offer"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <span className="badge-promo">
-                  {activePromoCoupon.discountType === "PERCENT"
-                    ? `ลด ${activePromoCoupon.discountValue}%`
-                    : `ลด ฿${activePromoCoupon.discountValue.toLocaleString()}`}
-                </span>
-              </div>
-
-              <p className="ty-body">
-                {pickLocalizedText(
-                  language,
-                  activePromoCoupon.titleTh,
-                  activePromoCoupon.titleEn || activePromoCoupon.titleTh
-                )}
-                {activePromoCoupon.descTh
-                  ? ` — ${activePromoCoupon.descTh}`
-                  : ""}
-              </p>
-
-              <div className="rounded-[8px] bg-[var(--color-promo-muted)] p-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <TicketPercent className="w-5 h-5 text-[var(--color-promo-text)] shrink-0" />
-                  <div>
-                    <p className="ty-caption font-semibold text-[var(--color-promo-text)]">
-                      {language === "th" ? "รหัสคูปองส่วนลด" : "Promo Code"}
-                    </p>
-                    <p className="ty-subtitle font-bold font-mono text-[var(--color-text-primary)]">
-                      {activePromoCoupon.code}
-                    </p>
-                  </div>
-                </div>
-
-                <StandardButton
-                  variant="promo"
-                  size="md"
-                  onClick={() => {
-                    claimAndApplyCoupon(activePromoCoupon.code);
-                    navigateToTab("book");
-                  }}
-                >
-                  <span>
-                    {language === "th"
-                      ? "เก็บคูปอง & เลือกห้องพัก"
-                      : "Claim & Book"}
-                  </span>
-                </StandardButton>
-              </div>
-            </article>
-          )}
-
-          {/* 3. FACEBOOK-STYLE STORY POSTS */}
-          {canShowEditControls && (
-            <div className="app-card px-4 py-3 flex items-center justify-between">
-              <span className="ty-body font-semibold">โพสต์บนหน้าเพจ</span>
+          <div className="flex items-center gap-2 shrink-0">
+            {canShowEditControls && (
               <EditSpotButton
                 icon="add"
-                label="เพิ่มโพสต์เรื่องราวใหม่"
-                onClick={() => openCmsEditor({ type: "home-story" })}
+                label="เพิ่มห้องพัก"
+                onClick={() => openCmsEditor({ type: "room" })}
               />
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              onClick={() => navigateToTab("book")}
+              className="inline-flex items-center gap-1 ty-body font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+            >
+              <span>
+                {language === "th" ? "เปรียบเทียบ & จอง" : "Compare & Book"}
+              </span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-          {visibleStories.map((story) => {
-            const isLiked = Boolean(likedPostIds[story.id]);
-            return (
-              <article key={story.id} className="app-card overflow-hidden">
-                <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0">
-                      {brandBadgeCode}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="ty-body font-bold flex items-center gap-1 truncate">
-                        <span className="truncate">{propertyShortName}</span>
-                        <BadgeCheck className="w-4 h-4 fill-[var(--color-accent)] text-white shrink-0" />
-                      </p>
-                      <p className="ty-caption truncate">
-                        {pickLocalizedText(
-                          language,
-                          homeCms.heroLocationTh,
-                          homeCms.heroLocationEn
-                        )}
-                      </p>
-                    </div>
-                  </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {rooms.map((room) => (
+            <article
+              key={room.id}
+              onClick={() => openRoomDrawer(room, "details", 0)}
+              className="group flex flex-col gap-2.5 cursor-pointer"
+            >
+              <div className="relative aspect-[4/3] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]">
+                <img
+                  src={room.images[0]?.url}
+                  alt={pickLocalizedText(language, room.nameTh, room.nameEn)}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
 
-                  {canShowEditControls && (
+                <span className="absolute top-2.5 left-2.5 rounded-full bg-white/95 text-[#080809] px-2.5 py-0.5 ty-caption font-bold shadow-xs">
+                  {room.code}
+                </span>
+
+                {room.discountPercent > 0 && (
+                  <span className="absolute top-2.5 right-2.5 badge-promo">
+                    -{room.discountPercent}%
+                  </span>
+                )}
+
+                {canShowEditControls && (
+                  <div className="absolute bottom-2.5 right-2.5 z-20">
                     <EditSpotButton
-                      label="แก้ไขโพสต์"
+                      label="แก้ห้องนี้"
                       onClick={() =>
-                        openCmsEditor({
-                          type: "home-story",
-                          storyId: story.id,
-                        })
+                        openCmsEditor({ type: "room", roomId: room.id })
                       }
                     />
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
-                <div className="px-4 pb-3 space-y-1">
-                  <h3 className="ty-subtitle font-bold">
-                    {pickLocalizedText(language, story.titleTh, story.titleEn)}
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="ty-body font-bold text-[var(--color-text-primary)] truncate">
+                    {pickLocalizedText(language, room.nameTh, room.nameEn)}
                   </h3>
-                  <p className="ty-body text-[var(--color-text-primary)]">
-                    {pickLocalizedText(language, story.descTh, story.descEn)}
-                  </p>
+                  <span className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-text-primary)] shrink-0">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    <span>9.8</span>
+                  </span>
                 </div>
 
-                <div className="w-full aspect-[16/9] bg-[var(--color-background-muted)] overflow-hidden">
-                  <img
-                    src={story.imageUrl}
-                    alt={pickLocalizedText(
-                      language,
-                      story.titleTh,
-                      story.titleEn
-                    )}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <p className="ty-caption flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>
+                    {room.baseGuests}–{room.maxGuests}{" "}
+                    {language === "th" ? "ท่าน" : "guests"} · {room.sizeSqm}{" "}
+                    {language === "th" ? "ตร.ม." : "m²"}
+                  </span>
+                </p>
 
-                {/* Facebook Post Action Bar */}
-                <div className="px-2 py-1.5 border-t border-[var(--color-border)] grid grid-cols-3 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => togglePostLike(story.id)}
-                    className={`h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold transition cursor-pointer ${
-                      isLiked
-                        ? "text-[var(--color-promo)]"
-                        : "text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    <Heart
-                      className={`w-[18px] h-[18px] ${
-                        isLiked ? "fill-current" : ""
-                      }`}
-                    />
-                    <span>{language === "th" ? "ถูกใจ" : "Like"}</span>
-                  </button>
+                <p className="pt-0.5 ty-body">
+                  <span className="font-bold">
+                    ฿{room.basePriceThb.toLocaleString()}
+                  </span>{" "}
+                  <span className="text-[var(--color-text-secondary)]">
+                    / {language === "th" ? "คืน" : "night"}
+                  </span>
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab("book")}
-                    className="h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold text-[var(--color-accent)] transition cursor-pointer"
-                  >
-                    <span>
-                      {language === "th" ? "ดูห้องว่าง" : "Check Rooms"}
-                    </span>
-                  </button>
+      {/* =====================================================================
+          SECTION 5: VERIFIED GUEST REVIEWS (Clean Minimal Grid)
+      ====================================================================== */}
+      {featuredReviews.length > 0 && (
+        <section className="pt-6 border-t border-[var(--color-border)] space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="ty-title flex items-center gap-2">
+              <Star className="w-5 h-5 fill-[var(--color-text-primary)] text-[var(--color-text-primary)] shrink-0" />
+              <span>
+                {bookingCms.ratingScore} ·{" "}
+                {pickLocalizedText(
+                  language,
+                  bookingCms.reviewCountTh,
+                  bookingCms.reviewCountEn
+                )}
+              </span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => navigateToTab("review")}
+              className="ty-body font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+            >
+              {language === "th" ? "ดูรีวิวทั้งหมด" : "Show all reviews"}
+            </button>
+          </div>
 
-                  <button
-                    type="button"
-                    onClick={() => navigateToTab(story.ctaTargetTab || "guide")}
-                    className="h-9 rounded-[6px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center gap-2 ty-body font-semibold text-[var(--color-text-secondary)] transition cursor-pointer"
-                  >
-                    <Share2 className="w-[18px] h-[18px]" />
-                    <span>{language === "th" ? "รายละเอียด" : "Explore"}</span>
-                  </button>
-                </div>
-              </article>
-            );
-          })}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {featuredReviews.map((rev) => (
+              <article
+                key={rev.id}
+                onClick={() => navigateToTab("review")}
+                className="rounded-[14px] border border-[var(--color-border)] p-4 flex flex-col justify-between gap-3 cursor-pointer hover:border-[var(--color-border-emphasized)] transition"
+              >
+                <p className="ty-body line-clamp-3">
+                  “{pickLocalizedText(language, rev.captionTh, rev.captionEn)}”
+                </p>
 
-          {/* 4. VERIFIED GUEST CHECK-IN POSTS */}
-          {featuredReviews.map((rev) => (
-            <article key={rev.id} className="app-card overflow-hidden">
-              <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="h-10 w-10 rounded-full bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center font-bold ty-body shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="h-9 w-9 rounded-full bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center ty-caption font-bold shrink-0">
                     {rev.authorAvatar || rev.authorNameTh[0]}
                   </span>
                   <div className="min-w-0">
-                    <p className="ty-body font-bold truncate">
+                    <p className="ty-caption font-bold text-[var(--color-text-primary)] truncate">
                       {pickLocalizedText(
                         language,
                         rev.authorNameTh,
                         rev.authorNameEn
-                      )}{" "}
-                      <span className="font-normal text-[var(--color-text-secondary)]">
-                        {language === "th" ? "ได้รีวิวที่พัก" : "reviewed"}
-                      </span>
+                      )}
                     </p>
-                    <p className="ty-caption flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 fill-[var(--color-warning)] text-[var(--color-warning)]" />
-                      <span className="font-semibold text-[var(--color-text-primary)]">
-                        {rev.rating}
-                      </span>
-                      <span>· {rev.roomLabel}</span>
-                    </p>
+                    <p className="ty-caption truncate">{rev.roomLabel}</p>
                   </div>
                 </div>
-              </div>
-
-              <p className="px-4 pb-3 ty-body">
-                {pickLocalizedText(language, rev.captionTh, rev.captionEn)}
-              </p>
-
-              {rev.photos[0] && (
-                <div
-                  onClick={() => navigateToTab("review")}
-                  className="w-full aspect-[16/9] bg-[var(--color-background-muted)] overflow-hidden cursor-pointer"
-                >
-                  <img
-                    src={rev.photos[0]}
-                    alt={rev.roomLabel}
-                    loading="lazy"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
-      </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
