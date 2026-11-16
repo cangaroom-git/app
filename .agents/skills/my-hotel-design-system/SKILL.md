@@ -2,33 +2,47 @@
 name: my-hotel-design-system
 description: >-
   Core UI/UX design standards for the Cangaroom / my-hotel application. Enforces
-  an ultra-minimal GoDaddy Console inspired layout (pure #ffffff canvas, 1px
-  #e5e7eb hairline borders, crisp #111111 solid primary buttons, 1px bordered
-  secondary buttons, underline tabs, zero noisy icon circles) combined with
-  Facebook's exact native Thai + English OS font stack.
+  a warm, familiar Facebook Comet inspired social interface: clean icon-first
+  navigation, soft neutral wash (#f2f4f7 Light / #18191a Dark), crisp elevated
+  cards (#ffffff Light / #242526 Dark), #0866ff brand accent, #c53829 promo
+  accent, native Thai + English typography (24px/20px/17px/15px/13px), and
+  unified Right Sidebar Drawers.
 ---
 
-# Cangaroom · Minimal Enterprise & Facebook Native Font Design System
+# Cangaroom · Facebook Comet Inspired Design System
 
 Every component, page, and interactive widget MUST strictly follow these design rules:
 
-## 1. Minimal Hairline Architecture (GoDaddy Console Inspired)
-- **Pure Crisp Surfaces & 1px Hairline Borders**:
-  - Canvas (`--color-background-body`): `#ffffff` (Light) / `#141517` (Dark).
-  - Left Sidebar (`--color-sidebar-bg`): `#f9fafb` (Light) / `#17181b` (Dark) with `1px solid var(--color-border)` right divider.
-  - Cards (`.app-card`): `#ffffff` with `1px solid var(--color-border)` (`#e5e7eb`), `rounded-[8px]`, `box-shadow: none`.
-- **Zero Noisy Icon Circles**:
-  - Sidebar items, dropdown menus, and top bar icon buttons use clean `16px–18px` monochrome stroke icons directly on clean rows — never wrap every icon inside gray circular blobs.
-- **Distinct Page Roles (No Duplicate Pages)**:
-  - `/` (Home): Property Overview, Horizontal Underline Tabs, 16:9 Cover, 3 Action Summary Cards, Compact 4-Column Room Grid, Short Videos, and Guest Reviews.
-  - `/booking`: Dedicated Rooms & Availability Workspace (starts directly with Date/Availability Header + Underline Category Tabs + Horizontal Room Booking Cards, without repeating the Home Cover Hero).
+## 1. Familiar, Human, Zero-Clutter Social Feed Philosophy
+- **Look Like a Friendly Social App (Facebook Comet), Never an AI Brochure**:
+  - Do NOT stack uppercase `TRACKING-WIDER` eyebrows, verbose marketing essays, or duplicate multi-section landing walls.
+  - Present properties like a clean **Facebook Page**: Cover Photo + Circular Avatar + Verified Name + Clear Action Buttons (`เช็กห้องว่าง`, `ทักแชท`, `แชร์`), followed by Reels and clean Post-style Room Cards.
+- **Role-Aware Menu Clarity**:
+  - Hide unused or admin-only controls from regular guests so menus stay uncluttered and effortless.
 
-## 2. Minimal Buttons & Controls
-- **Primary Button (`.btn-round-solid`, `StandardButton variant="primary"`)**: `#111111` solid (`#f3f4f6` in Dark Mode), `rounded-[6px]`, `36px` (`h-9`).
-- **Secondary Button (`.btn-fw-secondary`, `StandardButton variant="secondary"`)**: Pure `#ffffff` background + `1px solid #d1d5db` border (`hover:border-[#111111]`), `rounded-[6px]`, `36px` (`h-9`).
-- **Promotion Accent (`--color-promo`)**: `#c53829` reserved strictly for discount badges and coupon highlights.
-- **Custom CSS Layering**: All custom component classes in `src/app/globals.css` MUST live inside `@layer components` so Tailwind responsive utilities (`hidden`, `lg:hidden`) are never overridden.
+## 2. Facebook Comet Color Palette (Light & Dark Mode Tokens)
+Always consume CSS variables from `src/app/globals.css`:
+- **Canvas Wash (`--color-background-body`)**: `#f2f4f7` (Light) / `#18191a` (Dark).
+- **Elevated Card & Top Bar (`--color-background-card`)**: `#ffffff` (Light) / `#242526` (Dark) with subtle elevation `--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.12)`.
+- **Secondary Button / Icon Circle (`--color-background-subtle`)**: `#e4e6eb` (Light) / `#4e4f50` (Dark).
+- **Input / Muted Surface (`--color-background-muted`)**: `#f0f2f5` (Light) / `#3a3b3c` (Dark).
+- **Primary Brand Blue (`--color-accent`)**: `#0866ff` (hover `#075ce5` Light / `#2d88ff` Dark) with `--color-on-accent: #ffffff`.
+- **Promotion & Discount Red (`--color-promo`)**: `#c53829` with `--color-on-promo: #ffffff`.
+- **Typography Colors**:
+  - `--color-text-primary`: `#080809` (Light) / `#e4e6eb` (Dark)
+  - `--color-text-secondary`: `#65686c` (Light) / `#b0b3b8` (Dark)
 
-## 3. Exact Facebook Native OS Font Stack (Thai + English)
-- **Font Family**: `system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif` (do NOT inject Google Webfont overrides before `sans-serif`, so macOS renders native SF Pro + Thonburi and Windows renders Segoe UI + Leelawadee UI / Tahoma identically to `facebook.com`).
-- **5-Tier Scale**: `.ty-display` (`24px`), `.ty-title` (`19px`), `.ty-subtitle` (`16px`), `.ty-body` (`15px`), `.ty-caption` (`13px`).
+## 3. Unified Controls, Radii & Right Sidebar Drawers
+- **Buttons**: `h-9` (`36px`) / `h-10` (`40px`), `rounded-[8px]` (`--radius-button`), `15px` semibold.
+- **Circular Icon Buttons (`.btn-icon`, `.btn-icon-lg`)**: `36px` / `40px` `rounded-full` circles on `--color-background-subtle`.
+- **Cards (`.app-card`)**: `rounded-[12px]` (`--radius-page`), crisp white `#ffffff` on `#f2f4f7` wash.
+- **Right Sidebar Drawers (`.app-right-drawer`)**: All calendars, galleries, room details, 15-min QR checkout, video players, and mobile menus open exclusively as Right Sidebar Drawers (`fixed inset-y-0 right-0 h-[100dvh]`) — never centered modals.
+
+## 4. Native Facebook Thai + English Font Stack & 5-Tier Scale
+- **Font Family**: `system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif` (renders native OS Thai & English fonts identically to `facebook.com`: SF Pro + Thonburi on macOS/iOS, Segoe UI + Leelawadee UI on Windows).
+- **5-Tier Scale**:
+  1. `.ty-display` (`24px` desktop / `22px` mobile, bold)
+  2. `.ty-title` (`20px`, bold)
+  3. `.ty-subtitle` (`17px`, semibold)
+  4. `.ty-body` (`15px`, regular/medium)
+  5. `.ty-caption` (`13px`, secondary metadata)

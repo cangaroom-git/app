@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import {
+  BadgeCheck,
   Check,
   CloudSun,
   Images,
   MapPin,
+  MessageCircle,
   Share2,
   Star,
 } from "lucide-react";
@@ -13,13 +15,14 @@ import { pickLocalizedText } from "@/data/cmsDefaults";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { StandardButton } from "@/components/ui/standards";
-import { HotelNavTabId } from "@/components/navigation/NavigationIcons";
 
 export interface ResortHeroHeaderProps {
   id?: string;
   onBookClick?: () => void;
   onChatClick?: () => void;
   onShareClick?: () => void;
+  activeCategoryFilter?: string | null;
+  onSelectCategoryFilter?: (categoryId: string | null) => void;
   cmsEditType?: "home-hero" | "booking-hero";
 }
 
@@ -28,12 +31,15 @@ export function ResortHeroHeader({
   onBookClick,
   onChatClick,
   onShareClick,
-  cmsEditType = "home-hero",
+  activeCategoryFilter,
+  onSelectCategoryFilter,
+  cmsEditType = "booking-hero",
 }: ResortHeroHeaderProps) {
   const {
     propertyConfig,
     lang: language,
     weather,
+    openRoomDrawer,
     openGalleryModal,
     navigateToTab,
     rooms,
@@ -83,127 +89,32 @@ export function ResortHeroHeader({
     rooms[0]?.images[0]?.url ||
     "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=2000&q=85";
 
-  const quickTabs: Array<{ id: HotelNavTabId; th: string; en: string }> = [
-    { id: "home", th: "ภาพรวม", en: "Overview" },
-    {
-      id: "book",
-      th: `ห้องพัก (${rooms.length})`,
-      en: `Rooms (${rooms.length})`,
-    },
-    { id: "shorts", th: "วิดีโอสั้น", en: "Videos" },
-    { id: "deal", th: "คูปองส่วนลด", en: "Deals" },
-    { id: "review", th: "รีวิว", en: "Reviews" },
-    { id: "guide", th: "แผนที่ & ที่เที่ยว", en: "Location" },
-  ];
+  const brandBadgeCode = (propertyConfig.brandCode || "SU").slice(0, 2);
+
+  const roomCategoryChips = onSelectCategoryFilter
+    ? [
+        {
+          id: "all",
+          label:
+            language === "th"
+              ? `ห้องพักทั้งหมด (${rooms.length})`
+              : `All Rooms (${rooms.length})`,
+          isActive: !activeCategoryFilter || activeCategoryFilter === "all",
+        },
+        ...bookingCms.categoryChips.map((chip) => ({
+          id: chip.id,
+          label: pickLocalizedText(language, chip.labelTh, chip.labelEn),
+          isActive: activeCategoryFilter === chip.id,
+        })),
+      ]
+    : [];
 
   return (
-    <header id={id} className="space-y-5 select-none">
-      {/* 1. Minimal Clean Header Row (Like GoDaddy Portfolio Top Title + Black Action Button) */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div className="space-y-1 min-w-0">
-          <h1 className="ty-display tracking-tight">
-            {pickLocalizedText(
-              language,
-              propertyConfig.nameTh.split("(")[0].trim(),
-              propertyConfig.nameEn
-            )}
-          </h1>
-
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 ty-caption">
-            <button
-              type="button"
-              onClick={() => navigateToTab("review")}
-              className="inline-flex items-center gap-1 font-medium text-[var(--color-text-primary)] hover:underline cursor-pointer"
-            >
-              <Star className="w-3.5 h-3.5 fill-current" />
-              <span>{bookingCms.ratingScore}</span>
-              <span className="text-[var(--color-text-secondary)] font-normal">
-                (
-                {pickLocalizedText(
-                  language,
-                  bookingCms.reviewCountTh,
-                  bookingCms.reviewCountEn
-                )}
-                )
-              </span>
-            </button>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5" />
-              <span>
-                {pickLocalizedText(
-                  language,
-                  bookingCms.locationLabelTh,
-                  bookingCms.locationLabelEn
-                )}
-              </span>
-            </span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1">
-              <CloudSun className="w-3.5 h-3.5" />
-              <span>{liveTempCelsius}°C</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <StandardButton
-            variant="secondary"
-            size="md"
-            onClick={onChatClick || (() => navigateToTab("chat"))}
-          >
-            <span>{language === "th" ? "สอบถามที่พัก" : "Contact"}</span>
-          </StandardButton>
-
-          <button
-            type="button"
-            onClick={handleShareProperty}
-            className="btn-fw-secondary !px-2.5"
-            title={language === "th" ? "แชร์ลิงก์" : "Share"}
-            aria-label="Share"
-          >
-            {hasCopiedShareUrl ? (
-              <Check className="w-4 h-4 text-[var(--color-success)]" />
-            ) : (
-              <Share2 className="w-4 h-4" />
-            )}
-          </button>
-
-          <StandardButton
-            variant="primary"
-            size="md"
-            onClick={onBookClick || (() => navigateToTab("book"))}
-          >
-            <span>{language === "th" ? "จองห้องพัก" : "Book Stay"}</span>
-          </StandardButton>
-        </div>
-      </div>
-
-      {/* 2. GoDaddy-Style Horizontal Underline Navigation Tabs */}
-      <div className="border-b border-[var(--color-border)] flex items-center gap-5 overflow-x-auto no-scrollbar">
-        {quickTabs.map((t) => {
-          const isCurrent = t.id === "home";
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => navigateToTab(t.id)}
-              className={`pb-2.5 text-[14px] whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
-                isCurrent
-                  ? "border-[var(--color-text-primary)] font-semibold text-[var(--color-text-primary)]"
-                  : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              {language === "th" ? t.th : t.en}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. Clean 16:9 Cover Image Card (1px Border, Zero Heavy Overlays) */}
+    <header id={id} className="app-card overflow-hidden select-none">
+      {/* 1. FACEBOOK COVER PHOTO (16:9) */}
       <div
         onClick={() => openGalleryModal(null)}
-        className="relative w-full aspect-[16/9] max-h-[420px] rounded-[8px] border border-[var(--color-border)] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer"
+        className="relative w-full aspect-[16/9] max-h-[360px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/cover"
       >
         <img
           src={heroBannerImageUrl}
@@ -232,11 +143,138 @@ export function ResortHeroHeader({
             event.stopPropagation();
             openGalleryModal(null);
           }}
-          className="absolute bottom-3 right-3 rounded-[6px] bg-white/95 text-[#111111] border border-[#e5e7eb] px-3 h-8 inline-flex items-center gap-1.5 text-[13px] font-medium hover:bg-white transition cursor-pointer"
+          className="absolute bottom-3 right-3 rounded-[8px] bg-black/65 hover:bg-black/80 text-white px-3 h-8 inline-flex items-center gap-1.5 ty-caption font-semibold transition cursor-pointer"
         >
           <Images className="w-3.5 h-3.5" />
-          <span>{language === "th" ? "ดูรูปภาพทั้งหมด" : "All Photos"}</span>
+          <span>{language === "th" ? "ดูรูปทั้งหมด" : "All Photos"}</span>
         </button>
+      </div>
+
+      {/* 2. FACEBOOK PAGE PROFILE BAR */}
+      <div className="px-4 sm:px-5 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-7 sm:-mt-8 relative z-10">
+          <div className="flex items-end gap-3.5 min-w-0">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] ring-4 ring-[var(--color-background-card)] flex items-center justify-center text-[20px] sm:text-[24px] font-bold shrink-0 shadow-sm">
+              {brandBadgeCode}
+            </div>
+
+            <div className="pt-8 sm:pt-9 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="ty-display truncate">
+                  {pickLocalizedText(
+                    language,
+                    propertyConfig.nameTh.split("(")[0].trim(),
+                    propertyConfig.nameEn
+                  )}
+                </h1>
+                <BadgeCheck className="w-5 h-5 fill-[var(--color-accent)] text-white shrink-0" />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 ty-caption mt-0.5">
+                <button
+                  type="button"
+                  onClick={() => navigateToTab("review")}
+                  className="inline-flex items-center gap-1 font-semibold text-[var(--color-text-primary)] hover:underline cursor-pointer"
+                >
+                  <Star className="w-3.5 h-3.5 fill-[var(--color-warning)] text-[var(--color-warning)]" />
+                  <span>{bookingCms.ratingScore}</span>
+                  <span className="font-normal text-[var(--color-text-secondary)]">
+                    (
+                    {pickLocalizedText(
+                      language,
+                      bookingCms.reviewCountTh,
+                      bookingCms.reviewCountEn
+                    )}
+                    )
+                  </span>
+                </button>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>
+                    {pickLocalizedText(
+                      language,
+                      bookingCms.locationLabelTh,
+                      bookingCms.locationLabelEn
+                    )}
+                  </span>
+                </span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  <CloudSun className="w-3.5 h-3.5" />
+                  <span>{liveTempCelsius}°C</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Primary Page Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+            <StandardButton
+              variant="primary"
+              size="md"
+              onClick={
+                onBookClick ||
+                (() => rooms[0] && openRoomDrawer(rooms[0], "calendar"))
+              }
+            >
+              <span>
+                {language === "th" ? "เช็กห้องว่าง" : "Check Rooms"}
+              </span>
+            </StandardButton>
+
+            <StandardButton
+              variant="secondary"
+              size="md"
+              onClick={onChatClick || (() => navigateToTab("chat"))}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>{language === "th" ? "ทักแชท" : "Message"}</span>
+            </StandardButton>
+
+            <button
+              type="button"
+              onClick={handleShareProperty}
+              className="h-9 px-3 rounded-[8px] bg-[var(--color-background-subtle)] hover:brightness-95 inline-flex items-center justify-center transition cursor-pointer"
+              title={language === "th" ? "แชร์เพจที่พัก" : "Share"}
+              aria-label={language === "th" ? "แชร์เพจที่พัก" : "Share"}
+            >
+              {hasCopiedShareUrl ? (
+                <Check className="w-4 h-4 text-[var(--color-success)]" />
+              ) : (
+                <Share2 className="w-4 h-4 text-[var(--color-text-primary)]" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-3 ty-body text-[var(--color-text-secondary)] line-clamp-2">
+          {pickLocalizedText(
+            language,
+            propertyConfig.taglineTh,
+            propertyConfig.taglineEn
+          )}
+        </p>
+
+        {/* Optional Category Filter Chips */}
+        {roomCategoryChips.length > 0 && (
+          <div className="mt-3.5 pt-3 border-t border-[var(--color-border)] flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {roomCategoryChips.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => onSelectCategoryFilter?.(chip.id)}
+                className={`h-8 px-3.5 rounded-full ty-caption font-semibold inline-flex items-center justify-center transition cursor-pointer whitespace-nowrap ${
+                  chip.isActive
+                    ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+                    : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background-subtle)]"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </header>
   );
