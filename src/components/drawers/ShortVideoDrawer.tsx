@@ -20,10 +20,14 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
+import { pickLocalizedText } from "@/data/cmsDefaults";
 import { RoomLodge } from "@/data/rooms";
 import { ShortVideoComment, ShortVideoItem } from "@/data/shortsData";
 import { LanguageCode } from "@/lib/dateFormatters";
+import { parseVideoSource } from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
+import { UniversalVideoPlayer } from "@/components/cms/UniversalVideoPlayer";
 import { StandardButton } from "@/components/ui/standards";
 
 export interface ShortVideoDrawerProps {
@@ -32,6 +36,10 @@ export interface ShortVideoDrawerProps {
   totalVideosCount: number;
   linkedRoom: RoomLodge | null;
   language: LanguageCode;
+  channelHandle?: string;
+  channelAvatarUrl?: string;
+  canEdit?: boolean;
+  onEditActiveVideo?: () => void;
   isLiked: boolean;
   isBookmarked: boolean;
   isCouponSavedInBag: boolean;
@@ -60,6 +68,10 @@ export function ShortVideoDrawer({
   totalVideosCount,
   linkedRoom,
   language,
+  channelHandle = "sapanunseen",
+  channelAvatarUrl = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=160&q=80",
+  canEdit = false,
+  onEditActiveVideo,
   isLiked,
   isBookmarked,
   isCouponSavedInBag,
@@ -83,8 +95,18 @@ export function ShortVideoDrawer({
 
   useBodyScrollLock(Boolean(activeVideo));
 
+  const parsedSource = activeVideo
+    ? parseVideoSource(activeVideo.videoUrl, {
+        autoplay: true,
+        muted: isMuted,
+      })
+    : null;
+  const isExternalEmbed =
+    parsedSource?.provider === "youtube" ||
+    parsedSource?.provider === "facebook";
+
   useEffect(() => {
-    if (!activeVideo) {
+    if (!activeVideo || isExternalEmbed) {
       return;
     }
     setProgressPercent(0);
@@ -94,9 +116,7 @@ export function ShortVideoDrawer({
 
     const timerId = window.setTimeout(() => {
       const videoEl = videoElementRef.current;
-      if (!videoEl) {
-        return;
-      }
+      if (!videoEl) return;
       videoEl.currentTime = 0;
       videoEl
         .play()
@@ -109,17 +129,13 @@ export function ShortVideoDrawer({
     }, 30);
 
     return () => window.clearTimeout(timerId);
-  }, [activeVideo]);
+  }, [activeVideo, isExternalEmbed]);
 
   useEffect(() => {
-    if (!activeVideo) {
-      return;
-    }
+    if (!activeVideo) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       const targetTag = (event.target as HTMLElement)?.tagName;
-      if (targetTag === "INPUT" || targetTag === "TEXTAREA") {
-        return;
-      }
+      if (targetTag === "INPUT" || targetTag === "TEXTAREA") return;
       if (event.key === "Escape") {
         onClose();
       } else if (event.key === "ArrowDown") {
@@ -128,7 +144,7 @@ export function ShortVideoDrawer({
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         onNavigateVideo("prev");
-      } else if (event.key === " ") {
+      } else if (event.key === " " && !isExternalEmbed) {
         event.preventDefault();
         handleTogglePlayPause();
       }
@@ -136,7 +152,7 @@ export function ShortVideoDrawer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeVideo, onClose, onNavigateVideo]);
+  }, [activeVideo, isExternalEmbed, onClose, onNavigateVideo]);
 
   if (!activeVideo) {
     return null;
@@ -144,9 +160,7 @@ export function ShortVideoDrawer({
 
   const handleTogglePlayPause = () => {
     const videoEl = videoElementRef.current;
-    if (!videoEl) {
-      return;
-    }
+    if (!videoEl) return;
     if (videoEl.paused) {
       videoEl.play().catch(() => {});
       setIsPlaying(true);
@@ -158,9 +172,7 @@ export function ShortVideoDrawer({
 
   const handleTimeUpdate = () => {
     const videoEl = videoElementRef.current;
-    if (!videoEl || !videoEl.duration) {
-      return;
-    }
+    if (!videoEl || !videoEl.duration) return;
     setProgressPercent((videoEl.currentTime / videoEl.duration) * 100);
     setCurrentTimeLabel(formatPlaybackSeconds(videoEl.currentTime));
     setDurationLabel(formatPlaybackSeconds(videoEl.duration));
@@ -168,9 +180,7 @@ export function ShortVideoDrawer({
 
   const handleSeekProgress = (event: React.MouseEvent<HTMLDivElement>) => {
     const videoEl = videoElementRef.current;
-    if (!videoEl || !videoEl.duration) {
-      return;
-    }
+    if (!videoEl || !videoEl.duration) return;
     const barRect = event.currentTarget.getBoundingClientRect();
     const ratio = Math.max(
       0,
@@ -208,9 +218,7 @@ export function ShortVideoDrawer({
   const handleCommentFormSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedComment = commentInput.trim();
-    if (!trimmedComment) {
-      return;
-    }
+    if (!trimmedComment) return;
     onAddComment(activeVideo.id, trimmedComment);
     setCommentInput("");
   };
@@ -219,9 +227,11 @@ export function ShortVideoDrawer({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={
-        language === "th" ? activeVideo.titleTh : activeVideo.titleEn
-      }
+      aria-label={pickLocalizedText(
+        language,
+        activeVideo.titleTh,
+        activeVideo.titleEn
+      )}
       className="fixed inset-0 z-[70] flex justify-end"
     >
       <div
@@ -233,17 +243,17 @@ export function ShortVideoDrawer({
         {/* 1. Unified Drawer Header */}
         <header className="px-4 sm:px-5 py-3 bg-[var(--color-background-card)] flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+            <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[var(--color-background-muted)]">
               <img
-                src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=160&q=80"
-                alt="sapanunseen"
+                src={channelAvatarUrl}
+                alt={channelHandle}
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1">
                 <span className="ty-body font-bold text-[var(--color-text-primary)] truncate">
-                  sapanunseen
+                  {channelHandle}
                 </span>
                 <Check className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
               </div>
@@ -255,6 +265,10 @@ export function ShortVideoDrawer({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {canEdit && onEditActiveVideo && (
+              <EditSpotButton label="แก้คลิป" onClick={onEditActiveVideo} />
+            )}
+
             <button
               type="button"
               onClick={() => onNavigateVideo("prev")}
@@ -275,19 +289,21 @@ export function ShortVideoDrawer({
             >
               <ChevronDown className="w-4 h-4" />
             </button>
-            <button
-              type="button"
-              onClick={() => setIsMuted((prevMuted) => !prevMuted)}
-              aria-label={isMuted ? "เปิดเสียง" : "ปิดเสียง"}
-              title={isMuted ? "Unmute" : "Mute"}
-              className="btn-icon"
-            >
-              {isMuted ? (
-                <VolumeX className="w-4 h-4" />
-              ) : (
-                <Volume2 className="w-4 h-4 text-[var(--color-accent)]" />
-              )}
-            </button>
+            {!isExternalEmbed && (
+              <button
+                type="button"
+                onClick={() => setIsMuted((prevMuted) => !prevMuted)}
+                aria-label={isMuted ? "เปิดเสียง" : "ปิดเสียง"}
+                title={isMuted ? "Unmute" : "Mute"}
+                className="btn-icon"
+              >
+                {isMuted ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-[var(--color-accent)]" />
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -299,65 +315,79 @@ export function ShortVideoDrawer({
           </div>
         </header>
 
-        {/* 2. Scrollable Stream: 9:16 Video Stage + Promo Claim + Social + Comments */}
+        {/* 2. Scrollable Stream: Strict 9:16 Video Stage + Promo Claim + Social + Comments */}
         <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--color-background-card)]">
-          {/* Compact 9:16 Video Stage */}
           <div className="w-full bg-black flex items-center justify-center p-3">
-            <div className="relative h-[40dvh] sm:h-[44dvh] aspect-[9/16] rounded-[16px] overflow-hidden bg-black flex items-center justify-center">
-              <video
-                ref={videoElementRef}
-                src={activeVideo.videoUrl}
-                poster={activeVideo.posterUrl}
-                autoPlay
-                playsInline
-                loop
-                muted={isMuted}
-                onTimeUpdate={handleTimeUpdate}
-                onClick={handleTogglePlayPause}
-                className="w-full h-full object-cover cursor-pointer"
-              />
-
-              {!isPlaying && (
-                <button
-                  type="button"
-                  onClick={handleTogglePlayPause}
-                  aria-label={language === "th" ? "เล่นวิดีโอ" : "Play video"}
-                  className="absolute inset-0 m-auto h-14 w-14 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md hover:scale-105 transition cursor-pointer"
-                >
-                  <Play className="w-6 h-6 fill-white ml-0.5" />
-                </button>
-              )}
-
-              <div className="absolute inset-x-3 bottom-3 flex flex-col gap-2 z-20">
-                <div
-                  onClick={handleSeekProgress}
-                  className="w-full h-1.5 bg-white/30 hover:h-2 rounded-full cursor-pointer relative transition-all"
-                >
-                  <div
-                    className="h-full bg-[var(--color-accent)] rounded-full"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-white ty-caption">
-                  <button
-                    type="button"
+            <div className="relative w-full max-w-[264px] sm:max-w-[292px] aspect-[9/16] rounded-[16px] overflow-hidden bg-black flex items-center justify-center">
+              {isExternalEmbed ? (
+                <UniversalVideoPlayer
+                  videoUrl={activeVideo.videoUrl}
+                  posterUrl={activeVideo.posterUrl}
+                  title={activeVideo.titleTh}
+                  aspectRatio="9/16"
+                  autoPlay={true}
+                  initialMuted={isMuted}
+                />
+              ) : (
+                <>
+                  <video
+                    ref={videoElementRef}
+                    src={activeVideo.videoUrl}
+                    poster={activeVideo.posterUrl}
+                    autoPlay
+                    playsInline
+                    loop
+                    muted={isMuted}
+                    onTimeUpdate={handleTimeUpdate}
                     onClick={handleTogglePlayPause}
-                    aria-label={isPlaying ? "Pause" : "Play"}
-                    className="h-8 w-8 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white cursor-pointer"
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-3.5 h-3.5 fill-white" />
-                    ) : (
-                      <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
-                    )}
-                  </button>
+                    className="w-full h-full object-cover cursor-pointer"
+                  />
 
-                  <span className="px-2.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white font-mono">
-                    {currentTimeLabel} / {durationLabel}
-                  </span>
-                </div>
-              </div>
+                  {!isPlaying && (
+                    <button
+                      type="button"
+                      onClick={handleTogglePlayPause}
+                      aria-label={
+                        language === "th" ? "เล่นวิดีโอ" : "Play video"
+                      }
+                      className="absolute inset-0 m-auto h-14 w-14 rounded-full bg-black/60 text-white flex items-center justify-center backdrop-blur-md hover:scale-105 transition cursor-pointer"
+                    >
+                      <Play className="w-6 h-6 fill-white ml-0.5" />
+                    </button>
+                  )}
+
+                  <div className="absolute inset-x-3 bottom-3 flex flex-col gap-2 z-20">
+                    <div
+                      onClick={handleSeekProgress}
+                      className="w-full h-1.5 bg-white/30 hover:h-2 rounded-full cursor-pointer relative transition-all"
+                    >
+                      <div
+                        className="h-full bg-[var(--color-accent)] rounded-full"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-white ty-caption">
+                      <button
+                        type="button"
+                        onClick={handleTogglePlayPause}
+                        aria-label={isPlaying ? "Pause" : "Play"}
+                        className="h-8 w-8 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white cursor-pointer"
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-3.5 h-3.5 fill-white" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                        )}
+                      </button>
+
+                      <span className="px-2.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white font-mono">
+                        {currentTimeLabel} / {durationLabel}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -365,12 +395,18 @@ export function ShortVideoDrawer({
           <div className="p-4 sm:p-5 space-y-4">
             <div className="space-y-1.5">
               <h2 className="ty-subtitle text-[var(--color-text-primary)]">
-                {language === "th" ? activeVideo.titleTh : activeVideo.titleEn}
+                {pickLocalizedText(
+                  language,
+                  activeVideo.titleTh,
+                  activeVideo.titleEn
+                )}
               </h2>
               <p className="ty-body text-[var(--color-text-secondary)]">
-                {language === "th"
-                  ? activeVideo.captionTh
-                  : activeVideo.captionEn}
+                {pickLocalizedText(
+                  language,
+                  activeVideo.captionTh,
+                  activeVideo.captionEn
+                )}
               </p>
               <div className="flex items-center gap-1.5 ty-caption pt-0.5">
                 <Music2 className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
@@ -378,7 +414,6 @@ export function ShortVideoDrawer({
               </div>
             </div>
 
-            {/* Exclusive Promo Coupon Claim (#c53829 — Saves directly into Coupon Bag!) */}
             {activeVideo.couponCode && (
               <div className="p-3.5 rounded-[16px] bg-[var(--color-promo-muted)] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -423,7 +458,6 @@ export function ShortVideoDrawer({
               </div>
             )}
 
-            {/* Flat Icon-First Social Actions Row (Zero Outer Wrapper Box) */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button
@@ -487,7 +521,6 @@ export function ShortVideoDrawer({
               </button>
             </div>
 
-            {/* Comments List */}
             <div className="space-y-3">
               <span className="ty-caption font-bold uppercase tracking-wide block">
                 {language === "th"
@@ -519,7 +552,7 @@ export function ShortVideoDrawer({
           </div>
         </div>
 
-        {/* Sticky Bottom Zone: Add Comment Pill Form + Linked Room CTA */}
+        {/* Sticky Bottom Zone */}
         <div className="bg-[var(--color-background-card)] pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgba(15,23,42,0.06)] shrink-0">
           <form
             onSubmit={handleCommentFormSubmit}
@@ -550,7 +583,11 @@ export function ShortVideoDrawer({
                 <div className="flex items-center gap-2">
                   <span className="ty-body font-bold text-[var(--color-text-primary)] truncate">
                     {linkedRoom.code} ·{" "}
-                    {language === "th" ? linkedRoom.nameTh : linkedRoom.nameEn}
+                    {pickLocalizedText(
+                      language,
+                      linkedRoom.nameTh,
+                      linkedRoom.nameEn
+                    )}
                   </span>
                   {linkedRoom.discountPercent > 0 && (
                     <span className="badge-promo shrink-0">

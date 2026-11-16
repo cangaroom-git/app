@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   INITIAL_PROPERTY_CONFIG,
   INITIAL_SAPAN_ROOMS,
@@ -18,8 +18,12 @@ import {
   ResortExperienceItem,
   BookingRecord,
 } from "@/data/rooms";
+import {
+  INITIAL_SITE_CMS_CONTENT,
+  SiteCmsContent,
+} from "@/data/cmsDefaults";
 
-const RESORT_STORE_STORAGE_KEY = "white_label_resort_store_v6";
+const RESORT_STORE_STORAGE_KEY = "white_label_resort_store_v7";
 
 // In-memory cache of parsed store data (vercel-react-best-practices: js-cache-storage)
 let memoryBookingsCache: BookingRecord[] | null = null;
@@ -53,6 +57,7 @@ export interface SapanStoreData {
   coupons: PromoCoupon[];
   experiences: ResortExperienceItem[];
   bookings: BookingRecord[];
+  cms: SiteCmsContent;
 }
 
 export function formatDateStr(date: Date): string {
@@ -680,49 +685,110 @@ function getDefaultStore(): SapanStoreData {
     coupons: INITIAL_PROMO_COUPONS,
     experiences: INITIAL_RESORT_EXPERIENCES,
     bookings: createInitialBookings(),
+    cms: INITIAL_SITE_CMS_CONTENT,
+  };
+}
+
+function mergeWithDefaultStore(
+  parsedStore: Partial<SapanStoreData> | null | undefined
+): SapanStoreData {
+  const defaultStore = getDefaultStore();
+  if (!parsedStore || !Array.isArray(parsedStore.rooms)) {
+    return defaultStore;
+  }
+
+  const incomingCms = (parsedStore.cms || {}) as Partial<SiteCmsContent>;
+
+  return {
+    propertyConfig: {
+      ...defaultStore.propertyConfig,
+      ...(parsedStore.propertyConfig || {}),
+      sectionsVisibility: {
+        ...defaultStore.propertyConfig.sectionsVisibility,
+        ...(parsedStore.propertyConfig?.sectionsVisibility || {}),
+      },
+    },
+    rooms: parsedStore.rooms.map((room) => {
+      const defaultRoom = defaultStore.rooms.find(
+        (candidateRoom) => candidateRoom.id === room.id
+      );
+      return defaultRoom
+        ? {
+            ...room,
+            amenitiesEn: room.amenitiesEn ?? defaultRoom.amenitiesEn,
+          }
+        : room;
+    }),
+    seasonalRates: parsedStore.seasonalRates ?? defaultStore.seasonalRates,
+    specialDateRates:
+      parsedStore.specialDateRates ?? defaultStore.specialDateRates,
+    addons: parsedStore.addons ?? defaultStore.addons,
+    coupons: parsedStore.coupons ?? defaultStore.coupons,
+    experiences: parsedStore.experiences ?? defaultStore.experiences,
+    bookings: parsedStore.bookings ?? defaultStore.bookings,
+    cms: {
+      home: {
+        ...defaultStore.cms.home,
+        ...(incomingCms.home || {}),
+      },
+      bookingPage: {
+        ...defaultStore.cms.bookingPage,
+        ...(incomingCms.bookingPage || {}),
+      },
+      gallery: {
+        ...defaultStore.cms.gallery,
+        ...(incomingCms.gallery || {}),
+      },
+      shortsPage: {
+        ...defaultStore.cms.shortsPage,
+        ...(incomingCms.shortsPage || {}),
+      },
+      dealPage: {
+        ...defaultStore.cms.dealPage,
+        ...(incomingCms.dealPage || {}),
+      },
+      reviews: Array.isArray(incomingCms.reviews)
+        ? incomingCms.reviews
+        : defaultStore.cms.reviews,
+      guidePage: {
+        ...defaultStore.cms.guidePage,
+        ...(incomingCms.guidePage || {}),
+      },
+    },
   };
 }
 
 export function useSapanStore() {
   const [store, setStore] = useState<SapanStoreData>(getDefaultStore);
   const [isHydrated, setIsHydrated] = useState(false);
+  const syncTimerRef = useRef<number | null>(null);
+
+  const persistStoreToServer = useCallback((snapshot: SapanStoreData) => {
+    if (typeof window === "undefined") return;
+    if (syncTimerRef.current !== null) {
+      window.clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = window.setTimeout(() => {
+      fetch("/api/cms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snapshot),
+      }).catch(() => {
+        // Ignore background sync errors in offline mode
+      });
+    }, 220);
+  }, []);
 
   useEffect(() => {
+    let isCancelled = false;
+
     try {
       const rawStoreJson = localStorage.getItem(RESORT_STORE_STORAGE_KEY);
       if (rawStoreJson) {
         const parsedStore = JSON.parse(rawStoreJson) as Partial<SapanStoreData>;
-        if (parsedStore && Array.isArray(parsedStore.rooms)) {
-          const defaultStore = getDefaultStore();
-          setStore({
-            propertyConfig: {
-              ...defaultStore.propertyConfig,
-              ...(parsedStore.propertyConfig || {}),
-              sectionsVisibility: {
-                ...defaultStore.propertyConfig.sectionsVisibility,
-                ...(parsedStore.propertyConfig?.sectionsVisibility || {}),
-              },
-            },
-            rooms: parsedStore.rooms.map((room) => {
-              const defaultRoom = defaultStore.rooms.find(
-                (candidateRoom) => candidateRoom.id === room.id
-              );
-              return defaultRoom
-                ? {
-                    ...room,
-                    amenitiesEn: room.amenitiesEn ?? defaultRoom.amenitiesEn,
-                  }
-                : room;
-            }),
-            seasonalRates: parsedStore.seasonalRates ?? defaultStore.seasonalRates,
-            specialDateRates:
-              parsedStore.specialDateRates ?? defaultStore.specialDateRates,
-            addons: parsedStore.addons ?? defaultStore.addons,
-            coupons: parsedStore.coupons ?? defaultStore.coupons,
-            experiences: parsedStore.experiences ?? defaultStore.experiences,
-            bookings: parsedStore.bookings ?? defaultStore.bookings,
-          });
-        }
+        const mergedLocal = mergeWithDefaultStore(parsedStore);
+        memoryBookingsCache = mergedLocal.bookings;
+        setStore(mergedLocal);
       } else {
         localStorage.setItem(
           RESORT_STORE_STORAGE_KEY,
@@ -734,19 +800,47 @@ export function useSapanStore() {
     }
     setIsHydrated(true);
 
+    // Fetch authoritative server/database snapshot so edits appear across all devices & browsers
+    fetch("/api/cms", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { store?: Partial<SapanStoreData> | null } | null) => {
+        if (isCancelled || !data?.store) return;
+        const mergedServer = mergeWithDefaultStore(data.store);
+        memoryBookingsCache = mergedServer.bookings;
+        setStore(mergedServer);
+        try {
+          localStorage.setItem(
+            RESORT_STORE_STORAGE_KEY,
+            JSON.stringify(mergedServer)
+          );
+        } catch {
+          // ignore quota errors
+        }
+      })
+      .catch(() => {
+        // fallback to local store
+      });
+
     const handleStorageSync = (event: StorageEvent) => {
       if (event.key === RESORT_STORE_STORAGE_KEY && event.newValue) {
         try {
-          const parsedStore = JSON.parse(event.newValue) as SapanStoreData;
-          memoryBookingsCache = parsedStore.bookings ?? null;
-          setStore(parsedStore);
+          const parsedStore = JSON.parse(event.newValue) as Partial<SapanStoreData>;
+          const merged = mergeWithDefaultStore(parsedStore);
+          memoryBookingsCache = merged.bookings ?? null;
+          setStore(merged);
         } catch {
           // ignore
         }
       }
     };
     window.addEventListener("storage", handleStorageSync);
-    return () => window.removeEventListener("storage", handleStorageSync);
+    return () => {
+      isCancelled = true;
+      if (syncTimerRef.current !== null) {
+        window.clearTimeout(syncTimerRef.current);
+      }
+      window.removeEventListener("storage", handleStorageSync);
+    };
   }, []);
 
   const saveStore = useCallback(
@@ -762,10 +856,11 @@ export function useSapanStore() {
         } catch {
           // ignore quota errors
         }
+        persistStoreToServer(nextStore);
         return nextStore;
       });
     },
-    []
+    [persistStoreToServer]
   );
 
   const resetStoreToDefault = useCallback(() => {
@@ -780,7 +875,8 @@ export function useSapanStore() {
     } catch {
       // ignore
     }
-  }, []);
+    persistStoreToServer(defaultStore);
+  }, [persistStoreToServer]);
 
   return {
     store,

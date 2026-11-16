@@ -79,3 +79,45 @@ model Booking {
 
   @@index([roomId, checkInDate, checkOutDate])
 }
+
+model ShortVideo {
+  id         String   @id @default(cuid())
+  titleTh    String
+  titleEn    String   @default("")
+  captionTh  String   @default("")
+  captionEn  String   @default("")
+  videoUrl   String
+  posterUrl  String
+  audioLabel String   @default("")
+  category   String   @default("mist")
+  roomId     String?
+  couponCode String?
+  isPinned   Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive, isPinned, sortOrder])
+}
+
+model GalleryAsset {
+  id        String   @id @default(cuid())
+  url       String
+  captionTh String   @default("")
+  captionEn String   @default("")
+  category  String   @default("property")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category, sortOrder])
+}
+
+model SiteCmsState {
+  id        String   @id @default("default")
+  payload   Json
+  updatedAt DateTime @updatedAt
+
+  @@map("site_cms_state")
+}

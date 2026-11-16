@@ -83,6 +83,7 @@ export interface ExtraAddon {
   descTh: string;
   descEn: string;
   priceThb: number;
+  originalPriceThb?: number;
   unitTh: string;
   unitEn: string;
   imageUrl?: string;

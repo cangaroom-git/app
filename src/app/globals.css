@@ -156,6 +156,7 @@ html.dark {
 
   --color-success: #4ade80;
   --color-success-muted: rgba(34, 197, 94, 0.18);
+  --color-on-success: #052e16;
   --color-error: #f87171;
   --color-error-muted: rgba(239, 68, 68, 0.18);
   --color-warning: #facc15;
@@ -269,6 +270,19 @@ h1, h2, h3, h4, .font-serif {
 .bg-\[var\(--color-promo\)\].ty-subtitle,
 .bg-\[var\(--color-promo\)\].ty-title {
   color: var(--color-on-promo);
+}
+
+.bg-\[var\(--color-success\)\],
+.bg-\[var\(--color-success\)\].ty-body,
+.bg-\[var\(--color-success\)\].ty-caption,
+.bg-\[var\(--color-success\)\].ty-subtitle,
+.bg-\[var\(--color-success\)\].ty-title {
+  color: var(--color-on-success);
+}
+
+.text-white.ty-caption,
+.text-white.ty-body {
+  color: #ffffff;
 }
 
 /* Clamp non-standard micro/intermediate font sizes to the 5-tier scale */

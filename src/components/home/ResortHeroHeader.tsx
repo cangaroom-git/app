@@ -11,7 +11,9 @@ import {
   Star,
   Tag,
 } from "lucide-react";
+import { pickLocalizedText } from "@/data/cmsDefaults";
 import { useHotelApp } from "@/components/HotelAppShell";
+import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 
 export interface ResortHeroHeaderProps {
   id?: string;
@@ -38,12 +40,20 @@ export function ResortHeroHeader({
     navigateToTab,
     rooms,
     coupons,
+    cms,
+    canShowEditControls,
+    openCmsEditor,
   } = useHotelApp();
   const [hasCopiedShareUrl, setHasCopiedShareUrl] = useState(false);
 
+  const bookingCms = cms.bookingPage;
+
   const highestCouponPercent = coupons
     .filter((coupon) => coupon.isActive && coupon.discountType === "PERCENT")
-    .reduce((maxPercent, coupon) => Math.max(maxPercent, coupon.discountValue), 0);
+    .reduce(
+      (maxPercent, coupon) => Math.max(maxPercent, coupon.discountValue),
+      0
+    );
 
   const highestRoomDiscountPercent = rooms.reduce(
     (maxPercent, room) => Math.max(maxPercent, room.discountPercent || 0),
@@ -82,6 +92,7 @@ export function ResortHeroHeader({
   };
 
   const heroBannerImageUrl =
+    bookingCms.heroBannerUrl ||
     rooms[0]?.images[0]?.url ||
     "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=2000&q=85";
 
@@ -89,33 +100,8 @@ export function ResortHeroHeader({
     "@context": "https://schema.org",
     "@type": "Hotel",
     name: `${propertyConfig.nameTh} (${propertyConfig.nameEn})`,
-    alternateName: "Sapan Unseen Nan Resort",
-    description:
-      "ที่พักพรีเมียมวิวหมอก 360 องศา บ้านสะปัน อำเภอบ่อเกลือ จังหวัดน่าน สถาปัตยกรรมโมเดิร์นกลมกลืนธรรมชาติ พร้อมจากุซซี่และอาหารเช้าวิวเขา",
-    url: "https://sapanunseen.com",
-    telephone: "+66-88-888-8888",
-    priceRange: "฿2,500 - ฿6,500",
+    description: propertyConfig.taglineTh,
     image: [heroBannerImageUrl],
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: "บ้านสะปัน ตำบลดงพญา",
-      addressLocality: "อำเภอบ่อเกลือ",
-      addressRegion: "จังหวัดน่าน",
-      postalCode: "55220",
-      addressCountry: "TH",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: 19.1925,
-      longitude: 101.1989,
-    },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.9",
-      reviewCount: "1280",
-      bestRating: "5",
-      worstRating: "1",
-    },
   };
 
   const roomCategoryChips = [
@@ -127,16 +113,11 @@ export function ResortHeroHeader({
           : `All (${rooms.length})`,
       isActive: !activeCategoryFilter || activeCategoryFilter === "all",
     },
-    {
-      id: "aframe",
-      label: "A-Frame",
-      isActive: activeCategoryFilter === "aframe",
-    },
-    {
-      id: "panoramic",
-      label: "Panoramic",
-      isActive: activeCategoryFilter === "panoramic",
-    },
+    ...bookingCms.categoryChips.map((chip) => ({
+      id: chip.id,
+      label: pickLocalizedText(language, chip.labelTh, chip.labelEn),
+      isActive: activeCategoryFilter === chip.id,
+    })),
     {
       id: "sapan-attractions",
       label: language === "th" ? "ที่เที่ยวสะปัน" : "Attractions",
@@ -151,18 +132,31 @@ export function ResortHeroHeader({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLdSchema) }}
       />
 
-      {/* 1. Resort Hero Photo — Full-bleed edge-to-edge on Mobile (< 640px), rounded-[20px] on Tablet/Desktop */}
+      {/* 1. Resort Hero Photo — Matches Home Page (/) Hero 16:9 & max-h-[540px] */}
       <div
         onClick={() => openGalleryModal(null)}
-        className="relative -mt-4 -mx-4 w-[calc(100%+2rem)] rounded-none sm:mt-0 sm:mx-0 sm:w-full sm:rounded-[20px] aspect-[16/10] sm:aspect-[21/9] min-h-[228px] max-h-[420px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/resorthereo"
+        className="relative -mt-4 -mx-4 w-[calc(100%+2rem)] rounded-none sm:mt-0 sm:mx-0 sm:w-full sm:rounded-[20px] aspect-[16/9] max-h-[540px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/resorthereo"
       >
         <img
           src={heroBannerImageUrl}
-          alt={language === "th" ? propertyConfig.nameTh : propertyConfig.nameEn}
+          alt={pickLocalizedText(
+            language,
+            propertyConfig.nameTh,
+            propertyConfig.nameEn
+          )}
           loading="eager"
           decoding="async"
           className="w-full h-full object-cover object-center transition-transform duration-500 group-hover/resorthereo:scale-[1.015]"
         />
+
+        {canShowEditControls && (
+          <div className="absolute top-3 right-3 z-20">
+            <EditSpotButton
+              label="แก้ภาพปก & ข้อมูลที่พัก"
+              onClick={() => openCmsEditor({ type: "booking-hero" })}
+            />
+          </div>
+        )}
 
         <button
           type="button"
@@ -179,7 +173,7 @@ export function ResortHeroHeader({
         </button>
       </div>
 
-      {/* 2. Flat Open Property Header (Zero Wrapper Cards, Zero Nested Boxes) */}
+      {/* 2. Flat Open Property Header */}
       <div className="space-y-3 pt-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 ty-caption">
           <button
@@ -188,9 +182,15 @@ export function ResortHeroHeader({
             className="inline-flex items-center gap-1 font-bold text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition cursor-pointer"
           >
             <Star className="w-3.5 h-3.5 fill-[var(--color-warning)] text-[var(--color-warning)]" />
-            <span>4.9</span>
+            <span>{bookingCms.ratingScore}</span>
             <span className="font-normal text-[var(--color-text-secondary)] underline underline-offset-2">
-              (1,280+ {language === "th" ? "รีวิว" : "reviews"})
+              (
+              {pickLocalizedText(
+                language,
+                bookingCms.reviewCountTh,
+                bookingCms.reviewCountEn
+              )}
+              )
             </span>
           </button>
 
@@ -199,9 +199,11 @@ export function ResortHeroHeader({
           <span className="inline-flex items-center gap-1 font-medium text-[var(--color-text-secondary)]">
             <MapPin className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>
-              {language === "th"
-                ? "บ้านสะปัน บ่อเกลือ น่าน"
-                : "Ban Sapan, Bo Kluea, Nan"}
+              {pickLocalizedText(
+                language,
+                bookingCms.locationLabelTh,
+                bookingCms.locationLabelEn
+              )}
             </span>
           </span>
 
@@ -221,15 +223,19 @@ export function ResortHeroHeader({
 
         <div>
           <h1 className="ty-display text-[var(--color-text-primary)]">
-            {language === "th" ? propertyConfig.nameTh : propertyConfig.nameEn}
+            {pickLocalizedText(
+              language,
+              propertyConfig.nameTh,
+              propertyConfig.nameEn
+            )}
           </h1>
 
           <p className="mt-1 ty-body-muted max-w-3xl">
-            {language === "th"
-              ? propertyConfig.taglineTh ||
-                "ที่พักพรีเมียมวิวหมอก 360 องศา ท่ามกลางขุนเขาและสายธารสะปัน พร้อมอาหารเช้าเสิร์ฟถึงระเบียง"
-              : propertyConfig.taglineEn ||
-                "360° misty mountain & stream luxury villas in Sapan, Nan with private terrace breakfast"}
+            {pickLocalizedText(
+              language,
+              propertyConfig.taglineTh,
+              propertyConfig.taglineEn
+            )}
           </p>
         </div>
 

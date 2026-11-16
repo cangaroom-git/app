@@ -11,13 +11,10 @@ import {
   Sparkles,
   Tag,
 } from "lucide-react";
-import {
-  RESORT_SHORTS,
-  SHORTS_CATEGORIES,
-  ShortVideoCategory,
-  ShortVideoComment,
-} from "@/data/shortsData";
+import { pickLocalizedText } from "@/data/cmsDefaults";
+import { RESORT_SHORTS, ShortVideoComment } from "@/data/shortsData";
 import { useHotelApp } from "@/components/HotelAppShell";
+import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { ShortVideoDrawer } from "@/components/drawers/ShortVideoDrawer";
 
 export { RESORT_SHORTS };
@@ -32,10 +29,17 @@ export default function ShortsPage() {
     claimAndApplyCoupon,
     openCouponWallet,
     initialShortIndex,
+    cms,
+    canShowEditControls,
+    openCmsEditor,
   } = useHotelApp();
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<ShortVideoCategory>("all");
+  const shortsCms = cms.shortsPage;
+  const activeShortsList = shortsCms.videos.filter(
+    (video) => video.isActive !== false
+  );
+
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [likedVideoById, setLikedVideoById] = useState<Record<string, boolean>>(
     {}
@@ -49,45 +53,48 @@ export default function ShortsPage() {
 
   const filteredVideos =
     selectedCategory === "all"
-      ? RESORT_SHORTS
-      : RESORT_SHORTS.filter((video) => video.category === selectedCategory);
+      ? activeShortsList
+      : activeShortsList.filter((video) => video.category === selectedCategory);
 
   useEffect(() => {
     if (
       initialShortIndex !== null &&
       initialShortIndex !== undefined &&
       initialShortIndex >= 0 &&
-      initialShortIndex < RESORT_SHORTS.length
+      initialShortIndex < activeShortsList.length
     ) {
-      setSelectedVideoId(RESORT_SHORTS[initialShortIndex].id);
+      setSelectedVideoId(activeShortsList[initialShortIndex].id);
     } else {
       setSelectedVideoId(null);
     }
-  }, [initialShortIndex]);
+  }, [initialShortIndex, activeShortsList.length]);
 
-  const selectedVideoIndex = RESORT_SHORTS.findIndex(
+  const selectedVideoIndex = activeShortsList.findIndex(
     (video) => video.id === selectedVideoId
   );
   const activeVideo =
-    selectedVideoIndex >= 0 ? RESORT_SHORTS[selectedVideoIndex] : null;
-  const linkedRoom =
-    activeVideo && rooms[activeVideo.roomIndex]
-      ? rooms[activeVideo.roomIndex]
-      : rooms[0] ?? null;
+    selectedVideoIndex >= 0 ? activeShortsList[selectedVideoIndex] : null;
+  const linkedRoom = activeVideo
+    ? rooms.find((r) => r.id === activeVideo.roomId) ??
+      rooms[activeVideo.roomIndex] ??
+      rooms[0] ??
+      null
+    : null;
 
   const handleNavigateVideo = useCallback(
     (direction: "next" | "prev") => {
-      if (RESORT_SHORTS.length === 0) return;
-      const currentIndex = RESORT_SHORTS.findIndex(
+      if (activeShortsList.length === 0) return;
+      const currentIndex = activeShortsList.findIndex(
         (video) => video.id === selectedVideoId
       );
       const nextIndex =
         direction === "next"
-          ? (currentIndex + 1) % RESORT_SHORTS.length
-          : (currentIndex - 1 + RESORT_SHORTS.length) % RESORT_SHORTS.length;
-      setSelectedVideoId(RESORT_SHORTS[nextIndex].id);
+          ? (currentIndex + 1) % activeShortsList.length
+          : (currentIndex - 1 + activeShortsList.length) %
+            activeShortsList.length;
+      setSelectedVideoId(activeShortsList[nextIndex].id);
     },
-    [selectedVideoId]
+    [selectedVideoId, activeShortsList]
   );
 
   const handleToggleLike = (videoId: string) => {
@@ -135,26 +142,46 @@ export default function ShortsPage() {
 
   return (
     <>
-      {/* 1. Flat Sticky Shorts Header & Category Pill Bar (Open Canvas) */}
+      {/* 1. Flat Sticky Shorts Header & Category Pill Bar */}
       <header className="sticky top-0 z-20 -mx-1 px-1 py-2.5 bg-[var(--color-background-body)]/92 backdrop-blur-md space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="ty-title flex items-center gap-2 truncate">
               <Compass className="w-5 h-5 text-[var(--color-accent)] shrink-0" />
               <span className="truncate">
-                {language === "th"
-                  ? "สำรวจวิดีโอสั้นรีสอร์ท"
-                  : "Explore Resort Shorts"}
+                {pickLocalizedText(
+                  language,
+                  shortsCms.titleTh,
+                  shortsCms.titleEn
+                )}
               </span>
             </h1>
             <p className="ty-caption truncate mt-0.5">
-              {language === "th"
-                ? `บรรยากาศจริงจากสะปันอันซีน · ${filteredVideos.length} วิดีโอ`
-                : `Real moments at Sapan Unseen · ${filteredVideos.length} videos`}
+              {pickLocalizedText(
+                language,
+                shortsCms.subtitleTh,
+                shortsCms.subtitleEn
+              )}{" "}
+              · {filteredVideos.length}{" "}
+              {language === "th" ? "วิดีโอ" : "videos"}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {canShowEditControls && (
+              <>
+                <EditSpotButton
+                  label="ตั้งค่าหน้า"
+                  onClick={() => openCmsEditor({ type: "shorts-header" })}
+                />
+                <EditSpotButton
+                  icon="add"
+                  label="เพิ่มคลิป YouTube / FB"
+                  onClick={() => openCmsEditor({ type: "short-video" })}
+                />
+              </>
+            )}
+
             <button
               type="button"
               onClick={openCouponWallet}
@@ -176,7 +203,7 @@ export default function ShortsPage() {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-0.5">
-          {SHORTS_CATEGORIES.map((categoryItem) => {
+          {shortsCms.categories.map((categoryItem) => {
             const isSelected = selectedCategory === categoryItem.id;
             return (
               <button
@@ -189,19 +216,24 @@ export default function ShortsPage() {
                     : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 }`}
               >
-                {language === "th"
-                  ? categoryItem.labelTh
-                  : categoryItem.labelEn}
+                {pickLocalizedText(
+                  language,
+                  categoryItem.labelTh,
+                  categoryItem.labelEn
+                )}
               </button>
             );
           })}
         </div>
       </header>
 
-      {/* 2. Open 9:16 Short Videos Grid (Zero Outer Wrapper Card) */}
+      {/* 2. Open 9:16 Short Videos Grid */}
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {filteredVideos.map((video) => {
-          const cardRoom = rooms[video.roomIndex] ?? rooms[0];
+          const cardRoom =
+            rooms.find((r) => r.id === video.roomId) ??
+            rooms[video.roomIndex] ??
+            rooms[0];
           const isLiked = Boolean(likedVideoById[video.id]);
 
           return (
@@ -221,7 +253,11 @@ export default function ShortsPage() {
               <div className="relative aspect-[9/16] w-full rounded-[16px] overflow-hidden bg-[var(--color-background-muted)]">
                 <img
                   src={video.posterUrl}
-                  alt={language === "th" ? video.titleTh : video.titleEn}
+                  alt={pickLocalizedText(
+                    language,
+                    video.titleTh,
+                    video.titleEn
+                  )}
                   loading="lazy"
                   decoding="async"
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -246,6 +282,19 @@ export default function ShortsPage() {
                     </span>
                   )}
                 </div>
+
+                {canShowEditControls && (
+                  <div className="absolute top-11 right-2.5 z-20">
+                    <EditSpotButton
+                      onClick={() =>
+                        openCmsEditor({
+                          type: "short-video",
+                          videoId: video.id,
+                        })
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                   <span className="h-11 w-11 rounded-full bg-black/55 backdrop-blur-md text-white flex items-center justify-center">
@@ -273,12 +322,12 @@ export default function ShortsPage() {
               </div>
 
               <p className="pt-2 ty-body font-semibold text-[var(--color-text-primary)] line-clamp-2 group-hover:text-[var(--color-accent)] transition-colors">
-                {language === "th" ? video.titleTh : video.titleEn}
+                {pickLocalizedText(language, video.titleTh, video.titleEn)}
               </p>
 
               <div className="pt-0.5 flex items-center justify-between gap-2 ty-caption">
                 <span className="inline-flex items-center gap-1 font-medium truncate">
-                  <span className="truncate">sapanunseen</span>
+                  <span className="truncate">{shortsCms.channelHandle}</span>
                   <Check className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
                 </span>
 
@@ -297,9 +346,21 @@ export default function ShortsPage() {
       <ShortVideoDrawer
         activeVideo={activeVideo}
         videoIndex={Math.max(0, selectedVideoIndex)}
-        totalVideosCount={RESORT_SHORTS.length}
+        totalVideosCount={activeShortsList.length}
         linkedRoom={linkedRoom}
         language={language}
+        channelHandle={shortsCms.channelHandle}
+        channelAvatarUrl={shortsCms.channelAvatarUrl}
+        canEdit={canShowEditControls}
+        onEditActiveVideo={
+          activeVideo
+            ? () => {
+                const targetId = activeVideo.id;
+                setSelectedVideoId(null);
+                openCmsEditor({ type: "short-video", videoId: targetId });
+              }
+            : undefined
+        }
         isLiked={Boolean(activeVideo && likedVideoById[activeVideo.id])}
         isBookmarked={Boolean(
           activeVideo && bookmarkedVideoById[activeVideo.id]

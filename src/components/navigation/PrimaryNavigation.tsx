@@ -10,6 +10,7 @@ import {
   Globe,
   LogIn,
   Moon,
+  Pencil,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -51,6 +52,8 @@ export interface PrimaryNavigationProps {
   isCalendarDrawerOpen?: boolean;
   onOpenCalendarDrawer?: () => void;
   isChatOpen?: boolean;
+  isEditMode?: boolean;
+  onToggleEditMode?: () => void;
 }
 
 export function PrimaryNavigation({
@@ -74,6 +77,8 @@ export function PrimaryNavigation({
   isCalendarDrawerOpen = false,
   onOpenCalendarDrawer,
   isChatOpen = false,
+  isEditMode = false,
+  onToggleEditMode,
 }: PrimaryNavigationProps) {
   const [isPageScrolled, setIsPageScrolled] = useState(false);
   const [isMobileProfileDrawerOpen, setIsMobileProfileDrawerOpen] =
@@ -321,6 +326,8 @@ export function PrimaryNavigation({
                 savedCouponsCount={savedCouponsCount}
                 onOpenCouponWallet={onOpenCouponWallet}
                 pendingAdminCount={pendingAdminCount}
+                isEditMode={isEditMode}
+                onToggleEditMode={onToggleEditMode}
               />
             </div>
           </div>
@@ -496,6 +503,32 @@ export function PrimaryNavigation({
                 <LogIn className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>{language === "th" ? "เข้าสู่ระบบ" : "Sign In"}</span>
               </Link>
+
+              {onToggleEditMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileProfileDrawerOpen(false);
+                    onToggleEditMode();
+                  }}
+                  className={`w-full h-11 px-3 rounded-[12px] flex items-center gap-3.5 ty-body font-semibold transition cursor-pointer ${
+                    isEditMode
+                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                      : "hover:bg-[var(--color-background-muted)] text-[var(--color-accent)]"
+                  }`}
+                >
+                  <Pencil className="w-5 h-5" />
+                  <span>
+                    {isEditMode
+                      ? language === "th"
+                        ? "ปิดโหมดแก้ไขหน้าเว็บ"
+                        : "Exit Edit Mode"
+                      : language === "th"
+                      ? "แก้ไขหน้าเว็บจริง"
+                      : "Edit Live Page"}
+                  </span>
+                </button>
+              )}
 
               <Link
                 href="/admin"

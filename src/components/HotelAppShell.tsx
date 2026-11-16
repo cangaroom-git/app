@@ -21,6 +21,8 @@ import {
   SpecialDateRateOverride,
   WhiteLabelPropertyConfig,
 } from "@/data/rooms";
+import { SiteCmsContent } from "@/data/cmsDefaults";
+import type { CmsEditorTarget } from "@/components/cms/AdminEditOverlay";
 import {
   addDaysToDate,
   calculateStayPricingBreakdown,
@@ -85,6 +87,22 @@ const RoomGalleryDrawer = dynamic(
   { ssr: false }
 );
 
+const CmsEditorDrawer = dynamic(
+  () =>
+    import("@/components/cms/CmsEditorDrawer").then(
+      (mod) => mod.CmsEditorDrawer
+    ),
+  { ssr: false }
+);
+
+const AdminFloatingEditBar = dynamic(
+  () =>
+    import("@/components/cms/AdminEditOverlay").then(
+      (mod) => mod.AdminFloatingEditBar
+    ),
+  { ssr: false }
+);
+
 export { formatNavbarDateCard, formatShortDate, getFacilityIconMeta };
 
 export type Lang = LanguageCode;
@@ -109,7 +127,13 @@ export interface HotelAppContextValue {
   coupons: PromoCoupon[];
   experiences: ResortExperienceItem[];
   bookings: BookingRecord[];
+  cms: SiteCmsContent;
   saveStore: (updater: (prev: SapanStoreData) => SapanStoreData) => void;
+  isEditMode: boolean;
+  canShowEditControls: boolean;
+  setEditMode: (enabled: boolean) => void;
+  toggleEditMode: () => void;
+  openCmsEditor: (target: CmsEditorTarget) => void;
   today: Date;
   lang: Lang;
   setLang: (nextLang: Lang) => void;
@@ -198,7 +222,64 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     coupons,
     experiences,
     bookings,
+    cms,
   } = store;
+
+  const [isEditMode, setIsEditModeState] = useState<boolean>(false);
+  const [isPreviewingAsGuest, setIsPreviewingAsGuest] = useState<boolean>(false);
+  const [activeCmsEditor, setActiveCmsEditor] =
+    useState<CmsEditorTarget | null>(null);
+  const [cmsToastMessage, setCmsToastMessage] = useState<string | null>(null);
+
+  const setEditMode = useCallback((enabled: boolean) => {
+    setIsEditModeState(enabled);
+    setIsPreviewingAsGuest(false);
+    if (!enabled) {
+      setActiveCmsEditor(null);
+    }
+    try {
+      if (enabled) {
+        sessionStorage.setItem("my-hotel-edit-mode", "1");
+      } else {
+        sessionStorage.removeItem("my-hotel-edit-mode");
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleEditMode = useCallback(() => {
+    setEditMode(!isEditMode);
+  }, [isEditMode, setEditMode]);
+
+  const openCmsEditor = useCallback((target: CmsEditorTarget) => {
+    setActiveCmsEditor(target);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("edit") === "1") {
+        setEditMode(true);
+        return;
+      }
+      if (sessionStorage.getItem("my-hotel-edit-mode") === "1") {
+        setIsEditModeState(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [pathname, setEditMode]);
+
+  const canShowEditControls = isEditMode && !isPreviewingAsGuest;
+
+  const handleShowCmsToast = useCallback((message: string) => {
+    setCmsToastMessage(message);
+    window.setTimeout(() => {
+      setCmsToastMessage((current) => (current === message ? null : current));
+    }, 2800);
+  }, []);
 
   const today = useMemo(() => {
     const currentDate = new Date();
@@ -1307,6 +1388,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       setRoomFilterMode,
       hideSoldOutRooms,
       setHideSoldOutRooms,
+      cms,
+      isEditMode,
+      canShowEditControls,
+      setEditMode,
+      toggleEditMode,
+      openCmsEditor,
     }),
     [
       propertyConfig,
@@ -1317,6 +1404,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       coupons,
       experiences,
       bookings,
+      cms,
+      isEditMode,
+      canShowEditControls,
+      setEditMode,
+      toggleEditMode,
+      openCmsEditor,
       saveStore,
       today,
       lang,
@@ -1414,7 +1507,17 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           isCalendarDrawerOpen={isNavbarCalendarOpen}
           onOpenCalendarDrawer={openCalendarDrawer}
           isChatOpen={isChatDrawerOpen}
+          isEditMode={isEditMode}
+          onToggleEditMode={toggleEditMode}
         />
+
+        {cmsToastMessage && (
+          <div className="fixed top-16 inset-x-0 z-[85] pointer-events-none flex justify-center px-4">
+            <div className="rounded-full bg-[var(--color-success)] !text-[var(--color-on-success)] px-4 py-1.5 ty-caption font-bold shadow-[var(--shadow-popover)]">
+              ✓ {cmsToastMessage}
+            </div>
+          </div>
+        )}
 
         {/* 2. Centered 1140px Storefront Feed */}
         <main className="relative w-full min-w-0 pb-28 lg:pb-14">
@@ -1551,7 +1654,33 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           allRooms={rooms}
           propertyConfig={propertyConfig}
           language={lang}
+          galleryCms={cms.gallery}
+          canEdit={canShowEditControls}
+          onOpenCmsEditor={openCmsEditor}
         />
+
+        {/* 7. On-Page Visual CMS Floating Control Pill & Right Sidebar Drawer */}
+        {isEditMode && (
+          <AdminFloatingEditBar
+            activeTab={activeTab}
+            isPreviewingAsGuest={isPreviewingAsGuest}
+            onToggleGuestPreview={() =>
+              setIsPreviewingAsGuest((prev) => !prev)
+            }
+            onNavigateTab={navigateToTab}
+            onExitEditMode={() => setEditMode(false)}
+          />
+        )}
+
+        {activeCmsEditor && (
+          <CmsEditorDrawer
+            target={activeCmsEditor}
+            store={store}
+            saveStore={saveStore}
+            onClose={() => setActiveCmsEditor(null)}
+            onToast={handleShowCmsToast}
+          />
+        )}
       </div>
     </HotelAppContext.Provider>
   );

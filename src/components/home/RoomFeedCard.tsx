@@ -20,6 +20,7 @@ import { RoomLodge } from "@/data/rooms";
 import { RoomInventoryStatus } from "@/lib/store";
 import { formatShortDate, LanguageCode } from "@/lib/dateFormatters";
 import { StandardButton, StatusPill } from "@/components/ui/standards";
+import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 
 export interface RoomFeedCardProps {
   room: RoomLodge;
@@ -35,6 +36,7 @@ export interface RoomFeedCardProps {
   onSelectNextAvailableDates: (checkIn: string, checkOut: string) => void;
   onOpenRoomDetails: (initialPhotoIndex?: number) => void;
   onBookRoom: () => void;
+  onEditRoom?: () => void;
 }
 
 export function RoomFeedCard({
@@ -51,6 +53,7 @@ export function RoomFeedCard({
   onSelectNextAvailableDates,
   onOpenRoomDetails,
   onBookRoom,
+  onEditRoom,
 }: RoomFeedCardProps) {
   const photoTrackRef = useRef<HTMLDivElement | null>(null);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
@@ -112,7 +115,7 @@ export function RoomFeedCard({
       {/* 1. Native Scroll-Snap Photo Stage — Full-bleed edge-to-edge on Mobile, Tapping Opens Photos & Details Drawer */}
       <div
         onClick={() => onOpenRoomDetails(activePhotoIndex)}
-        className="md:col-span-5 relative w-full aspect-[4/3] sm:aspect-[16/10] md:aspect-auto md:min-h-[252px] overflow-hidden bg-[var(--color-background-subtle)] cursor-pointer group/hero select-none"
+        className="md:col-span-5 relative w-full aspect-[16/9] md:aspect-auto md:min-h-[252px] overflow-hidden bg-[var(--color-background-subtle)] cursor-pointer group/hero select-none"
       >
         <div
           ref={photoTrackRef}
@@ -184,6 +187,15 @@ export function RoomFeedCard({
             {activePhotoIndex + 1}/{totalImagesCount}
           </span>
         </span>
+
+        {onEditRoom && (
+          <div className="absolute bottom-3 left-3 z-20">
+            <EditSpotButton
+              label="แก้ไขห้อง & รูป"
+              onClick={() => onEditRoom()}
+            />
+          </div>
+        )}
       </div>
 
       {/* 2. Flat Details & Inline Pricing Column (Padding only on text side) */}

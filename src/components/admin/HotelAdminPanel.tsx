@@ -1,8 +1,20 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Plus, Tag } from "lucide-react";
+import {
+  ArrowRight,
+  BedDouble,
+  Check,
+  Compass,
+  Home,
+  Pencil,
+  Play,
+  Plus,
+  Star,
+  Tag,
+} from "lucide-react";
 import {
   BookingRecord,
   ExtraAddon,
@@ -28,22 +40,24 @@ export interface HotelAdminPanelProps {
 }
 
 type AdminSettingsSectionId =
+  | "visual"
+  | "bookings"
   | "account"
   | "domain"
-  | "bookings"
   | "rooms"
-  | "ai"
   | "coupons"
-  | "addons";
+  | "addons"
+  | "ai";
 
 const ADMIN_SECTION_ORDER: AdminSettingsSectionId[] = [
+  "visual",
+  "bookings",
   "account",
   "domain",
-  "bookings",
   "rooms",
-  "ai",
   "coupons",
   "addons",
+  "ai",
 ];
 
 function AdminSectionIcon({
@@ -56,6 +70,8 @@ function AdminSectionIcon({
   className?: string;
 }) {
   switch (sectionId) {
+    case "visual":
+      return <Pencil className={className} />;
     case "account":
       return isFilled ? (
         <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -280,7 +296,7 @@ export function HotelAdminPanel({
     section: AdminSettingsSectionId;
     direction: 1 | -1;
   }>({
-    section: "account",
+    section: "visual",
     direction: 1,
   });
 
@@ -486,6 +502,17 @@ export function HotelAdminPanel({
     count?: number;
   }[] = [
     {
+      id: "visual",
+      labelTh: "แก้ไขหน้าเว็บจริง",
+      labelEn: "Edit Live Website",
+    },
+    {
+      id: "bookings",
+      labelTh: "รายการจอง & สลิป",
+      labelEn: "Bookings & QR Slips",
+      count: bookings.length,
+    },
+    {
       id: "account",
       labelTh: "บัญชี & PromptPay",
       labelEn: "Account & PromptPay",
@@ -496,21 +523,10 @@ export function HotelAdminPanel({
       labelEn: "Domain & Website",
     },
     {
-      id: "bookings",
-      labelTh: "รายการจอง & สลิป",
-      labelEn: "Bookings & QR Slips",
-      count: bookings.length,
-    },
-    {
       id: "rooms",
-      labelTh: "ห้องพัก & เรทราคา",
-      labelEn: "Rooms & Rates",
+      labelTh: "ปรับเรทราคาด่วน",
+      labelEn: "Quick Room Rates",
       count: rooms.length,
-    },
-    {
-      id: "ai",
-      labelTh: "AI Concierge",
-      labelEn: "AI Concierge",
     },
     {
       id: "coupons",
@@ -523,6 +539,11 @@ export function HotelAdminPanel({
       labelTh: "บริการเสริมในวิลล่า",
       labelEn: "In-Villa Add-ons",
       count: addons.length,
+    },
+    {
+      id: "ai",
+      labelTh: "AI Concierge",
+      labelEn: "AI Concierge",
     },
   ];
 
@@ -723,6 +744,95 @@ export function HotelAdminPanel({
                   opacity: { duration: 0.16, ease: "easeOut" },
                 }}
               >
+                {/* 0. Live Visual Website Editor Launchpad */}
+                {activeSection === "visual" && (
+                  <div className="space-y-4">
+                    <p className="ty-body-muted">
+                      คลิกเลือกหน้าที่ต้องการแก้ไข ระบบจะเปิดหน้าเว็บจริงพร้อมปุ่มดินสอให้จิ้มแก้ข้อความ รูปภาพ (ย่อ WebP อัตโนมัติขึ้น Cloudinary) และวางลิงก์วิดีโอ YouTube / Facebook ได้ตรงจุดทันที
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {[
+                        {
+                          href: "/?edit=1",
+                          Icon: Home,
+                          title: "หน้าแรก (/)",
+                          desc: "ภาพปกหลัก, คำโปรย H1, 4 จุดเด่น, เรื่องราวคู่ภาพ และแบนเนอร์",
+                          isPromo: false,
+                        },
+                        {
+                          href: "/booking?edit=1",
+                          Icon: BedDouble,
+                          title: "หน้าจอง & ห้องพัก (/booking)",
+                          desc: "เพิ่ม/แก้ไขห้องพัก, อัปโหลดหลายรูป, เรทวันธรรมดา-ศุกร์เสาร์ และแกลเลอรีรวม",
+                          isPromo: false,
+                        },
+                        {
+                          href: "/shorts?edit=1",
+                          Icon: Play,
+                          title: "วิดีโอสั้น (/shorts)",
+                          desc: "วางลิงก์ YouTube Shorts / Facebook ดึงปกอัตโนมัติ ผูกห้องพักและคูปอง",
+                          isPromo: false,
+                        },
+                        {
+                          href: "/deal?edit=1",
+                          Icon: Tag,
+                          title: "คูปอง & โปรโมชั่น (/deal)",
+                          desc: "คูปองส่วนลด, แพ็กเกจหมูกระทะ/สปา, การ์ดสิทธิพิเศษ และเรทฤดูกาล",
+                          isPromo: true,
+                        },
+                        {
+                          href: "/review?edit=1",
+                          Icon: Star,
+                          title: "รีวิวผู้เข้าพัก (/review)",
+                          desc: "เพิ่มรูปและข้อความประทับใจจากลูกค้าจริง ผูกปุ่มจองห้องอัตโนมัติ",
+                          isPromo: false,
+                        },
+                        {
+                          href: "/guide?edit=1",
+                          Icon: Compass,
+                          title: "แผนที่ & คู่มือที่พัก (/guide)",
+                          desc: "แก้ไขพิกัดแผนที่, ที่เที่ยวใกล้เคียง และคำถามที่พบบ่อย (FAQs)",
+                          isPromo: false,
+                        },
+                      ].map((card) => {
+                        const CardIcon = card.Icon;
+                        return (
+                          <Link
+                            key={card.href}
+                            href={card.href}
+                            className="rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-4 flex items-start justify-between gap-3 transition group"
+                          >
+                            <div className="flex items-start gap-3 min-w-0">
+                              <span
+                                className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                                  card.isPromo
+                                    ? "bg-[var(--color-promo-muted)] text-[var(--color-promo-text)]"
+                                    : "bg-[var(--color-accent-muted)] text-[var(--color-accent)]"
+                                }`}
+                              >
+                                <CardIcon className="w-5 h-5" />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="ty-body font-bold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent)] transition-colors">
+                                  {card.title}
+                                </p>
+                                <p className="ty-caption mt-0.5 line-clamp-2">
+                                  {card.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className="h-9 w-9 rounded-full bg-[var(--color-background-card)] flex items-center justify-center shrink-0 text-[var(--color-accent)]">
+                              <ArrowRight className="w-4 h-4" />
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. Account & PromptPay */}
                 {activeSection === "account" && (
                   <div className="space-y-2.5">
@@ -1194,7 +1304,6 @@ export function HotelAdminPanel({
                                         ? {
                                             ...item,
                                             basePriceThb: nextRateThb,
-                                            weekendPriceThb: nextRateThb,
                                           }
                                         : item
                                     ),
@@ -1503,7 +1612,7 @@ export function HotelAdminPanel({
                         <p className="ty-caption font-mono mt-0.5">
                           https://
                           {propertyConfig.subdomainSlug || "sapanunseen"}
-                          .myhotel.app
+                          .cangaroom.com
                         </p>
                       </div>
                       <StatusPill variant="success">

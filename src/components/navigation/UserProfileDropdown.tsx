@@ -7,6 +7,7 @@ import {
   Globe,
   LogIn,
   Moon,
+  Pencil,
   Settings,
   ShieldCheck,
   ShoppingBag,
@@ -27,6 +28,8 @@ export interface UserProfileDropdownProps {
   savedCouponsCount: number;
   onOpenCouponWallet: () => void;
   pendingAdminCount?: number;
+  isEditMode?: boolean;
+  onToggleEditMode?: () => void;
 }
 
 export function UserProfileDropdown({
@@ -39,6 +42,8 @@ export function UserProfileDropdown({
   savedCouponsCount,
   onOpenCouponWallet,
   pendingAdminCount = 0,
+  isEditMode = false,
+  onToggleEditMode,
 }: UserProfileDropdownProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -234,6 +239,35 @@ export function UserProfileDropdown({
               <span>{language === "th" ? "เข้าสู่ระบบ" : "Sign In"}</span>
             </span>
           </Link>
+
+          {onToggleEditMode && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setIsDropdownOpen(false);
+                onToggleEditMode();
+              }}
+              className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between ty-body font-semibold transition cursor-pointer ${
+                isEditMode
+                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                  : "hover:bg-[var(--color-background-muted)] text-[var(--color-accent)]"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Pencil className="w-4 h-4" />
+                <span>
+                  {isEditMode
+                    ? language === "th"
+                      ? "ปิดโหมดแก้ไขเว็บ"
+                      : "Exit Edit Mode"
+                    : language === "th"
+                    ? "แก้ไขหน้าเว็บจริง"
+                    : "Edit Live Page"}
+                </span>
+              </span>
+            </button>
+          )}
 
           <Link
             href="/admin"

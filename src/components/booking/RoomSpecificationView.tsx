@@ -292,7 +292,7 @@ export function RoomSpecificationView({
       {/* 1. Native Scroll-Snap Swipeable Room Gallery Stage */}
       <div
         onClick={() => handleOpenLightbox(safeSlideIndex)}
-        className="relative aspect-[16/10] sm:aspect-auto sm:h-[268px] w-full shrink-0 overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/detailshero select-none"
+        className="relative aspect-[16/9] sm:aspect-auto sm:h-[268px] w-full shrink-0 overflow-hidden bg-[var(--color-background-muted)] cursor-pointer group/detailshero select-none"
       >
         <div
           ref={heroTrackRef}

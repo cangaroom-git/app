@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ChevronLeft, Moon, ShieldCheck, Sun } from "lucide-react";
+import { ChevronLeft, Moon, Pencil, ShieldCheck, Sun } from "lucide-react";
 import { useSapanStore } from "@/lib/store";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { HotelAdminPanel } from "@/components/admin/HotelAdminPanel";
@@ -52,6 +52,16 @@ export default function HotelAdminDashboardPage() {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <Link
+              href="/?edit=1"
+              className="h-8 px-3 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-on-accent)] ty-caption font-semibold inline-flex items-center gap-1.5 transition"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>
+                {language === "th" ? "แก้ไขบนหน้าเว็บจริง" : "Edit Live Site"}
+              </span>
+            </Link>
+
             <Link
               href="/super-admin"
               className="hidden sm:inline-flex h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold items-center gap-1.5 transition"

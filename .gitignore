@@ -29,3 +29,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local runtime uploads & fallback store
+/public/uploads/
+/.data/
+.neon

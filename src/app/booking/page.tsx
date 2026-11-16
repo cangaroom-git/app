@@ -2,64 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { Instagram, Play, Star } from "lucide-react";
-import { RESORT_SHORTS } from "@/data/shortsData";
+import { pickLocalizedText } from "@/data/cmsDefaults";
 import { useHotelApp } from "@/components/HotelAppShell";
+import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { ResortHeroHeader } from "@/components/home/ResortHeroHeader";
 import { RoomFeedCard } from "@/components/home/RoomFeedCard";
 import { ShortVideoCard } from "@/components/home/ShortVideoCard";
-
-interface FeaturedGuestReview {
-  id: string;
-  guestNameTh: string;
-  guestNameEn: string;
-  roomLabel: string;
-  ratingScore: string;
-  photoUrl: string;
-  quoteTh: string;
-  quoteEn: string;
-}
-
-const FEATURED_GUEST_REVIEWS: FeaturedGuestReview[] = [
-  {
-    id: "rev-1",
-    guestNameTh: "คุณกมลชนก",
-    guestNameEn: "Kamonchanok P.",
-    roomLabel: "A-Frame Panorama Villa (A1)",
-    ratingScore: "10/10",
-    photoUrl:
-      "https://images.unsplash.com/photo-1587061949409-02df41d5e562?auto=format&fit=crop&w=800&q=80",
-    quoteTh:
-      "ระบบจองใช้งานง่ายมาก เห็นวันว่างชัดเจน วิลล่าเป็นส่วนตัวและอ่างแช่น้ำชมหมอกฟินมากค่ะ",
-    quoteEn:
-      "Effortless direct booking with real-time calendar. The private A-Frame villa and misty outdoor bathtub were unforgettable!",
-  },
-  {
-    id: "rev-2",
-    guestNameTh: "คุณภาคิน",
-    guestNameEn: "Phakin T.",
-    roomLabel: "Skyline Jacuzzi Villa (A3)",
-    ratingScore: "9.8/10",
-    photoUrl:
-      "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=800&q=80",
-    quoteTh:
-      "ประทับใจตั้งแต่กดจองตรงได้ส่วนลด แนบสลิปปุ๊บระบบสแกน QR ยืนยันไวมาก หมูกระทะและอาหารเช้าดีงามครับ",
-    quoteEn:
-      "Loved the direct booking promo and instant QR slip check. Hot BBQ on our deck and 5-star breakfast!",
-  },
-  {
-    id: "rev-3",
-    guestNameTh: "คุณณัฐริกา",
-    guestNameEn: "Natrika S.",
-    roomLabel: "Sapan Forest Cabin (B1)",
-    ratingScore: "9.6/10",
-    photoUrl:
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80",
-    quoteTh:
-      "ตื่นเช้ามาเปิดม่านเจอทะเลหมอกลอยผ่านหน้าห้องเลยค่ะ กาแฟดริปหอมมาก พนักงานดูแลอบอุ่นที่สุด",
-    quoteEn:
-      "Waking up to a sea of mist drifting past our terrace was magical. Warm hospitality and great drip coffee.",
-  },
-];
 
 export default function BookingPage() {
   const {
@@ -74,6 +22,9 @@ export default function BookingPage() {
     openRoomDrawer,
     navigateToTab,
     openShortsAt,
+    cms,
+    canShowEditControls,
+    openCmsEditor,
   } = useHotelApp();
 
   const [activeFeedView] = useState<"rooms" | "shorts">("rooms");
@@ -87,7 +38,6 @@ export default function BookingPage() {
     string | null
   >(null);
 
-  // Support deep-link query `?room=<id>` or `?category=<id>` smoothly on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -97,7 +47,9 @@ export default function BookingPage() {
     }
     const targetRoomId = params.get("room");
     if (targetRoomId && rooms.length > 0) {
-      const targetElement = document.getElementById(`room-card-${targetRoomId}`);
+      const targetElement = document.getElementById(
+        `room-card-${targetRoomId}`
+      );
       targetElement?.scrollIntoView({ behavior: "smooth" });
     }
   }, [rooms]);
@@ -145,14 +97,24 @@ export default function BookingPage() {
     if (!selectedCategoryFilter || selectedCategoryFilter === "all") {
       return true;
     }
-    if (selectedCategoryFilter === "aframe") {
-      return room.code.startsWith("A");
-    }
-    if (selectedCategoryFilter === "panoramic") {
-      return room.code.startsWith("B");
+    const matchingChip = cms.bookingPage.categoryChips.find(
+      (chip) => chip.id === selectedCategoryFilter
+    );
+    if (matchingChip?.codePrefix) {
+      return room.code
+        .toUpperCase()
+        .startsWith(matchingChip.codePrefix.toUpperCase());
     }
     return true;
   });
+
+  const featuredReviews = cms.reviews.filter(
+    (reviewItem) => reviewItem.isFeaturedOnBooking !== false
+  );
+
+  const activeShorts = cms.shortsPage.videos.filter(
+    (video) => video.isActive !== false
+  );
 
   return (
     <>
@@ -190,21 +152,24 @@ export default function BookingPage() {
               </span>
             </h2>
             <span className="ty-caption">
-              {RESORT_SHORTS.length} {language === "th" ? "วิดีโอ" : "videos"}
+              {activeShorts.length} {language === "th" ? "วิดีโอ" : "videos"}
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {RESORT_SHORTS.map((shortVideo, videoIndex) => {
+            {activeShorts.map((shortVideo, videoIndex) => {
               const linkedRoom =
-                shortVideo.roomIndex !== undefined
-                  ? rooms[shortVideo.roomIndex]
-                  : undefined;
+                rooms.find((r) => r.id === shortVideo.roomId) ??
+                rooms[shortVideo.roomIndex];
               return (
                 <ShortVideoCard
                   key={shortVideo.id}
                   id={shortVideo.id}
-                  title={shortVideo.titleTh}
+                  title={pickLocalizedText(
+                    language,
+                    shortVideo.titleTh,
+                    shortVideo.titleEn
+                  )}
                   roomCode={linkedRoom?.code}
                   posterUrl={shortVideo.posterUrl}
                   viewsCount={shortVideo.views}
@@ -219,8 +184,21 @@ export default function BookingPage() {
         </section>
       )}
 
-      {/* 3. Centered 1140px Room Feed Cards (Frameless Full-Bleed on Mobile, Rounded Tonal on Desktop) */}
+      {/* 3. Centered 1140px Room Feed Cards */}
       <section id="rooms" className="scroll-mt-16 space-y-5 sm:space-y-4">
+        {canShowEditControls && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="ty-subtitle">
+              จัดการรายการห้องพัก ({rooms.length} หลัง)
+            </span>
+            <EditSpotButton
+              icon="add"
+              label="เพิ่มห้องพัก / วิลล่าใหม่"
+              onClick={() => openCmsEditor({ type: "room" })}
+            />
+          </div>
+        )}
+
         {filteredRooms.map((room, roomIndex) => {
           const roomStatus = roomStatusMap[room.id];
           const isRoomAvailable =
@@ -244,7 +222,7 @@ export default function BookingPage() {
               onToggleLike={() => handleToggleRoomLike(room.id)}
               onShareRoom={() =>
                 handleShareRoomLink(
-                  language === "th" ? room.nameTh : room.nameEn,
+                  pickLocalizedText(language, room.nameTh, room.nameEn),
                   room.id
                 )
               }
@@ -256,25 +234,40 @@ export default function BookingPage() {
                 openRoomDrawer(room, "details", initialPhotoIndex ?? 0)
               }
               onBookRoom={() => openRoomDrawer(room, "calendar")}
+              onEditRoom={
+                canShowEditControls
+                  ? () => openCmsEditor({ type: "room", roomId: room.id })
+                  : undefined
+              }
             />
           );
         })}
       </section>
 
-      {/* 4. Verified Guest Reviews Section (#reviews) — Open Canvas, 1-Layer Cards */}
+      {/* 4. Verified Guest Reviews Section (#reviews) */}
       {sectionVisibility.galleryAndReviewsSection && (
         <section id="reviews" className="space-y-4 pt-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="ty-title flex items-center gap-2">
               <Star className="w-5 h-5 text-[var(--color-warning)] fill-current shrink-0" />
               <span>
-                {language === "th"
-                  ? "9.6 / 10 รีวิวจากผู้เข้าพักจริง"
-                  : "9.6 / 10 Verified Guest Reviews"}
+                {pickLocalizedText(
+                  language,
+                  cms.bookingPage.reviewsHeadingTh,
+                  cms.bookingPage.reviewsHeadingEn
+                )}
               </span>
             </h2>
 
             <div className="flex flex-wrap items-center gap-2">
+              {canShowEditControls && (
+                <EditSpotButton
+                  icon="add"
+                  label="เพิ่มรีวิวลูกค้า"
+                  onClick={() => openCmsEditor({ type: "review" })}
+                />
+              )}
+
               <button
                 type="button"
                 onClick={() => navigateToTab("review")}
@@ -285,51 +278,70 @@ export default function BookingPage() {
                 </span>
               </button>
               <a
-                href="https://www.instagram.com/sapanunseen?vrfl=NGFrdjRieXI3NXNq&utm_source=qr"
+                href={cms.bookingPage.instagramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-fw-secondary"
               >
                 <Instagram className="w-4 h-4" />
-                <span>@sapanunseen</span>
+                <span>{cms.bookingPage.instagramHandle}</span>
               </a>
             </div>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
-            {FEATURED_GUEST_REVIEWS.map((reviewItem) => (
+          <div className="w-full min-w-0 flex gap-3 overflow-x-auto overflow-y-hidden lg:overflow-visible overscroll-x-contain touch-manipulation no-scrollbar snap-x snap-proximity lg:snap-none lg:grid lg:grid-cols-3 sm:gap-4">
+            {featuredReviews.map((reviewItem) => (
               <article
                 key={reviewItem.id}
                 onClick={() => navigateToTab("review")}
-                className="snap-start shrink-0 w-[268px] sm:w-auto rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75 overflow-hidden flex flex-col justify-between cursor-pointer transition"
+                className="relative snap-start shrink-0 w-[268px] sm:w-[300px] lg:w-auto rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75 overflow-hidden flex flex-col justify-between cursor-pointer transition"
               >
-                <img
-                  src={reviewItem.photoUrl}
-                  alt={reviewItem.roomLabel}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-36 w-full object-cover bg-[var(--color-background-subtle)]"
-                />
+                <div className="relative h-36 w-full bg-[var(--color-background-subtle)]">
+                  <img
+                    src={reviewItem.photos[0]}
+                    alt={reviewItem.roomLabel}
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    className="h-full w-full object-cover select-none pointer-events-none"
+                  />
+                  {canShowEditControls && (
+                    <div className="absolute top-2.5 right-2.5 z-20">
+                      <EditSpotButton
+                        onClick={() =>
+                          openCmsEditor({
+                            type: "review",
+                            reviewId: reviewItem.id,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
 
                 <div className="p-4 flex-1 flex flex-col justify-between gap-3">
                   <p className="ty-body line-clamp-2">
                     &ldquo;
-                    {language === "th"
-                      ? reviewItem.quoteTh
-                      : reviewItem.quoteEn}
+                    {pickLocalizedText(
+                      language,
+                      reviewItem.captionTh,
+                      reviewItem.captionEn
+                    )}
                     &rdquo;
                   </p>
 
                   <div className="flex items-center justify-between gap-2 ty-caption">
                     <span className="font-bold text-[var(--color-text-primary)] truncate">
-                      {language === "th"
-                        ? reviewItem.guestNameTh
-                        : reviewItem.guestNameEn}{" "}
-                      · {reviewItem.roomLabel.split("(")[0].trim()}
+                      {pickLocalizedText(
+                        language,
+                        reviewItem.authorNameTh,
+                        reviewItem.authorNameEn
+                      )}{" "}
+                      · {reviewItem.roomCode}
                     </span>
                     <span className="inline-flex items-center gap-1 font-bold text-[var(--color-text-primary)] shrink-0">
                       <Star className="w-3.5 h-3.5 fill-[var(--color-warning)] text-[var(--color-warning)]" />
-                      <span>{reviewItem.ratingScore}</span>
+                      <span>{reviewItem.rating}</span>
                     </span>
                   </div>
                 </div>
