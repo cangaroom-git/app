@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Bookmark,
   Building2,
   CalendarCheck,
   Compass,
@@ -312,6 +313,28 @@ export function UserProfileDropdown({
 
           {/* 2. GUEST ACTIONS */}
           <div className="space-y-0.5">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => handleNavigateMenuTab("board")}
+              className={`w-full h-10 px-2.5 rounded-[10px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
+                activeTab === "board"
+                  ? "bg-[var(--color-background-muted)] font-semibold"
+                  : "hover:bg-[var(--color-background-muted)]"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <span className="h-8 w-8 rounded-[10px] bg-[var(--color-background-subtle)] inline-flex items-center justify-center">
+                  <Bookmark className="w-[18px] h-[18px] text-[var(--color-promo)]" />
+                </span>
+                <span>
+                  {language === "th"
+                    ? "บอร์ดที่พักที่บันทึกไว้"
+                    : "My Saved Boards"}
+                </span>
+              </span>
+            </button>
+
             <button
               type="button"
               role="menuitem"

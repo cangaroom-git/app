@@ -454,6 +454,14 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
       setIsChatDrawerOpen(false);
 
+      if (targetTab === "board") {
+        router.push("/board");
+        return;
+      }
+      if (targetTab === "shorts") {
+        router.push("/?category=videos");
+        return;
+      }
       if (targetTab === "setting") {
         router.push("/setting");
         return;
@@ -521,7 +529,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const openShortsAt = useCallback(
     (index: number) => {
       setInitialShortIndex(index);
-      router.push("/shorts");
+      router.push("/?category=videos");
     },
     [router]
   );

@@ -12,6 +12,7 @@ import {
   Maximize2,
   MessageCircle,
   MoreHorizontal,
+  Play,
   Send,
   Share,
   Smile,
@@ -19,43 +20,16 @@ import {
 } from "lucide-react";
 import { PinCommentItem } from "@/data/cmsDefaults";
 import { LanguageCode } from "@/lib/dateFormatters";
+import { PinterestPinItem } from "@/lib/pinBuilder";
 import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import { UniversalVideoPlayer } from "@/components/cms/UniversalVideoPlayer";
+import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
   AuthenticatedProfileUser,
   UserAvatarCircle,
 } from "@/components/navigation/UserProfileDropdown";
 
-export type PinCategoryId =
-  | "all"
-  | "rooms"
-  | "videos"
-  | "views"
-  | "dining"
-  | "reviews"
-  | "deals";
-
-export interface PinterestPinItem {
-  id: string;
-  category: Exclude<PinCategoryId, "all">;
-  aspectClass: string;
-  imageUrl: string;
-  galleryUrls: string[];
-  videoUrl?: string;
-  videoDuration?: string;
-  title: string;
-  description: string;
-  boardLabel: string;
-  authorName: string;
-  authorSubtitle: string;
-  authorAvatar?: string;
-  footerCaption?: string;
-  footerSubcaption?: string;
-  ctaLabel?: string;
-  onCtaClick?: () => void;
-  baseLikes: number;
-  onEdit?: () => void;
-}
+export type { PinterestPinItem };
 
 export interface PinterestPinCardProps {
   pin: PinterestPinItem;
@@ -77,7 +51,7 @@ export function PinterestPinCard({
   onSharePin,
 }: PinterestPinCardProps) {
   return (
-    <article className="break-inside-avoid mb-4 select-none">
+    <article className="w-full select-none">
       <div
         onClick={() => onSelectPin(pin)}
         className={`group relative w-full ${pin.aspectClass} rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
@@ -91,19 +65,26 @@ export function PinterestPinCard({
           className="h-full w-full object-cover object-center"
         />
 
-        {/* Video Duration Pill at Top-Left (Exact Pinterest Video Pin Badge) */}
-        {pin.videoDuration && (
-          <span className="absolute top-2.5 left-2.5 z-10 rounded-full bg-black/65 text-white px-2 py-0.5 text-[11px] font-semibold tabular-nums pointer-events-none group-hover:opacity-0 transition-opacity">
-            {pin.videoDuration}
-          </span>
+        {/* Video Badge: Top-Left Duration + Top-Right Squircle Play Badge (Matches Image 3!) */}
+        {pin.videoUrl && (
+          <>
+            {pin.videoDuration && (
+              <span className="absolute top-3 left-3 z-10 rounded-[10px] bg-black/65 text-white px-2.5 py-0.5 text-[12px] font-semibold tabular-nums pointer-events-none group-hover:opacity-0 transition-opacity">
+                {pin.videoDuration}
+              </span>
+            )}
+            <span className="absolute top-3 right-3 z-10 h-7 w-7 rounded-[8px] bg-white/92 text-[#111111] inline-flex items-center justify-center shadow-xs pointer-events-none group-hover:opacity-0 transition-opacity">
+              <Play className="w-3.5 h-3.5 fill-[#111111] ml-0.5" />
+            </span>
+          </>
         )}
 
-        {/* Desktop Hover Overlay (ZERO Hover Scale — Subtle Veil + Save Pill + Quick Actions) */}
+        {/* Desktop Hover Overlay (ZERO Hover Scale — Squircle Save & Share Buttons) */}
         <div className="hidden sm:flex absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-3 flex-col justify-between">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1 text-white ty-caption !text-white font-semibold truncate max-w-[55%]">
               <span className="truncate">{pin.boardLabel}</span>
-              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+              <ChevronDown className="w-4 h-4 shrink-0" />
             </span>
 
             <button
@@ -112,7 +93,7 @@ export function PinterestPinCard({
                 e.stopPropagation();
                 onToggleSave(pin.id);
               }}
-              className={`h-9 px-4 rounded-full ty-body font-semibold transition cursor-pointer shrink-0 ${
+              className={`h-10 px-4 rounded-[14px] ty-body font-semibold transition cursor-pointer shrink-0 ${
                 isSaved
                   ? "bg-[#111111] !text-white"
                   : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
@@ -129,18 +110,11 @@ export function PinterestPinCard({
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            {pin.ctaLabel && pin.onCtaClick ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  pin.onCtaClick?.();
-                }}
-                className="h-8 px-3 rounded-full bg-white/90 hover:bg-white text-[#111111] ty-caption !text-[#111111] font-semibold inline-flex items-center gap-1 truncate max-w-[75%] cursor-pointer"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{pin.ctaLabel}</span>
-              </button>
+            {pin.nightlyPriceThb ? (
+              <span className="h-9 px-3 rounded-[12px] bg-white/92 text-[#111111] ty-caption !text-[#111111] font-bold inline-flex items-center gap-1 truncate">
+                <span>฿{pin.nightlyPriceThb.toLocaleString()}/คืน</span>
+                <ArrowUpRight className="w-4 h-4 shrink-0" />
+              </span>
             ) : (
               <span />
             )}
@@ -152,9 +126,9 @@ export function PinterestPinCard({
                 onSharePin(pin);
               }}
               aria-label="Share"
-              className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-[#111111] inline-flex items-center justify-center shrink-0 cursor-pointer"
+              className="h-9 w-9 rounded-[12px] bg-white/92 hover:bg-white text-[#111111] inline-flex items-center justify-center shrink-0 cursor-pointer"
             >
-              <Share className="w-4 h-4" />
+              <Share className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>
@@ -170,7 +144,7 @@ export function PinterestPinCard({
         )}
       </div>
 
-      {/* Subtle Pinterest Footer Caption (Shown cleanly under featured/room/review pins) */}
+      {/* Subtle Pinterest Footer Caption */}
       {pin.footerCaption && (
         <div className="pt-1.5 px-1 flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -187,7 +161,7 @@ export function PinterestPinCard({
             type="button"
             onClick={() => onSelectPin(pin)}
             aria-label="More details"
-            className="h-6 w-6 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer"
+            className="h-7 w-7 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -268,8 +242,9 @@ export function PinterestPinDetail({
     pin.galleryUrls.length > 0 ? pin.galleryUrls : [pin.imageUrl];
   const activeImageUrl = images[slideIndex] || pin.imageUrl;
 
-  const sideRelatedPins = relatedPins.slice(0, 6);
-  const bottomRelatedPins = relatedPins.slice(6);
+  // Split related pins cleanly between right sidebar (xl+) and immediate left-underneath Masonry so ZERO dead whitespace ever appears!
+  const rightColumnPins = relatedPins.filter((_, idx) => idx % 3 === 0);
+  const underMainCardPins = relatedPins.filter((_, idx) => idx % 3 !== 0);
 
   const handleSubmitComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,26 +264,30 @@ export function PinterestPinDetail({
   const isLongDesc = pin.description.length > 150;
 
   return (
-    <div className="space-y-8 select-none">
-      {/* TOP SECTION: Main Split 2-Column Pin Card (xl:col-span-8) + Side 2-Column Related Masonry (xl:col-span-4) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        {/* MAIN PINTEREST SPLIT 2-COLUMN PIN CLOSE-UP CARD */}
-        <div className="xl:col-span-8 rounded-[28px] bg-[var(--color-background-card)] border border-[var(--color-border)] shadow-[var(--shadow-card)] grid grid-cols-1 md:grid-cols-2 overflow-hidden">
-          {/* LEFT COLUMN: MEDIA STAGE */}
-          <div className="relative bg-[var(--color-background-muted)] flex items-center justify-center min-h-[340px] md:min-h-[540px] overflow-hidden">
-            {/* Top-Left Back Arrow Button (Exact Match to Pinterest Image 2) */}
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start select-none">
+      {/* =====================================================================
+          LEFT / MAIN COLUMN (xl:col-span-8):
+          1. Split 2-Column Pin Card (Natural Height)
+          2. Related Pins Masonry IMMEDIATELY underneath (Zero Empty Whitespace!)
+      ====================================================================== */}
+      <div className="xl:col-span-8 space-y-6 min-w-0">
+        {/* MAIN SPLIT 2-COLUMN PIN CARD */}
+        <div className="rounded-[28px] bg-[var(--color-background-card)] border border-[var(--color-border)] shadow-[var(--shadow-card)] grid grid-cols-1 md:grid-cols-2 items-stretch overflow-hidden">
+          {/* LEFT HALF: MEDIA STAGE */}
+          <div className="relative bg-[var(--color-background-muted)] flex items-center justify-center overflow-hidden">
+            {/* Top-Left Squircle Back Button (Exact Match to Image 2: rounded-[16px] pure white!) */}
             <button
               type="button"
               onClick={onClose}
               aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-              title={language === "th" ? "กลับหน้าตารางพิน" : "Back to feed"}
-              className="absolute top-4 left-4 z-20 h-10 w-10 rounded-full bg-white/92 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center transition cursor-pointer"
+              title={language === "th" ? "กลับหน้าหลัก" : "Back to feed"}
+              className="absolute top-4 left-4 z-20 h-12 w-12 rounded-[16px] bg-white hover:bg-[#f4f4f4] text-[#111111] shadow-[0_2px_10px_rgba(0,0,0,0.10)] inline-flex items-center justify-center transition cursor-pointer"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-6 h-6" strokeWidth={2.3} />
             </button>
 
             {pin.videoUrl ? (
-              <div className="w-full h-full min-h-[460px] bg-black flex items-center justify-center">
+              <div className="w-full h-full min-h-[420px] bg-black flex items-center justify-center">
                 <UniversalVideoPlayer
                   videoUrl={pin.videoUrl}
                   posterUrl={pin.imageUrl}
@@ -323,7 +302,7 @@ export function PinterestPinDetail({
                 <img
                   src={activeImageUrl}
                   alt={pin.title}
-                  className="w-full h-full max-h-[680px] object-cover"
+                  className="w-full h-auto max-h-[640px] object-cover"
                 />
 
                 {images.length > 1 && (
@@ -336,9 +315,9 @@ export function PinterestPinDetail({
                         )
                       }
                       aria-label="Previous image"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-white/90 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center cursor-pointer"
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-[14px] bg-white/95 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center cursor-pointer"
                     >
-                      <ChevronLeft className="w-5 h-5" />
+                      <ChevronLeft className="w-5 h-5" strokeWidth={2.3} />
                     </button>
                     <button
                       type="button"
@@ -346,12 +325,12 @@ export function PinterestPinDetail({
                         setSlideIndex((prev) => (prev + 1) % images.length)
                       }
                       aria-label="Next image"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-white/90 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center cursor-pointer"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-[14px] bg-white/95 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center cursor-pointer"
                     >
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-5 h-5" strokeWidth={2.3} />
                     </button>
 
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1">
                       {images.map((_, idx) => (
                         <button
                           key={idx}
@@ -369,36 +348,37 @@ export function PinterestPinDetail({
                   </>
                 )}
 
-                {/* Bottom-Right Expand Zoom Icon (Exact Match to Pinterest Image 2) */}
+                {/* Bottom-Right Squircle Expand Button */}
                 <button
                   type="button"
                   onClick={() => onExpandMedia(images, slideIndex)}
                   aria-label="Expand image"
                   title={language === "th" ? "ขยายรูปเต็มจอ" : "View full size"}
-                  className="absolute bottom-4 right-4 z-20 h-10 w-10 rounded-full bg-white/92 hover:bg-white text-[#111111] shadow-sm inline-flex items-center justify-center transition cursor-pointer"
+                  className="absolute bottom-4 right-4 z-20 h-11 w-11 rounded-[16px] bg-white/95 hover:bg-white text-[#111111] shadow-[0_2px_10px_rgba(0,0,0,0.10)] inline-flex items-center justify-center transition cursor-pointer"
                 >
-                  <Maximize2 className="w-4 h-4" />
+                  <Maximize2 className="w-5 h-5" strokeWidth={2.1} />
                 </button>
               </>
             )}
           </div>
 
-          {/* RIGHT COLUMN: ACTIONS, INFO & LIVE COMMENTS */}
-          <div className="flex flex-col justify-between min-h-[480px] md:max-h-[680px] bg-[var(--color-background-card)]">
-            {/* 1. Sticky Top Action Bar (♡ Like, 💬 Comment, ↑ Share, Board + Red บันทึก Pill) */}
+          {/* RIGHT HALF: INTERACTIONS, DETAILS & LIVE COMMENTS */}
+          <div className="flex flex-col justify-between max-h-[640px] bg-[var(--color-background-card)]">
+            {/* 1. Sticky Top Action Bar (Larger Icons + Squircle Buttons) */}
             <div className="px-5 sm:px-6 pt-5 pb-3 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={onToggleLike}
-                  className="h-10 px-2.5 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+                  className="h-11 px-3 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
                 >
                   <Heart
-                    className={`w-[21px] h-[21px] ${
+                    className={`w-[23px] h-[23px] ${
                       isLiked
                         ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
                         : ""
                     }`}
+                    strokeWidth={2.1}
                   />
                   <span>{likeCount}</span>
                 </button>
@@ -407,21 +387,21 @@ export function PinterestPinDetail({
                   type="button"
                   onClick={() => commentInputRef.current?.focus()}
                   aria-label="Comment"
-                  className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                  className="h-11 w-11 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
                 >
-                  <MessageCircle className="w-[21px] h-[21px]" />
+                  <MessageCircle className="w-[23px] h-[23px]" strokeWidth={2.1} />
                 </button>
 
                 <button
                   type="button"
                   onClick={handleShareWithFeedback}
                   aria-label="Share"
-                  className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                  className="h-11 w-11 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
                 >
                   {justCopied ? (
-                    <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
+                    <Check className="w-[22px] h-[22px] text-[var(--color-success)]" />
                   ) : (
-                    <Share className="w-[20px] h-[20px]" />
+                    <Share className="w-[22px] h-[22px]" strokeWidth={2.1} />
                   )}
                 </button>
 
@@ -431,7 +411,7 @@ export function PinterestPinDetail({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <span className="hidden sm:inline-flex items-center gap-1 ty-body font-semibold text-[var(--color-text-primary)] truncate max-w-[120px]">
+                <span className="hidden sm:inline-flex items-center gap-1 ty-body font-semibold text-[var(--color-text-primary)] truncate max-w-[125px]">
                   <span className="truncate">{pin.boardLabel}</span>
                   <ChevronDown className="w-4 h-4 shrink-0" />
                 </span>
@@ -439,7 +419,7 @@ export function PinterestPinDetail({
                 <button
                   type="button"
                   onClick={() => onToggleSave(pin.id)}
-                  className={`h-11 px-5 rounded-full ty-body font-semibold transition cursor-pointer ${
+                  className={`h-11 px-5 rounded-[16px] ty-body font-semibold transition cursor-pointer ${
                     isSaved
                       ? "bg-[#111111] !text-white"
                       : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
@@ -456,43 +436,40 @@ export function PinterestPinDetail({
               </div>
             </div>
 
-            {/* 2. Scrollable Author, Title, CTA Pill, Description & Comments List */}
+            {/* 2. Scrollable Content & Comments */}
             <div className="px-5 sm:px-6 py-2 flex-1 overflow-y-auto space-y-4">
-              {/* Author Row */}
               <div className="flex items-center gap-2.5">
                 {pin.authorAvatar ? (
                   <img
                     src={pin.authorAvatar}
                     alt={pin.authorName}
-                    className="h-8 w-8 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)]"
+                    className="h-9 w-9 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)]"
                   />
                 ) : (
-                  <span className="h-8 w-8 rounded-full bg-[var(--color-promo)] text-white inline-flex items-center justify-center ty-caption !text-white font-bold shrink-0">
-                    {pin.authorName[0] || "S"}
+                  <span className="h-9 w-9 rounded-full bg-[var(--color-promo)] text-white inline-flex items-center justify-center ty-caption !text-white font-bold shrink-0">
+                    {pin.authorName[0] || "C"}
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="ty-caption font-semibold text-[var(--color-text-primary)] leading-snug">
-                    {pin.authorName} · {pin.authorSubtitle}
+                  <p className="ty-body font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                    {pin.authorName}
                   </p>
+                  <p className="ty-caption truncate">{pin.authorSubtitle}</p>
                 </div>
               </div>
 
-              {/* Pin Title */}
               <h1 className="ty-title leading-snug">{pin.title}</h1>
 
-              {/* Gray Full-Width Pill Button (Matches Pinterest's "เยี่ยมชมเว็บไซต์" Button) */}
               {pin.ctaLabel && pin.onCtaClick && (
                 <button
                   type="button"
                   onClick={pin.onCtaClick}
-                  className="w-full h-11 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="w-full h-11 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <span>{pin.ctaLabel}</span>
                 </button>
               )}
 
-              {/* Description Section ("คำอธิบาย") */}
               <div className="space-y-1.5">
                 <h2 className="ty-body font-bold">
                   {language === "th" ? "คำอธิบาย" : "Description"}
@@ -521,7 +498,6 @@ export function PinterestPinDetail({
                 )}
               </div>
 
-              {/* Comments List ("ความคิดเห็น") */}
               <div className="pt-2 border-t border-[var(--color-border)] space-y-3.5">
                 <h3 className="ty-body font-bold flex items-center gap-1.5">
                   <span>
@@ -535,10 +511,10 @@ export function PinterestPinDetail({
                 </h3>
 
                 {comments.length === 0 ? (
-                  <p className="ty-caption py-2">
+                  <p className="ty-caption py-1">
                     {language === "th"
                       ? "ยังไม่มีความคิดเห็น ร่วมแบ่งปันความประทับใจคนแรกได้เลยครับ"
-                      : "No comments yet! Add one to start the conversation."}
+                      : "No comments yet! Share your thoughts below."}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -614,7 +590,7 @@ export function PinterestPinDetail({
                                   aria-label="Delete comment"
                                   className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                   <span>
                                     {language === "th" ? "ลบ" : "Delete"}
                                   </span>
@@ -630,7 +606,7 @@ export function PinterestPinDetail({
               </div>
             </div>
 
-            {/* 3. Sticky Bottom Rounded Comment Input Pill (Exact Match to Pinterest Image 2) */}
+            {/* 3. Sticky Bottom Rounded Comment Input */}
             <div className="px-5 sm:px-6 py-3.5 border-t border-[var(--color-border)] bg-[var(--color-background-card)] shrink-0 space-y-2">
               {showEmojiBar && (
                 <div className="flex items-center gap-1.5 px-1">
@@ -642,7 +618,7 @@ export function PinterestPinDetail({
                         setCommentText((prev) => `${prev}${em}`);
                         commentInputRef.current?.focus();
                       }}
-                      className="h-8 w-8 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[16px] cursor-pointer"
+                      className="h-8 w-8 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[16px] cursor-pointer"
                     >
                       {em}
                     </button>
@@ -658,7 +634,7 @@ export function PinterestPinDetail({
                   <UserAvatarCircle user={currentUser} sizeClass="h-9 w-9" />
                 )}
 
-                <div className="flex-1 h-12 rounded-full border border-[var(--color-border-emphasized)] focus-within:border-[var(--color-text-primary)] px-4 flex items-center gap-2 bg-[var(--color-background-card)]">
+                <div className="flex-1 h-12 rounded-[16px] border border-[var(--color-border-emphasized)] focus-within:border-[var(--color-text-primary)] px-4 flex items-center gap-2 bg-[var(--color-background-card)]">
                   <input
                     ref={commentInputRef}
                     type="text"
@@ -676,7 +652,7 @@ export function PinterestPinDetail({
                     type="button"
                     onClick={() => setShowEmojiBar((v) => !v)}
                     aria-label="Add emoji"
-                    className="h-8 w-8 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] cursor-pointer shrink-0"
+                    className="h-9 w-9 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] cursor-pointer shrink-0"
                   >
                     <Smile className="w-5 h-5" />
                   </button>
@@ -685,7 +661,7 @@ export function PinterestPinDetail({
                     <button
                       type="submit"
                       aria-label="Send comment"
-                      className="h-8 w-8 rounded-full bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-white inline-flex items-center justify-center transition cursor-pointer shrink-0"
+                      className="h-9 w-9 rounded-[12px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-white inline-flex items-center justify-center transition cursor-pointer shrink-0"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -696,36 +672,44 @@ export function PinterestPinDetail({
           </div>
         </div>
 
-        {/* RIGHT 2-COLUMN RELATED PINS SIDEBAR ON WIDE DESKTOP (Matches Pinterest Image 2!) */}
-        {sideRelatedPins.length > 0 && (
-          <div className="hidden xl:block xl:col-span-4 columns-2 gap-4">
-            {sideRelatedPins.map((relPin) => (
-              <PinterestPinCard
-                key={`side-${relPin.id}`}
-                pin={relPin}
-                language={language}
-                isSaved={Boolean(savedPinsMap[relPin.id])}
-                canEdit={canEdit}
-                onSelectPin={onSelectPin}
-                onToggleSave={onToggleSave}
-                onSharePin={onSharePin}
-              />
-            ))}
-          </div>
+        {/* IMMEDIATELY UNDERNEATH MAIN CARD (Eliminates Empty White Space Below Image!) */}
+        {underMainCardPins.length > 0 && (
+          <section className="space-y-3.5 pt-1">
+            <h2 className="ty-title">
+              {language === "th"
+                ? "สำรวจที่พักและบรรยากาศใกล้เคียง"
+                : "More stays to explore"}
+            </h2>
+
+            <MasonryGrid
+              items={underMainCardPins}
+              columnBreakpoints={[2, 2, 3, 3, 4]}
+              renderItem={(relPin) => (
+                <PinterestPinCard
+                  pin={relPin}
+                  language={language}
+                  isSaved={Boolean(savedPinsMap[relPin.id])}
+                  canEdit={canEdit}
+                  onSelectPin={onSelectPin}
+                  onToggleSave={onToggleSave}
+                  onSharePin={onSharePin}
+                />
+              )}
+            />
+          </section>
         )}
       </div>
 
-      {/* BOTTOM FULL-WIDTH RELATED MASONRY GRID */}
-      {bottomRelatedPins.length > 0 && (
-        <section className="space-y-4 pt-2">
-          <h2 className="ty-title text-center">
-            {language === "th" ? "สำรวจเพิ่มเติมที่คล้ายกัน" : "More to explore"}
-          </h2>
-
-          <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 2xl:columns-6 gap-4">
-            {bottomRelatedPins.map((relPin) => (
+      {/* =====================================================================
+          RIGHT SIDEBAR RELATED MASONRY COLUMN (xl:col-span-4)
+      ====================================================================== */}
+      {rightColumnPins.length > 0 && (
+        <div className="xl:col-span-4 min-w-0">
+          <MasonryGrid
+            items={rightColumnPins}
+            columnBreakpoints={[2, 2, 3, 2, 2]}
+            renderItem={(relPin) => (
               <PinterestPinCard
-                key={`bot-${relPin.id}`}
                 pin={relPin}
                 language={language}
                 isSaved={Boolean(savedPinsMap[relPin.id])}
@@ -734,9 +718,9 @@ export function PinterestPinDetail({
                 onToggleSave={onToggleSave}
                 onSharePin={onSharePin}
               />
-            ))}
-          </div>
-        </section>
+            )}
+          />
+        </div>
       )}
     </div>
   );

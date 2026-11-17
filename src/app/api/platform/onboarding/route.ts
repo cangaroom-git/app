@@ -25,6 +25,7 @@ const RESERVED_SLUGS = new Set([
   "login",
   "register-hotel",
   "booking",
+  "board",
   "shorts",
   "deal",
   "review",

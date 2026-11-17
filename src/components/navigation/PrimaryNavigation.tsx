@@ -3,10 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  Bookmark,
   Building2,
   Calendar,
   CalendarCheck,
-  Clapperboard,
   Compass,
   Crown,
   Globe,
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { WhiteLabelPropertyConfig } from "@/data/rooms";
 import { formatShortDate, LanguageCode } from "@/lib/dateFormatters";
+import { SAVED_PINS_STORAGE_KEY } from "@/lib/pinBuilder";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import {
   HOTEL_NAV_TABS,
@@ -94,6 +95,7 @@ export function PrimaryNavigation({
   const [isMobileProfileDrawerOpen, setIsMobileProfileDrawerOpen] =
     useState(false);
   const [isMorePopoverOpen, setIsMorePopoverOpen] = useState(false);
+  const [savedPinsCount, setSavedPinsCount] = useState(0);
   const moreWrapperRef = useRef<HTMLDivElement | null>(null);
   const { user, refreshProfile, signOutUser } = useAuthenticatedProfile();
 
@@ -101,7 +103,11 @@ export function PrimaryNavigation({
   const isDarkTheme = theme === "dark";
 
   const normalizedActiveTab: HotelNavTabId =
-    activeTab === "room" ? "book" : activeTab;
+    activeTab === "room"
+      ? "book"
+      : activeTab === "shorts"
+      ? "board"
+      : activeTab;
 
   const isHotelOrSuperAdmin =
     user?.role === "HOTEL_ADMIN" || user?.role === "SUPER_ADMIN";
@@ -118,6 +124,32 @@ export function PrimaryNavigation({
   };
 
   useBodyScrollLock(isMobileProfileDrawerOpen);
+
+  // Sync saved pins count across tabs & in-page updates
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncSavedCount = () => {
+      try {
+        const raw = localStorage.getItem(SAVED_PINS_STORAGE_KEY);
+        if (!raw) {
+          setSavedPinsCount(0);
+          return;
+        }
+        const parsed = JSON.parse(raw) as Record<string, boolean>;
+        const count = Object.values(parsed).filter(Boolean).length;
+        setSavedPinsCount(count);
+      } catch {
+        setSavedPinsCount(0);
+      }
+    };
+    syncSavedCount();
+    window.addEventListener("storage", syncSavedCount);
+    window.addEventListener("cangaroom-saved-pins-changed", syncSavedCount);
+    return () => {
+      window.removeEventListener("storage", syncSavedCount);
+      window.removeEventListener("cangaroom-saved-pins-changed", syncSavedCount);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isMorePopoverOpen) return;
@@ -149,15 +181,14 @@ export function PrimaryNavigation({
     <>
       {/* =====================================================================
           1. INSTAGRAM-STYLE MINIMAL 72px LEFT SIDEBAR (>= lg)
-             - Top: Minimal monochrome brand glyph
-             - Center: Vertically centered pure icon stack + circular user avatar
-             - Bottom: Minimal Hamburger (≡) More menu
+             - Larger 26px crisp icons + Pinterest 16px squircle hover buttons
+             - Replaced /shorts with /board (Saved Boards)
       ====================================================================== */}
       <aside
         aria-label="Primary sidebar navigation"
         className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-[72px] flex-col items-center justify-between bg-[var(--color-background-card)] border-r border-[var(--color-border)] py-5 select-none"
       >
-        {/* TOP BRAND GLYPH (Clean Instagram Outline Aesthetic) */}
+        {/* TOP BRAND GLYPH */}
         <Link
           href="/"
           onClick={(e) => {
@@ -168,29 +199,35 @@ export function PrimaryNavigation({
               onSelectTab("home");
             }
           }}
-          title={propertyShortName}
+          title="Cangaroom · Thailand Stays"
           aria-label="Home"
-          className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+          className="h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
         >
           <svg
             viewBox="0 0 24 24"
-            className="w-[24px] h-[24px]"
+            className="w-[27px] h-[27px]"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.1"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <rect width="18" height="18" x="3" y="3" rx="5" />
+            <rect width="18" height="18" x="3" y="3" rx="5.5" />
             <path d="M8 15.5 12 8.5l4 7" />
-            <circle cx="16.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+            <circle
+              cx="16.5"
+              cy="7.5"
+              r="1.15"
+              fill="currentColor"
+              stroke="none"
+            />
           </svg>
         </Link>
 
-        {/* CENTER VERTICALLY BALANCED ICON STACK (Exact Instagram Rhythm) */}
+        {/* CENTER VERTICALLY BALANCED ICON STACK */}
         <nav
           aria-label="Main navigation"
-          className="flex flex-col items-center gap-2"
+          className="flex flex-col items-center gap-2.5"
         >
           {/* 1. Home (Pinterest Masonry Feed) */}
           <button
@@ -201,43 +238,63 @@ export function PrimaryNavigation({
             }}
             title={language === "th" ? "หน้าแรก" : "Home"}
             aria-label="Home"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer ${
+              normalizedActiveTab === "home"
+                ? "bg-[var(--color-background-muted)]/75"
+                : ""
+            }`}
           >
             <Home
-              className="w-[24px] h-[24px]"
-              strokeWidth={normalizedActiveTab === "home" ? 2.6 : 1.9}
+              className="w-[26px] h-[26px]"
+              strokeWidth={normalizedActiveTab === "home" ? 2.5 : 2}
               fill={normalizedActiveTab === "home" ? "currentColor" : "none"}
             />
           </button>
 
-          {/* 2. Reels / Short Videos */}
+          {/* 2. Personal Saved Boards (/board) — Replaces /shorts */}
           <button
             type="button"
             onClick={() => {
-              onSelectTab("shorts");
+              onSelectTab("board");
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
-            title={language === "th" ? "คลิปสั้น Reels" : "Reels"}
-            aria-label="Reels"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+            title={
+              language === "th"
+                ? `บอร์ดที่พักที่บันทึกไว้${savedPinsCount > 0 ? ` (${savedPinsCount})` : ""}`
+                : `Saved Boards${savedPinsCount > 0 ? ` (${savedPinsCount})` : ""}`
+            }
+            aria-label="Saved Boards"
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative ${
+              normalizedActiveTab === "board"
+                ? "bg-[var(--color-background-muted)]/75"
+                : ""
+            }`}
           >
-            <Clapperboard
-              className="w-[24px] h-[24px]"
-              strokeWidth={normalizedActiveTab === "shorts" ? 2.5 : 1.9}
+            <Bookmark
+              className="w-[26px] h-[26px]"
+              strokeWidth={normalizedActiveTab === "board" ? 2.5 : 2}
+              fill={normalizedActiveTab === "board" ? "currentColor" : "none"}
             />
+            {savedPinsCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-[6px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[10px] font-bold inline-flex items-center justify-center leading-none">
+                {savedPinsCount > 99 ? "99+" : savedPinsCount}
+              </span>
+            )}
           </button>
 
-          {/* 3. Direct Message / AI Concierge (Instagram Paper Plane) */}
+          {/* 3. Direct Message / AI Concierge */}
           <button
             type="button"
             onClick={() => onSelectTab("chat")}
             title={language === "th" ? "แชทสอบถามที่พัก" : "Messages"}
             aria-label="Messages"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative ${
+              isChatOpen ? "bg-[var(--color-background-muted)]/75" : ""
+            }`}
           >
             <Send
-              className="w-[23px] h-[23px]"
-              strokeWidth={isChatOpen ? 2.5 : 1.9}
+              className="w-[25px] h-[25px]"
+              strokeWidth={isChatOpen ? 2.5 : 2}
             />
           </button>
 
@@ -250,18 +307,22 @@ export function PrimaryNavigation({
             }}
             title={language === "th" ? "เช็กห้องว่าง & จอง" : "Book Rooms"}
             aria-label="Book Rooms"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative ${
+              normalizedActiveTab === "book"
+                ? "bg-[var(--color-background-muted)]/75"
+                : ""
+            }`}
           >
             <Calendar
-              className="w-[24px] h-[24px]"
-              strokeWidth={normalizedActiveTab === "book" ? 2.5 : 1.9}
+              className="w-[26px] h-[26px]"
+              strokeWidth={normalizedActiveTab === "book" ? 2.5 : 2}
             />
             {freeRoomCount > 0 && (
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
             )}
           </button>
 
-          {/* 5. Deals & Saved Coupons (Heart Icon like Instagram) */}
+          {/* 5. Deals & Saved Coupons */}
           <button
             type="button"
             onClick={() => {
@@ -270,19 +331,23 @@ export function PrimaryNavigation({
             }}
             title={language === "th" ? "คูปอง & โปรโมชั่น" : "Deals & Coupons"}
             aria-label="Deals"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative ${
+              normalizedActiveTab === "deal"
+                ? "bg-[var(--color-background-muted)]/75"
+                : ""
+            }`}
           >
             <Heart
-              className="w-[24px] h-[24px]"
-              strokeWidth={normalizedActiveTab === "deal" ? 2.5 : 1.9}
+              className="w-[26px] h-[26px]"
+              strokeWidth={normalizedActiveTab === "deal" ? 2.5 : 2}
               fill={normalizedActiveTab === "deal" ? "currentColor" : "none"}
             />
             {savedCouponsCount > 0 && (
-              <span className="absolute top-2.5 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
             )}
           </button>
 
-          {/* 6. Create / Live Edit (Instagram + Icon) */}
+          {/* 6. Create / Live Edit / Register Hotel */}
           {isHotelOrSuperAdmin && onToggleEditMode ? (
             <button
               type="button"
@@ -297,30 +362,30 @@ export function PrimaryNavigation({
                   : "Edit Live Page"
               }
               aria-label="Create or edit"
-              className={`h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer ${
+              className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer ${
                 isEditMode
                   ? "text-[var(--color-accent)] bg-[var(--color-accent-muted)]"
                   : "text-[var(--color-text-primary)]"
               }`}
             >
-              <PlusSquare className="w-[24px] h-[24px]" strokeWidth={1.9} />
+              <PlusSquare className="w-[26px] h-[26px]" strokeWidth={2} />
             </button>
           ) : (
             <Link
               href="/register-hotel"
               title={
                 language === "th"
-                  ? "สร้างเว็บที่พักฟรี 30 วัน"
-                  : "Create Hotel Site (30-Day Free Trial)"
+                  ? "ลงที่พักฟรี 30 วัน"
+                  : "List Your Property (30-Day Free Trial)"
               }
-              aria-label="Create hotel site"
-              className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors"
+              aria-label="List hotel property"
+              className="h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors"
             >
-              <PlusSquare className="w-[24px] h-[24px]" strokeWidth={1.9} />
+              <PlusSquare className="w-[26px] h-[26px]" strokeWidth={2} />
             </Link>
           )}
 
-          {/* 7. Profile Avatar in Stack (Matches Instagram Image 1) */}
+          {/* 7. Profile Avatar in Stack */}
           <button
             type="button"
             onClick={() => {
@@ -337,7 +402,7 @@ export function PrimaryNavigation({
                 : "My Bookings"
             }
             aria-label="Profile and bookings"
-            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer"
+            className="h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer"
           >
             <span
               className={`rounded-full p-[1.5px] ${
@@ -348,43 +413,66 @@ export function PrimaryNavigation({
             >
               <UserAvatarCircle
                 user={user}
-                sizeClass="h-6 w-6"
-                iconSizeClass="w-[22px] h-[22px]"
+                sizeClass="h-7 w-7"
+                iconSizeClass="w-[24px] h-[24px]"
               />
             </span>
           </button>
         </nav>
 
-        {/* BOTTOM HAMBURGER (≡) MORE POPOVER (Exact Instagram Bottom-Left Menu) */}
+        {/* BOTTOM HAMBURGER (≡) MORE POPOVER */}
         <div ref={moreWrapperRef} className="relative">
           <button
             type="button"
             onClick={() => setIsMorePopoverOpen((v) => !v)}
             title={language === "th" ? "เมนูเพิ่มเติม" : "More"}
             aria-label="More menu"
-            className={`h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer ${
+            className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer ${
               isMorePopoverOpen ? "bg-[var(--color-background-muted)]" : ""
             }`}
           >
             <Menu
-              className="w-[24px] h-[24px]"
-              strokeWidth={isMorePopoverOpen ? 2.5 : 1.9}
+              className="w-[26px] h-[26px]"
+              strokeWidth={isMorePopoverOpen ? 2.5 : 2}
             />
           </button>
 
           {isMorePopoverOpen && (
-            <div className="absolute left-0 bottom-[calc(100%+8px)] w-[256px] rounded-[16px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] space-y-0.5 z-50">
+            <div className="absolute left-0 bottom-[calc(100%+8px)] w-[264px] rounded-[16px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] space-y-0.5 z-50">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMorePopoverOpen(false);
+                  onSelectTab("board");
+                }}
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
+              >
+                <span className="flex items-center gap-3">
+                  <Bookmark className="w-[20px] h-[20px] text-[var(--color-promo)]" />
+                  <span>
+                    {language === "th"
+                      ? "บอร์ดที่พักที่บันทึกไว้"
+                      : "My Saved Boards"}
+                  </span>
+                </span>
+                {savedPinsCount > 0 && (
+                  <span className="badge-promo">{savedPinsCount}</span>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setIsMorePopoverOpen(false);
                   onSelectTab("guide");
                 }}
-                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
               >
-                <Compass className="w-[18px] h-[18px]" />
+                <Compass className="w-[20px] h-[20px]" />
                 <span>
-                  {language === "th" ? "แผนที่ & ที่เที่ยวใกล้เคียง" : "Map & Local Guide"}
+                  {language === "th"
+                    ? "แผนที่ & ที่เที่ยวใกล้เคียง"
+                    : "Map & Local Guide"}
                 </span>
               </button>
 
@@ -394,9 +482,9 @@ export function PrimaryNavigation({
                   setIsMorePopoverOpen(false);
                   onSelectTab("review");
                 }}
-                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
               >
-                <Star className="w-[18px] h-[18px]" />
+                <Star className="w-[20px] h-[20px]" />
                 <span>
                   {language === "th" ? "รีวิวผู้เข้าพักจริง" : "Guest Reviews"}
                 </span>
@@ -406,13 +494,13 @@ export function PrimaryNavigation({
                 <button
                   type="button"
                   onClick={onToggleTheme}
-                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
                 >
                   <span className="flex items-center gap-3">
                     {isDarkTheme ? (
-                      <Moon className="w-[18px] h-[18px]" />
+                      <Moon className="w-[20px] h-[20px]" />
                     ) : (
-                      <Sun className="w-[18px] h-[18px]" />
+                      <Sun className="w-[20px] h-[20px]" />
                     )}
                     <span>
                       {language === "th" ? "สลับโหมดสี" : "Switch appearance"}
@@ -427,10 +515,10 @@ export function PrimaryNavigation({
               <button
                 type="button"
                 onClick={handleToggleLanguage}
-                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
               >
                 <span className="flex items-center gap-3">
-                  <Globe className="w-[18px] h-[18px]" />
+                  <Globe className="w-[20px] h-[20px]" />
                   <span>{language === "th" ? "ภาษา" : "Language"}</span>
                 </span>
                 <span className="ty-caption font-semibold">
@@ -444,10 +532,10 @@ export function PrimaryNavigation({
                   <Link
                     href={adminHref}
                     onClick={() => setIsMorePopoverOpen(false)}
-                    className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body"
+                    className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body"
                   >
                     <span className="flex items-center gap-3">
-                      <LayoutDashboard className="w-[18px] h-[18px]" />
+                      <LayoutDashboard className="w-[20px] h-[20px]" />
                       <span>Hotel Admin</span>
                     </span>
                     {pendingAdminCount > 0 && (
@@ -458,9 +546,9 @@ export function PrimaryNavigation({
                     <Link
                       href="/super-admin"
                       onClick={() => setIsMorePopoverOpen(false)}
-                      className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body"
+                      className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body"
                     >
-                      <Crown className="w-[18px] h-[18px] text-[var(--color-accent)]" />
+                      <Crown className="w-[20px] h-[20px] text-[var(--color-accent)]" />
                       <span>Super Admin</span>
                     </Link>
                   )}
@@ -475,18 +563,18 @@ export function PrimaryNavigation({
                     await signOutUser();
                     setIsMorePopoverOpen(false);
                   }}
-                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body text-[var(--color-error)] cursor-pointer"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body text-[var(--color-error)] cursor-pointer"
                 >
-                  <LogOut className="w-[18px] h-[18px]" />
+                  <LogOut className="w-[20px] h-[20px]" />
                   <span>{language === "th" ? "ออกจากระบบ" : "Log out"}</span>
                 </button>
               ) : (
                 <Link
                   href="/login"
                   onClick={() => setIsMorePopoverOpen(false)}
-                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold"
                 >
-                  <LogIn className="w-[18px] h-[18px]" />
+                  <LogIn className="w-[20px] h-[20px]" />
                   <span>{language === "th" ? "เข้าสู่ระบบ" : "Log in"}</span>
                 </Link>
               )}
@@ -497,14 +585,15 @@ export function PrimaryNavigation({
 
       {/* =====================================================================
           2. PINTEREST-STYLE TOP SEARCH BAR (h-16, pure white #FFFFFF)
+             - Larger icons + squircle action buttons
       ====================================================================== */}
       <header
         aria-label="Top search bar"
         className="fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)] px-3 sm:px-5 flex items-center gap-2.5 sm:gap-3 pr-[var(--scrollbar-compensation,0.75rem)]"
       >
-        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Pill */}
-        <div className="flex-1 h-12 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
-          <Search className="w-[18px] h-[18px] text-[var(--color-text-secondary)] shrink-0" />
+        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Bar */}
+        <div className="flex-1 h-12 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
+          <Search className="w-[20px] h-[20px] text-[var(--color-text-secondary)] shrink-0" />
 
           <input
             type="text"
@@ -512,8 +601,8 @@ export function PrimaryNavigation({
             onChange={(e) => onChangeSearchQuery?.(e.target.value)}
             placeholder={
               language === "th"
-                ? `ค้นหาใน ${propertyShortName} (เช่น วิวหมอก, อ่างแช่น้ำ, บ้านพัก A1, รีวิว)...`
-                : `Search ${propertyShortName} (villas, mist view, bathtub, reviews)...`
+                ? "ค้นหาที่พักทั่วไทย 77 จังหวัด (เช่น สะปัน, พูลวิลล่าภูเก็ต, ทะเลหมอก, รีวิว)..."
+                : "Search stays across 77 Thailand provinces (villas, sea, mist, bars)..."
             }
             aria-label={language === "th" ? "ค้นหา" : "Search"}
             className="flex-1 min-w-0 bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
@@ -524,9 +613,9 @@ export function PrimaryNavigation({
               type="button"
               onClick={() => onChangeSearchQuery?.("")}
               aria-label="Clear search"
-              className="h-6 w-6 rounded-full bg-[var(--color-text-secondary)]/25 hover:bg-[var(--color-text-secondary)]/40 flex items-center justify-center cursor-pointer shrink-0"
+              className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
 
@@ -540,9 +629,9 @@ export function PrimaryNavigation({
                   ? "เลือกวันเช็กอิน - เช็กเอาท์"
                   : "Select stay dates"
               }
-              className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
+              className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
             >
-              <Calendar className="w-3.5 h-3.5 text-[var(--color-promo)]" />
+              <Calendar className="w-4 h-4 text-[var(--color-promo)]" />
               <span>
                 {formatShortDate(checkInDate, language)} · {guestCount}{" "}
                 {language === "th" ? "ท่าน" : "guests"}
@@ -551,8 +640,34 @@ export function PrimaryNavigation({
           )}
         </div>
 
-        {/* Right Action Icons: Saved Coupons + Single User Avatar */}
+        {/* Right Action Icons: Saved Board Shortcut + Saved Coupons + Single User Avatar */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onSelectTab("board")}
+            aria-label={
+              language === "th" ? "บอร์ดที่พักที่บันทึกไว้" : "Saved Boards"
+            }
+            title={
+              language === "th" ? "บอร์ดที่พักที่บันทึกไว้" : "Saved Boards"
+            }
+            className={`h-11 w-11 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] relative transition cursor-pointer ${
+              normalizedActiveTab === "board"
+                ? "bg-[var(--color-background-muted)]"
+                : ""
+            }`}
+          >
+            <Bookmark
+              className="w-[22px] h-[22px]"
+              fill={normalizedActiveTab === "board" ? "currentColor" : "none"}
+            />
+            {savedPinsCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-[6px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[11px] font-bold inline-flex items-center justify-center leading-none">
+                {savedPinsCount > 99 ? "99+" : savedPinsCount}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={onOpenCouponWallet}
@@ -560,11 +675,11 @@ export function PrimaryNavigation({
               language === "th" ? "กระเป๋าคูปองส่วนลด" : "Saved Coupons"
             }
             title={language === "th" ? "กระเป๋าคูปองส่วนลด" : "Saved Coupons"}
-            className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] relative transition cursor-pointer"
+            className="h-11 w-11 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] relative transition cursor-pointer"
           >
-            <ShoppingBag className="w-5 h-5" />
+            <ShoppingBag className="w-[22px] h-[22px]" />
             {savedCouponsCount > 0 && (
-              <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[11px] font-bold inline-flex items-center justify-center leading-none">
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-[6px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[11px] font-bold inline-flex items-center justify-center leading-none">
                 {savedCouponsCount}
               </span>
             )}
@@ -579,12 +694,12 @@ export function PrimaryNavigation({
                 refreshProfile();
                 setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen);
               }}
-              className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center relative cursor-pointer"
+              className="h-11 w-11 rounded-[14px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center relative cursor-pointer"
             >
               <UserAvatarCircle
                 user={user}
                 sizeClass="h-8 w-8"
-                iconSizeClass="w-5 h-5"
+                iconSizeClass="w-[22px] h-[22px]"
               />
             </button>
           </div>
@@ -645,9 +760,9 @@ export function PrimaryNavigation({
                 type="button"
                 onClick={() => setIsMobileProfileDrawerOpen(false)}
                 aria-label="Close menu"
-                className="btn-icon"
+                className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] flex items-center justify-center cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -656,9 +771,9 @@ export function PrimaryNavigation({
                 <Link
                   href="/login"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-10 px-3.5 rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
+                  className="w-full h-11 px-3.5 rounded-[14px] bg-[var(--color-promo)] text-[var(--color-on-promo)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
                 >
-                  <LogIn className="w-4 h-4" />
+                  <LogIn className="w-5 h-5" />
                   <span>
                     {language === "th"
                       ? "เข้าสู่ระบบด้วย Google"
@@ -666,6 +781,27 @@ export function PrimaryNavigation({
                   </span>
                 </Link>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectTab("board");
+                  setIsMobileProfileDrawerOpen(false);
+                }}
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium cursor-pointer"
+              >
+                <span className="flex items-center gap-3">
+                  <Bookmark className="w-5 h-5 text-[var(--color-promo)]" />
+                  <span>
+                    {language === "th"
+                      ? "บอร์ดที่พักที่บันทึกไว้"
+                      : "My Saved Boards"}
+                  </span>
+                </span>
+                {savedPinsCount > 0 && (
+                  <span className="badge-promo">{savedPinsCount}</span>
+                )}
+              </button>
 
               <button
                 type="button"
@@ -789,7 +925,7 @@ export function PrimaryNavigation({
                   <Building2 className="w-5 h-5" />
                   <span>
                     {language === "th"
-                      ? "สร้างเว็บที่พักฟรี 30 วัน"
+                      ? "ลงที่พักฟรี 30 วัน"
                       : "Start 30-Day Free Trial"}
                   </span>
                 </Link>
@@ -860,7 +996,7 @@ export function PrimaryNavigation({
           normalizedActiveTab === "chat" ? "hidden" : "lg:hidden"
         } fixed inset-x-0 bottom-0 z-40 bg-[var(--color-background-card)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)] select-none`}
       >
-        <div className="max-w-[540px] mx-auto px-2 h-[52px] grid grid-cols-5 items-center">
+        <div className="max-w-[540px] mx-auto px-2 h-[56px] grid grid-cols-5 items-center">
           {HOTEL_NAV_TABS.map((tab) => {
             const effectiveActiveTab: HotelNavTabId = isChatOpen
               ? "chat"
@@ -889,16 +1025,21 @@ export function PrimaryNavigation({
                 <span className="relative flex items-center justify-center">
                   {tab.id === "chat" ? (
                     <Send
-                      className="w-[22px] h-[22px]"
-                      strokeWidth={isTabActive ? 2.5 : 1.9}
+                      className="w-[24px] h-[24px]"
+                      strokeWidth={isTabActive ? 2.5 : 2}
                     />
                   ) : (
                     <HotelNavTabIcon
                       id={tab.id}
                       isActive={isTabActive}
                       cutoutColor="var(--color-background-card)"
-                      className="w-[22px] h-[22px]"
+                      className="w-[25px] h-[25px]"
                     />
+                  )}
+                  {tab.id === "board" && savedPinsCount > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-[5px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[9px] font-bold inline-flex items-center justify-center leading-none">
+                      {savedPinsCount > 9 ? "9+" : savedPinsCount}
+                    </span>
                   )}
                 </span>
               </button>

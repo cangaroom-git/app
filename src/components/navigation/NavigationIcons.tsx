@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
-import { Compass, Sparkles, Star } from "lucide-react";
+import { Bookmark, Compass, Sparkles, Star } from "lucide-react";
 
 export type HotelNavTabId =
   | "home"
+  | "board"
   | "book"
   | "room"
   | "shorts"
@@ -15,29 +16,32 @@ export type HotelNavTabId =
   | "setting";
 
 export const HOTEL_NAV_TABS: ReadonlyArray<{
-  id: "home" | "book" | "chat" | "shorts" | "deal";
+  id: "home" | "board" | "book" | "chat" | "deal";
   href: string;
   labelEn: string;
   labelTh: string;
 }> = [
   { id: "home", href: "/", labelEn: "Home", labelTh: "หน้าแรก" },
+  {
+    id: "board",
+    href: "/board",
+    labelEn: "Saved Board",
+    labelTh: "บอร์ดที่บันทึก",
+  },
   { id: "book", href: "/booking", labelEn: "Book", labelTh: "จองห้อง" },
   { id: "chat", href: "/chat", labelEn: "Ask AI", labelTh: "ถาม AI" },
-  {
-    id: "shorts",
-    href: "/shorts",
-    labelEn: "Shorts",
-    labelTh: "วิดีโอสั้น",
-  },
   { id: "deal", href: "/deal", labelEn: "Deals", labelTh: "โปรโมชั่น" },
 ];
 
 export function getTabIdFromPathname(pathname: string): HotelNavTabId {
+  if (pathname.startsWith("/board")) {
+    return "board";
+  }
   if (pathname.startsWith("/booking") || pathname.startsWith("/room")) {
     return "book";
   }
   if (pathname.startsWith("/shorts")) {
-    return "shorts";
+    return "board";
   }
   if (pathname.startsWith("/chat")) {
     return "chat";
@@ -61,7 +65,7 @@ export function HotelNavTabIcon({
   id,
   isActive,
   cutoutColor = "var(--color-background-card)",
-  className = "w-[22px] h-[22px]",
+  className = "w-[24px] h-[24px]",
 }: {
   id: HotelNavTabId;
   isActive: boolean;
@@ -90,7 +94,7 @@ export function HotelNavTabIcon({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
           className={className}
@@ -99,6 +103,16 @@ export function HotelNavTabIcon({
           <path d="M3 10.5 12 3l9 7.5V19.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" />
           <path d="M9.5 21.5v-7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v7" />
         </svg>
+      );
+
+    case "board":
+    case "shorts":
+      return (
+        <Bookmark
+          className={className}
+          strokeWidth={isActive ? 2.4 : 2}
+          fill={isActive ? "currentColor" : "none"}
+        />
       );
 
     case "book":
@@ -133,7 +147,7 @@ export function HotelNavTabIcon({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
           className={className}
@@ -142,35 +156,6 @@ export function HotelNavTabIcon({
           <rect x="3" y="4.5" width="18" height="16.5" rx="3.5" />
           <path d="M8 2.8v3.2M16 2.8v3.2M3 9.5h18" />
           <path d="M8.5 14h3M8.5 17h6" />
-        </svg>
-      );
-
-    case "shorts":
-      return isActive ? (
-        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-          <rect
-            x="3"
-            y="3"
-            width="18"
-            height="18"
-            rx="5"
-            fill="currentColor"
-          />
-          <path d="M10 8.5v7l6-3.5-6-3.5Z" fill={cutoutColor} />
-        </svg>
-      ) : (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.9}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={className}
-          aria-hidden="true"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="5" />
-          <path d="M10 8.8v6.4l5.5-3.2-5.5-3.2Z" fill="currentColor" />
         </svg>
       );
 
@@ -191,7 +176,7 @@ export function HotelNavTabIcon({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
           className={className}
@@ -219,14 +204,14 @@ export function HotelNavTabIcon({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.9}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
           className={className}
           aria-hidden="true"
         >
           <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.02 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.77 1.02 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
         </svg>
       );
   }
