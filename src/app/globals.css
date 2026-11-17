@@ -210,48 +210,50 @@ h1, h2, h3, h4, .font-serif {
 /* ============================================================================
    5-TIER FACEBOOK COMET TYPOGRAPHY CLASSES
    ============================================================================ */
-.ty-display {
-  font-size: 1.375rem; /* 22px mobile */
-  line-height: 1.24;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-@media (min-width: 640px) {
+@layer components {
   .ty-display {
-    font-size: var(--font-size-display); /* 24px desktop */
+    font-size: 1.375rem; /* 22px mobile */
+    line-height: 1.24;
+    font-weight: 700;
+    color: var(--color-text-primary);
   }
-}
+  @media (min-width: 640px) {
+    .ty-display {
+      font-size: var(--font-size-display); /* 24px desktop */
+    }
+  }
 
-.ty-title {
-  font-size: var(--font-size-title); /* 20px */
-  line-height: 1.28;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
+  .ty-title {
+    font-size: var(--font-size-title); /* 20px */
+    line-height: 1.28;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
 
-.ty-subtitle {
-  font-size: var(--font-size-subtitle); /* 17px */
-  line-height: 1.32;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
+  .ty-subtitle {
+    font-size: var(--font-size-subtitle); /* 17px */
+    line-height: 1.32;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
 
-.ty-body {
-  font-size: var(--font-size-body); /* 15px */
-  line-height: 1.45;
-  color: var(--color-text-primary);
-}
+  .ty-body {
+    font-size: var(--font-size-body); /* 15px */
+    line-height: 1.45;
+    color: var(--color-text-primary);
+  }
 
-.ty-body-muted {
-  font-size: var(--font-size-body); /* 15px */
-  line-height: 1.45;
-  color: var(--color-text-secondary);
-}
+  .ty-body-muted {
+    font-size: var(--font-size-body); /* 15px */
+    line-height: 1.45;
+    color: var(--color-text-secondary);
+  }
 
-.ty-caption {
-  font-size: var(--font-size-caption); /* 13px */
-  line-height: 1.35;
-  color: var(--color-text-secondary);
+  .ty-caption {
+    font-size: var(--font-size-caption); /* 13px */
+    line-height: 1.35;
+    color: var(--color-text-secondary);
+  }
 }
 
 .bg-\[var\(--color-accent\)\],

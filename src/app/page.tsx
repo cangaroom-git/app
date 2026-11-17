@@ -2,13 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MapPin, RotateCcw, X } from "lucide-react";
 import { PinCommentItem } from "@/data/cmsDefaults";
-import {
-  STAY_STYLE_CATEGORIES,
-  StayStyleTag,
-  THAILAND_77_PROVINCES,
-} from "@/data/thailandProvinces";
+import { StayStyleTag } from "@/data/thailandProvinces";
 import {
   LIKED_PINS_STORAGE_KEY,
   PinCategoryId,
@@ -106,7 +101,8 @@ export default function HomePage() {
   const navigateToBookRoom = useCallback(
     (roomId?: string) => {
       if (roomId && typeof window !== "undefined") {
-        window.history.pushState(null, "", `/booking?room=${roomId}`);
+        window.location.href = `/sapanunseen?room=${encodeURIComponent(roomId)}`;
+        return;
       }
       navigateToTab("book");
     },
@@ -365,10 +361,6 @@ export default function HomePage() {
     { id: "deals", labelTh: "โปรโมชั่นจองตรง", labelEn: "Direct Deals" },
   ];
 
-  const activeProvinceMeta = selectedProvinceId
-    ? THAILAND_77_PROVINCES.find((p) => p.id === selectedProvinceId) ?? null
-    : null;
-
   return (
     <div className="w-full min-w-0 space-y-5">
       {/* =====================================================================
@@ -466,64 +458,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Active Cross-Filter Chips Bar */}
-            {(activeProvinceMeta || selectedStyles.length > 0) && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="ty-caption font-medium">
-                  {language === "th"
-                    ? `${filteredPins.length} รายการ:`
-                    : `${filteredPins.length} stays:`}
-                </span>
-
-                {activeProvinceMeta && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProvinceId(null)}
-                    className="h-8 px-3 rounded-[10px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>
-                      {language === "th"
-                        ? activeProvinceMeta.nameTh.split("(")[0].trim()
-                        : activeProvinceMeta.nameEn}
-                    </span>
-                    <X className="w-3.5 h-3.5 opacity-80" />
-                  </button>
-                )}
-
-                {selectedStyles.map((stId) => {
-                  const stMeta = STAY_STYLE_CATEGORIES.find(
-                    (c) => c.id === stId
-                  );
-                  if (!stMeta) return null;
-                  return (
-                    <button
-                      key={stId}
-                      type="button"
-                      onClick={() => handleToggleStyle(stId)}
-                      className="h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
-                    >
-                      <span>
-                        {language === "th"
-                          ? stMeta.subtitleTh.replace("ที่พัก", "")
-                          : stMeta.titleEn}
-                      </span>
-                      <X className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-                    </button>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={handleResetAllFilters}
-                  className="h-8 px-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-1 ty-caption font-medium cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>{language === "th" ? "ล้าง" : "Reset"}</span>
-                </button>
-              </div>
-            )}
-
             {/* True Shortest-Column Staggered Masonry Grid (Photos + Mixed Aspect Videos) */}
             {filteredPins.length === 0 ? (
               <div className="py-16 px-4 text-center space-y-3">
@@ -584,6 +518,7 @@ export default function HomePage() {
               selectedStyles={selectedStyles}
               onToggleStyle={handleToggleStyle}
               onResetAllFilters={handleResetAllFilters}
+              resultCount={filteredPins.length}
             />
           </div>
         </div>

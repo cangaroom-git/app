@@ -107,6 +107,7 @@ export interface BuildMarketplacePinsParams {
   navigateToReview: () => void;
   claimCouponAndBook: (code: string) => void;
   openCmsEditor?: (target: CmsEditorTarget) => void;
+  includePartnerPins?: boolean;
 }
 
 export function buildAllMarketplacePins({
@@ -120,6 +121,7 @@ export function buildAllMarketplacePins({
   navigateToReview,
   claimCouponAndBook,
   openCmsEditor,
+  includePartnerPins = true,
 }: BuildMarketplacePinsParams): PinterestPinItem[] {
   const resortName = pickLocalizedText(
     language,
@@ -283,7 +285,8 @@ export function buildAllMarketplacePins({
     });
 
   // 3. Curated Partner Hotels across Thailand (Phuket, Chiang Mai, Bangkok, Khao Yai, Krabi, Trat, Hua Hin, Kanchanaburi)
-  CURATED_THAILAND_PARTNER_PINS.forEach((partner) => {
+  if (includePartnerPins) {
+    CURATED_THAILAND_PARTNER_PINS.forEach((partner) => {
     const likes = cms.pinLikes?.[partner.id] ?? partner.baseLikes;
     const commentsCount = cms.pinComments?.[partner.id]?.length ?? 0;
     const hotelName = pickLocalizedText(
@@ -326,7 +329,8 @@ export function buildAllMarketplacePins({
       baseLikes: likes,
       rankingScore: likes * 1.15 + commentsCount * 4 + 26,
     });
-  });
+    });
+  }
 
   // 4. Guest Reviews
   cms.reviews

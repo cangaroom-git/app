@@ -200,10 +200,12 @@ export default function RegisterHotelTrialPage() {
 
               <div className="rounded-[10px] bg-[var(--color-background-muted)] p-3.5 text-left space-y-1.5">
                 <p className="ty-caption font-semibold">
-                  {lang === "th" ? "ลิงก์เว็บไซต์ของคุณ" : "Your Subdomain URL"}
+                  {lang === "th"
+                    ? "ลิงก์หน้าโปรไฟล์ที่พักของคุณ"
+                    : "Your Property Profile URL"}
                 </p>
                 <p className="ty-subtitle font-mono text-[var(--color-accent)] break-all">
-                  https://{createdTenant.slug}.cangaroom.com
+                  cangaroom.com/{createdTenant.slug}
                 </p>
                 <p className="ty-caption">
                   {lang === "th"
@@ -241,14 +243,12 @@ export default function RegisterHotelTrialPage() {
                   size="lg"
                   fullWidth
                   onClick={() =>
-                    router.push(
-                      `/?tenant=${encodeURIComponent(createdTenant.slug)}&edit=1`
-                    )
+                    router.push(`/${encodeURIComponent(createdTenant.slug)}?edit=1`)
                   }
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span>
-                    {lang === "th" ? "แก้ไขหน้าเว็บจริง" : "Edit Live Site"}
+                    {lang === "th" ? "ดูหน้าโปรไฟล์ที่พัก" : "View Profile Page"}
                   </span>
                 </StandardButton>
               </div>
@@ -344,12 +344,12 @@ export default function RegisterHotelTrialPage() {
                   <div className="space-y-1.5">
                     <label className="block ty-body font-semibold text-[var(--color-text-primary)]">
                       {lang === "th"
-                        ? "ชื่อลิงก์เว็บไซต์ของคุณ (Subdomain) *"
-                        : "Your Subdomain *"}
+                        ? "ชื่อลิงก์หน้าโปรไฟล์ที่พักของคุณ *"
+                        : "Your Property URL Slug *"}
                     </label>
                     <div className="flex items-center rounded-[8px] border border-[var(--color-border)] bg-[var(--color-background-muted)] focus-within:border-[var(--color-accent)] focus-within:bg-[var(--color-background-card)] overflow-hidden">
-                      <span className="pl-3 pr-1 text-[var(--color-text-secondary)]">
-                        <Globe className="w-4 h-4" />
+                      <span className="pl-3 pr-1 ty-caption font-mono font-semibold text-[var(--color-text-secondary)] shrink-0">
+                        cangaroom.com/
                       </span>
                       <input
                         type="text"
@@ -362,12 +362,9 @@ export default function RegisterHotelTrialPage() {
                               .replace(/[^a-z0-9-]/g, "")
                           )
                         }
-                        placeholder="phupha"
-                        className="h-10 flex-1 min-w-0 bg-transparent px-2 ty-body font-mono focus:outline-none"
+                        placeholder="sapanunseen"
+                        className="h-10 flex-1 min-w-0 bg-transparent px-1 ty-body font-mono focus:outline-none"
                       />
-                      <span className="pr-3 ty-caption font-mono font-semibold text-[var(--color-text-secondary)] shrink-0">
-                        .cangaroom.com
-                      </span>
                     </div>
 
                     {normalizedSlug.length >= 3 && (
@@ -383,7 +380,7 @@ export default function RegisterHotelTrialPage() {
                         {slugChecking
                           ? "กำลังตรวจสอบชื่อลิงก์..."
                           : slugAvailable
-                          ? `✓ ใช้งาน https://${normalizedSlug}.cangaroom.com ได้ทันที`
+                          ? `✓ ใช้งาน cangaroom.com/${normalizedSlug} ได้ทันที`
                           : `✗ ${slugReason || "ชื่อนี้ไม่สามารถใช้งานได้"}`}
                       </p>
                     )}

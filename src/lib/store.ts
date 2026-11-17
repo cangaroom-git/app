@@ -25,6 +25,26 @@ import {
 
 const RESORT_STORE_STORAGE_KEY = "white_label_resort_store_v7";
 
+const RESERVED_APP_PATH_SEGMENTS = new Set([
+  "",
+  "admin",
+  "super-admin",
+  "board",
+  "booking",
+  "chat",
+  "deal",
+  "guide",
+  "login",
+  "register-hotel",
+  "review",
+  "room",
+  "setting",
+  "shorts",
+  "api",
+  "sapanunseen",
+  "default",
+]);
+
 export function getActiveClientTenantSlug(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -37,6 +57,15 @@ export function getActiveClientTenantSlug(): string | null {
     if (qTenant && qTenant !== "sapanunseen" && qTenant !== "default") {
       return qTenant;
     }
+
+    const firstSegment = (window.location.pathname.split("/")[1] || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "");
+    if (firstSegment && !RESERVED_APP_PATH_SEGMENTS.has(firstSegment)) {
+      return firstSegment;
+    }
+
     const host = window.location.hostname.toLowerCase();
     if (host.endsWith(".cangaroom.com")) {
       const sub = host.slice(0, -".cangaroom.com".length).replace(/^www\./, "");

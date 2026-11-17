@@ -17,6 +17,7 @@ import {
 import { PinCommentItem } from "@/data/cmsDefaults";
 import {
   LIKED_PINS_STORAGE_KEY,
+  PinCategoryId,
   PinterestPinItem,
   SAVED_PINS_STORAGE_KEY,
   USER_BOARDS_STORAGE_KEY,
@@ -56,13 +57,13 @@ export default function SavedBoardPage() {
 
   const { user: currentUser } = useAuthenticatedProfile();
 
+  const [activeCategory, setActiveCategory] = useState<PinCategoryId>("all");
   const [savedPinsMap, setSavedPinsMap] = useState<Record<string, boolean>>({});
   const [likedPinsMap, setLikedPinsMap] = useState<Record<string, boolean>>({});
   const [userBoards, setUserBoards] = useState<UserBoardCollection[]>([]);
   const [activeBoardFilter, setActiveBoardFilter] = useState<string>("all");
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
 
-  // Create new custom board UI state
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
   const [assigningPinId, setAssigningPinId] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export default function SavedBoardPage() {
   const navigateToBookRoom = useCallback(
     (roomId?: string) => {
       if (roomId && typeof window !== "undefined") {
-        window.history.pushState(null, "", `/booking?room=${roomId}`);
+        window.history.pushState(null, "", `/sapanunseen?room=${roomId}`);
       }
       navigateToTab("book");
     },
@@ -145,7 +146,6 @@ export default function SavedBoardPage() {
     [allPins, savedPinsMap]
   );
 
-  // Auto-grouped province boards from saved pins
   const savedProvinceGroups = useMemo(() => {
     const map = new Map<
       string,
@@ -170,16 +170,22 @@ export default function SavedBoardPage() {
     const q = globalSearchQuery.trim().toLowerCase();
     let list = savedPins;
 
+    // 1. Category Tab Filter (same as Home page!)
+    if (activeCategory !== "all") {
+      list = list.filter((p) => p.category === activeCategory);
+    }
+
+    // 2. Board / Province Filter
     if (activeBoardFilter.startsWith("board:")) {
       const boardId = activeBoardFilter.replace("board:", "");
       const foundBoard = userBoards.find((b) => b.id === boardId);
       if (foundBoard) {
         const idSet = new Set(foundBoard.pinIds);
-        list = savedPins.filter((p) => idSet.has(p.id));
+        list = list.filter((p) => idSet.has(p.id));
       }
     } else if (activeBoardFilter.startsWith("prov:")) {
       const provId = activeBoardFilter.replace("prov:", "");
-      list = savedPins.filter((p) => p.provinceId === provId);
+      list = list.filter((p) => p.provinceId === provId);
     }
 
     if (!q) return list;
@@ -190,7 +196,13 @@ export default function SavedBoardPage() {
         pin.provinceLabel.toLowerCase().includes(q) ||
         pin.authorName.toLowerCase().includes(q)
     );
-  }, [activeBoardFilter, globalSearchQuery, savedPins, userBoards]);
+  }, [
+    activeBoardFilter,
+    activeCategory,
+    globalSearchQuery,
+    savedPins,
+    userBoards,
+  ]);
 
   const selectedPin = useMemo(
     () =>
@@ -240,7 +252,6 @@ export default function SavedBoardPage() {
   };
 
   const handleTogglePinInBoard = (boardId: string, pinId: string) => {
-    // Also ensure pin is marked saved globally
     if (!savedPinsMap[pinId]) {
       handleToggleSavePin(pinId);
     }
@@ -381,12 +392,26 @@ export default function SavedBoardPage() {
     }
   };
 
+  const categoryTabs: Array<{
+    id: PinCategoryId;
+    labelTh: string;
+    labelEn: string;
+  }> = [
+    { id: "all", labelTh: "ทั้งหมด", labelEn: "All Stays" },
+    { id: "rooms", labelTh: "ที่พัก & พูลวิลล่า", labelEn: "Villas & Suites" },
+    { id: "videos", labelTh: "คลิปบรรยากาศ", labelEn: "Videos" },
+    { id: "views", labelTh: "วิว & มุมถ่ายรูป", labelEn: "Scenic Views" },
+    { id: "dining", labelTh: "อาหาร & บาร์", labelEn: "Dining & Bars" },
+    { id: "reviews", labelTh: "รีวิวผู้เข้าพัก", labelEn: "Guest Stories" },
+    { id: "deals", labelTh: "โปรโมชั่นจองตรง", labelEn: "Direct Deals" },
+  ];
+
   const activeUserBoard = activeBoardFilter.startsWith("board:")
     ? userBoards.find((b) => `board:${b.id}` === activeBoardFilter) ?? null
     : null;
 
   return (
-    <div className="w-full min-w-0 space-y-6">
+    <div className="w-full min-w-0 space-y-5">
       {selectedPin ? (
         <PinterestPinDetail
           key={selectedPin.id}
@@ -423,125 +448,163 @@ export default function SavedBoardPage() {
       ) : (
         <>
           {/* =================================================================
-              1. PINTEREST-STYLE PERSONAL BOARD HEADER
+              1. CLEAN PERSONAL BOARD HEADER
           ================================================================== */}
-          <section className="rounded-[24px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)] p-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0">
-                <Link
-                  href="/"
-                  title={language === "th" ? "กลับหน้าแรก" : "Back to Home"}
-                  className="h-12 w-12 rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center text-[var(--color-text-primary)] shrink-0 transition-colors"
-                >
-                  <ArrowLeft className="w-6 h-6 stroke-[2.2]" />
-                </Link>
+          <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <Link
+                href="/"
+                title={language === "th" ? "กลับหน้าแรก" : "Back to Home"}
+                className="h-11 w-11 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center text-[var(--color-text-primary)] shrink-0 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 stroke-[2.2]" />
+              </Link>
 
-                {currentUser ? (
-                  <UserAvatarCircle
-                    user={currentUser}
-                    sizeClass="h-14 w-14"
-                    iconSizeClass="w-7 h-7"
-                  />
-                ) : (
-                  <div className="h-14 w-14 rounded-[18px] bg-[var(--color-promo)] text-[var(--color-on-promo)] flex items-center justify-center shrink-0">
-                    <Bookmark className="w-7 h-7" fill="currentColor" />
-                  </div>
-                )}
-
-                <div className="min-w-0">
-                  <h1 className="ty-display truncate">
-                    {language === "th"
-                      ? "บอร์ดที่พักที่บันทึกไว้"
-                      : "My Saved Stay Boards"}
-                  </h1>
-                  <p className="ty-body-muted">
-                    {language === "th"
-                      ? `บันทึกไว้ ${savedPins.length} การ์ด · ${savedProvinceGroups.length} จังหวัด · ${userBoards.length} บอร์ดทริปส่วนตัว`
-                      : `${savedPins.length} saved cards · ${savedProvinceGroups.length} provinces · ${userBoards.length} custom boards`}
-                  </p>
+              {currentUser ? (
+                <UserAvatarCircle
+                  user={currentUser}
+                  sizeClass="h-12 w-12"
+                  iconSizeClass="w-6 h-6"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-[16px] bg-[var(--color-promo)] !text-white flex items-center justify-center shrink-0">
+                  <Bookmark className="w-6 h-6" fill="currentColor" />
                 </div>
-              </div>
+              )}
 
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingBoard((v) => !v)}
-                  className="h-11 px-4 rounded-[14px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] hover:opacity-90 inline-flex items-center gap-2 ty-body font-semibold cursor-pointer transition-opacity"
-                >
-                  <FolderPlus className="w-5 h-5" />
-                  <span>
-                    {language === "th"
-                      ? "สร้างบอร์ดทริปใหม่"
-                      : "Create Trip Board"}
-                  </span>
-                </button>
-
-                <Link
-                  href="/"
-                  className="h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] border border-[var(--color-border)] inline-flex items-center gap-2 ty-body font-semibold transition-colors"
-                >
-                  <Compass className="w-5 h-5 text-[var(--color-promo)]" />
-                  <span>
-                    {language === "th" ? "สำรวจที่พักเพิ่ม" : "Explore Stays"}
-                  </span>
-                </Link>
+              <div className="min-w-0">
+                <h1 className="ty-display truncate">
+                  {language === "th"
+                    ? "บอร์ดที่พักที่บันทึกไว้"
+                    : "My Saved Stay Boards"}
+                </h1>
+                <p className="ty-caption">
+                  {language === "th"
+                    ? `บันทึกไว้ ${savedPins.length} การ์ด · ${savedProvinceGroups.length} จังหวัด · ${userBoards.length} บอร์ดทริปส่วนตัว`
+                    : `${savedPins.length} saved cards · ${savedProvinceGroups.length} provinces · ${userBoards.length} custom boards`}
+                </p>
               </div>
             </div>
 
-            {/* Inline Create Trip Board Form */}
-            {isCreatingBoard && (
-              <form
-                onSubmit={handleCreateBoard}
-                className="mt-4 pt-4 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsCreatingBoard((v) => !v)}
+                className="h-11 px-4 rounded-[14px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white inline-flex items-center gap-2 ty-body font-semibold cursor-pointer transition-colors"
               >
-                <input
-                  type="text"
-                  value={newBoardName}
-                  onChange={(e) => setNewBoardName(e.target.value)}
-                  placeholder={
-                    language === "th"
-                      ? "ตั้งชื่อบอร์ด เช่น ทริปหน้าหนาวน่าน, พูลวิลล่าภูเก็ตกับเพื่อน..."
-                      : "Board name e.g. Winter Mountain Trip, Phuket Pool Villas..."
-                  }
-                  autoFocus
-                  className="flex-1 h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30"
-                />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    className="h-11 px-5 rounded-[14px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] ty-body font-semibold cursor-pointer"
-                  >
-                    {language === "th" ? "สร้างบอร์ด" : "Create"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingBoard(false)}
-                    className="h-11 px-3.5 rounded-[14px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-body font-semibold cursor-pointer"
-                  >
-                    {language === "th" ? "ยกเลิก" : "Cancel"}
-                  </button>
-                </div>
-              </form>
-            )}
+                <FolderPlus className="w-5 h-5 !text-white" />
+                <span className="!text-white">
+                  {language === "th"
+                    ? "สร้างบอร์ดทริปใหม่"
+                    : "Create Trip Board"}
+                </span>
+              </button>
+
+              <Link
+                href="/"
+                className="h-11 px-4 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-2 ty-body font-semibold transition-colors"
+              >
+                <Compass className="w-5 h-5 text-[var(--color-text-primary)]" />
+                <span>
+                  {language === "th" ? "สำรวจที่พักเพิ่ม" : "Explore Stays"}
+                </span>
+              </Link>
+            </div>
           </section>
 
+          {/* Inline Create Trip Board Form */}
+          {isCreatingBoard && (
+            <form
+              onSubmit={handleCreateBoard}
+              className="p-4 rounded-[16px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)] flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
+            >
+              <input
+                type="text"
+                value={newBoardName}
+                onChange={(e) => setNewBoardName(e.target.value)}
+                placeholder={
+                  language === "th"
+                    ? "ตั้งชื่อบอร์ด เช่น ทริปหน้าหนาวน่าน, พูลวิลล่าภูเก็ตกับเพื่อน..."
+                    : "Board name e.g. Winter Mountain Trip, Phuket Pool Villas..."
+                }
+                autoFocus
+                className="flex-1 h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  className="h-11 px-5 rounded-[14px] bg-[#111111] hover:opacity-90 !text-white ty-body font-semibold cursor-pointer"
+                >
+                  <span className="!text-white">
+                    {language === "th" ? "สร้างบอร์ด" : "Create"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingBoard(false)}
+                  className="h-11 px-3.5 rounded-[14px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-body font-semibold cursor-pointer"
+                >
+                  {language === "th" ? "ยกเลิก" : "Cancel"}
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* =================================================================
-              2. BOARD COLLECTIONS & PROVINCE FILTER TABS
+              2. HORIZONTAL UNDERLINE CATEGORY TABS (Matches Home Page!)
+          ================================================================== */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
+            <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
+              {categoryTabs.map((tab) => {
+                const isActive = activeCategory === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveCategory(tab.id)}
+                    className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isActive
+                        ? "text-[var(--color-text-primary)]"
+                        : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span>
+                      {language === "th" ? tab.labelTh : tab.labelEn}
+                    </span>
+                    {isActive && (
+                      <span className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* =================================================================
+              3. BOARD COLLECTIONS & PROVINCE PILLS
           ================================================================== */}
           {(savedPins.length > 0 || userBoards.length > 0) && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
                 <button
                   type="button"
                   onClick={() => setActiveBoardFilter("all")}
-                  className={`h-10 px-4 rounded-[12px] ty-body font-semibold whitespace-nowrap inline-flex items-center gap-2 transition-colors cursor-pointer ${
+                  className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                     activeBoardFilter === "all"
-                      ? "bg-[var(--color-text-primary)] text-[var(--color-background-card)]"
+                      ? "bg-[#111111] !text-white"
                       : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <Bookmark className="w-4 h-4" />
-                  <span>
+                  <Bookmark
+                    className={`w-3.5 h-3.5 ${
+                      activeBoardFilter === "all" ? "!text-white" : ""
+                    }`}
+                  />
+                  <span
+                    className={
+                      activeBoardFilter === "all" ? "!text-white" : ""
+                    }
+                  >
                     {language === "th"
                       ? `ทั้งหมดที่บันทึกไว้ (${savedPins.length})`
                       : `All Saved (${savedPins.length})`}
@@ -560,14 +623,18 @@ export default function SavedBoardPage() {
                       key={board.id}
                       type="button"
                       onClick={() => setActiveBoardFilter(key)}
-                      className={`h-10 px-4 rounded-[12px] ty-body font-semibold whitespace-nowrap inline-flex items-center gap-2 transition-colors cursor-pointer ${
+                      className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[var(--color-promo)] text-[var(--color-on-promo)]"
+                          ? "bg-[var(--color-promo)] !text-white"
                           : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                       }`}
                     >
-                      <FolderHeart className="w-4 h-4" />
-                      <span>
+                      <FolderHeart
+                        className={`w-3.5 h-3.5 ${
+                          isActive ? "!text-white" : ""
+                        }`}
+                      />
+                      <span className={isActive ? "!text-white" : ""}>
                         {board.name} ({validCount})
                       </span>
                     </button>
@@ -583,24 +650,27 @@ export default function SavedBoardPage() {
                       key={group.provinceId}
                       type="button"
                       onClick={() => setActiveBoardFilter(key)}
-                      className={`h-10 px-3.5 rounded-[12px] ty-body font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[var(--color-text-primary)] text-[var(--color-background-card)]"
+                          ? "bg-[#111111] !text-white"
                           : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                       }`}
                     >
-                      <MapPin className="w-4 h-4" />
-                      <span>
-                        {group.label} ({group.pins.length})
+                      <MapPin
+                        className={`w-3.5 h-3.5 ${
+                          isActive ? "!text-white" : ""
+                        }`}
+                      />
+                      <span className={isActive ? "!text-white" : ""}>
+                        {group.label.split("(")[0].trim()} ({group.pins.length})
                       </span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Active Custom Board Toolbar */}
               {activeUserBoard && (
-                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-[16px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)]">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-[14px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)]">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <FolderHeart className="w-5 h-5 text-[var(--color-promo)] shrink-0" />
                     <div className="min-w-0">
@@ -609,8 +679,8 @@ export default function SavedBoardPage() {
                       </p>
                       <p className="ty-caption">
                         {language === "th"
-                          ? "กดปุ่ม “+ จัดเข้าบอร์ด” บนการ์ดที่บันทึกไว้เพื่อเพิ่มเข้าบอร์ดทริปนี้"
-                          : "Use '+ Add to Board' on any saved card to organize into this trip board."}
+                          ? "กดปุ่ม “+ จัดเข้าบอร์ด” ใต้การ์ดที่บันทึกไว้เพื่อเพิ่มเข้าบอร์ดทริปนี้"
+                          : "Use '+ Add to Board' below any saved card to organize into this trip board."}
                       </p>
                     </div>
                   </div>
@@ -630,7 +700,7 @@ export default function SavedBoardPage() {
           )}
 
           {/* =================================================================
-              3. SAVED PINS MASONRY GRID OR EMPTY STATE WITH STARTER PICKS
+              4. SAVED PINS MASONRY GRID OR EMPTY STATE
           ================================================================== */}
           {savedPins.length === 0 ? (
             <div className="space-y-8">
@@ -651,10 +721,10 @@ export default function SavedBoardPage() {
                 <div className="pt-2">
                   <Link
                     href="/"
-                    className="h-11 px-5 rounded-[14px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] inline-flex items-center gap-2 ty-body font-semibold"
+                    className="h-11 px-5 rounded-[14px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white inline-flex items-center gap-2 ty-body font-semibold"
                   >
-                    <Compass className="w-5 h-5" />
-                    <span>
+                    <Compass className="w-5 h-5 !text-white" />
+                    <span className="!text-white">
                       {language === "th"
                         ? "ไปเลือกดูที่พักหน้าแรก"
                         : "Discover Stays on Home"}
@@ -663,15 +733,12 @@ export default function SavedBoardPage() {
                 </div>
               </div>
 
-              {/* Starter Curated Recommendations so User Can Try Saving Immediately */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="ty-subtitle font-bold">
-                    {language === "th"
-                      ? "ที่พักยอดนิยมทั่วไทย — ลองกด “บันทึก” เก็บเข้าบอร์ดของคุณ"
-                      : "Popular Thailand Stays — Click 'Save' to Start Your Board"}
-                  </h3>
-                </div>
+                <h3 className="ty-subtitle font-bold">
+                  {language === "th"
+                    ? "ที่พักยอดนิยมทั่วไทย — ลองกด “บันทึก” เก็บเข้าบอร์ดของคุณ"
+                    : "Popular Thailand Stays — Click 'Save' to Start Your Board"}
+                </h3>
                 <MasonryGrid
                   items={allPins.slice(0, 10)}
                   columnBreakpoints={[2, 3, 4, 5, 5]}
@@ -691,20 +758,25 @@ export default function SavedBoardPage() {
               </div>
             </div>
           ) : displayedSavedPins.length === 0 ? (
-            <div className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-background-muted)]/35 py-12 px-4 text-center space-y-3">
+            <div className="py-14 px-4 text-center space-y-3">
               <p className="ty-title">
                 {language === "th"
-                  ? "ยังไม่มีการ์ดในบอร์ดทริปนี้"
-                  : "No cards in this trip board yet"}
+                  ? "ไม่พบการ์ดที่บันทึกไว้ในหมวดนี้"
+                  : "No saved cards in this filter"}
               </p>
               <button
                 type="button"
-                onClick={() => setActiveBoardFilter("all")}
-                className="h-10 px-4 rounded-[12px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] ty-body font-semibold cursor-pointer"
+                onClick={() => {
+                  setActiveCategory("all");
+                  setActiveBoardFilter("all");
+                }}
+                className="h-10 px-4 rounded-[12px] bg-[#111111] !text-white ty-body font-semibold cursor-pointer"
               >
-                {language === "th"
-                  ? "ดูการ์ดที่บันทึกไว้ทั้งหมดเพื่อเลือกเพิ่มเข้าบอร์ด"
-                  : "View All Saved Cards"}
+                <span className="!text-white">
+                  {language === "th"
+                    ? "ดูการ์ดที่บันทึกไว้ทั้งหมด"
+                    : "View All Saved Cards"}
+                </span>
               </button>
             </div>
           ) : (
@@ -724,9 +796,8 @@ export default function SavedBoardPage() {
                     onSharePin={handleSharePin}
                   />
 
-                  {/* Assign to Custom Trip Board Trigger */}
                   {userBoards.length > 0 && (
-                    <div className="-mt-2 mb-4 flex items-center justify-between gap-2 px-1">
+                    <div className="mt-1 mb-3 flex items-center justify-between gap-2 px-0.5">
                       <button
                         type="button"
                         onClick={() =>
@@ -741,15 +812,11 @@ export default function SavedBoardPage() {
                           {language === "th" ? "จัดเข้าบอร์ด" : "Add to Board"}
                         </span>
                       </button>
-
-                      <span className="ty-caption truncate">
-                        {pin.provinceLabel}
-                      </span>
                     </div>
                   )}
 
                   {assigningPinId === pin.id && userBoards.length > 0 && (
-                    <div className="mb-4 p-2.5 rounded-[14px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-md space-y-1">
+                    <div className="mb-3 p-2.5 rounded-[14px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-md space-y-1">
                       <div className="flex items-center justify-between px-1 pb-1 border-b border-[var(--color-border)]">
                         <span className="ty-caption font-bold text-[var(--color-text-primary)]">
                           {language === "th"
@@ -799,4 +866,3 @@ export default function SavedBoardPage() {
     </div>
   );
 }
-

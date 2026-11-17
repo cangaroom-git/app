@@ -3,36 +3,36 @@ name: my-hotel-design-system
 description: >-
   Core UI/UX design standards for Cangaroom / my-hotel. Enforces ZERO hover
   scale site-wide, Instagram-style minimal 72px pure-white left icon sidebar,
-  Pinterest squircle buttons & staggered variable-height Masonry Pin cards,
-  Fastwork-inspired Thailand 77-province & stay-style cross-filter right column,
+  clean Pinterest Masonry Pin cards (only '...' underneath, no play/duration or
+  subtitle clutter), Fastwork-style /{hotelSlug} property profile pages,
   personal /board saved stay boards, and native Thai/EN system font.
 ---
 
-# Cangaroom · Pinterest Gestalt, Fastwork Discovery & Instagram Minimal Design System
+# Cangaroom · Pinterest Gestalt, Fastwork Profile & Instagram Minimal Design System
 
 Every component, page, and interactive widget MUST strictly follow these design rules:
 
 ## 1. STRICT FORBIDDEN RULE
 - **NO Hover Scale Anywhere (`ห้ามใช้ hover แล้ว scale ทั้งเว็บเด็ดขาด`)**:
   - **NEVER** apply `hover:scale-*`, `group-hover:scale-*`, or `:hover { transform: scale(...) }` to ANY image, Pin card, video thumbnail, button, or icon anywhere in the codebase.
-  - On Pin cards, hover feedback uses a subtle `bg-black/25` dim overlay revealing the `#e60023` `บันทึก` squircle button (`rounded-[14px]`) and squircle action buttons (`rounded-[12px]`).
+  - On Pin cards, hover feedback uses a subtle `bg-black/28` dim overlay revealing the `#e60023` `บันทึก` squircle button (`rounded-[14px]`) and squircle action buttons (`rounded-[12px]`).
 
-## 2. Navigation & Button Geometry: Larger Icons + Pinterest Squircle Radius
+## 2. Clean Pinterest Pin Cards
+- **No Play/Duration Badges & No Subtitle Clutter**:
+  - Pin cards in `<MasonryGrid />` render pure rounded images (`rounded-[16px]`) with **no** video duration pill, **no** play icon overlay, and **no** title/subtitle text block underneath—only the clean right-aligned `...` (`MoreHorizontal`) menu button underneath each card.
+
+## 3. Navigation & Page Architecture
 - **Desktop Left Sidebar (`w-[72px]`, pure `#ffffff` / `#121212`)**:
   - Top slot: Brand glyph (`27px`).
-  - Middle stack: Vertically centered `26px` outline/solid icons inside `h-12 w-12 rounded-[16px]` squircle buttons (`Home`, `Saved Board (/board)`, `Messages`, `Book (/booking)`, `Deals (/deal)`, `List Hotel (/register-hotel)`, `Profile Avatar`).
+  - Middle stack: Vertically centered `26px` outline/solid icons inside `h-12 w-12 rounded-[16px]` squircle buttons (`Home (/)`, `Saved Board (/board)`, `Messages`, `Property Profile (/sapanunseen)`, `Deals (/deal)`, `List Hotel (/register-hotel)`, `Profile Avatar`).
   - Bottom slot: `26px` `≡` More menu icon with popover settings.
-- **Standard Squircle Button Radius**:
-  - Prefer crisp squircle radii (`rounded-[16px]` / `rounded-[14px]` / `rounded-[12px]`) over `rounded-full` circles for icon buttons, Pin Detail `←` Back button (`h-12 w-12 rounded-[16px] bg-white`), `บันทึก` buttons, and action buttons.
-
-## 3. Home Feed (`/`) & Saved Board (`/board`)
-- **2-Column Clean Minimal Workspace (`/` Feed Mode — NO cluttered top banner)**:
-  - **Left (`flex-1`)**: Underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, `วิว & มุมถ่ายรูป`, `อาหาร & บาร์`, `รีวิวผู้เข้าพัก`, `โปรโมชั่นจองตรง`) + shortest-column `<MasonryGrid />` with varied aspect ratios across both photos and videos (`16:9`, `9:16`, `3:4`, `2:3`, `4/5`).
-  - **Right (`lg:w-[236px] xl:w-[248px]`)**: Slim borderless minimal `<ThailandDiscoverySidebar />` with clean icon-and-label Stay Style rows + quiet searchable **77 Thailand Provinces** cross-filter (no heavy boxes, no price/star clutter, no ad banners).
-- **Pin Close-Up View (`/?pin=...`)**:
-  - Split 2-Column Card (`rounded-[28px]`) inside `xl:col-span-8` with `underMainCardPins` rendered immediately below it (`space-y-6`) so there is ZERO empty whitespace beneath the image, paired with `rightColumnPins` in `xl:col-span-4`.
-- **Personal Saved Boards (`/board`)**:
-  - Replaces `/shorts`. Displays all user-saved Pin cards organized by All Saved, Custom Trip Boards, and Province Auto-Boards.
+- **Home Feed (`/`)**:
+  - **Left (`flex-1`)**: Underline category tabs + `<MasonryGrid />` (never jumps vertically when filtering).
+  - **Right (`lg:w-[236px] xl:w-[248px]`)**: Slim minimal `<ThailandDiscoverySidebar />` containing active filter chips, Stay Style rows, and searchable **77 Thailand Provinces** cross-filter.
+- **Saved Boards (`/board`)**:
+  - Includes the same underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, etc.) + custom Trip Boards & Province filter pills.
+- **Hotel Profile Page (`/{hotelSlug}`, e.g. `/sapanunseen` — Replaces `/booking`)**:
+  - Fastwork Profile layout: Top 2-column profile header (Avatar + Name + `@slug` + 4-Metric box on left, Wide Cover Banner + Tag Pills + Location on right), Left Masonry Portfolio with underline tabs, and Right Sidebar showing **ประเภทห้องพักพร้อมราคา** (`Rooms & Villas` horizontal cards) that open the Room Booking Drawer on click.
 
 ## 4. Pinterest Gestalt Color Palette & Native System Font
 - **Canvas & Card**: `#ffffff` (Light) / `#121212` & `#1e1e1e` (Dark).

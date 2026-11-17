@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -12,7 +13,6 @@ import {
   Maximize2,
   MessageCircle,
   MoreHorizontal,
-  Play,
   Send,
   Share,
   Smile,
@@ -64,20 +64,6 @@ export function PinterestPinCard({
           draggable={false}
           className="h-full w-full object-cover object-center"
         />
-
-        {/* Video Badge: Top-Left Duration + Top-Right Squircle Play Badge (Matches Image 3!) */}
-        {pin.videoUrl && (
-          <>
-            {pin.videoDuration && (
-              <span className="absolute top-3 left-3 z-10 rounded-[10px] bg-black/65 text-white px-2.5 py-0.5 text-[12px] font-semibold tabular-nums pointer-events-none group-hover:opacity-0 transition-opacity">
-                {pin.videoDuration}
-              </span>
-            )}
-            <span className="absolute top-3 right-3 z-10 h-7 w-7 rounded-[8px] bg-white/92 text-[#111111] inline-flex items-center justify-center shadow-xs pointer-events-none group-hover:opacity-0 transition-opacity">
-              <Play className="w-3.5 h-3.5 fill-[#111111] ml-0.5" />
-            </span>
-          </>
-        )}
 
         {/* Desktop Hover Overlay (ZERO Hover Scale — Squircle Save & Share Buttons) */}
         <div className="hidden sm:flex absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-3 flex-col justify-between">
@@ -144,29 +130,17 @@ export function PinterestPinCard({
         )}
       </div>
 
-      {/* Subtle Pinterest Footer Caption */}
-      {pin.footerCaption && (
-        <div className="pt-1.5 px-1 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate leading-snug">
-              {pin.footerCaption}
-            </p>
-            {pin.footerSubcaption && (
-              <p className="text-[12px] text-[var(--color-text-secondary)] truncate leading-tight">
-                {pin.footerSubcaption}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => onSelectPin(pin)}
-            aria-label="More details"
-            className="h-7 w-7 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {/* Pure Minimal Pinterest Bottom-Right "..." Menu Only (No Cluttered Subtitle/Title) */}
+      <div className="pt-1 pb-0.5 px-0.5 flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => onSelectPin(pin)}
+          aria-label="More options"
+          className="h-7 w-7 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+      </div>
     </article>
   );
 }
@@ -438,7 +412,10 @@ export function PinterestPinDetail({
 
             {/* 2. Scrollable Content & Comments */}
             <div className="px-5 sm:px-6 py-2 flex-1 overflow-y-auto space-y-4">
-              <div className="flex items-center gap-2.5">
+              <Link
+                href="/sapanunseen"
+                className="flex items-center gap-2.5 group/author hover:opacity-90 transition-opacity"
+              >
                 {pin.authorAvatar ? (
                   <img
                     src={pin.authorAvatar}
@@ -451,12 +428,12 @@ export function PinterestPinDetail({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="ty-body font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                  <p className="ty-body font-semibold text-[var(--color-text-primary)] group-hover/author:underline leading-snug truncate">
                     {pin.authorName}
                   </p>
                   <p className="ty-caption truncate">{pin.authorSubtitle}</p>
                 </div>
-              </div>
+              </Link>
 
               <h1 className="ty-title leading-snug">{pin.title}</h1>
 

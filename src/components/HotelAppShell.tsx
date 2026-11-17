@@ -481,12 +481,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
         return;
       }
       if (targetTab === "book" || targetTab === "room") {
-        if (!pathname.startsWith("/booking")) {
-          router.push("/booking");
-        } else if (targetTab === "room") {
-          document
-            .getElementById("rooms")
-            ?.scrollIntoView({ behavior: "smooth" });
+        if (!pathname.startsWith("/sapanunseen")) {
+          router.push("/sapanunseen");
         }
         return;
       }

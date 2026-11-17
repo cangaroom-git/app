@@ -31,6 +31,7 @@ export interface ThailandDiscoverySidebarProps {
   selectedStyles: StayStyleTag[];
   onToggleStyle: (style: StayStyleTag) => void;
   onResetAllFilters: () => void;
+  resultCount?: number;
 }
 
 const MINIMAL_STAY_STYLES: ReadonlyArray<{
@@ -84,6 +85,7 @@ export function ThailandDiscoverySidebar({
   selectedStyles,
   onToggleStyle,
   onResetAllFilters,
+  resultCount,
 }: ThailandDiscoverySidebarProps) {
   const [provinceSearch, setProvinceSearch] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<
@@ -123,6 +125,62 @@ export function ThailandDiscoverySidebar({
 
   return (
     <aside className="space-y-6 select-none lg:pl-2">
+      {/* ACTIVE FILTER CHIPS (Moved from Left Masonry Column to Right Sidebar so cards never jump!) */}
+      {hasAnyFilter && (
+        <section className="rounded-[14px] bg-[var(--color-background-muted)]/60 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="ty-caption font-semibold text-[var(--color-text-primary)]">
+              {language === "th"
+                ? `ตัวกรอง (${resultCount ?? 0} รายการ)`
+                : `Filtered (${resultCount ?? 0})`}
+            </span>
+            <button
+              type="button"
+              onClick={onResetAllFilters}
+              className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-promo)] hover:underline cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{language === "th" ? "ล้าง" : "Reset"}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {activeProvinceObj && (
+              <button
+                type="button"
+                onClick={() => onSelectProvince(null)}
+                className="h-7 px-2.5 rounded-[8px] bg-[#111111] !text-white inline-flex items-center gap-1 ty-caption font-semibold cursor-pointer"
+              >
+                <span>
+                  {language === "th"
+                    ? activeProvinceObj.nameTh.split("(")[0].trim()
+                    : activeProvinceObj.nameEn}
+                </span>
+                <X className="w-3 h-3" />
+              </button>
+            )}
+
+            {selectedStyles.map((stId) => {
+              const stMeta = MINIMAL_STAY_STYLES.find((s) => s.id === stId);
+              if (!stMeta) return null;
+              return (
+                <button
+                  key={stId}
+                  type="button"
+                  onClick={() => onToggleStyle(stId)}
+                  className="h-7 px-2.5 rounded-[8px] bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center gap-1 ty-caption font-medium cursor-pointer"
+                >
+                  <span>
+                    {language === "th" ? stMeta.labelTh : stMeta.labelEn}
+                  </span>
+                  <X className="w-3 h-3 text-[var(--color-text-secondary)]" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* =====================================================================
           1. MINIMAL STAY STYLE CROSS-FILTER
       ====================================================================== */}
@@ -270,8 +328,8 @@ export function ThailandDiscoverySidebar({
                 onClick={() => onSelectProvince(isSelected ? null : prov.id)}
                 className={`h-8 px-3 rounded-[10px] text-[13px] transition-colors cursor-pointer ${
                   isSelected
-                    ? "bg-[var(--color-text-primary)] text-[var(--color-background-card)] font-semibold"
-                    : "bg-[var(--color-background-muted)]/75 hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                    ? "text-[var(--color-background-card)] font-semibold"
+                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                 }`}
               >
                 {language === "th" ? shortTh : prov.nameEn}

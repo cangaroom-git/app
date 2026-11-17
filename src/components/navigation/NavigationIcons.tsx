@@ -28,19 +28,21 @@ export const HOTEL_NAV_TABS: ReadonlyArray<{
     labelEn: "Saved Board",
     labelTh: "บอร์ดที่บันทึก",
   },
-  { id: "book", href: "/booking", labelEn: "Book", labelTh: "จองห้อง" },
+  {
+    id: "book",
+    href: "/sapanunseen",
+    labelEn: "Property",
+    labelTh: "โปรไฟล์ที่พัก",
+  },
   { id: "chat", href: "/chat", labelEn: "Ask AI", labelTh: "ถาม AI" },
   { id: "deal", href: "/deal", labelEn: "Deals", labelTh: "โปรโมชั่น" },
 ];
 
 export function getTabIdFromPathname(pathname: string): HotelNavTabId {
-  if (pathname.startsWith("/board")) {
-    return "board";
+  if (pathname === "/" || pathname === "") {
+    return "home";
   }
-  if (pathname.startsWith("/booking") || pathname.startsWith("/room")) {
-    return "book";
-  }
-  if (pathname.startsWith("/shorts")) {
+  if (pathname.startsWith("/board") || pathname.startsWith("/shorts")) {
     return "board";
   }
   if (pathname.startsWith("/chat")) {
@@ -58,7 +60,7 @@ export function getTabIdFromPathname(pathname: string): HotelNavTabId {
   if (pathname.startsWith("/setting")) {
     return "setting";
   }
-  return "home";
+  return "book";
 }
 
 export function HotelNavTabIcon({
