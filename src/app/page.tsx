@@ -6,7 +6,6 @@ import { PinCommentItem } from "@/data/cmsDefaults";
 import { StayStyleTag } from "@/data/thailandProvinces";
 import {
   LIKED_PINS_STORAGE_KEY,
-  PinCategoryId,
   PinterestPinItem,
   SAVED_PINS_STORAGE_KEY,
   buildAllMarketplacePins,
@@ -22,18 +21,27 @@ import {
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
-import { ThailandDiscoverySidebar } from "@/components/home/ThailandDiscoverySidebar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
 
-const VALID_PIN_CATEGORIES: ReadonlySet<string> = new Set([
-  "all",
-  "rooms",
-  "videos",
-  "views",
-  "dining",
-  "reviews",
-  "deals",
-]);
+type HomeStyleTabId = "all" | StayStyleTag;
+
+const STAY_STYLE_TABS: ReadonlyArray<{
+  id: HomeStyleTabId;
+  labelTh: string;
+  labelEn: string;
+}> = [
+  { id: "all", labelTh: "ทั้งหมด", labelEn: "All Stays" },
+  { id: "mountain", labelTh: "ภูเขา & ทะเลหมอก", labelEn: "Mountain & Mist" },
+  { id: "pool-villa", labelTh: "พูลวิลล่า", labelEn: "Pool Villas" },
+  { id: "sea", labelTh: "ติดทะเล & ชายหาด", labelEn: "Sea & Beachfront" },
+  { id: "bars", labelTh: "บาร์ & รูฟท็อป", labelEn: "Bars & Rooftop" },
+  { id: "bathtub", labelTh: "อ่างแช่น้ำ & ออนเซ็น", labelEn: "Onsen & Bathtub" },
+  { id: "glamping", labelTh: "แกลมปิ้ง & เคบิน", labelEn: "Glamping & Cabin" },
+];
+
+const VALID_STYLE_TABS: ReadonlySet<string> = new Set(
+  STAY_STYLE_TABS.map((t) => t.id)
+);
 
 export default function HomePage() {
   const {
@@ -49,15 +57,18 @@ export default function HomePage() {
     canShowEditControls,
     openCmsEditor,
     globalSearchQuery,
+    selectedProvinceId,
+    setSelectedProvinceId,
+    isDateFilterActive,
+    setIsDateFilterActive,
+    roomStatusMap,
+    totalAvailableUnitsCount,
+    guests,
   } = useHotelApp();
 
   const { user: currentUser } = useAuthenticatedProfile();
 
-  const [activeCategory, setActiveCategory] = useState<PinCategoryId>("all");
-  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(
-    null
-  );
-  const [selectedStyles, setSelectedStyles] = useState<StayStyleTag[]>([]);
+  const [activeStyleTab, setActiveStyleTab] = useState<HomeStyleTabId>("all");
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [savedPinsMap, setSavedPinsMap] = useState<Record<string, boolean>>({});
   const [likedPinsMap, setLikedPinsMap] = useState<Record<string, boolean>>({});
@@ -66,7 +77,7 @@ export default function HomePage() {
     index: number;
   } | null>(null);
 
-  // Hydrate saved & liked pins + deep-linked ?pin=... or ?category=...
+  // Hydrate saved & liked pins + deep-linked ?pin=... or ?style=...
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -78,9 +89,9 @@ export default function HomePage() {
       const params = new URLSearchParams(window.location.search);
       const pinParam = params.get("pin");
       if (pinParam) setSelectedPinId(pinParam);
-      const catParam = params.get("category");
-      if (catParam && VALID_PIN_CATEGORIES.has(catParam)) {
-        setActiveCategory(catParam as PinCategoryId);
+      const styleParam = params.get("style");
+      if (styleParam && VALID_STYLE_TABS.has(styleParam)) {
+        setActiveStyleTab(styleParam as HomeStyleTabId);
       }
     } catch {
       // ignore storage errors
@@ -89,9 +100,9 @@ export default function HomePage() {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       setSelectedPinId(params.get("pin"));
-      const catParam = params.get("category");
-      if (catParam && VALID_PIN_CATEGORIES.has(catParam)) {
-        setActiveCategory(catParam as PinCategoryId);
+      const styleParam = params.get("style");
+      if (styleParam && VALID_STYLE_TABS.has(styleParam)) {
+        setActiveStyleTab(styleParam as HomeStyleTabId);
       }
     };
     window.addEventListener("popstate", handlePopState);
@@ -101,7 +112,9 @@ export default function HomePage() {
   const navigateToBookRoom = useCallback(
     (roomId?: string) => {
       if (roomId && typeof window !== "undefined") {
-        window.location.href = `/sapanunseen?room=${encodeURIComponent(roomId)}`;
+        window.location.href = `/sapanunseen?room=${encodeURIComponent(
+          roomId
+        )}`;
         return;
       }
       navigateToTab("book");
@@ -150,22 +163,35 @@ export default function HomePage() {
     ]
   );
 
-  // Cross-Filter: Category Tab × Province (77 Provinces) × Stay Styles × Top Search Query
+  // Cross-Filter: Stay Style Tab × Province (Search Bar) × Agoda Date Availability (Search Bar) × Text Query
   const filteredPins = useMemo(() => {
     const q = globalSearchQuery.trim().toLowerCase();
     return allPins.filter((pin) => {
-      if (activeCategory !== "all" && pin.category !== activeCategory) {
+      // 1. Stay Style Tab
+      if (activeStyleTab !== "all" && !pin.styles.includes(activeStyleTab)) {
         return false;
       }
+
+      // 2. Province Filter (from Top Search Bar)
       if (selectedProvinceId && pin.provinceId !== selectedProvinceId) {
         return false;
       }
-      if (
-        selectedStyles.length > 0 &&
-        !selectedStyles.some((st) => pin.styles.includes(st))
-      ) {
-        return false;
+
+      // 3. Agoda Calendar Date & Guest Availability Filter (from Top Search Bar)
+      if (isDateFilterActive) {
+        if (pin.roomId) {
+          const roomAvail = roomStatusMap[pin.roomId]?.availableUnits ?? 0;
+          if (roomAvail <= 0) return false;
+          if (pin.maxGuests && guests > pin.maxGuests) return false;
+        } else if (pin.maxGuests) {
+          if (guests > pin.maxGuests) return false;
+        } else {
+          // General resort atmosphere/video pins: require at least 1 available unit at the resort
+          if (totalAvailableUnitsCount <= 0) return false;
+        }
       }
+
+      // 4. Keyword Search
       if (!q) return true;
       return (
         pin.title.toLowerCase().includes(q) ||
@@ -176,11 +202,14 @@ export default function HomePage() {
       );
     });
   }, [
-    activeCategory,
+    activeStyleTab,
     allPins,
     globalSearchQuery,
+    guests,
+    isDateFilterActive,
+    roomStatusMap,
     selectedProvinceId,
-    selectedStyles,
+    totalAvailableUnitsCount,
   ]);
 
   const selectedPin = useMemo(
@@ -208,16 +237,10 @@ export default function HomePage() {
     return [...sameCategoryOrStyle, ...others];
   }, [allPins, selectedPin]);
 
-  const handleToggleStyle = (style: StayStyleTag) => {
-    setSelectedStyles((prev) =>
-      prev.includes(style) ? prev.filter((s) => s !== style) : [...prev, style]
-    );
-  };
-
   const handleResetAllFilters = () => {
+    setActiveStyleTab("all");
     setSelectedProvinceId(null);
-    setSelectedStyles([]);
-    setActiveCategory("all");
+    setIsDateFilterActive(false);
   };
 
   const handleSelectPin = (pin: PinterestPinItem) => {
@@ -347,27 +370,8 @@ export default function HomePage() {
     });
   };
 
-  const categoryTabs: Array<{
-    id: PinCategoryId;
-    labelTh: string;
-    labelEn: string;
-  }> = [
-    { id: "all", labelTh: "ทั้งหมด", labelEn: "All Stays" },
-    { id: "rooms", labelTh: "ที่พัก & พูลวิลล่า", labelEn: "Villas & Suites" },
-    { id: "videos", labelTh: "คลิปบรรยากาศ", labelEn: "Videos" },
-    { id: "views", labelTh: "วิว & มุมถ่ายรูป", labelEn: "Scenic Views" },
-    { id: "dining", labelTh: "อาหาร & บาร์", labelEn: "Dining & Bars" },
-    { id: "reviews", labelTh: "รีวิวผู้เข้าพัก", labelEn: "Guest Stories" },
-    { id: "deals", labelTh: "โปรโมชั่นจองตรง", labelEn: "Direct Deals" },
-  ];
-
   return (
     <div className="w-full min-w-0 space-y-5">
-      {/* =====================================================================
-          MODE A: IN-PAGE PINTEREST PIN DETAIL CLOSE-UP + RELATED MASONRY
-             - Zero empty space underneath the image (related masonry directly below)
-             - Squircle rounded-[16px] Back button matching Pinterest reference
-      ====================================================================== */}
       {selectedPin ? (
         <PinterestPinDetail
           key={selectedPin.id}
@@ -403,22 +407,20 @@ export default function HomePage() {
         />
       ) : (
         /* =====================================================================
-           MODE B: FULL-WIDTH PINTEREST MASONRY + COMPACT TOP FILTER BAR
-              - Top Row: Category Underline Tabs (Left) + Compact Province/Style Filter Dropdowns (Right)
-              - Main: Full-Width Variable-Height Masonry Grid (No Right Sidebar!)
+           FULL-WIDTH 6-COLUMN PINTEREST MASONRY + STAY STYLE UNDERLINE TABS
         ====================================================================== */
         <div className="w-full min-w-0 space-y-4">
-          {/* Single Compact Top Bar: Category Underline Tabs + Right Filter Dropdowns */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-2">
+          {/* Stay Style Horizontal Underline Tabs */}
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
             <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
-              {categoryTabs.map((tab) => {
-                const isActive = activeCategory === tab.id;
+              {STAY_STYLE_TABS.map((tab) => {
+                const isActive = activeStyleTab === tab.id;
                 return (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveCategory(tab.id)}
-                    className={`relative py-1.5 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                    onClick={() => setActiveStyleTab(tab.id)}
+                    className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       isActive
                         ? "text-[var(--color-text-primary)]"
                         : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -428,58 +430,46 @@ export default function HomePage() {
                       {language === "th" ? tab.labelTh : tab.labelEn}
                     </span>
                     {isActive && (
-                      <span className="absolute -bottom-2 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
+                      <span className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
                     )}
                   </button>
                 );
               })}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 ml-auto">
-              <ThailandDiscoverySidebar
-                language={language}
-                selectedProvinceId={selectedProvinceId}
-                onSelectProvince={setSelectedProvinceId}
-                selectedStyles={selectedStyles}
-                onToggleStyle={handleToggleStyle}
-                onResetAllFilters={handleResetAllFilters}
-                resultCount={filteredPins.length}
-              />
-
-              {canShowEditControls && (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <EditSpotButton
-                    icon="add"
-                    label="เพิ่มรูป"
-                    onClick={() => openCmsEditor({ type: "gallery-photos" })}
-                  />
-                  <EditSpotButton
-                    icon="add"
-                    label="เพิ่มคลิป"
-                    onClick={() => openCmsEditor({ type: "short-video" })}
-                  />
-                  <EditSpotButton
-                    icon="add"
-                    label="เพิ่มห้อง"
-                    onClick={() => openCmsEditor({ type: "room" })}
-                  />
-                </div>
-              )}
-            </div>
+            {canShowEditControls && (
+              <div className="flex items-center gap-1.5 pb-2 shrink-0">
+                <EditSpotButton
+                  icon="add"
+                  label="เพิ่มรูป"
+                  onClick={() => openCmsEditor({ type: "gallery-photos" })}
+                />
+                <EditSpotButton
+                  icon="add"
+                  label="เพิ่มคลิป"
+                  onClick={() => openCmsEditor({ type: "short-video" })}
+                />
+                <EditSpotButton
+                  icon="add"
+                  label="เพิ่มห้อง"
+                  onClick={() => openCmsEditor({ type: "room" })}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Full-Width Staggered Masonry Grid (No Right Sidebar) */}
+          {/* Full-Width 6-Column Staggered Masonry Grid */}
           {filteredPins.length === 0 ? (
             <div className="py-16 px-4 text-center space-y-3">
               <p className="ty-title">
                 {language === "th"
-                  ? "ยังไม่มีที่พักที่ตรงกับตัวกรองนี้"
-                  : "No stays match the selected filters"}
+                  ? "ไม่พบที่พักว่างที่ตรงกับตัวกรองนี้"
+                  : "No available stays match the selected filters"}
               </p>
               <p className="ty-body-muted max-w-md mx-auto">
                 {language === "th"
-                  ? "ลองล้างตัวกรองเพื่อดูที่พักทั้งหมด หรือนำที่พักของคุณในจังหวัดนี้เข้าร่วมฟรี 30 วัน"
-                  : "Try resetting filters to browse all curated Thailand stays."}
+                  ? "ลองเปลี่ยนจังหวัด วันเข้าพัก หรือเลือกสไตล์ “ทั้งหมด” เพื่อดูที่พักแนะนำทั่วไทย"
+                  : "Try clearing the province, stay dates, or style filter to view all curated stays."}
               </p>
               <div className="flex items-center justify-center gap-2.5 pt-1">
                 <button
@@ -504,7 +494,7 @@ export default function HomePage() {
           ) : (
             <MasonryGrid
               items={filteredPins}
-              columnBreakpoints={[2, 3, 4, 5, 5]}
+              columnBreakpoints={[2, 3, 4, 5, 6]}
               gapClass="gap-4"
               renderItem={(pin) => (
                 <PinterestPinCard

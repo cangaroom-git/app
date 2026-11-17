@@ -15,9 +15,9 @@ import {
   X,
 } from "lucide-react";
 import { PinCommentItem } from "@/data/cmsDefaults";
+import { StayStyleTag } from "@/data/thailandProvinces";
 import {
   LIKED_PINS_STORAGE_KEY,
-  PinCategoryId,
   PinterestPinItem,
   SAVED_PINS_STORAGE_KEY,
   USER_BOARDS_STORAGE_KEY,
@@ -53,11 +53,15 @@ export default function SavedBoardPage() {
     canShowEditControls,
     openCmsEditor,
     globalSearchQuery,
+    selectedProvinceId,
+    setSelectedProvinceId,
   } = useHotelApp();
 
   const { user: currentUser } = useAuthenticatedProfile();
 
-  const [activeCategory, setActiveCategory] = useState<PinCategoryId>("all");
+  const [activeStyleTab, setActiveStyleTab] = useState<"all" | StayStyleTag>(
+    "all"
+  );
   const [savedPinsMap, setSavedPinsMap] = useState<Record<string, boolean>>({});
   const [likedPinsMap, setLikedPinsMap] = useState<Record<string, boolean>>({});
   const [userBoards, setUserBoards] = useState<UserBoardCollection[]>([]);
@@ -170,9 +174,14 @@ export default function SavedBoardPage() {
     const q = globalSearchQuery.trim().toLowerCase();
     let list = savedPins;
 
-    // 1. Category Tab Filter (same as Home page!)
-    if (activeCategory !== "all") {
-      list = list.filter((p) => p.category === activeCategory);
+    // 1. Stay Style Tab Filter (same as Home page!)
+    if (activeStyleTab !== "all") {
+      list = list.filter((p) => p.styles.includes(activeStyleTab));
+    }
+
+    // 2. Top Search Bar Province Filter
+    if (selectedProvinceId) {
+      list = list.filter((p) => p.provinceId === selectedProvinceId);
     }
 
     // 2. Board / Province Filter
@@ -198,9 +207,10 @@ export default function SavedBoardPage() {
     );
   }, [
     activeBoardFilter,
-    activeCategory,
+    activeStyleTab,
     globalSearchQuery,
     savedPins,
+    selectedProvinceId,
     userBoards,
   ]);
 
@@ -392,18 +402,18 @@ export default function SavedBoardPage() {
     }
   };
 
-  const categoryTabs: Array<{
-    id: PinCategoryId;
+  const styleTabs: Array<{
+    id: "all" | StayStyleTag;
     labelTh: string;
     labelEn: string;
   }> = [
     { id: "all", labelTh: "ทั้งหมด", labelEn: "All Stays" },
-    { id: "rooms", labelTh: "ที่พัก & พูลวิลล่า", labelEn: "Villas & Suites" },
-    { id: "videos", labelTh: "คลิปบรรยากาศ", labelEn: "Videos" },
-    { id: "views", labelTh: "วิว & มุมถ่ายรูป", labelEn: "Scenic Views" },
-    { id: "dining", labelTh: "อาหาร & บาร์", labelEn: "Dining & Bars" },
-    { id: "reviews", labelTh: "รีวิวผู้เข้าพัก", labelEn: "Guest Stories" },
-    { id: "deals", labelTh: "โปรโมชั่นจองตรง", labelEn: "Direct Deals" },
+    { id: "mountain", labelTh: "ภูเขา & ทะเลหมอก", labelEn: "Mountain & Mist" },
+    { id: "pool-villa", labelTh: "พูลวิลล่า", labelEn: "Pool Villas" },
+    { id: "sea", labelTh: "ติดทะเล & ชายหาด", labelEn: "Sea & Beachfront" },
+    { id: "bars", labelTh: "บาร์ & รูฟท็อป", labelEn: "Bars & Rooftop" },
+    { id: "bathtub", labelTh: "อ่างแช่น้ำ & ออนเซ็น", labelEn: "Onsen & Bathtub" },
+    { id: "glamping", labelTh: "แกลมปิ้ง & เคบิน", labelEn: "Glamping & Cabin" },
   ];
 
   const activeUserBoard = activeBoardFilter.startsWith("board:")
@@ -551,17 +561,17 @@ export default function SavedBoardPage() {
           )}
 
           {/* =================================================================
-              2. HORIZONTAL UNDERLINE CATEGORY TABS (Matches Home Page!)
+              2. HORIZONTAL UNDERLINE STAY STYLE TABS (Matches Home Page!)
           ================================================================== */}
           <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
             <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
-              {categoryTabs.map((tab) => {
-                const isActive = activeCategory === tab.id;
+              {styleTabs.map((tab) => {
+                const isActive = activeStyleTab === tab.id;
                 return (
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveCategory(tab.id)}
+                    onClick={() => setActiveStyleTab(tab.id)}
                     className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                       isActive
                         ? "text-[var(--color-text-primary)]"
@@ -740,8 +750,8 @@ export default function SavedBoardPage() {
                     : "Popular Thailand Stays — Click 'Save' to Start Your Board"}
                 </h3>
                 <MasonryGrid
-                  items={allPins.slice(0, 10)}
-                  columnBreakpoints={[2, 3, 4, 5, 5]}
+                  items={allPins.slice(0, 12)}
+                  columnBreakpoints={[2, 3, 4, 5, 6]}
                   gapClass="gap-4"
                   renderItem={(pin) => (
                     <PinterestPinCard
@@ -767,8 +777,9 @@ export default function SavedBoardPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setActiveCategory("all");
+                  setActiveStyleTab("all");
                   setActiveBoardFilter("all");
+                  setSelectedProvinceId(null);
                 }}
                 className="h-10 px-4 rounded-[12px] bg-[#111111] !text-white ty-body font-semibold cursor-pointer"
               >
@@ -782,7 +793,7 @@ export default function SavedBoardPage() {
           ) : (
             <MasonryGrid
               items={displayedSavedPins}
-              columnBreakpoints={[2, 3, 4, 5, 5]}
+              columnBreakpoints={[2, 3, 4, 5, 6]}
               gapClass="gap-4"
               renderItem={(pin) => (
                 <div className="relative">

@@ -28,14 +28,16 @@ import {
   X,
 } from "lucide-react";
 import { WhiteLabelPropertyConfig } from "@/data/rooms";
-import { formatShortDate, LanguageCode } from "@/lib/dateFormatters";
+import { LanguageCode } from "@/lib/dateFormatters";
 import { SAVED_PINS_STORAGE_KEY } from "@/lib/pinBuilder";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { AgodaDateRangeFilter } from "@/components/navigation/AgodaDateRangeFilter";
 import {
   HOTEL_NAV_TABS,
   HotelNavTabIcon,
   HotelNavTabId,
 } from "@/components/navigation/NavigationIcons";
+import { ProvinceSearchDropdown } from "@/components/navigation/ProvinceSearchDropdown";
 import {
   UserAvatarCircle,
   UserProfileDropdown,
@@ -58,10 +60,18 @@ export interface PrimaryNavigationProps {
   onOpenCouponWallet: () => void;
   checkInDate?: string;
   checkOutDate?: string;
+  onChangeCheckInDate?: (dateStr: string) => void;
+  onChangeCheckOutDate?: (dateStr: string) => void;
+  todayDate?: Date;
   guestCount?: number;
+  onChangeGuestCount?: (guests: number) => void;
   stayNights?: number;
   isCalendarDrawerOpen?: boolean;
   onOpenCalendarDrawer?: () => void;
+  isDateFilterActive?: boolean;
+  onChangeDateFilterActive?: (active: boolean) => void;
+  selectedProvinceId?: string | null;
+  onSelectProvince?: (provinceId: string | null) => void;
   isChatOpen?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
@@ -84,8 +94,15 @@ export function PrimaryNavigation({
   onOpenCouponWallet,
   checkInDate,
   checkOutDate,
+  onChangeCheckInDate,
+  onChangeCheckOutDate,
+  todayDate,
   guestCount = 2,
-  onOpenCalendarDrawer,
+  onChangeGuestCount,
+  isDateFilterActive = false,
+  onChangeDateFilterActive,
+  selectedProvinceId = null,
+  onSelectProvince,
   isChatOpen = false,
   isEditMode = false,
   onToggleEditMode,
@@ -591,10 +608,10 @@ export function PrimaryNavigation({
         aria-label="Top navigation bar"
         className="fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)] px-3 sm:px-5 flex items-center justify-end gap-2.5 sm:gap-3 pr-[var(--scrollbar-compensation,0.75rem)]"
       >
-        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Bar (Hidden on Hotel Profile /{hotelSlug}) */}
+        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Bar + Province & Agoda Calendar Filters */}
         {normalizedActiveTab !== "book" && (
-          <div className="flex-1 h-12 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
-            <Search className="w-[20px] h-[20px] text-[var(--color-text-secondary)] shrink-0" />
+          <div className="flex-1 h-12 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 pl-3.5 pr-2 flex items-center gap-2 transition-colors min-w-0">
+            <Search className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
 
             <input
               type="text"
@@ -602,11 +619,11 @@ export function PrimaryNavigation({
               onChange={(e) => onChangeSearchQuery?.(e.target.value)}
               placeholder={
                 language === "th"
-                  ? "ค้นหาที่พักทั่วไทย 77 จังหวัด (เช่น สะปัน, พูลวิลล่าภูเก็ต, ทะเลหมอก, รีวิว)..."
-                  : "Search stays across 77 Thailand provinces (villas, sea, mist, bars)..."
+                  ? "ค้นหาที่พัก สไตล์ หรือทำเล..."
+                  : "Search stays, styles, or locations..."
               }
               aria-label={language === "th" ? "ค้นหา" : "Search"}
-              className="flex-1 min-w-0 bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+              className="flex-1 min-w-[60px] bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
             />
 
             {searchQuery && (
@@ -620,24 +637,27 @@ export function PrimaryNavigation({
               </button>
             )}
 
-            {/* Right-Inside-Search-Pill Quick Date Picker Trigger */}
+            {/* 1. Province Filter (Beside Calendar — Zero-Scroll Desktop Grid & Full-Screen Mobile) */}
+            <ProvinceSearchDropdown
+              language={language}
+              selectedProvinceId={selectedProvinceId}
+              onSelectProvince={(prov) => onSelectProvince?.(prov)}
+            />
+
+            {/* 2. Agoda-Standard 2-Month Date Range Filter */}
             {checkInDate && checkOutDate && (
-              <button
-                type="button"
-                onClick={onOpenCalendarDrawer}
-                title={
-                  language === "th"
-                    ? "เลือกวันเช็กอิน - เช็กเอาท์"
-                    : "Select stay dates"
-                }
-                className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
-              >
-                <Calendar className="w-4 h-4 text-[var(--color-promo)]" />
-                <span>
-                  {formatShortDate(checkInDate, language)} · {guestCount}{" "}
-                  {language === "th" ? "ท่าน" : "guests"}
-                </span>
-              </button>
+              <AgodaDateRangeFilter
+                language={language}
+                todayDate={todayDate ?? new Date()}
+                checkInDate={checkInDate}
+                checkOutDate={checkOutDate}
+                onChangeCheckInDate={(d) => onChangeCheckInDate?.(d)}
+                onChangeCheckOutDate={(d) => onChangeCheckOutDate?.(d)}
+                guestCount={guestCount}
+                onChangeGuestCount={(g) => onChangeGuestCount?.(g)}
+                isDateFilterActive={isDateFilterActive}
+                onChangeDateFilterActive={(a) => onChangeDateFilterActive?.(a)}
+              />
             )}
           </div>
         )}

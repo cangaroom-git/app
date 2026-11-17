@@ -39,8 +39,8 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
   useEffect(() => {
     const syncColumns = () => {
       const w = window.innerWidth;
-      if (w >= 1536) setColCount(columnBreakpoints[4]);
-      else if (w >= 1280) setColCount(columnBreakpoints[3]);
+      if (w >= 1400) setColCount(columnBreakpoints[4]);
+      else if (w >= 1150) setColCount(columnBreakpoints[3]);
       else if (w >= 768) setColCount(columnBreakpoints[2]);
       else if (w >= 640) setColCount(columnBreakpoints[1]);
       else setColCount(columnBreakpoints[0]);

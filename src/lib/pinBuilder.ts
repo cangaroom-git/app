@@ -42,6 +42,8 @@ export interface PinterestPinItem {
   footerSubcaption?: string;
   nightlyPriceThb?: number;
   ratingScore?: string;
+  roomId?: string;
+  maxGuests?: number;
   ctaLabel?: string;
   onCtaClick?: () => void;
   baseLikes: number;
@@ -190,6 +192,8 @@ export function buildAllMarketplacePins({
         footerSubcaption: `${resortName} · ฿${room.basePriceThb.toLocaleString()}/คืน`,
         nightlyPriceThb: room.basePriceThb,
         ratingScore: "4.9",
+        roomId: room.id,
+        maxGuests: room.maxGuests,
         ctaLabel:
           language === "th"
             ? `เช็กวันว่าง & จองห้องพัก (${room.code})`
@@ -232,6 +236,8 @@ export function buildAllMarketplacePins({
         authorAvatar: resortAvatar,
         nightlyPriceThb: room.basePriceThb,
         ratingScore: "4.9",
+        roomId: room.id,
+        maxGuests: room.maxGuests,
         ctaLabel:
           language === "th"
             ? `ดูตารางห้องว่าง ${room.code}`
@@ -321,6 +327,7 @@ export function buildAllMarketplacePins({
       footerSubcaption: `${provLabel} · ฿${partner.nightlyPriceThb.toLocaleString()}/คืน · ★ ${partner.rating}`,
       nightlyPriceThb: partner.nightlyPriceThb,
       ratingScore: partner.rating,
+      maxGuests: partner.styles.includes("pool-villa") ? 6 : 4,
       ctaLabel:
         language === "th"
           ? `ดูรายละเอียด & เช็กวันว่าง (฿${partner.nightlyPriceThb.toLocaleString()}/คืน)`

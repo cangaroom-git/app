@@ -26,10 +26,10 @@ Every component, page, and interactive widget MUST strictly follow these design 
   - Top slot: Brand glyph (`27px`).
   - Middle stack: Vertically centered `26px` outline/solid icons inside `h-12 w-12 rounded-[16px]` squircle buttons (`Home (/)`, `Saved Board (/board)`, `Messages`, `Property Profile (/sapanunseen)`, `Deals (/deal)`, `List Hotel (/register-hotel)`, `Profile Avatar`).
   - Bottom slot: `26px` `≡` More menu icon with popover settings.
-- **Home Feed (`/`)**:
-  - **Full-Width Masonry (No Right Sidebar)**: Top bar combines underline category tabs on the left + compact dropdown triggers (`จังหวัด (77)` & `สไตล์ที่พัก`) on the right, followed by full-width `<MasonryGrid columnBreakpoints={[2, 3, 4, 5, 5]} />`.
-- **Saved Boards (`/board`)**:
-  - Includes the same underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, etc.) + custom Trip Boards & Province filter pills.
+- **Top Search Bar (`/` & `/board`)**:
+  - Contains keyword search input + **Province Filter (`ProvinceSearchDropdown`)** (zero-scroll 7-column 77-province mega-grid on Desktop; full-screen 1-tap modal on Mobile) + **Agoda 2-Month Date Range Filter (`AgodaDateRangeFilter`)** (filters available stays live on Home).
+- **Home Feed (`/`) & Saved Boards (`/board`)**:
+  - **6-Column Full-Width Masonry (`columnBreakpoints={[2, 3, 4, 5, 6]}`)**: Top horizontal underline tabs filter by **Stay Style** (`ทั้งหมด`, `ภูเขา & ทะเลหมอก`, `พูลวิลล่า`, `ติดทะเล & ชายหาด`, `บาร์ & รูฟท็อป`, `อ่างแช่น้ำ & ออนเซ็น`, `แกลมปิ้ง & เคบิน`), followed by full-width 6-column `<MasonryGrid />`.
 - **Hotel Profile Page (`/{hotelSlug}`, e.g. `/sapanunseen` — Replaces `/booking`)**:
   - Top search bar is hidden on `/{hotelSlug}`.
   - Compact Top Profile Header (Avatar + Name + `@slug` + 4-Metric box, without right cover banner), Left Masonry Portfolio (`columnBreakpoints={[2, 3, 3, 4, 4]}` matching Home card sizing), and Right Sidebar (`lg:w-[310px] xl:w-[330px]`) showing **ประเภทห้องพักพร้อมราคา** (`Rooms & Villas` horizontal cards) that open the Room Booking Drawer on click.

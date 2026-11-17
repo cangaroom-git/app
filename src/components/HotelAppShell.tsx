@@ -199,6 +199,10 @@ export interface HotelAppContextValue {
   setHideSoldOutRooms: React.Dispatch<React.SetStateAction<boolean>>;
   globalSearchQuery: string;
   setGlobalSearchQuery: (query: string) => void;
+  selectedProvinceId: string | null;
+  setSelectedProvinceId: (provinceId: string | null) => void;
+  isDateFilterActive: boolean;
+  setIsDateFilterActive: (active: boolean) => void;
 }
 
 const HotelAppContext = createContext<HotelAppContextValue | null>(null);
@@ -538,6 +542,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const [guests, setGuests] = useState<number>(2);
   const [roomFilterMode, setRoomFilterMode] = useState<RoomFilterMode>("all");
   const [hideSoldOutRooms, setHideSoldOutRooms] = useState<boolean>(false);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(
+    null
+  );
+  const [isDateFilterActive, setIsDateFilterActive] = useState<boolean>(false);
 
   const { weather, loading: weatherLoading } = useResortWeather(
     propertyConfig.latitude,
@@ -1397,6 +1405,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       setHideSoldOutRooms,
       globalSearchQuery,
       setGlobalSearchQuery,
+      selectedProvinceId,
+      setSelectedProvinceId,
+      isDateFilterActive,
+      setIsDateFilterActive,
       cms,
       isEditMode,
       canShowEditControls,
@@ -1465,6 +1477,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       roomFilterMode,
       hideSoldOutRooms,
       globalSearchQuery,
+      selectedProvinceId,
+      isDateFilterActive,
     ]
   );
 
@@ -1507,10 +1521,18 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           onOpenCouponWallet={openCouponWallet}
           checkInDate={checkIn}
           checkOutDate={checkOut}
+          onChangeCheckInDate={setCheckIn}
+          onChangeCheckOutDate={setCheckOut}
+          todayDate={today}
           guestCount={guests}
+          onChangeGuestCount={setGuests}
           stayNights={nights}
           isCalendarDrawerOpen={isNavbarCalendarOpen}
           onOpenCalendarDrawer={openCalendarDrawer}
+          isDateFilterActive={isDateFilterActive}
+          onChangeDateFilterActive={setIsDateFilterActive}
+          selectedProvinceId={selectedProvinceId}
+          onSelectProvince={setSelectedProvinceId}
           isChatOpen={isChatDrawerOpen}
           isEditMode={isEditMode}
           onToggleEditMode={toggleEditMode}
