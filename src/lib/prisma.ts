@@ -7,7 +7,12 @@ const globalForPrisma = globalThis as unknown as {
   __cangaroomPgPool?: Pool;
 };
 
-function createPrismaClient(): PrismaClient {
+function getOrCreatePrismaClient(): PrismaClient {
+  const cachedPrisma = globalForPrisma.__cangaroomPrisma;
+  if (cachedPrisma && "hotelPost" in cachedPrisma) {
+    return cachedPrisma;
+  }
+
   const connectionString =
     process.env.DATABASE_URL || process.env.DIRECT_URL || "";
 
@@ -30,19 +35,19 @@ function createPrismaClient(): PrismaClient {
   }
 
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  const client = new PrismaClient({ adapter });
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.__cangaroomPrisma = client;
+  }
+
+  return client;
 }
 
-const cachedPrisma = globalForPrisma.__cangaroomPrisma;
-const hasCurrentModels = Boolean(
-  cachedPrisma && "hotelPost" in cachedPrisma
-);
-
-export const prisma = hasCurrentModels && cachedPrisma
-  ? cachedPrisma
-  : createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.__cangaroomPrisma = prisma;
-}
-
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const instance = getOrCreatePrismaClient();
+    const value = Reflect.get(instance as object, prop, receiver);
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});
