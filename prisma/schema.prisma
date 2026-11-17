@@ -3,121 +3,551 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-model Room {
-  id              String    @id @default(cuid())
-  slug            String    @unique
-  code            String    @unique
-  nameTh          String
-  nameEn          String
-  categoryTh      String
-  categoryEn      String
-  shortDescTh     String
-  shortDescEn     String
-  basePriceThb    Int
-  weekendPriceThb Int
-  sizeSqm         Int
-  minGuests       Int       @default(1)
-  maxGuests       Int       @default(2)
-  bedrooms        Int       @default(1)
-  beds            Int       @default(1)
-  bathrooms       Int       @default(1)
-  petsAllowed     Boolean   @default(false)
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  bookings        Booking[]
-}
-
-enum BookingStatus {
-  PENDING_PAYMENT
-  CONFIRMED
-  CANCELLED
+  provider = "postgresql"
 }
 
 enum UserRole {
+  TRAVELLER
+  HOTEL_OWNER
   SUPER_ADMIN
-  HOTEL_ADMIN
-  GUEST
+}
+
+enum VerificationStatus {
+  PENDING_REVIEW
+  VERIFIED
+  SUSPENDED
+}
+
+enum PinMediaType {
+  PHOTO
+  CAROUSEL
+  VIDEO
+}
+
+enum PinCategory {
+  ROOMS
+  VIEWS
+  VIDEOS
+  DINING
+  REVIEWS
+}
+
+enum SocialPlatform {
+  MANUAL
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+}
+
+enum PinPublishStatus {
+  PUBLISHED
+  PENDING_APPROVAL
+  DISCARDED
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+
+enum ShareChannel {
+  LINE
+  FACEBOOK
+  COPY_LINK
+  WEB_SHARE
+  OTHER
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED_THB
+}
+
+enum BookingStatus {
+  HOLD_PENDING_PAYMENT
+  PENDING_VERIFICATION
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum SocialPublishMode {
+  ONE_CLICK_APPROVE
+  AUTO_HIGH_CONFIDENCE
+}
+
+enum AdPlacement {
+  HOME_FEED
+  DEAL_FEATURED
+  AGENT_PRIORITY
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum PostPublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContactChannel {
+  LINE
+  FACEBOOK_MESSENGER
+  PHONE
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String             @id @default(cuid())
+  email        String             @unique
   name         String?
-  role         UserRole @default(GUEST)
-  provider     String   @default("EMAIL") // "GOOGLE" | "LINE" | "APPLE" | "EMAIL"
-  providerId   String?
-  hotelSlug    String?  // For HOTEL_ADMIN: links to their property tenant
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  phone        String?
+  avatarUrl    String?
+  role         UserRole           @default(TRAVELLER)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  ownedHotels  Hotel[]
+  likes        PinLike[]
+  comments     PinComment[]
+  commentLikes PinCommentLike[]
+  boards       SavedBoard[]
+  boardPins    SavedBoardPin[]
+  couponWallet UserCouponWallet[]
+  bookings     Booking[]
+}
+
+model Hotel {
+  id                   String              @id @default(cuid())
+  slug                 String              @unique
+  ownerId              String
+  owner                User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  nameTh               String
+  nameEn               String              @default("")
+  taglineTh            String              @default("")
+  taglineEn            String              @default("")
+  descriptionTh        String              @default("")
+  descriptionEn        String              @default("")
+  logoUrl              String?
+  coverImageUrl        String?
+  provinceId           String
+  districtTh           String              @default("")
+  addressTh            String              @default("")
+  latitude             Float?
+  longitude            Float?
+  googleMapsUrl        String?
+  stayStyles           String[]            @default([])
+  checkInTime          String              @default("14:00")
+  checkOutTime         String              @default("11:00")
+  petsAllowed          Boolean             @default(false)
+  petPolicyTh          String              @default("")
+  highlightsJson       Json?
+  nearbySpotsJson      Json?
+  faqJson              Json?
+  contactPhone         String              @default("")
+  contactLine          String              @default("")
+  facebookPageUrl      String              @default("")
+  instagramUrl         String              @default("")
+  promptPayId          String              @default("")
+  promptPayAccountName String              @default("")
+  bankName             String              @default("")
+  bankAccountNo        String              @default("")
+  verificationStatus   VerificationStatus  @default(PENDING_REVIEW)
+  isPublished          Boolean             @default(true)
+  ratingAvg            Float               @default(4.9)
+  reviewCount          Int                 @default(0)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  rooms                Room[]
+  addons               HotelAddon[]
+  pins                 Pin[]
+  coupons              Coupon[]
+  bookings             Booking[]
+  reviews              GuestReview[]
+  contactClicks        ContactClickLog[]
+  socialConnections    SocialConnection[]
+  campaigns            SponsoredCampaign[]
+  posts                HotelPost[]
+
+  @@index([provinceId])
+  @@index([ownerId])
+  @@index([verificationStatus, isPublished])
+}
+
+model Room {
+  id                 String             @id @default(cuid())
+  hotelId            String
+  hotel              Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  code               String
+  slug               String
+  nameTh             String
+  nameEn             String             @default("")
+  categoryTh         String             @default("Villa")
+  categoryEn         String             @default("Villa")
+  shortDescTh        String             @default("")
+  shortDescEn        String             @default("")
+  totalUnits         Int                @default(1)
+  weekdayPriceThb    Int
+  weekendPriceThb    Int
+  extraGuestPriceThb Int                @default(0)
+  sizeSqm            Int                @default(32)
+  standardGuests     Int                @default(2)
+  maxGuests          Int                @default(2)
+  bedrooms           Int                @default(1)
+  beds               Int                @default(1)
+  bathrooms          Int                @default(1)
+  petsAllowed        Boolean            @default(false)
+  amenities          String[]           @default([])
+  galleryUrls        String[]           @default([])
+  isActive           Boolean            @default(true)
+  sortOrder          Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  dateOverrides      RoomDateOverride[]
+  pins               Pin[]
+  bookings           Booking[]
+  posts              HotelPost[]
+
+  @@unique([hotelId, code])
+  @@unique([hotelId, slug])
+  @@index([hotelId, isActive, sortOrder])
+}
+
+model RoomDateOverride {
+  id               String   @id @default(cuid())
+  roomId           String
+  room             Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  date             DateTime @db.Date
+  blockedUnits     Int      @default(0)
+  overridePriceThb Int?
+  note             String?
+
+  @@unique([roomId, date])
+}
+
+model HotelAddon {
+  id            String  @id @default(cuid())
+  hotelId       String
+  hotel         Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  nameTh        String
+  nameEn        String  @default("")
+  descriptionTh String  @default("")
+  priceThb      Int
+  unitLabelTh   String  @default("ชุด")
+  unitLabelEn   String  @default("set")
+  imageUrl      String?
+  isActive      Boolean @default(true)
+  sortOrder     Int     @default(0)
+
+  @@index([hotelId, isActive])
+}
+
+model Pin {
+  id                String            @id @default(cuid())
+  hotelId           String
+  hotel             Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomId            String?
+  room              Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  couponId          String?
+  coupon            Coupon?           @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  mediaType         PinMediaType      @default(PHOTO)
+  category          PinCategory       @default(VIEWS)
+  titleTh           String
+  titleEn           String            @default("")
+  descriptionTh     String            @default("")
+  descriptionEn     String            @default("")
+  coverImageUrl     String
+  mediaUrls         String[]          @default([])
+  videoUrl          String?
+  aspectRatio       String            @default("3/4")
+  provinceId        String
+  stayStyles        String[]          @default([])
+  semanticTags      String[]          @default([])
+  sourcePlatform    SocialPlatform    @default(MANUAL)
+  externalPostId    String?
+  externalPermalink String?
+  publishStatus     PinPublishStatus  @default(PUBLISHED)
+  aiConfidenceScore Int?
+  aiTriageNote      String?
+  isSponsored       Boolean           @default(false)
+  sponsoredPriority Int               @default(0)
+  likesCount        Int               @default(0)
+  savesCount        Int               @default(0)
+  commentsCount     Int               @default(0)
+  sharesCount       Int               @default(0)
+  viewsCount        Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  likes             PinLike[]
+  comments          PinComment[]
+  shares            PinShare[]
+  boardEntries      SavedBoardPin[]
+  campaigns         SponsoredCampaign[]
+
+  @@unique([hotelId, sourcePlatform, externalPostId])
+  @@index([publishStatus, provinceId])
+  @@index([publishStatus, isSponsored, sponsoredPriority, createdAt])
+}
+
+model PinLike {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pinId     String
+  pin       Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, pinId])
+  @@index([pinId])
+}
+
+model PinComment {
+  id                String           @id @default(cuid())
+  pinId             String
+  pin               Pin              @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId          String?
+  parent            PinComment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies           PinComment[]     @relation("CommentReplies")
+  isHotelOwnerReply Boolean          @default(false)
+  body              String
+  likesCount        Int              @default(0)
+  status            CommentStatus    @default(VISIBLE)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  likes             PinCommentLike[]
+
+  @@index([pinId, status, createdAt])
+  @@index([parentId])
+}
+
+model PinCommentLike {
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commentId String
+  comment   PinComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@id([userId, commentId])
+}
+
+model PinShare {
+  id        String       @id @default(cuid())
+  pinId     String
+  pin       Pin          @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  userId    String?
+  channel   ShareChannel @default(COPY_LINK)
+  createdAt DateTime     @default(now())
+
+  @@index([pinId, createdAt])
+}
+
+model SavedBoard {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  pins      SavedBoardPin[]
+
+  @@index([userId, createdAt])
+}
+
+model SavedBoardPin {
+  id                    String     @id @default(cuid())
+  boardId               String
+  board                 SavedBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  pinId                 String
+  pin                   Pin        @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedPriceSnapshotThb Int?
+  createdAt             DateTime   @default(now())
+
+  @@unique([boardId, pinId])
+  @@index([userId, pinId])
+}
+
+model Coupon {
+  id             String              @id @default(cuid())
+  hotelId        String
+  hotel          Hotel               @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  code           String
+  titleTh        String
+  titleEn        String              @default("")
+  descriptionTh  String              @default("")
+  descriptionEn  String              @default("")
+  coverImageUrl  String?
+  discountType   DiscountType        @default(FIXED_THB)
+  discountValue  Int
+  minSpendThb    Int                 @default(0)
+  maxDiscountThb Int?
+  totalQuota     Int?
+  claimedCount   Int                 @default(0)
+  usedCount      Int                 @default(0)
+  startsAt       DateTime            @default(now())
+  expiresAt      DateTime
+  isFeaturedDeal Boolean             @default(false)
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  walletClaims   UserCouponWallet[]
+  pins           Pin[]
+  bookings       Booking[]
+  campaigns      SponsoredCampaign[]
+
+  @@unique([hotelId, code])
+  @@index([isActive, isFeaturedDeal, expiresAt])
+}
+
+model UserCouponWallet {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  couponId      String
+  coupon        Coupon    @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  claimedAt     DateTime  @default(now())
+  usedAt        DateTime?
+  usedBookingId String?
+
+  @@unique([userId, couponId])
+  @@index([userId, usedAt])
 }
 
 model Booking {
-  id            String        @id @default(cuid())
-  bookingCode   String        @unique
-  roomId        String
-  room          Room          @relation(fields: [roomId], references: [id])
-  checkInDate   DateTime
-  checkOutDate  DateTime
-  nights        Int
-  guests        Int
-  guestName     String
-  guestPhone    String
-  guestContact  String?
-  guestNote     String?
-  addonsJson    String?
-  totalPriceThb Int
-  slipImageUrl  String?
-  status        BookingStatus @default(PENDING_PAYMENT)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  bookingCode     String        @unique
+  hotelId         String
+  hotel           Hotel         @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomId          String
+  room            Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  couponId        String?
+  coupon          Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  checkInDate     DateTime      @db.Date
+  checkOutDate    DateTime      @db.Date
+  nights          Int
+  guests          Int
+  unitsBooked     Int           @default(1)
+  roomSubtotalThb Int
+  addonsTotalThb  Int           @default(0)
+  discountThb     Int           @default(0)
+  netTotalThb     Int
+  addonsJson      Json?
+  guestName       String
+  guestPhone      String
+  guestEmail      String?
+  guestLine       String?
+  guestNote       String?
+  slipImageUrl    String?
+  slipQrPayload   String?       @unique
+  holdExpiresAt   DateTime?
+  status          BookingStatus @default(HOLD_PENDING_PAYMENT)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  @@index([roomId, checkInDate, checkOutDate])
+  @@index([roomId, status, checkInDate, checkOutDate])
+  @@index([hotelId, status, createdAt])
+  @@index([userId, createdAt])
 }
 
-model ShortVideo {
-  id         String   @id @default(cuid())
-  titleTh    String
-  titleEn    String   @default("")
-  captionTh  String   @default("")
-  captionEn  String   @default("")
-  videoUrl   String
-  posterUrl  String
-  audioLabel String   @default("")
-  category   String   @default("mist")
-  roomId     String?
-  couponCode String?
-  isPinned   Boolean  @default(false)
-  isActive   Boolean  @default(true)
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model GuestReview {
+  id             String   @id @default(cuid())
+  hotelId        String
+  hotel          Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  bookingId      String?  @unique
+  userId         String?
+  roomCode       String?
+  authorName     String
+  authorAvatar   String?
+  rating         Int      @default(5)
+  commentTh      String
+  commentEn      String   @default("")
+  photoUrls      String[] @default([])
+  isVerifiedStay Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
-  @@index([isActive, isPinned, sortOrder])
+  @@index([hotelId, createdAt])
 }
 
-model GalleryAsset {
-  id        String   @id @default(cuid())
-  url       String
-  captionTh String   @default("")
-  captionEn String   @default("")
-  category  String   @default("property")
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model ContactClickLog {
+  id        String         @id @default(cuid())
+  hotelId   String
+  hotel     Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomId    String?
+  userId    String?
+  channel   ContactChannel
+  createdAt DateTime       @default(now())
 
-  @@index([category, sortOrder])
+  @@index([hotelId, channel, createdAt])
 }
 
-model SiteCmsState {
-  id        String   @id @default("default")
-  payload   Json
-  updatedAt DateTime @updatedAt
+model SocialConnection {
+  id               String            @id @default(cuid())
+  hotelId          String
+  hotel            Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  platform         SocialPlatform    @default(FACEBOOK)
+  externalPageId   String
+  externalPageName String
+  pageUrl          String?
+  publishMode      SocialPublishMode @default(ONE_CLICK_APPROVE)
+  excludedHashtags String[]          @default([])
+  lastSyncedAt     DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  @@map("site_cms_state")
+  @@unique([hotelId, platform, externalPageId])
+}
+
+model SponsoredCampaign {
+  id                 String         @id @default(cuid())
+  hotelId            String
+  hotel              Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  pinId              String?
+  pin                Pin?           @relation(fields: [pinId], references: [id], onDelete: SetNull)
+  couponId           String?
+  coupon             Coupon?        @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  placement          AdPlacement    @default(HOME_FEED)
+  dailyBudgetThb     Int            @default(300)
+  impressions        Int            @default(0)
+  clicks             Int            @default(0)
+  bookingsAttributed Int            @default(0)
+  startsAt           DateTime       @default(now())
+  endsAt             DateTime
+  status             CampaignStatus @default(ACTIVE)
+  createdAt          DateTime       @default(now())
+
+  @@index([hotelId, status])
+  @@index([placement, status])
+}
+
+model HotelPost {
+  id            String            @id @default(cuid())
+  hotelId       String
+  hotel         Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  authorId      String?
+  roomId        String?
+  room          Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  slug          String
+  titleTh       String
+  titleEn       String            @default("")
+  excerptTh     String            @default("")
+  contentTh     String            @db.Text
+  coverImageUrl String
+  galleryUrls   String[]          @default([])
+  categoryTh    String            @default("คู่มือเที่ยว & ที่พัก")
+  tags          String[]          @default([])
+  status        PostPublishStatus @default(PUBLISHED)
+  viewsCount    Int               @default(0)
+  publishedAt   DateTime          @default(now())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([hotelId, slug])
+  @@index([hotelId, status, publishedAt])
 }

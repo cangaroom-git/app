@@ -1,272 +1,204 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  BadgeCheck,
   Ban,
   Building2,
-  Check,
-  ChevronLeft,
   Crown,
   ExternalLink,
-  Globe,
-  Loader2,
-  Lock,
-  Moon,
-  Plus,
+  Flame,
+  LayoutDashboard,
   RefreshCw,
   Search,
   ShieldCheck,
-  Sun,
-  Trash2,
+  Tag,
   Users,
 } from "lucide-react";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { StandardButton, StatusPill } from "@/components/ui/standards";
-import {
-  UserAvatarCircle,
-  useAuthenticatedProfile,
-} from "@/components/navigation/UserProfileDropdown";
-import type { PlatformTenantRecord } from "@/lib/db";
-import type { ManagedPlatformUser } from "@/app/api/platform/users/route";
-import type { AppUserRole } from "@/lib/auth/client";
+import { StatusPill } from "@/components/ui/standards";
+import type { AppRole, VerificationStatusDto } from "@/types/cangaroom";
 
-type SuperTab = "tenants" | "users";
+type SuperTab = "hotels" | "ads" | "users";
 
-function computeDaysLeft(expiresAtIso: string): number {
-  const diffMs = new Date(expiresAtIso).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+interface AdminHotelItem {
+  id: string;
+  slug: string;
+  nameTh: string;
+  provinceId: string;
+  verificationStatus: VerificationStatusDto;
+  isPublished: boolean;
+  owner: { name: string | null; email: string };
+  _count: { rooms: number; pins: number; coupons: number; bookings: number };
 }
 
-export default function SuperAdminPage() {
-  const { lang, setLang, theme, toggleTheme } = useHotelApp();
-  const { user: currentUser, isCheckingSession } = useAuthenticatedProfile();
+interface AdminPinAdItem {
+  id: string;
+  titleTh: string;
+  coverImageUrl: string;
+  provinceId: string;
+  isSponsored: boolean;
+  sponsoredPriority: number;
+  likesCount: number;
+  savesCount: number;
+  hotel: { id: string; slug: string; nameTh: string };
+}
 
-  const [activeTab, setActiveTab] = useState<SuperTab>("tenants");
-  const [tenants, setTenants] = useState<PlatformTenantRecord[]>([]);
-  const [users, setUsers] = useState<ManagedPlatformUser[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+interface AdminCouponAdItem {
+  id: string;
+  code: string;
+  titleTh: string;
+  discountType: "PERCENT" | "FIXED_THB";
+  discountValue: number;
+  claimedCount: number;
+  isFeaturedDeal: boolean;
+  hotel: { id: string; slug: string; nameTh: string };
+}
+
+interface AdminUserItem {
+  id: string;
+  email: string;
+  name: string | null;
+  role: AppRole;
+  createdAt: string;
+  _count: { ownedHotels: number; bookings: number; boards: number };
+}
+
+export default function SuperAdminConsolePage() {
+  const { user, isCheckingSession } = useHotelApp();
+
+  const [activeTab, setActiveTab] = useState<SuperTab>("hotels");
+  const [hotels, setHotels] = useState<AdminHotelItem[]>([]);
+  const [pins, setPins] = useState<AdminPinAdItem[]>([]);
+  const [coupons, setCoupons] = useState<AdminCouponAdItem[]>([]);
+  const [users, setUsers] = useState<AdminUserItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Create Tenant Form
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newNameTh, setNewNameTh] = useState("");
-  const [newSlug, setNewSlug] = useState("");
-  const [newOwnerEmail, setNewOwnerEmail] = useState("");
-  const [newCustomDomain, setNewCustomDomain] = useState("");
-  const [newStatus, setNewStatus] = useState<"TRIAL" | "ACTIVE">("TRIAL");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const showToast = (msg: string) => {
+  const showNotice = (msg: string) => {
     setNotice(msg);
-    setErrorMsg(null);
-    window.setTimeout(() => setNotice(null), 2800);
+    window.setTimeout(() => setNotice(null), 2600);
   };
 
-  const fetchPlatformData = useCallback(async () => {
-    setIsLoadingData(true);
+  const fetchAll = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const [tenantsRes, usersRes] = await Promise.all([
-        fetch("/api/platform/tenants", { cache: "no-store" }),
-        fetch("/api/platform/users", { cache: "no-store" }),
+      const [hRes, cRes, uRes] = await Promise.all([
+        fetch("/api/super-admin/hotels", { cache: "no-store" }),
+        fetch("/api/super-admin/campaigns", { cache: "no-store" }),
+        fetch("/api/super-admin/users", { cache: "no-store" }),
       ]);
-      if (tenantsRes.ok) {
-        const tData = await tenantsRes.json();
-        setTenants(tData.tenants || []);
+      if (hRes.ok) {
+        const d = await hRes.json();
+        setHotels(d.hotels || []);
       }
-      if (usersRes.ok) {
-        const uData = await usersRes.json();
-        setUsers(uData.users || []);
+      if (cRes.ok) {
+        const d = await cRes.json();
+        setPins(d.pins || []);
+        setCoupons(d.coupons || []);
       }
-    } catch {
-      setErrorMsg("ไม่สามารถโหลดข้อมูลแพลตฟอร์มได้");
+      if (uRes.ok) {
+        const d = await uRes.json();
+        setUsers(d.users || []);
+      }
     } finally {
-      setIsLoadingData(false);
+      setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (currentUser?.role === "SUPER_ADMIN") {
-      fetchPlatformData();
+    if (user?.role === "SUPER_ADMIN") {
+      fetchAll();
     }
-  }, [currentUser?.role, fetchPlatformData]);
+  }, [user?.role, fetchAll]);
 
-  const handleCreateTenant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNameTh.trim() || !newSlug.trim() || !newOwnerEmail.trim()) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/platform/tenants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nameTh: newNameTh.trim(),
-          slug: newSlug.trim(),
-          ownerEmail: newOwnerEmail.trim(),
-          customDomain: newCustomDomain.trim(),
-          status: newStatus,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || "สร้างโรงแรมไม่สำเร็จ");
-        return;
-      }
-      setTenants((prev) => [data.tenant, ...prev]);
-      setNewNameTh("");
-      setNewSlug("");
-      setNewOwnerEmail("");
-      setNewCustomDomain("");
-      setShowCreateForm(false);
-      showToast(`เพิ่มโรงแรม ${data.tenant.slug}.cangaroom.com เรียบร้อยแล้ว`);
-      fetchPlatformData();
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleTenantAction = async (
-    id: string,
-    action: "EXTEND_TRIAL_30D" | "ACTIVATE_1YR" | "SUSPEND" | "REACTIVATE"
+  const handleUpdateHotelVerification = async (
+    hotelId: string,
+    verificationStatus: VerificationStatusDto
   ) => {
-    const res = await fetch("/api/platform/tenants", {
+    const res = await fetch("/api/super-admin/hotels", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, action }),
+      body: JSON.stringify({ hotelId, verificationStatus }),
     });
-    const data = await res.json();
-    if (res.ok && data.tenant) {
-      setTenants((prev) =>
-        prev.map((t) => (t.id === id ? data.tenant : t))
-      );
-      showToast("อัปเดตสถานะโรงแรมเรียบร้อยแล้ว");
-    } else {
-      setErrorMsg(data.error || "ไม่สามารถอัปเดตได้");
-    }
-  };
-
-  const handleDeleteTenant = async (tenant: PlatformTenantRecord) => {
-    if (
-      !window.confirm(
-        `ยืนยันลบโรงแรม "${tenant.nameTh}" (${tenant.slug}.cangaroom.com) ออกจากระบบ?`
-      )
-    ) {
-      return;
-    }
-    const res = await fetch(
-      `/api/platform/tenants?id=${encodeURIComponent(tenant.id)}`,
-      { method: "DELETE" }
-    );
-    const data = await res.json();
     if (res.ok) {
-      setTenants((prev) => prev.filter((t) => t.id !== tenant.id));
-      showToast(`ลบ ${tenant.nameTh} เรียบร้อยแล้ว`);
-    } else {
-      setErrorMsg(data.error || "ลบไม่สำเร็จ");
+      showNotice(`อัปเดตสถานะเป็น ${verificationStatus} แล้ว`);
+      await fetchAll();
     }
   };
 
-  const handleUpdateUser = async (
-    targetUser: ManagedPlatformUser,
-    patch: { role?: AppUserRole; tenantSlug?: string; banned?: boolean }
-  ) => {
-    const res = await fetch("/api/platform/users", {
+  const handleTogglePinSponsored = async (pin: AdminPinAdItem) => {
+    const next = !pin.isSponsored;
+    const res = await fetch("/api/super-admin/campaigns", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id: targetUser.id,
-        email: targetUser.email,
-        ...patch,
+        targetType: "PIN",
+        id: pin.id,
+        isSponsored: next,
+        sponsoredPriority: next ? 95 : 0,
       }),
     });
-    const data = await res.json();
     if (res.ok) {
-      showToast(`อัปเดตบัญชี ${targetUser.email} เรียบร้อยแล้ว`);
-      fetchPlatformData();
-    } else {
-      setErrorMsg(data.error || "อัปเดตบัญชีไม่สำเร็จ");
+      showNotice(
+        next ? "เปิดสถานะ Sponsored Pin แล้ว" : "ปิด Sponsored Pin แล้ว"
+      );
+      await fetchAll();
     }
   };
 
-  const handleDeleteUser = async (targetUser: ManagedPlatformUser) => {
-    if (
-      !window.confirm(
-        `ยืนยันลบบัญชีผู้ใช้ "${targetUser.email}" ออกจากระบบถาวร?`
-      )
-    ) {
-      return;
-    }
-    const res = await fetch(
-      `/api/platform/users?id=${encodeURIComponent(
-        targetUser.id
-      )}&email=${encodeURIComponent(targetUser.email)}`,
-      { method: "DELETE" }
-    );
-    const data = await res.json();
+  const handleToggleFeaturedDeal = async (coupon: AdminCouponAdItem) => {
+    const next = !coupon.isFeaturedDeal;
+    const res = await fetch("/api/super-admin/campaigns", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        targetType: "COUPON",
+        id: coupon.id,
+        isFeaturedDeal: next,
+      }),
+    });
     if (res.ok) {
-      setUsers((prev) => prev.filter((u) => u.id !== targetUser.id));
-      showToast(`ลบบัญชี ${targetUser.email} เรียบร้อยแล้ว`);
-    } else {
-      setErrorMsg(data.error || "ลบบัญชีไม่สำเร็จ");
+      showNotice(
+        next ? "ปักหมุด Featured Deal บนหน้า /deal แล้ว" : "นำออกจาก Featured Deal แล้ว"
+      );
+      await fetchAll();
     }
   };
 
-  const filteredTenants = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tenants;
-    return tenants.filter(
-      (t) =>
-        t.nameTh.toLowerCase().includes(q) ||
-        t.slug.toLowerCase().includes(q) ||
-        t.ownerEmail.toLowerCase().includes(q) ||
-        t.customDomain.toLowerCase().includes(q)
-    );
-  }, [tenants, searchQuery]);
+  const handleChangeUserRole = async (userId: string, role: AppRole) => {
+    const res = await fetch("/api/super-admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role }),
+    });
+    if (res.ok) {
+      showNotice("อัปเดตสิทธิ์ผู้ใช้งานแล้ว");
+      await fetchAll();
+    }
+  };
 
-  const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        (u.tenantSlug || "").toLowerCase().includes(q)
-    );
-  }, [users, searchQuery]);
-
-  const activePaidCount = tenants.filter((t) => t.status === "ACTIVE").length;
-  const trialCount = tenants.filter((t) => t.status === "TRIAL").length;
-  const totalArr = tenants
-    .filter((t) => t.status === "ACTIVE")
-    .reduce((sum, t) => sum + (t.planPriceThb || 12000), 0);
-
-  // Route Guard: Only SUPER_ADMIN can access /super-admin
   if (isCheckingSession) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[var(--color-background-body)] gap-2 ty-body">
-        <Loader2 className="w-5 h-5 animate-spin text-[var(--color-accent)]" />
-        <span>กำลังตรวจสอบสิทธิ์ผู้ดูแลแพลตฟอร์ม...</span>
+      <div className="min-h-[100dvh] flex items-center justify-center">
+        <RefreshCw className="w-6 h-6 animate-spin text-[var(--color-accent)]" />
       </div>
     );
   }
 
-  if (!currentUser || currentUser.role !== "SUPER_ADMIN") {
+  if (!user || user.role !== "SUPER_ADMIN") {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[var(--color-background-body)] px-4">
-        <div className="w-full max-w-[420px] app-card p-6 text-center space-y-4">
-          <div className="mx-auto h-12 w-12 rounded-full bg-[var(--color-error-muted)] text-[var(--color-error)] flex items-center justify-center">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h1 className="ty-title">เฉพาะผู้ดูแลแพลตฟอร์มสูงสุด (Super Admin)</h1>
-            <p className="ty-body-muted">
-              กรุณาเข้าสู่ระบบด้วยอีเมลผู้ดูแลหลักของ Cangaroom เพื่อเข้าใช้งานหน้านี้
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-2">
-            <Link href="/login" className="btn-round-solid">
+      <div className="cgr-page-form py-8">
+        <div className="app-card p-6 text-center space-y-3">
+          <Crown className="w-10 h-10 text-[var(--color-text-primary)] mx-auto" />
+          <h1 className="ty-title">เฉพาะผู้ดูแลระบบ Cangaroom (Super Admin)</h1>
+          <p className="ty-caption">
+            กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลแพลตฟอร์มเพื่อเข้าใช้งานหน้านี้
+          </p>
+          <div className="flex justify-center gap-2">
+            <Link href="/login?callbackUrl=/super-admin" className="btn-round-solid">
               เข้าสู่ระบบ
             </Link>
             <Link href="/" className="btn-fw-secondary">
@@ -278,505 +210,319 @@ export default function SuperAdminPage() {
     );
   }
 
+  const q = searchQuery.trim().toLowerCase();
+  const filteredHotels = hotels.filter(
+    (h) =>
+      !q ||
+      h.nameTh.toLowerCase().includes(q) ||
+      h.slug.toLowerCase().includes(q) ||
+      h.owner.email.toLowerCase().includes(q)
+  );
+  const filteredUsers = users.filter(
+    (u) =>
+      !q ||
+      u.email.toLowerCase().includes(q) ||
+      (u.name || "").toLowerCase().includes(q)
+  );
+
   return (
-    <div className="min-h-[100dvh] pt-14 bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
-      {/* Facebook-Style Fixed Top Header */}
-      <header className="fixed top-0 inset-x-0 z-40 h-14 bg-[var(--color-background-card)] border-b border-[var(--color-border)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-        <div className="max-w-6xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Link href="/" className="btn-fw-secondary !h-9 !px-3">
-              <ChevronLeft className="w-4 h-4" />
-              <span>{lang === "th" ? "หน้าเว็บ" : "Storefront"}</span>
-            </Link>
+    <div className="cgr-page-standard space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Crown className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
+          <h1 className="ty-display truncate">Cangaroom Super Admin</h1>
+        </div>
 
-            <Crown className="w-5 h-5 text-[var(--color-accent)] shrink-0" />
-            <span className="ty-subtitle font-bold truncate">
-              Cangaroom Super Admin
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/register-hotel"
-              className="hidden sm:inline-flex btn-fw-secondary !h-9 !px-3"
-            >
-              <Plus className="w-4 h-4" />
-              <span>หน้าสมัครฟรี 30 วัน</span>
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => setLang(lang === "th" ? "en" : "th")}
-              className="btn-icon ty-caption font-bold"
-            >
-              {lang === "th" ? "EN" : "TH"}
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="btn-icon"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Link href="/studio" className="btn-fw-secondary !h-9">
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Hotel Studio</span>
+          </Link>
+          <button
+            type="button"
+            onClick={fetchAll}
+            className="btn-icon"
+            title="รีเฟรชข้อมูล"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 space-y-4">
-        {/* 1. REAL DATABASE KPI SUMMARY BAR */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="app-card p-4">
-            <p className="ty-caption">โรงแรมทั้งหมดในระบบ</p>
-            <p className="ty-display mt-1">{tenants.length}</p>
+      <div className="space-y-6">
+        {notice && (
+          <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-4 py-2.5 ty-body font-semibold">
+            {notice}
           </div>
-          <div className="app-card p-4">
-            <p className="ty-caption">กำลังทดลองใช้ฟรี 30 วัน</p>
-            <p className="ty-display mt-1 text-[var(--color-warning)]">
-              {trialCount}
-            </p>
-          </div>
-          <div className="app-card p-4">
-            <p className="ty-caption">เปิดแพ็กเกจรายปีแล้ว (Active)</p>
-            <p className="ty-display mt-1 text-[var(--color-success)]">
-              {activePaidCount}
-            </p>
-          </div>
-          <div className="app-card p-4">
-            <p className="ty-caption">รายได้ประจำต่อปี (ARR)</p>
-            <p className="ty-display mt-1 text-[var(--color-accent)]">
-              ฿{totalArr.toLocaleString()}
-            </p>
-          </div>
-        </section>
+        )}
 
-        {/* 2. CLEAN 2-TAB BAR + SEARCH */}
-        <section className="app-card p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--color-border)]">
+          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
             <button
               type="button"
-              onClick={() => setActiveTab("tenants")}
-              className={`h-10 px-4 rounded-[8px] inline-flex items-center gap-2 ty-body font-semibold transition cursor-pointer ${
-                activeTab === "tenants"
-                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                  : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+              onClick={() => setActiveTab("hotels")}
+              className={`py-3 -mb-px border-b-2 ty-body inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
+                activeTab === "hotels"
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
               }`}
             >
               <Building2 className="w-4 h-4" />
-              <span>โรงแรม & วันทดลองใช้ ({tenants.length})</span>
+              <span>ที่พัก & ยืนยันตัวตน ({hotels.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("ads")}
+              className={`py-3 -mb-px border-b-2 ty-body inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
+                activeTab === "ads"
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              <Flame className="w-4 h-4" />
+              <span>โฆษณา & Featured Deals</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab("users")}
-              className={`h-10 px-4 rounded-[8px] inline-flex items-center gap-2 ty-body font-semibold transition cursor-pointer ${
+              className={`py-3 -mb-px border-b-2 ty-body inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
                 activeTab === "users"
-                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                  : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
               }`}
             >
               <Users className="w-4 h-4" />
-              <span>บัญชีผู้ใช้ทั้งหมด ({users.length})</span>
+              <span>ผู้ใช้งาน ({users.length})</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 sm:w-[260px]">
-              <Search className="w-4 h-4 text-[var(--color-text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อโรงแรม, อีเมล, โดเมน..."
-                className="h-10 w-full rounded-full bg-[var(--color-background-muted)] pl-9 pr-3.5 ty-body focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/30"
-              />
-            </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-[var(--color-text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาชื่อที่พัก / slug / email..."
+              className="w-full h-10 rounded-full bg-[var(--color-background-muted)] pl-9 pr-4 ty-body focus:outline-none"
+            />
+          </div>
+        </div>
 
-            {activeTab === "tenants" && (
-              <StandardButton
-                variant="primary"
-                size="md"
-                onClick={() => setShowCreateForm((v) => !v)}
+        {/* TAB 1: HOTELS & VERIFIED KYC */}
+        {activeTab === "hotels" && (
+          <div className="space-y-3">
+            {filteredHotels.map((h) => (
+              <div
+                key={h.id}
+                className="rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
-                <Plus className="w-4 h-4" />
-                <span>{showCreateForm ? "ปิดฟอร์ม" : "เพิ่มโรงแรม"}</span>
-              </StandardButton>
-            )}
-          </div>
-        </section>
-
-        {notice && (
-          <div className="rounded-[8px] bg-[var(--color-success-muted)] text-[var(--color-success)] px-4 py-2.5 ty-body font-semibold">
-            ✓ {notice}
-          </div>
-        )}
-        {errorMsg && (
-          <div className="rounded-[8px] bg-[var(--color-error-muted)] text-[var(--color-error)] px-4 py-2.5 ty-body font-semibold">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* =================================================================
-            TAB 1: REAL HOTELS & 30-DAY FREE TRIAL MANAGEMENT
-        ================================================================== */}
-        {activeTab === "tenants" && (
-          <section className="space-y-3">
-            {showCreateForm && (
-              <form
-                onSubmit={handleCreateTenant}
-                className="app-card p-4 space-y-3"
-              >
-                <h2 className="ty-subtitle font-bold">
-                  เพิ่มโรงแรมใหม่เข้าระบบฐานข้อมูล
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <input
-                    type="text"
-                    required
-                    value={newNameTh}
-                    onChange={(e) => setNewNameTh(e.target.value)}
-                    placeholder="ชื่อโรงแรม *"
-                    className="fw-input"
-                  />
-                  <input
-                    type="text"
-                    required
-                    value={newSlug}
-                    onChange={(e) =>
-                      setNewSlug(
-                        e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
-                      )
-                    }
-                    placeholder="ซับโดเมน (เช่น phupha) *"
-                    className="fw-input font-mono"
-                  />
-                  <input
-                    type="email"
-                    required
-                    value={newOwnerEmail}
-                    onChange={(e) => setNewOwnerEmail(e.target.value)}
-                    placeholder="Gmail เจ้าของที่พัก *"
-                    className="fw-input"
-                  />
-                  <input
-                    type="text"
-                    value={newCustomDomain}
-                    onChange={(e) => setNewCustomDomain(e.target.value)}
-                    placeholder="โดเมน .com (ถ้ามี)"
-                    className="fw-input font-mono"
-                  />
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={newStatus}
-                      onChange={(e) =>
-                        setNewStatus(e.target.value as "TRIAL" | "ACTIVE")
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/${h.slug}`}
+                      className="ty-subtitle font-bold hover:underline inline-flex items-center gap-1.5"
+                    >
+                      <span>{h.nameTh}</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                    <StatusPill
+                      variant={
+                        h.verificationStatus === "VERIFIED"
+                          ? "success"
+                          : h.verificationStatus === "SUSPENDED"
+                          ? "error"
+                          : "warning"
                       }
-                      className="fw-input flex-1"
                     >
-                      <option value="TRIAL">ทดลองฟรี 30 วัน</option>
-                      <option value="ACTIVE">รายปี (Active)</option>
-                    </select>
-                    <StandardButton
-                      type="submit"
-                      variant="primary"
-                      size="md"
-                      disabled={isSubmitting}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>บันทึก</span>
-                    </StandardButton>
+                      {h.verificationStatus}
+                    </StatusPill>
                   </div>
+                  <p className="ty-caption">
+                    /{h.slug} · จังหวัด {h.provinceId} · เจ้าของ: {h.owner.email}
+                  </p>
+                  <p className="ty-caption">
+                    {h._count.rooms} ห้องพัก · {h._count.pins} Pins ·{" "}
+                    {h._count.coupons} คูปอง · {h._count.bookings} การจอง
+                  </p>
                 </div>
-              </form>
-            )}
 
-            {isLoadingData ? (
-              <div className="app-card p-8 flex items-center justify-center gap-2 ty-body-muted">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--color-accent)]" />
-                <span>กำลังโหลดรายชื่อโรงแรมจากฐานข้อมูล...</span>
-              </div>
-            ) : filteredTenants.length === 0 ? (
-              <div className="app-card p-8 text-center ty-body-muted">
-                ไม่พบโรงแรมที่ค้นหา
-              </div>
-            ) : (
-              filteredTenants.map((tenant) => {
-                const daysLeft = computeDaysLeft(tenant.expiresAt);
-                const storefrontHref =
-                  tenant.slug === "sapanunseen"
-                    ? "/"
-                    : `/?tenant=${encodeURIComponent(tenant.slug)}`;
-                const adminHref =
-                  tenant.slug === "sapanunseen"
-                    ? "/admin"
-                    : `/admin?tenant=${encodeURIComponent(tenant.slug)}`;
-
-                return (
-                  <article
-                    key={tenant.id}
-                    className="app-card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <Link
+                    href={`/studio?hotel=${encodeURIComponent(h.slug)}`}
+                    className="btn-fw-secondary !h-9"
                   >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="ty-subtitle font-bold">
-                          {tenant.nameTh}
-                        </h3>
-                        <StatusPill
-                          variant={
-                            tenant.status === "ACTIVE"
-                              ? "success"
-                              : tenant.status === "TRIAL"
-                              ? "warning"
-                              : "error"
-                          }
-                        >
-                          {tenant.status === "TRIAL"
-                            ? `ทดลองใช้ · เหลือ ${daysLeft} วัน`
-                            : tenant.status === "ACTIVE"
-                            ? `ใช้งานรายปี · เหลือ ${daysLeft} วัน`
-                            : tenant.status === "SUSPENDED"
-                            ? "ระงับชั่วคราว"
-                            : "หมดอายุ"}
-                        </StatusPill>
-                      </div>
+                    เข้า Studio
+                  </Link>
 
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 ty-caption">
-                        <span className="inline-flex items-center gap-1 font-mono text-[var(--color-accent)] font-semibold">
-                          <Globe className="w-3.5 h-3.5" />
-                          {tenant.slug}.cangaroom.com
-                        </span>
-                        {tenant.customDomain && (
-                          <span className="font-mono font-semibold text-[var(--color-text-primary)]">
-                            · {tenant.customDomain}
-                          </span>
-                        )}
-                        <span>· เจ้าของ: {tenant.ownerEmail}</span>
-                        <span>
-                          · หมดอายุ:{" "}
-                          {new Date(tenant.expiresAt).toLocaleDateString(
-                            "th-TH"
-                          )}
-                        </span>
-                      </div>
-                    </div>
+                  {h.verificationStatus !== "VERIFIED" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateHotelVerification(h.id, "VERIFIED")
+                      }
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-accent)] text-white ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <BadgeCheck className="w-4 h-4" />
+                      <span>อนุมัติ Verified</span>
+                    </button>
+                  )}
 
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleTenantAction(tenant.id, "EXTEND_TRIAL_30D")
-                        }
-                        className="btn-fw-secondary !h-8 !px-3 !text-[13px]"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>+30 วัน</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleTenantAction(tenant.id, "ACTIVATE_1YR")
-                        }
-                        className="btn-round-solid !h-8 !px-3 !text-[13px]"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>เปิดรายปี (+1 ปี)</span>
-                      </button>
-
-                      {tenant.status === "SUSPENDED" ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleTenantAction(tenant.id, "REACTIVATE")
-                          }
-                          className="btn-fw-secondary !h-8 !px-3 !text-[13px]"
-                        >
-                          <span>ปลดระงับ</span>
-                        </button>
-                      ) : (
-                        tenant.id !== "ten-sapanunseen" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleTenantAction(tenant.id, "SUSPEND")
-                            }
-                            className="btn-fw-secondary !h-8 !px-3 !text-[13px]"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                            <span>ระงับ</span>
-                          </button>
-                        )
-                      )}
-
-                      <Link
-                        href={storefrontHref}
-                        className="btn-fw-secondary !h-8 !px-3 !text-[13px]"
-                      >
-                        <span>หน้าเว็บ</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-
-                      <Link
-                        href={adminHref}
-                        className="btn-fw-secondary !h-8 !px-3 !text-[13px]"
-                      >
-                        <span>หลังบ้าน</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-
-                      {tenant.id !== "ten-sapanunseen" && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTenant(tenant)}
-                          className="h-8 w-8 rounded-[8px] bg-[var(--color-error-muted)] text-[var(--color-error)] inline-flex items-center justify-center hover:opacity-85 cursor-pointer"
-                          title="ลบโรงแรม"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })
-            )}
-          </section>
+                  {h.verificationStatus !== "SUSPENDED" ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateHotelVerification(h.id, "SUSPENDED")
+                      }
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-error-muted)] text-[var(--color-error)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>ระงับ</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleUpdateHotelVerification(h.id, "VERIFIED")
+                      }
+                      className="btn-fw-secondary !h-9"
+                    >
+                      ปลดระงับ
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
-        {/* =================================================================
-            TAB 2: ALL USER ACCOUNTS MANAGEMENT (neon_auth.user)
-        ================================================================== */}
-        {activeTab === "users" && (
-          <section className="space-y-3">
-            {isLoadingData ? (
-              <div className="app-card p-8 flex items-center justify-center gap-2 ty-body-muted">
-                <Loader2 className="w-5 h-5 animate-spin text-[var(--color-accent)]" />
-                <span>กำลังโหลดรายชื่อบัญชีผู้ใช้ทั้งหมด...</span>
+        {/* TAB 2: ADS & SPONSORED PLACEMENTS */}
+        {activeTab === "ads" && (
+          <div className="space-y-8">
+            <section className="space-y-3">
+              <h2 className="ty-title flex items-center gap-2">
+                <Tag className="w-5 h-5 text-[var(--color-promo)]" />
+                <span>Featured Deals (แถวบนสุดของหน้า /deal)</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {coupons.map((c) => (
+                  <div
+                    key={c.id}
+                    className="rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="ty-caption font-bold text-[var(--color-accent)]">
+                        {c.hotel.nameTh} · {c.code}
+                      </p>
+                      <p className="ty-body font-bold truncate">{c.titleTh}</p>
+                      <p className="ty-caption">เก็บไปแล้ว {c.claimedCount} สิทธิ์</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFeaturedDeal(c)}
+                      className={`h-9 px-3.5 rounded-full ty-caption font-semibold shrink-0 cursor-pointer ${
+                        c.isFeaturedDeal
+                          ? "bg-[var(--color-promo)] text-white"
+                          : "bg-[var(--color-background-muted)]"
+                      }`}
+                    >
+                      {c.isFeaturedDeal ? "กำลังปักหมุดเด่น" : "ตั้งเป็นดีลเด่น"}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="app-card p-8 text-center ty-body-muted">
-                ยังไม่มีบัญชีผู้ใช้ที่ตรงกับคำค้นหา
-              </div>
-            ) : (
-              filteredUsers.map((u) => {
-                const isPrimaryOwner =
-                  u.email.toLowerCase() === "cangaroomapp@gmail.com";
+            </section>
 
-                return (
-                  <article
-                    key={u.id}
-                    className="app-card p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+            <section className="space-y-3">
+              <h2 className="ty-title flex items-center gap-2">
+                <Flame className="w-5 h-5 text-[var(--color-accent)]" />
+                <span>Promoted Pins (อันดับเด่นบนหน้าแรก / และ MCP)</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {pins.map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-3 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <UserAvatarCircle
-                        user={{
-                          name: u.name,
-                          email: u.email,
-                          image: u.image,
-                          role: u.role,
-                        }}
-                        sizeClass="h-11 w-11"
+                      <img
+                        src={p.coverImageUrl}
+                        alt={p.titleTh}
+                        className="h-14 w-14 rounded-[10px] object-cover shrink-0"
                       />
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="ty-subtitle font-bold truncate">
-                            {u.name}
-                          </h3>
-                          {u.banned ? (
-                            <StatusPill variant="error">ถูกระงับบัญชี</StatusPill>
-                          ) : (
-                            <StatusPill
-                              variant={
-                                u.role === "SUPER_ADMIN"
-                                  ? "accent"
-                                  : u.role === "HOTEL_ADMIN"
-                                  ? "success"
-                                  : "neutral"
-                              }
-                            >
-                              {u.role}
-                            </StatusPill>
-                          )}
-                        </div>
-                        <p className="ty-caption truncate">
-                          {u.email} · สมัครเมื่อ{" "}
-                          {new Date(u.createdAt).toLocaleDateString("th-TH")}
+                        <p className="ty-caption font-bold text-[var(--color-accent)] truncate">
+                          {p.hotel.nameTh}
+                        </p>
+                        <p className="ty-body font-semibold truncate">
+                          {p.titleTh}
+                        </p>
+                        <p className="ty-caption">
+                          {p.likesCount} Likes · {p.savesCount} Saves
                         </p>
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {/* Role Selector */}
-                      <select
-                        disabled={isPrimaryOwner}
-                        value={u.role}
-                        onChange={(e) =>
-                          handleUpdateUser(u, {
-                            role: e.target.value as AppUserRole,
-                          })
-                        }
-                        aria-label="กำหนดสิทธิ์ผู้ใช้"
-                        className="fw-input !h-9 !text-[13px]"
-                      >
-                        <option value="GUEST">GUEST (ลูกค้าจองห้อง)</option>
-                        <option value="HOTEL_ADMIN">
-                          HOTEL_ADMIN (เจ้าของที่พัก)
-                        </option>
-                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                      </select>
-
-                      {/* Linked Hotel Selector */}
-                      <select
-                        value={u.tenantSlug || ""}
-                        onChange={(e) =>
-                          handleUpdateUser(u, { tenantSlug: e.target.value })
-                        }
-                        aria-label="ผูกกับโรงแรม"
-                        className="fw-input !h-9 !text-[13px] max-w-[200px]"
-                      >
-                        <option value="">— ไม่ผูกโรงแรม —</option>
-                        {tenants.map((t) => (
-                          <option key={t.id} value={t.slug}>
-                            {t.nameTh} ({t.slug})
-                          </option>
-                        ))}
-                      </select>
-
-                      {!isPrimaryOwner && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateUser(u, { banned: !u.banned })
-                            }
-                            className="btn-fw-secondary !h-9 !px-3 !text-[13px]"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                            <span>{u.banned ? "ปลดระงับ" : "ระงับบัญชี"}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(u)}
-                            className="h-9 w-9 rounded-[8px] bg-[var(--color-error-muted)] text-[var(--color-error)] inline-flex items-center justify-center hover:opacity-85 cursor-pointer"
-                            title="ลบบัญชีผู้ใช้"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                );
-              })
-            )}
-          </section>
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePinSponsored(p)}
+                      className={`h-9 px-3.5 rounded-full ty-caption font-semibold shrink-0 cursor-pointer ${
+                        p.isSponsored
+                          ? "bg-[var(--color-accent)] text-white"
+                          : "bg-[var(--color-background-muted)]"
+                      }`}
+                    >
+                      {p.isSponsored ? "Sponsored ON" : "Boost Pin"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
         )}
-      </main>
+
+        {/* TAB 3: USERS & ROLES */}
+        {activeTab === "users" && (
+          <div className="space-y-2.5">
+            {filteredUsers.map((u) => (
+              <div
+                key={u.id}
+                className="rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="ty-body font-bold truncate">
+                      {u.name || u.email}
+                    </p>
+                    <StatusPill variant="accent">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>{u.role}</span>
+                    </StatusPill>
+                  </div>
+                  <p className="ty-caption">
+                    {u.email} · {u._count.ownedHotels} ที่พัก ·{" "}
+                    {u._count.bookings} การจอง · {u._count.boards} บอร์ด
+                  </p>
+                </div>
+
+                <select
+                  value={u.role}
+                  disabled={u.email === "cangaroomapp@gmail.com"}
+                  onChange={(e) =>
+                    handleChangeUserRole(u.id, e.target.value as AppRole)
+                  }
+                  className="h-9 rounded-[10px] bg-[var(--color-background-muted)] px-3 ty-caption font-bold"
+                >
+                  <option value="TRAVELLER">TRAVELLER</option>
+                  <option value="HOTEL_OWNER">HOTEL_OWNER</option>
+                  <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

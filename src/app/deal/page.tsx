@@ -1,654 +1,531 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  Calendar,
   Check,
   Copy,
-  Gift,
-  Percent,
+  ExternalLink,
+  Info,
   ShoppingBag,
-  Tag,
-  Utensils,
+  X,
 } from "lucide-react";
-import { pickLocalizedText } from "@/data/cmsDefaults";
-import { formatShortDate, useHotelApp } from "@/components/HotelAppShell";
-import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
-import { StandardButton, StatusPill } from "@/components/ui/standards";
+import {
+  getProvinceById,
+  STAY_STYLE_TABS,
+} from "@/data/thailandProvinces";
+import { formatShortDate } from "@/lib/dateFormatters";
+import { useHotelApp } from "@/components/HotelAppShell";
+import type { CouponDealDto } from "@/types/cangaroom";
 
-const FALLBACK_COUPON_IMAGES = [
-  "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=900&q=80",
-  "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=900&q=80",
-];
-
-export default function DealPage() {
+export default function DealMarketplacePage() {
+  const router = useRouter();
   const {
-    coupons,
-    addons,
-    seasonalRates,
     lang: language,
-    checkIn,
-    checkOut,
-    nights: stayNights,
-    guests: guestCount,
-    savedCouponCodes,
+    user: currentUser,
+    selectedProvinceId,
+    setSelectedProvinceId,
+    globalSearchQuery,
+    setGlobalSearchQuery,
+    walletCoupons,
+    claimCouponToWallet,
     openCouponWallet,
-    saveCouponToWallet,
-    claimAndApplyCoupon,
-    appliedCouponCode,
-    selectedAddons,
-    toggleAddon,
-    navigateToTab,
-    cms,
-    canShowEditControls,
-    openCmsEditor,
   } = useHotelApp();
 
-  const dealCms = cms.dealPage;
+  const [activeStyleTab, setActiveStyleTab] = useState("all");
+  const [deals, setDeals] = useState<CouponDealDto[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [feedbackBanner, setFeedbackBanner] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [flippedIds, setFlippedIds] = useState<Set<string>>(() => new Set());
 
-  const [copiedCouponCode, setCopiedCouponCode] = useState<string | null>(null);
-  const [recentBagFeedback, setRecentBagFeedback] = useState<string | null>(
-    null
-  );
-
-  const visibleCoupons = canShowEditControls
-    ? coupons
-    : coupons.filter((coupon) => coupon.isActive);
-  const visibleDiningAddons = canShowEditControls
-    ? addons
-    : addons.filter((addon) => addon.isActive);
-
-  const savedCodesUpperSet = new Set(
-    savedCouponCodes.map((code) => code.toUpperCase())
-  );
-
-  const handleCopyCouponCode = (
-    event: React.MouseEvent,
-    couponCode: string
-  ) => {
-    event.stopPropagation();
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(couponCode);
+  const loadDeals = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const qs = new URLSearchParams();
+      if (selectedProvinceId) qs.set("provinceId", selectedProvinceId);
+      const res = await fetch(`/api/deals?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { deals?: CouponDealDto[] };
+      setDeals(data.deals || []);
+    } catch {
+      setErrorMsg(
+        language === "th"
+          ? "ไม่สามารถโหลดรายการคูปองส่วนลดได้ในขณะนี้"
+          : "Unable to load hotel coupons right now."
+      );
+    } finally {
+      setIsLoading(false);
     }
-    const result = saveCouponToWallet(couponCode);
-    setRecentBagFeedback(result.message);
-    setCopiedCouponCode(couponCode);
-    setTimeout(() => setCopiedCouponCode(null), 1800);
-    setTimeout(() => setRecentBagFeedback(null), 2600);
+  }, [selectedProvinceId, language]);
+
+  useEffect(() => {
+    loadDeals();
+  }, [loadDeals, currentUser?.id]);
+
+  const handleCopyCode = async (
+    e: React.MouseEvent,
+    code: string
+  ) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      window.setTimeout(() => setCopiedCode(null), 1800);
+    } catch {
+      // ignore clipboard restrictions
+    }
   };
 
-  const handleCouponActionClick = (
-    couponCode: string,
-    isSavedInBag: boolean
+  const handleClaim = async (
+    e: React.MouseEvent,
+    deal: CouponDealDto
   ) => {
-    if (!isSavedInBag) {
-      const result = saveCouponToWallet(couponCode);
-      setRecentBagFeedback(result.message);
-      setTimeout(() => setRecentBagFeedback(null), 2600);
+    e.stopPropagation();
+    if (!currentUser) {
+      router.push("/login?callbackUrl=/deal");
       return;
     }
+    setClaimingId(deal.id);
+    setFeedbackBanner(null);
+    const res = await claimCouponToWallet({ couponId: deal.id });
+    setClaimingId(null);
+    setFeedbackBanner({
+      type: res.success ? "success" : "error",
+      text: res.message,
+    });
+    if (res.success) {
+      await loadDeals();
+    }
+    window.setTimeout(() => setFeedbackBanner(null), 3200);
+  };
 
-    claimAndApplyCoupon(couponCode);
-    navigateToTab("book");
+  const toggleFlip = (dealId: string) => {
+    setFlippedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(dealId)) {
+        next.delete(dealId);
+      } else {
+        next.add(dealId);
+      }
+      return next;
+    });
+  };
+
+  const filteredDeals = useMemo(() => {
+    const q = globalSearchQuery.trim().toLowerCase();
+    const list = deals.filter((d) => {
+      if (activeStyleTab !== "all" && !d.stayStyles.includes(activeStyleTab)) {
+        return false;
+      }
+      if (q) {
+        const hay = [
+          d.code,
+          d.titleTh,
+          d.titleEn,
+          d.hotelNameTh,
+          d.hotelNameEn,
+          d.provinceNameTh,
+          d.provinceNameEn,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    return list;
+  }, [deals, activeStyleTab, globalSearchQuery]);
+
+  const walletCount = currentUser?.savedCouponsCount ?? walletCoupons.length;
+  const activeProvince = selectedProvinceId
+    ? getProvinceById(selectedProvinceId)
+    : null;
+  const hasActiveFilter =
+    activeStyleTab !== "all" ||
+    Boolean(selectedProvinceId) ||
+    Boolean(globalSearchQuery.trim());
+
+  const handleResetFilters = () => {
+    setActiveStyleTab("all");
+    setSelectedProvinceId(null);
+    setGlobalSearchQuery("");
+  };
+
+  const renderNotches = (emphasized = false) => {
+    const borderClass = emphasized
+      ? "border-[var(--color-border-emphasized)]"
+      : "border-[var(--color-border)]";
+    return (
+      <>
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute -left-[1px] top-1/2 -translate-y-1/2 w-[10px] h-[20px] rounded-r-full bg-[var(--color-background-body)] border-y border-r ${borderClass} z-10`}
+        />
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute -right-[1px] top-1/2 -translate-y-1/2 w-[10px] h-[20px] rounded-l-full bg-[var(--color-background-body)] border-y border-l ${borderClass} z-10`}
+        />
+      </>
+    );
+  };
+
+  const renderFlipCouponCard = (deal: CouponDealDto) => {
+    const isFlipped = flippedIds.has(deal.id);
+    const discountHeadline =
+      deal.discountType === "PERCENT"
+        ? language === "th"
+          ? `ลด ${deal.discountValue}%`
+          : `${deal.discountValue}% OFF`
+        : language === "th"
+        ? `ลด ฿${deal.discountValue.toLocaleString()}`
+        : `฿${deal.discountValue.toLocaleString()} OFF`;
+
+    const hotelName = language === "th" ? deal.hotelNameTh : deal.hotelNameEn;
+    const provinceName =
+      language === "th" ? deal.provinceNameTh : deal.provinceNameEn;
+    const logoSrc = deal.hotelLogoUrl || deal.coverImageUrl || "";
+
+    const minSpendText =
+      deal.minSpendThb > 0
+        ? language === "th"
+          ? `ยอดจองขั้นต่ำ ฿${deal.minSpendThb.toLocaleString()}`
+          : `Min spend ฿${deal.minSpendThb.toLocaleString()}`
+        : language === "th"
+        ? "ไม่มีขั้นต่ำในการจอง"
+        : "No minimum spend";
+
+    const capText = deal.maxDiscountThb
+      ? language === "th"
+        ? `ลดสูงสุด ฿${deal.maxDiscountThb.toLocaleString()}`
+        : `Max ฿${deal.maxDiscountThb.toLocaleString()}`
+      : null;
+
+    const quotaText =
+      deal.totalQuota && deal.totalQuota > 0
+        ? language === "th"
+          ? `เหลือ ${Math.max(0, deal.totalQuota - deal.claimedCount)}/${
+              deal.totalQuota
+            } สิทธิ์`
+          : `${Math.max(0, deal.totalQuota - deal.claimedCount)}/${
+              deal.totalQuota
+            } left`
+        : language === "th"
+        ? "ไม่จำกัดสิทธิ์"
+        : "Unlimited uses";
+
+    return (
+      <div key={deal.id} className="cgr-flip-scene h-[168px] select-none">
+        <div className={`cgr-flip-card ${isFlipped ? "is-flipped" : ""}`}>
+          {/* ===============================================================
+              FRONT FACE — Minimal Zen Coupon (Logo | Dashed | Value + Hotel + Date)
+          =============================================================== */}
+          <article
+            role="button"
+            tabIndex={0}
+            aria-label={`${discountHeadline} ${hotelName}`}
+            onClick={() => toggleFlip(deal.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleFlip(deal.id);
+              }
+            }}
+            className="cgr-flip-face rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] hover:border-[var(--color-border-emphasized)] transition-colors flex items-center cursor-pointer"
+          >
+            {renderNotches(false)}
+
+            {/* Left Brand Logo Zone */}
+            <div className="w-[104px] shrink-0 h-full flex items-center justify-center pl-4 pr-3">
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt={hotelName}
+                  className="h-14 w-14 rounded-full object-cover border border-[var(--color-border)] bg-[var(--color-background-muted)]"
+                />
+              ) : (
+                <span className="h-14 w-14 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center ty-title font-bold">
+                  {hotelName[0] || "C"}
+                </span>
+              )}
+            </div>
+
+            {/* Vertical Dashed Perforation */}
+            <div
+              aria-hidden="true"
+              className="h-[72%] border-l border-dashed border-[var(--color-border-emphasized)] shrink-0"
+            />
+
+            {/* Right Clean Value Zone (Strictly 3 Lines) */}
+            <div className="flex-1 min-w-0 px-5 py-4 h-full flex flex-col justify-center gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[22px] leading-tight font-extrabold tracking-tight text-[var(--color-text-primary)] truncate">
+                  {discountHeadline}
+                </p>
+                {deal.isClaimedByMe && (
+                  <span className="shrink-0 h-5 px-2 rounded-full bg-[var(--color-background-muted)] text-[11px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>{language === "th" ? "เก็บแล้ว" : "Saved"}</span>
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[15px] font-medium text-[var(--color-text-primary)] truncate">
+                {hotelName}
+              </p>
+
+              <div className="pt-1.5 flex items-center justify-between gap-2 text-[12px] text-[var(--color-text-secondary)]">
+                <span className="truncate">
+                  {language === "th"
+                    ? `ใช้ได้ถึง ${formatShortDate(deal.expiresAt, language)}`
+                    : `Valid until ${formatShortDate(deal.expiresAt, language)}`}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 inline-flex items-center gap-1 text-[var(--color-text-secondary)]"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+          </article>
+
+          {/* ===============================================================
+              BACK FACE — Conditions, Promo Code & Claim/Redeem CTA
+          =============================================================== */}
+          <article
+            onClick={() => toggleFlip(deal.id)}
+            className="cgr-flip-face cgr-flip-face-back rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] px-5 py-3.5 flex flex-col justify-between cursor-pointer"
+          >
+            {renderNotches(true)}
+
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-[14px] font-bold text-[var(--color-text-primary)] truncate">
+                {language === "th" ? deal.titleTh : deal.titleEn}
+              </h3>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFlip(deal.id);
+                }}
+                aria-label={language === "th" ? "พลิกกลับ" : "Flip back"}
+                className="h-6 w-6 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <ul className="space-y-0.5 text-[12px] leading-[1.45] text-[var(--color-text-secondary)]">
+              <li className="truncate">
+                • {minSpendText}
+                {capText ? ` · ${capText}` : ""}
+              </li>
+              <li className="truncate">
+                • {quotaText} · {provinceName} (0% GP)
+              </li>
+            </ul>
+
+            <div className="pt-2.5 border-t border-dashed border-[var(--color-border-emphasized)] flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={(e) => handleCopyCode(e, deal.code)}
+                title={
+                  language === "th" ? "คัดลอกโค้ดส่วนลด" : "Copy promo code"
+                }
+                className="h-8 px-2.5 rounded-[8px] border border-dashed border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] font-mono text-[12px] font-bold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 min-w-0 cursor-pointer transition-colors"
+              >
+                <span className="truncate">{deal.code}</span>
+                {copiedCode === deal.code ? (
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
+                )}
+              </button>
+
+              <div
+                className="flex items-center gap-1.5 shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Link
+                  href={`/${deal.hotelSlug}`}
+                  title={hotelName}
+                  aria-label={hotelName}
+                  className="h-8 w-8 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+
+                {deal.isClaimedByMe ? (
+                  <Link
+                    href={`/${deal.hotelSlug}?coupon=${encodeURIComponent(
+                      deal.code
+                    )}`}
+                    className="h-8 px-3.5 rounded-[8px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12px] font-semibold inline-flex items-center gap-1 transition-opacity"
+                  >
+                    <span>{language === "th" ? "ใช้โค้ด" : "Redeem"}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={claimingId === deal.id}
+                    onClick={(e) => handleClaim(e, deal)}
+                    className="h-8 px-3.5 rounded-[8px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-opacity"
+                  >
+                    <span>
+                      {claimingId === deal.id
+                        ? language === "th"
+                          ? "กำลังเก็บ..."
+                          : "Saving..."
+                        : language === "th"
+                        ? "เก็บคูปอง"
+                        : "Claim"}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <>
-      {/* 1. Direct Booking Coupons (#c53829 Promo Standard) */}
-      <section id="offers" className="space-y-4">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="ty-title flex items-center gap-2 truncate">
-                <Tag className="w-5 h-5 text-[var(--color-promo-text)] shrink-0" />
-                <span className="truncate">
-                  {pickLocalizedText(
-                    language,
-                    dealCms.couponsTitleTh,
-                    dealCms.couponsTitleEn
-                  )}{" "}
-                  ({visibleCoupons.length})
-                </span>
-              </h1>
-              {appliedCouponCode && (
-                <StatusPill variant="promo">
-                  <Check className="w-3.5 h-3.5" />
-                  <span>
-                    {language === "th"
-                      ? `กำลังใช้: ${appliedCouponCode}`
-                      : `Active: ${appliedCouponCode}`}
-                  </span>
-                </StatusPill>
-              )}
-            </div>
-            <p className="ty-caption truncate mt-0.5">
-              {recentBagFeedback ? (
-                <span className="font-semibold text-[var(--color-promo-text)]">
-                  ✓ {recentBagFeedback}
-                </span>
-              ) : language === "th" ? (
-                `เข้าพัก ${formatShortDate(
-                  checkIn,
-                  language
-                )} – ${formatShortDate(checkOut, language)} (${stayNights} คืน · ${guestCount} ท่าน)`
-              ) : (
-                `Stay ${formatShortDate(
-                  checkIn,
-                  language
-                )} – ${formatShortDate(checkOut, language)} (${stayNights}N · ${guestCount} guests)`
-              )}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {canShowEditControls && (
-              <>
-                <EditSpotButton
-                  label="แก้หัวข้อหน้า"
-                  onClick={() => openCmsEditor({ type: "deal-addons-header" })}
-                />
-                <EditSpotButton
-                  icon="add"
-                  variant="promo"
-                  label="สร้างคูปองใหม่"
-                  onClick={() => openCmsEditor({ type: "coupon" })}
-                />
-              </>
-            )}
-
-            <StandardButton
-              variant="promo"
-              size="md"
-              onClick={openCouponWallet}
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>
-                {language === "th"
-                  ? `กระเป๋าคูปอง (${savedCouponCodes.length})`
-                  : `Coupon Bag (${savedCouponCodes.length})`}
-              </span>
-            </StandardButton>
-
-            <button
-              type="button"
-              onClick={() => navigateToTab("book")}
-              className="hidden sm:inline-flex btn-fw-secondary shrink-0 cursor-pointer"
-            >
-              <span>
-                {language === "th" ? "เลือกห้องพัก →" : "Browse Rooms →"}
-              </span>
-            </button>
-          </div>
-        </header>
-
-        <div className="w-full min-w-0 flex gap-3.5 overflow-x-auto overflow-y-hidden lg:overflow-visible overscroll-x-contain touch-manipulation no-scrollbar snap-x snap-proximity lg:snap-none lg:grid lg:grid-cols-3 xl:grid-cols-4 sm:gap-4">
-          {visibleCoupons.map((couponItem, couponIndex) => {
-            const isApplied = appliedCouponCode === couponItem.code;
-            const isSavedInBag = savedCodesUpperSet.has(
-              couponItem.code.toUpperCase()
-            );
-            const isCopied = copiedCouponCode === couponItem.code;
-
-            return (
-              <article
-                key={couponItem.id}
-                onClick={() =>
-                  handleCouponActionClick(couponItem.code, isSavedInBag)
-                }
-                className={`group snap-start shrink-0 w-[268px] sm:w-[292px] lg:w-auto app-card overflow-hidden flex flex-col justify-between cursor-pointer transition ${
-                  !couponItem.isActive ? "opacity-60" : ""
-                } ${
-                  isApplied ? "ring-2 ring-[var(--color-promo)]" : ""
-                }`}
-              >
-                <div className="relative h-36 w-full overflow-hidden bg-[var(--color-background-subtle)]">
-                  <img
-                    src={
-                      couponItem.imageUrl ||
-                      FALLBACK_COUPON_IMAGES[
-                        couponIndex % FALLBACK_COUPON_IMAGES.length
-                      ]
-                    }
-                    alt={pickLocalizedText(
-                      language,
-                      couponItem.titleTh,
-                      couponItem.titleEn
-                    )}
-                    draggable={false}
-                    className="w-full h-full object-cover select-none pointer-events-none"
-                  />
-
-                  {canShowEditControls && (
-                    <div className="absolute top-2.5 left-2.5 z-20">
-                      <EditSpotButton
-                        variant="promo"
-                        onClick={() =>
-                          openCmsEditor({
-                            type: "coupon",
-                            couponId: couponItem.id,
-                          })
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {isSavedInBag && (
-                    <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-black/65 backdrop-blur-md text-white px-2.5 py-0.5 ty-caption font-semibold">
-                      <ShoppingBag className="w-3 h-3" />
-                      <span>{language === "th" ? "ในกระเป๋า" : "In Bag"}</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-4 flex-1 flex flex-col justify-between gap-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="badge-promo">
-                        {couponItem.discountType === "PERCENT"
-                          ? language === "th"
-                            ? `ลด ${couponItem.discountValue}%`
-                            : `${couponItem.discountValue}% OFF`
-                          : language === "th"
-                          ? `ลด ฿${couponItem.discountValue.toLocaleString()}`
-                          : `฿${couponItem.discountValue.toLocaleString()} OFF`}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={(event) =>
-                          handleCopyCouponCode(event, couponItem.code)
-                        }
-                        className="shrink-0 inline-flex items-center gap-1 ty-caption font-mono font-bold text-[var(--color-promo-text)] hover:underline cursor-pointer"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>
-                          {isCopied
-                            ? language === "th"
-                              ? "คัดลอกแล้ว"
-                              : "Copied"
-                            : couponItem.code}
-                        </span>
-                      </button>
-                    </div>
-
-                    <h3 className="ty-body font-bold text-[var(--color-text-primary)] line-clamp-2">
-                      {pickLocalizedText(
-                        language,
-                        couponItem.titleTh,
-                        couponItem.titleEn
-                      )}
-                    </h3>
-                    <p className="ty-caption">
-                      {language === "th"
-                        ? `ยอดขั้นต่ำ ฿${couponItem.minSpendThb.toLocaleString()}`
-                        : `Min. spend ฿${couponItem.minSpendThb.toLocaleString()}`}
-                    </p>
-                  </div>
-
-                  <StandardButton
-                    variant={isApplied ? "secondary" : "promo"}
-                    size="md"
-                    className={`w-full ${
-                      isApplied
-                        ? "!bg-[var(--color-success-muted)] !text-[var(--color-success)]"
-                        : isSavedInBag
-                        ? "!bg-[var(--color-promo-muted)] !text-[var(--color-promo-text)]"
-                        : ""
-                    }`}
-                  >
-                    {isApplied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>
-                          {language === "th"
-                            ? `กำลังใช้ ${couponItem.code}`
-                            : `${couponItem.code} Active`}
-                        </span>
-                      </>
-                    ) : isSavedInBag ? (
-                      <>
-                        <span>
-                          {language === "th"
-                            ? `ใช้คูปอง ${couponItem.code}`
-                            : `Use ${couponItem.code}`}
-                        </span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingBag className="w-4 h-4" />
-                        <span>
-                          {language === "th"
-                            ? "เก็บเข้ากระเป๋า"
-                            : "Save to Bag"}
-                        </span>
-                      </>
-                    )}
-                  </StandardButton>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 2. In-Villa Dining & Wellness Promotions (#c53829 Deals) */}
-      <section id="dining-promotions" className="space-y-4">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="ty-title flex items-center gap-2">
-              <Utensils className="w-5 h-5 text-[var(--color-promo-text)] shrink-0" />
-              <span>
-                {pickLocalizedText(
-                  language,
-                  dealCms.addonsTitleTh,
-                  dealCms.addonsTitleEn
-                )}
-              </span>
-            </h2>
-            <p className="ty-caption mt-0.5">
-              {pickLocalizedText(
-                language,
-                dealCms.addonsSubtitleTh,
-                dealCms.addonsSubtitleEn
-              )}
-            </p>
-          </div>
-
-          {canShowEditControls && (
-            <EditSpotButton
-              icon="add"
-              variant="promo"
-              label="เพิ่มแพ็กเกจหมูกระทะ/สปา"
-              onClick={() => openCmsEditor({ type: "addon" })}
-            />
-          )}
-        </header>
-
-        <div className="w-full min-w-0 flex gap-3.5 overflow-x-auto overflow-y-hidden lg:overflow-visible overscroll-x-contain touch-manipulation no-scrollbar snap-x snap-proximity lg:snap-none lg:grid lg:grid-cols-3 xl:grid-cols-4 sm:gap-4">
-          {visibleDiningAddons.map((addonPromo) => {
-            const isSelectedForStay = selectedAddons.includes(addonPromo.id);
-            const originalPriceThb =
-              addonPromo.originalPriceThb &&
-              addonPromo.originalPriceThb > addonPromo.priceThb
-                ? addonPromo.originalPriceThb
-                : Math.round(addonPromo.priceThb * 1.25);
-            const discountPercent = Math.max(
-              1,
-              Math.round(
-                ((originalPriceThb - addonPromo.priceThb) / originalPriceThb) *
-                  100
-              )
-            );
-
-            return (
-              <article
-                key={addonPromo.id}
-                onClick={() => {
-                  if (!isSelectedForStay) {
-                    toggleAddon(addonPromo.id);
-                  }
-                  navigateToTab("book");
-                }}
-                className={`group snap-start shrink-0 w-[268px] sm:w-[292px] lg:w-auto rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75 overflow-hidden flex flex-col justify-between cursor-pointer transition ${
-                  !addonPromo.isActive ? "opacity-60" : ""
-                }`}
-              >
-                <div className="relative h-36 w-full overflow-hidden bg-[var(--color-background-subtle)]">
-                  <img
-                    src={
-                      addonPromo.imageUrl ||
-                      "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80"
-                    }
-                    alt={pickLocalizedText(
-                      language,
-                      addonPromo.nameTh,
-                      addonPromo.nameEn
-                    )}
-                    draggable={false}
-                    className="h-full w-full object-cover select-none pointer-events-none"
-                  />
-
-                  {canShowEditControls && (
-                    <div className="absolute top-2.5 left-2.5 z-20">
-                      <EditSpotButton
-                        variant="promo"
-                        onClick={() =>
-                          openCmsEditor({
-                            type: "addon",
-                            addonId: addonPromo.id,
-                          })
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-4 flex-1 flex flex-col justify-between gap-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="badge-promo">
-                        {language === "th"
-                          ? `ลด ${discountPercent}%`
-                          : `-${discountPercent}%`}
-                      </span>
-                      <span className="ty-caption font-medium truncate">
-                        {pickLocalizedText(
-                          language,
-                          addonPromo.unitTh,
-                          addonPromo.unitEn
-                        )}
-                      </span>
-                    </div>
-                    <h3 className="ty-body font-bold text-[var(--color-text-primary)] line-clamp-1">
-                      {pickLocalizedText(
-                        language,
-                        addonPromo.nameTh,
-                        addonPromo.nameEn
-                      )}
-                    </h3>
-                    <p className="ty-caption line-clamp-2">
-                      {pickLocalizedText(
-                        language,
-                        addonPromo.descTh,
-                        addonPromo.descEn
-                      )}
-                    </p>
-                    <div className="pt-0.5 flex items-baseline gap-2">
-                      <span className="ty-subtitle font-bold text-[var(--color-promo-text)]">
-                        ฿{addonPromo.priceThb.toLocaleString()}
-                      </span>
-                      <span className="ty-caption line-through">
-                        ฿{originalPriceThb.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <StandardButton
-                    variant={isSelectedForStay ? "secondary" : "promo"}
-                    size="md"
-                    className={`w-full ${
-                      isSelectedForStay
-                        ? "!bg-[var(--color-success-muted)] !text-[var(--color-success)]"
-                        : ""
-                    }`}
-                  >
-                    {isSelectedForStay ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>
-                          {language === "th" ? "รับสิทธิ์แล้ว" : "Added to Stay"}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          {language === "th"
-                            ? "รับโปรโมชั่นนี้"
-                            : "Claim Offer"}
-                        </span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </StandardButton>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 3. Direct Booking Privileges & Seasonal Rate Tiers */}
-      <section className="space-y-5">
-        <header>
-          <h2 className="ty-title flex items-center gap-2">
-            <Gift className="w-5 h-5 text-[var(--color-accent)] shrink-0" />
-            <span>
-              {pickLocalizedText(
-                language,
-                dealCms.privilegesTitleTh,
-                dealCms.privilegesTitleEn
-              )}
-            </span>
-          </h2>
+    <div className="cgr-page-standard space-y-6">
+      {/* Clean 1-Row Header */}
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="ty-display">
+            {language === "th" ? "คูปองส่วนลดที่พัก" : "Hotel Coupons"}
+          </h1>
           <p className="ty-caption mt-0.5">
-            {pickLocalizedText(
-              language,
-              dealCms.privilegesSubtitleTh,
-              dealCms.privilegesSubtitleEn
-            )}
+            {language === "th"
+              ? `คูปองจองตรง 0% GP ทั้งหมด ${filteredDeals.length} รายการ · คลิกที่การ์ดเพื่อพลิกดูเงื่อนไข`
+              : `${filteredDeals.length} direct-stay vouchers · Click any card to flip for details`}
           </p>
-        </header>
+        </div>
 
-        <div className="w-full min-w-0 flex gap-3.5 overflow-x-auto overflow-y-hidden lg:overflow-visible overscroll-x-contain touch-manipulation no-scrollbar snap-x snap-proximity lg:snap-none lg:grid lg:grid-cols-3 sm:gap-4">
-          {dealCms.privileges.map((privilege) => (
-            <article
-              key={privilege.id}
-              className="relative snap-start shrink-0 w-[268px] sm:w-[292px] lg:w-auto rounded-[16px] bg-[var(--color-background-muted)] overflow-hidden flex flex-col"
+        <button
+          type="button"
+          onClick={openCouponWallet}
+          className="h-10 px-4 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+        >
+          <ShoppingBag className="w-4 h-4" />
+          <span>
+            {language === "th" ? "กระเป๋าคูปองของฉัน" : "My Wallet"}
+          </span>
+          {walletCount > 0 && (
+            <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--color-promo)] !text-white text-[11px] font-bold inline-flex items-center justify-center leading-none">
+              {walletCount}
+            </span>
+          )}
+        </button>
+      </header>
+
+      {/* Single-Row Stay Style Underline Tabs (Matches Home /) */}
+      <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-b border-[var(--color-border)]">
+        {STAY_STYLE_TABS.map((tab) => {
+          const isActive = activeStyleTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveStyleTab(tab.id)}
+              className={`relative shrink-0 py-3 -mb-px border-b-2 ty-body transition-colors cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
             >
-              <div className="relative h-36 w-full bg-[var(--color-background-subtle)]">
-                <img
-                  src={privilege.imageUrl}
-                  alt={pickLocalizedText(
-                    language,
-                    privilege.titleTh,
-                    privilege.titleEn
-                  )}
-                  draggable={false}
-                  className="h-full w-full object-cover select-none pointer-events-none"
-                />
-                {canShowEditControls && (
-                  <div className="absolute top-2.5 right-2.5 z-20">
-                    <EditSpotButton
-                      onClick={() =>
-                        openCmsEditor({
-                          type: "deal-privilege",
-                          privilegeId: privilege.id,
-                        })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
+              <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+            </button>
+          );
+        })}
 
-              <div className="p-4 space-y-1">
-                <span className="ty-caption font-bold text-[var(--color-accent)]">
-                  {pickLocalizedText(
-                    language,
-                    privilege.badgeTh,
-                    privilege.badgeEn
-                  )}
-                </span>
-                <h3 className="ty-body font-bold text-[var(--color-text-primary)]">
-                  {pickLocalizedText(
-                    language,
-                    privilege.titleTh,
-                    privilege.titleEn
-                  )}
-                </h3>
-                <p className="ty-caption">
-                  {pickLocalizedText(
-                    language,
-                    privilege.descTh,
-                    privilege.descEn
-                  )}
-                </p>
-              </div>
-            </article>
+        {(activeProvince || hasActiveFilter) && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="ml-auto shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <span>
+              {activeProvince
+                ? language === "th"
+                  ? `${activeProvince.nameTh} · ล้างตัวกรอง`
+                  : `${activeProvince.nameEn} · Reset`
+                : language === "th"
+                ? "ล้างตัวกรอง"
+                : "Reset"}
+            </span>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {feedbackBanner && (
+        <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-muted)] px-4 py-2.5 ty-body font-semibold text-[var(--color-text-primary)]">
+          {feedbackBanner.text}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-muted)] p-4 ty-body text-[var(--color-error)]">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Clean Minimalist 3-Column Coupon Ticket Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[168px] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+            />
           ))}
         </div>
-
-        {(seasonalRates.some((season) => season.isActive) ||
-          canShowEditControls) && (
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="ty-body font-bold flex items-center gap-2 text-[var(--color-text-primary)]">
-                <Percent className="w-4 h-4 text-[var(--color-promo-text)]" />
-                <span>
-                  {language === "th"
-                    ? "ตารางเรทราคาตามฤดูกาล"
-                    : "Seasonal Rate Tiers"}
-                </span>
-              </h3>
-
-              {canShowEditControls && (
-                <EditSpotButton
-                  label="จัดการเรทฤดูกาล & วันหยุด"
-                  onClick={() => openCmsEditor({ type: "seasonal-rates" })}
-                />
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {seasonalRates
-                .filter((season) => season.isActive)
-                .map((seasonRule) => {
-                  const isDiscountTier =
-                    seasonRule.adjustmentType === "PERCENT_DISCOUNT";
-                  return (
-                    <div
-                      key={seasonRule.id}
-                      className="rounded-[16px] bg-[var(--color-background-muted)] px-4 py-3 flex items-center justify-between gap-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="ty-body font-semibold text-[var(--color-text-primary)] truncate">
-                          {pickLocalizedText(
-                            language,
-                            seasonRule.nameTh,
-                            seasonRule.nameEn
-                          )}
-                        </p>
-                        <p className="ty-caption flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-                          <span>
-                            {formatShortDate(seasonRule.startDate, language)} –{" "}
-                            {formatShortDate(seasonRule.endDate, language)}
-                          </span>
-                        </p>
-                      </div>
-                      <span
-                        className={
-                          isDiscountTier
-                            ? "badge-promo shrink-0"
-                            : "ty-caption font-bold text-[var(--color-accent)] shrink-0"
-                        }
-                      >
-                        {pickLocalizedText(
-                          language,
-                          seasonRule.badgeTh,
-                          seasonRule.badgeEn
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
-      </section>
-    </>
+      ) : filteredDeals.length === 0 ? (
+        <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+          <h2 className="ty-title">
+            {language === "th"
+              ? "ไม่พบคูปองส่วนลดที่ตรงกับตัวกรองนี้"
+              : "No active coupons match your filters"}
+          </h2>
+          <p className="ty-caption">
+            {language === "th"
+              ? "ลองเลือกดูทุกจังหวัด หรือแสดงทุกสไตล์ที่พัก"
+              : "Try clearing province or stay style filters."}
+          </p>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="btn-round-solid inline-flex"
+            >
+              {language === "th" ? "ดูคูปองทั้งหมด" : "Show All Coupons"}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredDeals.map((deal) => renderFlipCouponCard(deal))}
+        </div>
+      )}
+    </div>
   );
 }

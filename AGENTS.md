@@ -1,18 +1,34 @@
 # Mandatory Agent Guidelines for `my-hotel` (Cangaroom)
 
-> **CRITICAL RULE (บังคับอ่านทุกครั้งก่อนเขียนหรือแก้ไขโค้ด):**
+> **CRITICAL RULE 1 — MASTER DESIGN SYSTEM CONSTITUTION (บังคับอ่านทุกครั้งก่อนเขียนหรือแก้ไข UI):**
 > Every time you implement, create, or modify any UI component, page, or feature in this repository, you **MUST** first read and strictly follow the design system skill at:
 > `.agents/skills/my-hotel-design-system/SKILL.md`
+>
+> **CRITICAL RULE 2 — CORE BUSINESS MODEL & ARCHITECTURE (บังคับอ่านก่อนแก้ลอจิก ฐานข้อมูล หรือโครงสร้างหน้าเว็บ):**
+> Every time you plan, build, or modify business logic, routes, APIs, or database schemas, you **MUST** read and follow the master business blueprint inside:
+> `CoreBusiness/README.md` (and `CoreBusiness/01` through `05` — which supersede legacy `plan/` and `booking-flow.md`).
 
-## Core Summary of Mandatory Design Rules
-1. **STRICT FORBIDDEN RULE — NO HOVER SCALE ANYWHERE (ห้ามใช้ `hover` แล้ว `scale` ทั้งเว็บเด็ดขาด):**
-   - **NEVER** use `hover:scale-*`, `group-hover:scale-*`, or CSS `transform: scale(...)` on `:hover` on ANY image, card, button, or icon anywhere in the application.
-2. **Instagram Left Sidebar (`72px`) + Pinterest Masonry & Pin Detail UI:**
-   - Desktop Left Sidebar (`w-[72px]`) uses Instagram's clean pure-white vertical icon rail (top brand mark, centered minimal outline/filled icons, bottom `≡` menu).
-   - Top bar features Pinterest's `#f1f1f1` full-width rounded search bar + user avatar.
-   - Home (`/`) uses a variable-height multi-column **Pinterest Masonry Grid** (`rounded-[16px]` pins). Clicking any pin opens **Pinterest's Split 2-Column Pin Close-Up Card** (`rounded-[28px]`) with live likes, save button (`#e60023`), description, **interactive comments**, and staggered related pins beside & below it.
-3. **Pinterest Gestalt Palette & Pure White Canvas:**
-   - Light Mode: Pure white `#ffffff` canvas, `#f1f1f1` / `#efefef` muted pills & search bar, `#111111` primary ink, `#767676` secondary gray, `#e60023` Save/Promo red, `#0866ff` booking accent.
-   - Dark Mode: `#121212` canvas, `#1e1e1e` cards, `#2b2b2b` muted pills, `#f5f5f5` primary ink.
-4. **Native System Font Stack & 5-Tier Scale:**
-   - Native `system-ui` font stack (`SF Pro + ThonburiUI` on macOS/iOS, `Segoe UI + Leelawadee UI` on Windows) with `.ty-display`, `.ty-title`, `.ty-subtitle`, `.ty-body`, and `.ty-caption`.
+## Non-Negotiable Design Constitution (Read Every Turn)
+
+1. **ZERO HOVER SCALE (`ห้ามใช้ hover แล้ว scale ทั้งเว็บเด็ดขาด`)**:
+   - **NEVER** use `hover:scale-*`, `group-hover:scale-*`, or `:hover { transform: scale(...) }` on ANY image, card, button, or icon anywhere in the codebase.
+2. **ZERO CARD/BUTTON SHADOWS & ZERO GRADIENTS/PASTEL WASHES (`ห้ามใส่เงาการ์ด/ปุ่ม และห้ามใช้พื้นหลังพาสเทลหรือไล่สี`)**:
+   - **NEVER** apply `shadow-*` (`shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-[var(--shadow-card)]`) to cards, banners, or buttons. Separate surfaces strictly with `1px solid var(--color-border)` (`#ebebeb` Light / `#2b2b2b` Dark) or muted fills (`#f2f2f2` / `#262626`). Floating shadows (`--shadow-popover`) are permitted ONLY on floating dropdown popovers/modals.
+   - **NEVER** use `bg-gradient-*` or pastel tinted boxes (`--color-promo-muted`, `--color-accent-muted`, `--color-warning-muted`, `--color-success-muted`) on UI cards or section headers.
+3. **STRICT 95/5 MONOCHROME PALETTE & 2-BUTTON HIERARCHY**:
+   - **95% Monochrome**: Pure white `#ffffff` (`#121212` Dark) canvas, `#ffffff` (`#1e1e1e` Dark) bordered cards, `#efefef` / `#f2f2f2` (`#262626` Dark) secondary surfaces, `#111111` (`#f5f5f5` Dark) primary ink, `#737373` (`#a3a3a3` Dark) secondary ink.
+   - **2 Buttons Only**:
+     - **Primary Button**: Solid `#111111` ink (`#f5f5f5` Dark) for primary actions (`จองห้องพัก`, `เก็บคูปอง`, `ค้นหา`, `บันทึกข้อมูล`).
+     - **Secondary Button**: Flat `#efefef` (`#262626` Dark) with `#111111` ink for secondary actions (`ดูรายละเอียด`, `ทัก LINE`, `Facebook`, `คัดลอกโค้ด`).
+     - **FORBIDDEN**: Never use `#0866ff` blue buttons, `#06c755` green buttons, or colored section eyebrows/headings.
+   - **5% Reserved Red (`#e60023`)**: Allowed **ONLY** on the Pin `'บันทึก'` (`Save`) button and tiny notification count badges/dots in navigation. Status indicators use a `6px` dot inside a monochrome `#efefef` pill.
+4. **UNIFIED APP SHELL & 3-TIER CONTAINER GRID (Exact Margins & Paddings Everywhere)**:
+   - **Persistent `72px` Left Sidebar + `64px` Top Bar**: Shown consistently across **ALL** routes (`/`, `/board`, `/deal`, `/{hotelSlug}`, `/{hotelSlug}/posts`, `/trips`, `/studio`, `/register-hotel`, `/super-admin`), with standalone auth ONLY on `/login`.
+   - **Single Global Gutter & Vertical Rhythm**: Both `<header>` and `<main>` in `HotelAppShell` enforce `px-4 sm:px-6 lg:px-8` horizontally and `pt-5 pb-12` vertically. Individual `page.tsx` files **MUST NOT** add conflicting outer `px-*` or arbitrary `py-*`.
+   - **3 Container Width Tiers Only**:
+     - **Tier 1 (`cgr-page-fluid` — `w-full`)**: `/` and `/board` ONLY (for `236px` fixed-width animated `<MasonryGrid />`).
+     - **Tier 2 (`cgr-page-standard` — `max-w-[1120px] mx-auto`)**: `/deal`, `/{hotelSlug}`, `/{hotelSlug}/posts`, `/trips`, `/studio`, `/super-admin`.
+     - **Tier 3 (`cgr-page-reading` `760px` / `cgr-page-form` `640px` / Auth `420px`)**: `/{hotelSlug}/posts/{postSlug}`, `/register-hotel`, `/login`.
+5. **SIGNATURE PAGE ARCHITECTURES**:
+   - **`/deal`**: Clean pure-white horizontal ticket grid (`1px` border, semicircular side notches, vertical dashed divider: Logo left | Discount + Hotel + Expiry right) with **In-Place 3D Card Flip (`rotateY(180deg)`)** on click to reveal conditions, copyable code, and `#111111` Claim/Redeem CTA.
+   - **`/{hotelSlug}`**: **Facebook Cover Photo Banner Header** (no Instagram circular Story highlights) + **5 SSR DOM Tabs (`posts`, `rooms`, `blog`, `reviews`, `more`)**: `posts` uses the Home Pinterest `<MasonryGrid columnWidth={236} gutter={16} />` & `<PinterestPinCard />`; `rooms` puts an always-visible **Inline Interactive Calendar** on top that filters rooms immediately on tap; `reviews` and `more` (`เพิ่มเติม` — Map, Policies, FAQs) are separate tabs; all 5 panels render in SSR HTML and toggle via CSS `hidden` + `?tab=` URL sync + `Schema.org JSON-LD`.

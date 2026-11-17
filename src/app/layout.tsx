@@ -8,14 +8,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#242526" },
+    { media: "(prefers-color-scheme: dark)", color: "#121212" },
   ],
 };
 
 export const metadata: Metadata = {
-  title: "Cangaroom — เว็บไซต์และระบบจองที่พักโดยตรงสำหรับโรงแรมและพูลวิลล่า",
+  title: "Cangaroom — ค้นหาที่พักสวยทั่วไทย & จองตรงฟรีค่า GP 0%",
   description:
-    "Cangaroom แพลตฟอร์มเว็บไซต์และระบบจองห้องพักโดยตรง ใช้งานง่าย ทดลองใช้ฟรี 30 วัน พร้อมระบบล็อกห้องอัตโนมัติ คูปองส่วนลด และผู้ช่วย AI",
+    "Cangaroom แพลตฟอร์มรวมที่พักไทยสไตล์ Pinterest ทั้งภูเขา ทะเล พูลวิลล่า แกลมปิ้ง พร้อมเก็บคูปองส่วนลดและจองห้องพักตรงกับโรงแรม 0% GP",
 };
 
 export default function RootLayout({

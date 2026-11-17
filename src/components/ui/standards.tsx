@@ -3,12 +3,12 @@
 import React from "react";
 
 /* ============================================================================
-   MY-HOTEL · UNIFIED UI, LAYOUT & TYPOGRAPHY STANDARDS
+   CANGAROOM · MASTER UI, LAYOUT & MONOCHROME STANDARDS (v2.0)
    Enforces:
-   1. Single Centered Feed Layout (`max-w-[1140px] mx-auto`)
-   2. Strict 5-Tier Font Scale (`ty-display`, `ty-title`, `ty-subtitle`, `ty-body`, `ty-caption`)
-   3. Unified Pill Buttons, Circular Icon Buttons, Inputs & `#c53829` Promo Tokens
-   4. Automatic Light Mode (#ffffff) & Dark Mode (#1C1C1D / #262627) surfaces
+   1. 3-Tier Standardized Container Grid (`cgr-page-fluid`, `cgr-page-standard`, `cgr-page-reading`)
+   2. Strict 95/5 Monochrome Palette (#FFFFFF, #F1F1F1, #111111, #737373)
+   3. ZERO Card Shadows & ZERO Hover Scale Site-Wide
+   4. 2-Button Hierarchy (#111111 Primary, #F1F1F1 Secondary) & 6px Dot StatusPills
    ============================================================================ */
 
 export function StandardFeedContainer({
@@ -19,9 +19,7 @@ export function StandardFeedContainer({
   className?: string;
 }) {
   return (
-    <div
-      className={`app-feed-shell py-3 sm:py-4 flex flex-col gap-3.5 sm:gap-4 ${className}`}
-    >
+    <div className={`cgr-page-standard flex flex-col gap-6 ${className}`}>
       {children}
     </div>
   );
@@ -41,7 +39,7 @@ export function StandardCard({
   return (
     <section
       id={id}
-      className={`app-card ${
+      className={`rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] ${
         noPadding ? "overflow-hidden" : "p-4 sm:p-5"
       } ${className}`}
     >
@@ -51,7 +49,6 @@ export function StandardCard({
 }
 
 export function StandardSectionHeader({
-  eyebrow,
   title,
   description,
   icon,
@@ -70,14 +67,9 @@ export function StandardSectionHeader({
       className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${className}`}
     >
       <div className="min-w-0">
-        {eyebrow && (
-          <span className="ty-caption font-semibold uppercase tracking-wider block mb-0.5">
-            {eyebrow}
-          </span>
-        )}
         <h2 className="ty-title flex items-center gap-2 min-w-0">
           {icon && (
-            <span className="text-[var(--color-accent)] shrink-0 [&_svg]:w-5 [&_svg]:h-5">
+            <span className="text-[var(--color-text-primary)] shrink-0 [&_svg]:w-5 [&_svg]:h-5">
               {icon}
             </span>
           )}
@@ -110,26 +102,26 @@ export function StandardButton({
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
     sm: "h-8 px-3 text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
-    md: "h-9 px-4 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    md: "h-9 px-4 text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
     lg: "h-10 px-5 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
+      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
     promo:
-      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
+      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
     secondary:
-      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
+      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] hover:brightness-95",
+      "bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
   };
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
+      className={`inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
@@ -161,19 +153,19 @@ export function StandardIconButton({
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
+      "bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
     primary:
-      "bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
+      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
     promo:
-      "bg-[var(--color-promo)] text-[var(--color-on-promo)] hover:bg-[var(--color-promo-hover)]",
+      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
     ghost:
-      "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-overlay-hover)] hover:text-[var(--color-text-primary)]",
+      "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]",
   };
 
   return (
     <button
       type="button"
-      className={`inline-flex items-center justify-center shrink-0 rounded-full transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${sizeMap[size]} ${variantMap[variant]} ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 rounded-[10px] transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${sizeMap[size]} ${variantMap[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -208,9 +200,9 @@ export function StandardInput({
       </span>
       <input
         id={inputId}
-        className={`h-10 w-full rounded-[8px] border border-[var(--color-border)] ${
+        className={`h-10 w-full rounded-[10px] border border-[var(--color-border)] ${
           hasCustomBg ? "" : "bg-[var(--color-background-muted)]"
-        } px-3.5 text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:bg-[var(--color-background-card)] ${className}`}
+        } px-3.5 text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-colors focus:outline-none focus:border-[var(--color-border-emphasized)] focus:bg-[var(--color-background-card)] ${className}`}
         {...props}
       />
     </label>
@@ -241,56 +233,30 @@ export function StatusPill({
   children,
   className = "",
 }: StatusPillProps) {
-  const statusStyles: Record<RoomStatusType, { wrapper: string; dot: string }> = {
-    available: {
-      wrapper:
-        "bg-[var(--color-success-muted)] text-[var(--color-success)]",
-      dot: "bg-[var(--color-success)]",
-    },
-    last_unit: {
-      wrapper:
-        "bg-[var(--color-warning-muted)] text-[var(--color-warning)]",
-      dot: "bg-[var(--color-warning)] animate-pulse",
-    },
-    booked: {
-      wrapper:
-        "bg-[var(--color-error-muted)] text-[var(--color-error)]",
-      dot: "bg-[var(--color-error)]",
-    },
-    promo: {
-      wrapper:
-        "bg-[var(--color-promo)] text-[var(--color-on-promo)]",
-      dot: "bg-[var(--color-on-promo)]",
-    },
+  const dotByStatus: Record<RoomStatusType, string> = {
+    available: "bg-emerald-500",
+    last_unit: "bg-amber-500",
+    booked: "bg-rose-500",
+    promo: "bg-[#111111] dark:bg-[#f5f5f5]",
   };
 
-  if (status) {
-    const current = statusStyles[status];
-    return (
-      <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-6 ty-caption font-semibold leading-none ${current.wrapper} ${className}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${current.dot}`} />
-        <span>{label ?? children}</span>
-      </span>
-    );
-  }
-
-  const variantClasses: Record<StatusPillVariant, string> = {
-    success: "bg-[var(--color-success-muted)] text-[var(--color-success)]",
-    warning: "bg-[var(--color-warning-muted)] text-[var(--color-warning)]",
-    error: "bg-[var(--color-error-muted)] text-[var(--color-error)]",
-    promo: "bg-[var(--color-promo)] text-[var(--color-on-promo)]",
-    accent: "bg-[var(--color-accent-muted)] text-[var(--color-accent)]",
-    neutral:
-      "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]",
+  const dotByVariant: Record<StatusPillVariant, string> = {
+    success: "bg-emerald-500",
+    warning: "bg-amber-500",
+    error: "bg-rose-500",
+    promo: "bg-[#111111] dark:bg-[#f5f5f5]",
+    accent: "bg-[#111111] dark:bg-[#f5f5f5]",
+    neutral: "bg-[var(--color-text-secondary)]",
   };
+
+  const dotClass = status ? dotByStatus[status] : dotByVariant[variant];
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 h-6 ty-caption font-semibold leading-none ${variantClasses[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2.5 h-6 text-[12px] font-semibold leading-none ${className}`}
     >
-      {children ?? label}
+      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
+      <span>{label ?? children}</span>
     </span>
   );
 }

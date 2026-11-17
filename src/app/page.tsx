@@ -1,518 +1,476 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { PinCommentItem } from "@/data/cmsDefaults";
-import { StayStyleTag } from "@/data/thailandProvinces";
-import {
-  LIKED_PINS_STORAGE_KEY,
-  PinterestPinItem,
-  SAVED_PINS_STORAGE_KEY,
-  buildAllMarketplacePins,
-} from "@/lib/pinBuilder";
+import { useRouter } from "next/navigation";
+import { STAY_STYLE_TABS, VALID_STYLE_TAGS } from "@/data/thailandProvinces";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { EditSpotButton } from "@/components/cms/AdminEditOverlay";
 import {
-  PureMediaSlide,
   PureMediaViewer,
-} from "@/components/cms/PureMediaViewer";
+  type PureMediaSlide,
+} from "@/components/media/PureMediaViewer";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
-import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
-
-type HomeStyleTabId = "all" | StayStyleTag;
-
-const STAY_STYLE_TABS: ReadonlyArray<{
-  id: HomeStyleTabId;
-  labelTh: string;
-  labelEn: string;
-}> = [
-  { id: "all", labelTh: "ทั้งหมด", labelEn: "All Stays" },
-  { id: "mountain", labelTh: "ภูเขา & ทะเลหมอก", labelEn: "Mountain & Mist" },
-  { id: "pool-villa", labelTh: "พูลวิลล่า", labelEn: "Pool Villas" },
-  { id: "sea", labelTh: "ติดทะเล & ชายหาด", labelEn: "Sea & Beachfront" },
-  { id: "bars", labelTh: "บาร์ & รูฟท็อป", labelEn: "Bars & Rooftop" },
-  { id: "bathtub", labelTh: "อ่างแช่น้ำ & ออนเซ็น", labelEn: "Onsen & Bathtub" },
-  { id: "glamping", labelTh: "แกลมปิ้ง & เคบิน", labelEn: "Glamping & Cabin" },
-];
-
-const VALID_STYLE_TABS: ReadonlySet<string> = new Set(
-  STAY_STYLE_TABS.map((t) => t.id)
-);
+import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
 
 export default function HomePage() {
+  const router = useRouter();
   const {
-    propertyConfig,
-    rooms,
-    addons,
-    coupons,
     lang: language,
-    navigateToTab,
-    claimAndApplyCoupon,
-    cms,
-    saveStore,
-    canShowEditControls,
-    openCmsEditor,
+    user: currentUser,
+    refreshMe,
     globalSearchQuery,
+    setGlobalSearchQuery,
     selectedProvinceId,
     setSelectedProvinceId,
     isDateFilterActive,
     setIsDateFilterActive,
-    roomStatusMap,
-    totalAvailableUnitsCount,
+    checkIn,
+    checkOut,
     guests,
   } = useHotelApp();
 
-  const { user: currentUser } = useAuthenticatedProfile();
+  const [activeStyleTab, setActiveStyleTab] = useState<string>("all");
+  const [pins, setPins] = useState<PinFeedItemDto[]>([]);
+  const [isLoadingPins, setIsLoadingPins] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [activeStyleTab, setActiveStyleTab] = useState<HomeStyleTabId>("all");
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
-  const [savedPinsMap, setSavedPinsMap] = useState<Record<string, boolean>>({});
-  const [likedPinsMap, setLikedPinsMap] = useState<Record<string, boolean>>({});
+  const [pinDetail, setPinDetail] = useState<{
+    pin: PinFeedItemDto;
+    comments: PinCommentDto[];
+    relatedPins: PinFeedItemDto[];
+  } | null>(null);
+  const [optimisticSavedIds, setOptimisticSavedIds] = useState<Set<string>>(
+    () => new Set()
+  );
   const [fullscreenMedia, setFullscreenMedia] = useState<{
     slides: PureMediaSlide[];
     index: number;
   } | null>(null);
 
-  // Hydrate saved & liked pins + deep-linked ?pin=... or ?style=...
+  // Sync ?pin=... & ?style=... on initial load / popstate
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const savedRaw = localStorage.getItem(SAVED_PINS_STORAGE_KEY);
-      if (savedRaw) setSavedPinsMap(JSON.parse(savedRaw));
-      const likedRaw = localStorage.getItem(LIKED_PINS_STORAGE_KEY);
-      if (likedRaw) setLikedPinsMap(JSON.parse(likedRaw));
-
-      const params = new URLSearchParams(window.location.search);
-      const pinParam = params.get("pin");
-      if (pinParam) setSelectedPinId(pinParam);
-      const styleParam = params.get("style");
-      if (styleParam && VALID_STYLE_TABS.has(styleParam)) {
-        setActiveStyleTab(styleParam as HomeStyleTabId);
-      }
-    } catch {
-      // ignore storage errors
-    }
-
-    const handlePopState = () => {
+    const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       setSelectedPinId(params.get("pin"));
       const styleParam = params.get("style");
-      if (styleParam && VALID_STYLE_TABS.has(styleParam)) {
-        setActiveStyleTab(styleParam as HomeStyleTabId);
+      if (styleParam && VALID_STYLE_TAGS.has(styleParam)) {
+        setActiveStyleTab(styleParam);
       }
     };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
 
-  const navigateToBookRoom = useCallback(
-    (roomId?: string) => {
-      if (roomId && typeof window !== "undefined") {
-        window.location.href = `/sapanunseen?room=${encodeURIComponent(
-          roomId
-        )}`;
-        return;
-      }
-      navigateToTab("book");
-    },
-    [navigateToTab]
-  );
-
-  const navigateToReview = useCallback(() => {
-    navigateToTab("review");
-  }, [navigateToTab]);
-
-  const claimCouponAndBook = useCallback(
-    (code: string) => {
-      claimAndApplyCoupon(code);
-      navigateToTab("book");
-    },
-    [claimAndApplyCoupon, navigateToTab]
-  );
-
-  // Build ranked & staggered multi-hotel Thailand discovery pins
-  const allPins = useMemo<PinterestPinItem[]>(
-    () =>
-      buildAllMarketplacePins({
-        propertyConfig,
-        rooms,
-        addons,
-        coupons,
-        cms,
-        language,
-        navigateToBookRoom,
-        navigateToReview,
-        claimCouponAndBook,
-        openCmsEditor,
-      }),
-    [
-      addons,
-      claimCouponAndBook,
-      cms,
-      coupons,
-      language,
-      navigateToBookRoom,
-      navigateToReview,
-      openCmsEditor,
-      propertyConfig,
-      rooms,
-    ]
-  );
-
-  // Cross-Filter: Stay Style Tab × Province (Search Bar) × Agoda Date Availability (Search Bar) × Text Query
-  const filteredPins = useMemo(() => {
-    const q = globalSearchQuery.trim().toLowerCase();
-    return allPins.filter((pin) => {
-      // 1. Stay Style Tab
-      if (activeStyleTab !== "all" && !pin.styles.includes(activeStyleTab)) {
-        return false;
-      }
-
-      // 2. Province Filter (from Top Search Bar)
-      if (selectedProvinceId && pin.provinceId !== selectedProvinceId) {
-        return false;
-      }
-
-      // 3. Agoda Calendar Date & Guest Availability Filter (from Top Search Bar)
+  const loadPins = useCallback(async () => {
+    setIsLoadingPins(true);
+    setFetchError(null);
+    try {
+      const qs = new URLSearchParams();
+      if (activeStyleTab !== "all") qs.set("style", activeStyleTab);
+      if (selectedProvinceId) qs.set("provinceId", selectedProvinceId);
+      if (globalSearchQuery.trim()) qs.set("q", globalSearchQuery.trim());
       if (isDateFilterActive) {
-        if (pin.roomId) {
-          const roomAvail = roomStatusMap[pin.roomId]?.availableUnits ?? 0;
-          if (roomAvail <= 0) return false;
-          if (pin.maxGuests && guests > pin.maxGuests) return false;
-        } else if (pin.maxGuests) {
-          if (guests > pin.maxGuests) return false;
-        } else {
-          // General resort atmosphere/video pins: require at least 1 available unit at the resort
-          if (totalAvailableUnitsCount <= 0) return false;
-        }
+        qs.set("checkIn", checkIn);
+        qs.set("checkOut", checkOut);
+        qs.set("guests", String(guests));
       }
 
-      // 4. Keyword Search
-      if (!q) return true;
-      return (
-        pin.title.toLowerCase().includes(q) ||
-        pin.description.toLowerCase().includes(q) ||
-        pin.boardLabel.toLowerCase().includes(q) ||
-        pin.authorName.toLowerCase().includes(q) ||
-        pin.provinceLabel.toLowerCase().includes(q)
+      const res = await fetch(`/api/pins?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as {
+        pins?: PinFeedItemDto[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "ไม่สามารถโหลดข้อมูลที่พักได้");
+      }
+      const fetched = data.pins || [];
+      setPins(fetched);
+      setOptimisticSavedIds(
+        new Set(fetched.filter((p) => p.isSavedByMe).map((p) => p.id))
       );
-    });
+    } catch (err) {
+      setFetchError(
+        err instanceof Error ? err.message : "โหลดข้อมูลที่พักไม่สำเร็จ"
+      );
+    } finally {
+      setIsLoadingPins(false);
+    }
   }, [
     activeStyleTab,
-    allPins,
-    globalSearchQuery,
-    guests,
-    isDateFilterActive,
-    roomStatusMap,
     selectedProvinceId,
-    totalAvailableUnitsCount,
+    globalSearchQuery,
+    isDateFilterActive,
+    checkIn,
+    checkOut,
+    guests,
   ]);
 
-  const selectedPin = useMemo(
-    () =>
-      selectedPinId
-        ? allPins.find((p) => p.id === selectedPinId) ?? null
-        : null,
-    [allPins, selectedPinId]
-  );
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadPins();
+    }, 140);
+    return () => window.clearTimeout(timer);
+  }, [loadPins]);
 
-  const relatedPins = useMemo(() => {
-    if (!selectedPin) return [];
-    const sameCategoryOrStyle = allPins.filter(
-      (p) =>
-        p.id !== selectedPin.id &&
-        (p.category === selectedPin.category ||
-          p.styles.some((s) => selectedPin.styles.includes(s)))
-    );
-    const others = allPins.filter(
-      (p) =>
-        p.id !== selectedPin.id &&
-        p.category !== selectedPin.category &&
-        !p.styles.some((s) => selectedPin.styles.includes(s))
-    );
-    return [...sameCategoryOrStyle, ...others];
-  }, [allPins, selectedPin]);
+  const loadPinDetail = useCallback(async (pinId: string) => {
+    try {
+      const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        pin: PinFeedItemDto;
+        comments: PinCommentDto[];
+        relatedPins: PinFeedItemDto[];
+      };
+      setPinDetail(data);
+    } catch {
+      // ignore
+    }
+  }, []);
 
-  const handleResetAllFilters = () => {
-    setActiveStyleTab("all");
-    setSelectedProvinceId(null);
-    setIsDateFilterActive(false);
-  };
+  useEffect(() => {
+    if (selectedPinId) {
+      loadPinDetail(selectedPinId);
+    } else {
+      setPinDetail(null);
+    }
+  }, [selectedPinId, loadPinDetail]);
 
-  const handleSelectPin = (pin: PinterestPinItem) => {
+  const handleSelectPin = (pin: PinFeedItemDto) => {
     setSelectedPinId(pin.id);
     if (typeof window !== "undefined") {
-      const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set("pin", pin.id);
-      window.history.pushState(null, "", nextUrl.toString());
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const url = new URL(window.location.href);
+      url.searchParams.set("pin", pin.id);
+      window.history.pushState(null, "", url.toString());
     }
   };
 
-  const handleClosePinDetail = () => {
+  const handleClosePin = () => {
     setSelectedPinId(null);
+    setPinDetail(null);
     if (typeof window !== "undefined") {
-      const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.delete("pin");
-      window.history.pushState(null, "", nextUrl.toString());
+      const url = new URL(window.location.href);
+      url.searchParams.delete("pin");
+      window.history.pushState(null, "", url.toString());
     }
   };
 
-  const handleToggleSavePin = (pinId: string) => {
-    setSavedPinsMap((prev) => {
-      const next = { ...prev, [pinId]: !prev[pinId] };
-      try {
-        localStorage.setItem(SAVED_PINS_STORAGE_KEY, JSON.stringify(next));
-        window.dispatchEvent(new Event("cangaroom-saved-pins-changed"));
-      } catch {
-        // ignore
-      }
+  const handleToggleSave = async (pinId: string) => {
+    if (!currentUser) {
+      router.push(`/login?callbackUrl=${encodeURIComponent("/")}`);
+      return;
+    }
+
+    const res = await fetch("/api/boards/toggle-pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinId }),
+    });
+    if (!res.ok) return;
+
+    const result = (await res.json()) as { isSaved: boolean };
+    setOptimisticSavedIds((prev) => {
+      const next = new Set(prev);
+      if (result.isSaved) next.add(pinId);
+      else next.delete(pinId);
       return next;
     });
+    setPins((prev) =>
+      prev.map((p) =>
+        p.id === pinId ? { ...p, isSavedByMe: result.isSaved } : p
+      )
+    );
+    if (pinDetail?.pin.id === pinId) {
+      setPinDetail((prev) =>
+        prev ? { ...prev, pin: { ...prev.pin, isSavedByMe: result.isSaved } } : prev
+      );
+    }
+    await refreshMe();
   };
 
-  const handleToggleLikePin = (pin: PinterestPinItem) => {
-    const currentlyLiked = Boolean(likedPinsMap[pin.id]);
-    const nextLiked = !currentlyLiked;
+  const handleToggleLike = async (pinId: string) => {
+    if (!currentUser) {
+      router.push(`/login?callbackUrl=${encodeURIComponent(`/?pin=${pinId}`)}`);
+      return;
+    }
 
-    setLikedPinsMap((prev) => {
-      const next = { ...prev, [pin.id]: nextLiked };
-      try {
-        localStorage.setItem(LIKED_PINS_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
+    const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
+      method: "POST",
     });
+    if (!res.ok) return;
+    const data = (await res.json()) as { isLiked: boolean; likesCount: number };
 
-    const currentCount = cms.pinLikes?.[pin.id] ?? pin.baseLikes;
-    const nextCount = Math.max(0, currentCount + (nextLiked ? 1 : -1));
-
-    saveStore((prevStore) => ({
-      ...prevStore,
-      cms: {
-        ...prevStore.cms,
-        pinLikes: {
-          ...(prevStore.cms.pinLikes || {}),
-          [pin.id]: nextCount,
-        },
-      },
-    }));
+    setPins((prev) =>
+      prev.map((p) =>
+        p.id === pinId
+          ? { ...p, isLikedByMe: data.isLiked, likesCount: data.likesCount }
+          : p
+      )
+    );
+    if (pinDetail?.pin.id === pinId) {
+      setPinDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              pin: {
+                ...prev.pin,
+                isLikedByMe: data.isLiked,
+                likesCount: data.likesCount,
+              },
+            }
+          : prev
+      );
+    }
   };
 
-  const handleSharePin = async (pin: PinterestPinItem) => {
+  const handleSharePin = async (pin: PinFeedItemDto) => {
     const shareUrl =
       typeof window !== "undefined"
         ? `${window.location.origin}/?pin=${encodeURIComponent(pin.id)}`
         : "";
+    let channel: "WEB_SHARE" | "COPY_LINK" = "COPY_LINK";
+
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
-          title: pin.title,
-          text: pin.description,
+          title: pin.titleTh,
+          text: pin.descriptionTh,
           url: shareUrl,
         });
-        return;
+        channel = "WEB_SHARE";
       } catch {
-        // fallback to clipboard
+        // fallback clipboard below
       }
     }
-    if (typeof navigator !== "undefined" && navigator.clipboard && shareUrl) {
-      navigator.clipboard.writeText(shareUrl);
+    if (channel === "COPY_LINK" && typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).catch(() => {});
+    }
+
+    await fetch(`/api/pins/${encodeURIComponent(pin.id)}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel }),
+    }).catch(() => {});
+  };
+
+  const handleAddComment = async (
+    text: string,
+    parentId?: string | null
+  ) => {
+    if (!selectedPinId) return;
+    if (!currentUser) {
+      router.push(
+        `/login?callbackUrl=${encodeURIComponent(`/?pin=${selectedPinId}`)}`
+      );
+      return;
+    }
+
+    const res = await fetch(
+      `/api/pins/${encodeURIComponent(selectedPinId)}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: text, parentId }),
+      }
+    );
+    if (res.ok) {
+      await loadPinDetail(selectedPinId);
     }
   };
 
-  const handleAddPinComment = (pinId: string, text: string) => {
-    const newComment: PinCommentItem = {
-      id: `pcm-${Date.now()}`,
-      authorName:
-        currentUser?.name ||
-        (language === "th" ? "ผู้เยี่ยมชม" : "Guest Visitor"),
-      authorEmail: currentUser?.email,
-      authorAvatar: currentUser?.image || null,
-      text,
-      createdAtIso: new Date().toISOString(),
-      likes: 0,
-    };
-
-    saveStore((prevStore) => {
-      const existing = prevStore.cms.pinComments?.[pinId] || [];
-      return {
-        ...prevStore,
-        cms: {
-          ...prevStore.cms,
-          pinComments: {
-            ...(prevStore.cms.pinComments || {}),
-            [pinId]: [...existing, newComment],
-          },
-        },
-      };
-    });
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedPinId) return;
+    const res = await fetch(
+      `/api/comments/${encodeURIComponent(commentId)}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      await loadPinDetail(selectedPinId);
+    }
   };
 
-  const handleDeletePinComment = (pinId: string, commentId: string) => {
-    saveStore((prevStore) => {
-      const existing = prevStore.cms.pinComments?.[pinId] || [];
-      return {
-        ...prevStore,
-        cms: {
-          ...prevStore.cms,
-          pinComments: {
-            ...(prevStore.cms.pinComments || {}),
-            [pinId]: existing.filter((c) => c.id !== commentId),
-          },
-        },
-      };
-    });
+  const activePin = useMemo(
+    () =>
+      pinDetail?.pin ||
+      (selectedPinId ? pins.find((p) => p.id === selectedPinId) ?? null : null),
+    [pinDetail, selectedPinId, pins]
+  );
+
+  const masonryPins = useMemo(() => {
+    const base =
+      activePin && !pins.some((p) => p.id === activePin.id)
+        ? [activePin, ...pins]
+        : pins;
+    if (!activePin || !pinDetail?.relatedPins) return base;
+    const seen = new Set(base.map((p) => p.id));
+    const extras = pinDetail.relatedPins.filter((p) => !seen.has(p.id));
+    return [...base, ...extras];
+  }, [pins, activePin, pinDetail?.relatedPins]);
+
+  const hasActiveFilter =
+    activeStyleTab !== "all" ||
+    Boolean(selectedProvinceId) ||
+    isDateFilterActive ||
+    Boolean(globalSearchQuery.trim());
+
+  const handleResetFilters = () => {
+    setActiveStyleTab("all");
+    setSelectedProvinceId(null);
+    setIsDateFilterActive(false);
+    setGlobalSearchQuery("");
   };
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      {selectedPin ? (
-        <PinterestPinDetail
-          key={selectedPin.id}
-          pin={selectedPin}
-          relatedPins={relatedPins}
-          language={language}
-          currentUser={currentUser}
-          canEdit={canShowEditControls}
-          isLiked={Boolean(likedPinsMap[selectedPin.id])}
-          likeCount={cms.pinLikes?.[selectedPin.id] ?? selectedPin.baseLikes}
-          isSaved={Boolean(savedPinsMap[selectedPin.id])}
-          savedPinsMap={savedPinsMap}
-          comments={cms.pinComments?.[selectedPin.id] || []}
-          onClose={handleClosePinDetail}
-          onSelectPin={handleSelectPin}
-          onToggleLike={() => handleToggleLikePin(selectedPin)}
-          onToggleSave={handleToggleSavePin}
-          onSharePin={handleSharePin}
-          onExpandMedia={(urls, idx) =>
-            setFullscreenMedia({
-              slides: urls.map((u) => ({
-                type: "image",
-                url: u,
-                caption: selectedPin.title,
-              })),
-              index: idx,
-            })
-          }
-          onAddComment={(txt) => handleAddPinComment(selectedPin.id, txt)}
-          onDeleteComment={(commentId) =>
-            handleDeletePinComment(selectedPin.id, commentId)
-          }
-        />
+    <div className="cgr-page-fluid space-y-5">
+      {/* Horizontal Stay Style Tabs */}
+      <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-b border-[var(--color-border)]">
+        {STAY_STYLE_TABS.map((tab) => {
+          const isActive = activeStyleTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveStyleTab(tab.id);
+                if (selectedPinId) handleClosePin();
+              }}
+              className={`relative shrink-0 py-3 -mb-px border-b-2 ty-body transition-colors cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+            </button>
+          );
+        })}
+
+        {hasActiveFilter && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="ml-auto shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+          >
+            {language === "th" ? "ล้างตัวกรอง" : "Reset filters"}
+          </button>
+        )}
+      </div>
+
+      {/* Error State (Explicit — Zero Silent Mock Fallback!) */}
+      {fetchError && (
+        <div className="rounded-[16px] bg-[var(--color-error-muted)] p-5 flex items-center justify-between gap-4">
+          <p className="ty-body font-semibold text-[var(--color-error)]">
+            {fetchError}
+          </p>
+          <button
+            type="button"
+            onClick={loadPins}
+            className="btn-round-solid !h-9 shrink-0"
+          >
+            {language === "th" ? "ลองใหม่" : "Retry"}
+          </button>
+        </div>
+      )}
+
+      {/* In-Place Animated Masonry Grid (Expands Clicked Pin Right at Its Row — Zero Jump to Top!) */}
+      {isLoadingPins && !activePin ? (
+        <div className="flex flex-wrap justify-center gap-4">
+          {Array.from({ length: 14 }).map((_, idx) => (
+            <div
+              key={idx}
+              className={`w-[calc(50%-8px)] sm:w-[236px] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse ${
+                idx % 3 === 0
+                  ? "aspect-[2/3]"
+                  : idx % 2 === 0
+                  ? "aspect-[4/5]"
+                  : "aspect-[3/4]"
+              }`}
+            />
+          ))}
+        </div>
+      ) : masonryPins.length === 0 && !activePin ? (
+        <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+          <h2 className="ty-title">
+            {language === "th"
+              ? "ไม่พบที่พักที่ตรงกับตัวกรองนี้"
+              : "No stays match your active filters"}
+          </h2>
+          <p className="ty-body text-[var(--color-text-secondary)]">
+            {language === "th"
+              ? "ลองเปลี่ยนจังหวัด สไตล์ที่พัก หรือล้างช่วงวันเข้าพักเพื่อชมที่พักทั้งหมดในระบบ"
+              : "Try clearing province, stay style, or date filters."}
+          </p>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="btn-round-solid inline-flex"
+            >
+              {language === "th" ? "แสดงที่พักทั้งหมด" : "Show All Stays"}
+            </button>
+          )}
+        </div>
       ) : (
-        /* =====================================================================
-           FULL-WIDTH 6-COLUMN PINTEREST MASONRY + STAY STYLE UNDERLINE TABS
-        ====================================================================== */
-        <div className="w-full min-w-0 space-y-4">
-          {/* Stay Style Horizontal Underline Tabs */}
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
-            <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
-              {STAY_STYLE_TABS.map((tab) => {
-                const isActive = activeStyleTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveStyleTab(tab.id)}
-                    className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      isActive
-                        ? "text-[var(--color-text-primary)]"
-                        : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    <span>
-                      {language === "th" ? tab.labelTh : tab.labelEn}
-                    </span>
-                    {isActive && (
-                      <span className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {canShowEditControls && (
-              <div className="flex items-center gap-1.5 pb-2 shrink-0">
-                <EditSpotButton
-                  icon="add"
-                  label="เพิ่มรูป"
-                  onClick={() => openCmsEditor({ type: "gallery-photos" })}
-                />
-                <EditSpotButton
-                  icon="add"
-                  label="เพิ่มคลิป"
-                  onClick={() => openCmsEditor({ type: "short-video" })}
-                />
-                <EditSpotButton
-                  icon="add"
-                  label="เพิ่มห้อง"
-                  onClick={() => openCmsEditor({ type: "room" })}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Full-Width 6-Column Staggered Masonry Grid */}
-          {filteredPins.length === 0 ? (
-            <div className="py-16 px-4 text-center space-y-3">
-              <p className="ty-title">
-                {language === "th"
-                  ? "ไม่พบที่พักว่างที่ตรงกับตัวกรองนี้"
-                  : "No available stays match the selected filters"}
-              </p>
-              <p className="ty-body-muted max-w-md mx-auto">
-                {language === "th"
-                  ? "ลองเปลี่ยนจังหวัด วันเข้าพัก หรือเลือกสไตล์ “ทั้งหมด” เพื่อดูที่พักแนะนำทั่วไทย"
-                  : "Try clearing the province, stay dates, or style filter to view all curated stays."}
-              </p>
-              <div className="flex items-center justify-center gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={handleResetAllFilters}
-                  className="h-10 px-4 rounded-[12px] bg-[#111111] !text-white ty-body font-semibold cursor-pointer"
-                >
-                  <span className="!text-white">
-                    {language === "th" ? "ดูที่พักทั้งหมด" : "Show All Stays"}
-                  </span>
-                </button>
-                <Link
-                  href="/register-hotel"
-                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center"
-                >
-                  {language === "th"
-                    ? "+ ลงที่พักฟรี 30 วัน"
-                    : "+ List Property Free"}
-                </Link>
-              </div>
-            </div>
-          ) : (
+        masonryPins.length > 0 && (
+          <section>
             <MasonryGrid
-              items={filteredPins}
-              columnBreakpoints={[2, 3, 4, 5, 6]}
-              gapClass="gap-4"
+              items={masonryPins.map((p) => ({
+                ...p,
+                aspectClass: p.aspectRatio,
+              }))}
+              columnWidth={236}
+              gutter={16}
+              expandedItemId={activePin?.id ?? null}
+              renderExpandedStage={
+                activePin
+                  ? () => (
+                      <PinterestPinDetail
+                        pin={activePin}
+                        language={language}
+                        currentUser={currentUser}
+                        comments={pinDetail?.comments ?? []}
+                        savedPinIds={optimisticSavedIds}
+                        onClose={handleClosePin}
+                        onSelectPin={handleSelectPin}
+                        onToggleLike={handleToggleLike}
+                        onToggleSave={handleToggleSave}
+                        onSharePin={handleSharePin}
+                        onExpandMedia={(urls, idx) =>
+                          setFullscreenMedia({
+                            slides: urls.map((u) => ({ type: "image", url: u })),
+                            index: idx,
+                          })
+                        }
+                        onAddComment={handleAddComment}
+                        onDeleteComment={handleDeleteComment}
+                      />
+                    )
+                  : undefined
+              }
               renderItem={(pin) => (
                 <PinterestPinCard
                   pin={pin}
                   language={language}
-                  isSaved={Boolean(savedPinsMap[pin.id])}
-                  canEdit={canShowEditControls}
+                  isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
                   onSelectPin={handleSelectPin}
-                  onToggleSave={handleToggleSavePin}
+                  onToggleSave={handleToggleSave}
                   onSharePin={handleSharePin}
                 />
               )}
             />
-          )}
-        </div>
+          </section>
+        )
       )}
 
-      {/* Optional Fullscreen Image Zoom */}
       <PureMediaViewer
         slides={fullscreenMedia?.slides ?? null}
         initialIndex={fullscreenMedia?.index ?? 0}

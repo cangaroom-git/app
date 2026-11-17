@@ -8,50 +8,50 @@
    4. Native Thai + English System Font Stack (SF Pro / ThonburiUI / Segoe UI)
    ============================================================================ */
 :root {
-  /* Core Accent Tokens */
-  --color-accent: #0866ff;
-  --color-accent-hover: #075ce5;
-  --color-accent-muted: #ebf5ff;
+  /* Strict 95/5 Monochrome Core Tokens (Light Mode) */
+  --color-accent: #111111;
+  --color-accent-hover: #262626;
+  --color-accent-muted: #f1f1f1;
   --color-on-accent: #ffffff;
-  --color-tiktok-accent: #0866ff;
-  --color-tiktok-accent-hover: #075ce5;
+  --color-tiktok-accent: #111111;
+  --color-tiktok-accent-hover: #262626;
   --color-tiktok-on-accent: #ffffff;
   --color-tiktok-gray: #efefef;
-  --color-tiktok-gray-hover: #e2e2e2;
-  --color-fastwork: #0866ff;
+  --color-tiktok-gray-hover: #e4e4e4;
+  --color-fastwork: #111111;
   --color-on-fastwork: #ffffff;
   --color-neutral: rgba(0, 0, 0, 0.05);
 
-  /* Pinterest Red Save & Promotion Tokens (#e60023) */
+  /* Reserved 5% Red — Pin Save Button & Nav Notification Dots ONLY (#e60023) */
   --color-promo: #e60023;
   --color-promo-hover: #ad081b;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #ffeef0;
-  --color-promo-border: rgba(230, 0, 35, 0.24);
-  --color-promo-text: #e60023;
+  --color-promo-muted: #f1f1f1;
+  --color-promo-border: #d4d4d4;
+  --color-promo-text: #111111;
 
-  /* Pinterest Gestalt Pure White Surface Hierarchy (Light Mode) */
+  /* Pure White Surface Hierarchy (Light Mode) */
   --color-background-body: #ffffff;
   --color-background-surface: #ffffff;
   --color-background-card: #ffffff;
   --color-background-popover: #ffffff;
-  --color-background-muted: #f1f1f1;     /* Search bar & input fill */
-  --color-background-subtle: #e2e2e2;    /* Secondary pill hover */
+  --color-background-muted: #f1f1f1;     /* Search bar, secondary button & input fill */
+  --color-background-subtle: #e4e4e4;    /* Secondary surface hover */
   --color-sidebar-bg: #ffffff;
 
-  /* Subtle Pinterest Close-Up Card & Popover Shadows */
-  --shadow-card: 0 1px 20px 0 rgba(0, 0, 0, 0.06);
-  --shadow-popover: 0 8px 28px 0 rgba(0, 0, 0, 0.14);
+  /* Zero Card Shadow Rule (Popover shadow allowed strictly on floating menus) */
+  --shadow-card: none;
+  --shadow-popover: 0 8px 28px 0 rgba(0, 0, 0, 0.12);
 
-  /* Pinterest Gestalt Typography Color Tokens (Light Mode) */
+  /* Monochrome Ink Tokens (Light Mode) */
   --color-text-primary: #111111;
-  --color-text-secondary: #767676;
+  --color-text-secondary: #737373;
   --color-text-disabled: #cdcdcd;
-  --color-text-accent: #0866ff;
+  --color-text-accent: #111111;
 
-  /* Dividers & Overlays (Light Mode) */
-  --color-border: #efefef;
-  --color-border-emphasized: #cdcdcd;
+  /* Crisp 1px Hairline Dividers (Light Mode) */
+  --color-border: #ebebeb;
+  --color-border-emphasized: #d4d4d4;
   --color-overlay-hover: rgba(0, 0, 0, 0.05);
   --color-overlay-pressed: rgba(0, 0, 0, 0.10);
 
@@ -60,30 +60,30 @@
   --color-scrollbar-thumb-hover: rgba(0, 0, 0, 0.38);
   --color-scrollbar-thumb-active: rgba(0, 0, 0, 0.55);
 
-  /* Semantic Status Tokens */
-  --color-success: #1b873f;
-  --color-success-muted: #e6f4ea;
+  /* Semantic Text/Dot Tokens (Muted backgrounds stay neutral #f1f1f1) */
+  --color-success: #15803d;
+  --color-success-muted: #f1f1f1;
   --color-on-success: #ffffff;
 
-  --color-error: #cc0000;
-  --color-error-muted: #fce8e6;
+  --color-error: #dc2626;
+  --color-error-muted: #f1f1f1;
   --color-on-error: #ffffff;
 
-  --color-warning: #b06000;
-  --color-warning-muted: #fef7e0;
+  --color-warning: #b45309;
+  --color-warning-muted: #f1f1f1;
   --color-on-warning: #111111;
 
-  /* Wide Pinterest Masonry Feed & Right Drawer Dimensions */
-  --feed-max-width: 1920px;
+  /* Standardized Layout & Right Drawer Dimensions */
+  --feed-max-width: 1120px;
   --right-drawer-tablet-width: 460px;
   --right-drawer-desktop-width: 520px;
 
-  /* Pinterest Gestalt Border Radii */
-  --radius-inner: 12px;
-  --radius-button: 9999px;
-  --radius-element: 16px;
+  /* Clean Architectural Radii */
+  --radius-inner: 10px;
+  --radius-button: 10px;
+  --radius-element: 14px;
   --radius-container: 16px;
-  --radius-page: 24px;
+  --radius-page: 20px;
   --radius-full: 9999px;
 
   /* ==========================================================================
@@ -111,43 +111,43 @@
    FACEBOOK COMET DARK MODE TOKENS (html.dark)
    ============================================================================ */
 html.dark {
-  --color-accent: #0866ff;
-  --color-accent-hover: #2d88ff;
-  --color-accent-muted: rgba(45, 136, 255, 0.20);
-  --color-on-accent: #ffffff;
-  --color-tiktok-accent: #0866ff;
-  --color-tiktok-accent-hover: #2d88ff;
-  --color-tiktok-on-accent: #ffffff;
-  --color-tiktok-gray: #2b2b2b;
-  --color-tiktok-gray-hover: #3a3a3a;
-  --color-fastwork: #0866ff;
+  --color-accent: #f5f5f5;
+  --color-accent-hover: #e5e5e5;
+  --color-accent-muted: #262626;
+  --color-on-accent: #111111;
+  --color-tiktok-accent: #f5f5f5;
+  --color-tiktok-accent-hover: #e5e5e5;
+  --color-tiktok-on-accent: #111111;
+  --color-tiktok-gray: #262626;
+  --color-tiktok-gray-hover: #333333;
+  --color-fastwork: #f5f5f5;
   --color-neutral: rgba(255, 255, 255, 0.08);
 
   --color-promo: #e60023;
   --color-promo-hover: #ff1f40;
   --color-on-promo: #ffffff;
-  --color-promo-muted: rgba(230, 0, 35, 0.24);
-  --color-promo-border: rgba(255, 92, 114, 0.38);
-  --color-promo-text: #ff6b7d;
+  --color-promo-muted: #262626;
+  --color-promo-border: #404040;
+  --color-promo-text: #f5f5f5;
 
   --color-background-body: #121212;
   --color-background-surface: #1e1e1e;
   --color-background-card: #1e1e1e;
   --color-background-popover: #242424;
-  --color-background-muted: #2b2b2b;
-  --color-background-subtle: #3a3a3a;
+  --color-background-muted: #262626;
+  --color-background-subtle: #333333;
   --color-sidebar-bg: #121212;
 
-  --shadow-card: 0 1px 20px rgba(0, 0, 0, 0.40);
+  --shadow-card: none;
   --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.55);
 
   --color-text-primary: #f5f5f5;
   --color-text-secondary: #a3a3a3;
   --color-text-disabled: #555555;
-  --color-text-accent: #4599ff;
+  --color-text-accent: #f5f5f5;
 
   --color-border: #2b2b2b;
-  --color-border-emphasized: #444444;
+  --color-border-emphasized: #404040;
   --color-overlay-hover: rgba(255, 255, 255, 0.08);
   --color-overlay-pressed: rgba(255, 255, 255, 0.14);
 
@@ -155,13 +155,13 @@ html.dark {
   --color-scrollbar-thumb-hover: rgba(255, 255, 255, 0.42);
   --color-scrollbar-thumb-active: rgba(255, 255, 255, 0.6);
 
-  --color-success: #45bd62;
-  --color-success-muted: rgba(69, 189, 98, 0.18);
+  --color-success: #4ade80;
+  --color-success-muted: #262626;
   --color-on-success: #052e16;
-  --color-error: #f02849;
-  --color-error-muted: rgba(240, 40, 73, 0.18);
-  --color-warning: #f7b928;
-  --color-warning-muted: rgba(247, 185, 40, 0.18);
+  --color-error: #f87171;
+  --color-error-muted: #262626;
+  --color-warning: #fbbf24;
+  --color-warning-muted: #262626;
 }
 
 @theme inline {
@@ -285,46 +285,41 @@ h1, h2, h3, h4, .font-serif {
   color: #ffffff;
 }
 
-.text-\[9px\],
-.text-\[10px\],
-.text-\[11px\],
-.text-\[12px\] {
-  font-size: var(--font-size-caption) !important; /* 13px */
-  line-height: 1.35 !important;
-}
-
-.text-\[13px\],
-.text-\[14px\],
-.text-\[15px\] {
-  font-size: var(--font-size-body) !important; /* 15px */
-  line-height: 1.45 !important;
-}
-
-.text-\[17px\] {
-  font-size: var(--font-size-subtitle) !important; /* 17px */
-  line-height: 1.32 !important;
-}
-
 /* ============================================================================
-   FACEBOOK FEED CONTAINER & CRISP ELEVATED CARDS
+   STANDARDIZED 3-TIER CONTAINER GRID & ZERO-SHADOW CARDS
    ============================================================================ */
-.app-feed-shell {
+.cgr-page-fluid {
   width: 100%;
-  max-width: var(--feed-max-width);
+  min-width: 0;
+}
+
+.cgr-page-standard {
+  width: 100%;
+  max-width: 1120px;
   min-width: 0;
   margin-inline: auto;
-  padding-inline: 0.75rem;
+}
+
+.cgr-page-reading {
+  width: 100%;
+  max-width: 760px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.cgr-page-form {
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.app-feed-shell {
+  width: 100%;
+  max-width: 1120px;
+  min-width: 0;
+  margin-inline: auto;
   overflow-anchor: none;
-}
-@media (min-width: 640px) {
-  .app-feed-shell {
-    padding-inline: 1.25rem;
-  }
-}
-@media (min-width: 1024px) {
-  .app-feed-shell {
-    padding-inline: 1.5rem;
-  }
 }
 
 .app-card {
@@ -335,7 +330,7 @@ h1, h2, h3, h4, .font-serif {
   border-radius: var(--radius-page);
   background-color: var(--color-background-card);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
   color: var(--color-text-primary);
   transition: background-color 0.18s ease;
 }
@@ -438,7 +433,8 @@ html.dark .border-stone-300 {
    responsive utilities like `hidden`, `lg:hidden`, `sm:inline-flex` always win!)
    ============================================================================ */
 @layer components {
-.btn-round-solid {
+.btn-round-solid,
+.btn-promo-solid {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -451,39 +447,17 @@ html.dark .border-stone-300 {
   font-size: var(--font-size-body);
   font-weight: 600;
   border: none;
-  transition: background-color 0.14s ease, transform 0.14s ease;
+  transition: background-color 0.14s ease, opacity 0.14s ease;
   cursor: pointer;
   user-select: none;
 }
-.btn-round-solid:hover:not(:disabled) {
+.btn-round-solid:hover:not(:disabled),
+.btn-promo-solid:hover:not(:disabled) {
   background-color: var(--color-accent-hover);
 }
-.btn-round-solid:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.btn-promo-solid {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  height: 2.375rem;
-  border-radius: var(--radius-button);
-  background-color: var(--color-promo);
-  color: var(--color-on-promo);
-  padding-inline: 1rem;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  border: none;
-  transition: background-color 0.14s ease, transform 0.14s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.btn-promo-solid:hover:not(:disabled) {
-  background-color: var(--color-promo-hover);
-}
+.btn-round-solid:active:not(:disabled),
 .btn-promo-solid:active:not(:disabled) {
-  transform: scale(0.98);
+  opacity: 0.86;
 }
 
 .btn-fw-secondary,
@@ -494,23 +468,23 @@ html.dark .border-stone-300 {
   gap: 0.45rem;
   height: 2.375rem; /* 38px */
   border-radius: var(--radius-button);
-  background-color: var(--color-background-subtle);
+  background-color: var(--color-background-muted);
   color: var(--color-text-primary);
   padding-inline: 0.9rem;
   font-size: var(--font-size-body);
   font-weight: 600;
   border: none;
-  transition: filter 0.14s ease, background-color 0.14s ease, transform 0.14s ease;
+  transition: background-color 0.14s ease, opacity 0.14s ease;
   cursor: pointer;
   user-select: none;
 }
 .btn-fw-secondary:hover:not(:disabled),
 .btn-round-border:hover:not(:disabled) {
-  filter: brightness(0.96);
+  background-color: var(--color-background-subtle);
 }
 .btn-fw-secondary:active:not(:disabled),
 .btn-round-border:active:not(:disabled) {
-  transform: scale(0.98);
+  opacity: 0.86;
 }
 
 .btn-icon {
@@ -520,19 +494,34 @@ html.dark .border-stone-300 {
   width: 2.25rem;  /* 36px */
   height: 2.25rem;
   flex-shrink: 0;
-  border-radius: 9999px;
-  background-color: var(--color-background-subtle);
+  border-radius: 10px;
+  background-color: var(--color-background-muted);
   color: var(--color-text-primary);
   border: none;
-  transition: filter 0.14s ease, transform 0.14s ease;
+  transition: background-color 0.14s ease, opacity 0.14s ease;
   cursor: pointer;
   user-select: none;
 }
 .btn-icon:hover:not(:disabled) {
-  filter: brightness(0.95);
+  background-color: var(--color-background-subtle);
 }
 .btn-icon:active:not(:disabled) {
-  transform: scale(0.96);
+  opacity: 0.86;
+}
+
+.badge-accent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding-inline: 0.625rem;
+  border-radius: 8px;
+  background-color: var(--color-background-muted);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 1;
 }
 
 .btn-icon-lg {
@@ -840,4 +829,59 @@ html.dark .border-stone-300 {
 
 .modal-slide-track {
   transition: transform 0.26s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes pinStageIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-pin-stage-in {
+  animation: pinStageIn 240ms cubic-bezier(0.2, 0, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* ============================================================================
+   IN-PLACE 3D FLIP COUPON CARD PRIMITIVES (/deal)
+   ============================================================================ */
+.cgr-flip-scene {
+  perspective: 1200px;
+}
+
+.cgr-flip-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.cgr-flip-card.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.cgr-flip-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.cgr-flip-face-back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cgr-flip-card {
+    transition-duration: 0ms;
+  }
 }

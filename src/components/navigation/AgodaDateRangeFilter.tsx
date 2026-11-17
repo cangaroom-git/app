@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { formatShortDate, LanguageCode } from "@/lib/dateFormatters";
-import { addDaysToDate, formatDateStr } from "@/lib/store";
+import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 
 export interface AgodaDateRangeFilterProps {
@@ -26,6 +26,9 @@ export interface AgodaDateRangeFilterProps {
   onChangeGuestCount: (guests: number) => void;
   isDateFilterActive: boolean;
   onChangeDateFilterActive: (active: boolean) => void;
+  allowClear?: boolean;
+  popoverAlign?: "left" | "right";
+  triggerClassName?: string;
 }
 
 const WEEKDAYS_EN = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -114,6 +117,9 @@ export function AgodaDateRangeFilter({
   onChangeGuestCount,
   isDateFilterActive,
   onChangeDateFilterActive,
+  allowClear = true,
+  popoverAlign = "right",
+  triggerClassName = "",
 }: AgodaDateRangeFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -322,7 +328,9 @@ export function AgodaDateRangeFilter({
   return (
     <div ref={wrapperRef} className="relative shrink-0 select-none">
       {/* SEARCH BAR TRIGGER PILL */}
-      <div className="inline-flex items-center h-9 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] shadow-2xs border border-[var(--color-border)]/70">
+      <div
+        className={`inline-flex items-center h-9 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] shadow-2xs border border-[var(--color-border)]/70 ${triggerClassName}`}
+      >
         <button
           type="button"
           onClick={() => {
@@ -338,17 +346,17 @@ export function AgodaDateRangeFilter({
         >
           <Calendar
             className={`w-3.5 h-3.5 shrink-0 ${
-              isDateFilterActive
+              isDateFilterActive || !allowClear
                 ? "text-[#2067da]"
                 : "text-[var(--color-text-secondary)]"
             }`}
           />
           <span className="whitespace-nowrap">
-            {isDateFilterActive ? (
+            {isDateFilterActive || !allowClear ? (
               <>
                 {formatShortDate(checkInDate, language)} –{" "}
                 {formatShortDate(checkOutDate, language)}
-                <span className="hidden md:inline">
+                <span className={!allowClear ? "inline" : "hidden md:inline"}>
                   {" "}
                   · {guestCount} {language === "th" ? "ท่าน" : "guests"}
                 </span>
@@ -361,7 +369,7 @@ export function AgodaDateRangeFilter({
           </span>
         </button>
 
-        {isDateFilterActive && (
+        {allowClear && isDateFilterActive && (
           <button
             type="button"
             onClick={(e) => {
@@ -381,7 +389,11 @@ export function AgodaDateRangeFilter({
           Matches uploaded Agoda screenshot 100%
       ====================================================================== */}
       {isOpen && !isMobileViewport && (
-        <div className="hidden md:block absolute right-0 top-[calc(100%+10px)] z-[85] w-[664px] rounded-[20px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[0_12px_40px_rgba(0,0,0,0.16)] p-6 space-y-5">
+        <div
+          className={`hidden md:block absolute ${
+            popoverAlign === "left" ? "left-0" : "right-0"
+          } top-[calc(100%+10px)] z-[85] w-[664px] max-w-[calc(100vw-2rem)] rounded-[20px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[0_12px_40px_rgba(0,0,0,0.16)] p-6 space-y-5`}
+        >
           {/* Top Navigation & 2 Month Headers */}
           <div className="relative grid grid-cols-2 gap-8 items-center">
             <button
@@ -456,7 +468,7 @@ export function AgodaDateRangeFilter({
             </div>
 
             <div className="flex items-center gap-2">
-              {isDateFilterActive && (
+              {allowClear && isDateFilterActive && (
                 <button
                   type="button"
                   onClick={() => {
@@ -478,7 +490,11 @@ export function AgodaDateRangeFilter({
                 className="h-9 px-4 rounded-[10px] bg-[#2067da] hover:bg-[#1956b8] !text-white ty-caption font-semibold cursor-pointer"
               >
                 <span className="!text-white">
-                  {language === "th"
+                  {!allowClear
+                    ? language === "th"
+                      ? "ยืนยันวันเข้าพัก"
+                      : "Apply Dates"
+                    : language === "th"
                     ? "ค้นหาที่พักว่างช่วงนี้"
                     : "Filter Available Stays"}
                 </span>
@@ -512,16 +528,20 @@ export function AgodaDateRangeFilter({
                 : "Select Stay Dates"}
             </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                onChangeDateFilterActive(false);
-                setIsOpen(false);
-              }}
-              className="ty-caption font-semibold text-[var(--color-text-secondary)] cursor-pointer"
-            >
-              {language === "th" ? "ล้างค่า" : "Clear"}
-            </button>
+            {allowClear ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onChangeDateFilterActive(false);
+                  setIsOpen(false);
+                }}
+                className="ty-caption font-semibold text-[var(--color-text-secondary)] cursor-pointer"
+              >
+                {language === "th" ? "ล้างค่า" : "Clear"}
+              </button>
+            ) : (
+              <span className="w-10" />
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
@@ -598,11 +618,13 @@ export function AgodaDateRangeFilter({
             >
               <span className="!text-white">
                 {language === "th"
-                  ? `ดูที่พักว่าง (${formatShortDate(
+                  ? `${allowClear ? "ดูที่พักว่าง" : "ยืนยันวันเข้าพัก"} (${formatShortDate(
                       checkInDate,
                       language
                     )} – ${formatShortDate(checkOutDate, language)})`
-                  : "Show Available Stays"}
+                  : allowClear
+                  ? "Show Available Stays"
+                  : "Apply Stay Dates"}
               </span>
             </button>
           </div>

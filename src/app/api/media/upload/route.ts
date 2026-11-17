@@ -11,9 +11,10 @@ const ALLOWED_FOLDERS = z.enum([
   "coupons",
   "addons",
   "gallery",
-  "shorts",
+  "pins",
+  "slips",
+  "logos",
   "reviews",
-  "stories",
 ]);
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB post-compression ceiling

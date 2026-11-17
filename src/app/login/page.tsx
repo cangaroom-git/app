@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,19 +14,16 @@ import {
 } from "lucide-react";
 import {
   authClient,
-  resolveDestinationByEmail,
+  resolveDestinationByRole,
 } from "@/lib/auth/client";
 import { useHotelApp } from "@/components/HotelAppShell";
-import {
-  UserAvatarCircle,
-  useAuthenticatedProfile,
-} from "@/components/navigation/UserProfileDropdown";
+import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
 import { StandardButton, StatusPill } from "@/components/ui/standards";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { lang, setLang, theme, toggleTheme } = useHotelApp();
-  const { user, signOutUser, refreshProfile } = useAuthenticatedProfile();
+  const { lang, setLang, theme, toggleTheme, user, refreshMe, signOutUser } =
+    useHotelApp();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,26 +31,24 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const cb = new URLSearchParams(window.location.search).get("callbackUrl");
+    if (cb && cb.startsWith("/")) setCallbackUrl(cb);
+  }, []);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const callbackOrigin =
-        typeof window !== "undefined" ? `${window.location.origin}/login` : "/";
-      const { error } = await authClient.signIn.social({
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      await authClient.signIn.social({
         provider: "google",
-        callbackURL: callbackOrigin,
+        callbackURL: callbackUrl ? `${origin}${callbackUrl}` : `${origin}/login`,
       });
-      if (error) {
-        setErrorMessage(
-          error.message ||
-            (lang === "th"
-              ? "ไม่สามารถเชื่อมต่อ Google Login ได้ กรุณาลองอีกครั้ง"
-              : "Could not start Google login")
-        );
-        setIsLoading(false);
-      }
     } catch {
       setErrorMessage(
         lang === "th"
@@ -73,7 +68,7 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        const { data, error } = await authClient.signUp.email({
+        const { error } = await authClient.signUp.email({
           email: email.trim(),
           password,
           name: name.trim() || email.split("@")[0],
@@ -83,28 +78,28 @@ export default function LoginPage() {
           setIsLoading(false);
           return;
         }
-        await refreshProfile();
-        router.push(resolveDestinationByEmail(data?.user?.email || email.trim()));
-        return;
+      } else {
+        const { error } = await authClient.signIn.email({
+          email: email.trim(),
+          password,
+        });
+        if (error) {
+          setErrorMessage(
+            lang === "th"
+              ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+              : "Invalid email or password"
+          );
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const { data, error } = await authClient.signIn.email({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        setErrorMessage(
-          lang === "th"
-            ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
-            : "Invalid email or password"
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      await refreshProfile();
-      router.push(resolveDestinationByEmail(data?.user?.email || email.trim()));
+      await refreshMe();
+      const meRes = await fetch("/api/me", { cache: "no-store" });
+      const meData = await meRes.json().catch(() => ({}));
+      const dest =
+        callbackUrl || resolveDestinationByRole(meData?.user?.role ?? "TRAVELLER");
+      router.push(dest);
     } catch {
       setErrorMessage(
         lang === "th" ? "เกิดข้อผิดพลาด กรุณาลองใหม่" : "Authentication error"
@@ -113,24 +108,11 @@ export default function LoginPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    setIsLoading(true);
-    await signOutUser();
-    setIsLoading(false);
-  };
-
   const destinationHref =
-    user?.role === "SUPER_ADMIN"
-      ? "/super-admin"
-      : user?.role === "HOTEL_ADMIN"
-      ? user.tenantSlug && user.tenantSlug !== "sapanunseen"
-        ? `/admin?tenant=${encodeURIComponent(user.tenantSlug)}`
-        : "/admin"
-      : "/";
+    callbackUrl || resolveDestinationByRole(user?.role ?? "TRAVELLER");
 
   return (
     <div className="min-h-[100dvh] w-full bg-[var(--color-background-body)] text-[var(--color-text-primary)] flex flex-col justify-between select-none">
-      {/* Top Bar */}
       <header className="w-full h-14 bg-[var(--color-background-card)] border-b border-[var(--color-border)] px-4 sm:px-6 flex items-center justify-between">
         <Link href="/" className="btn-fw-secondary !h-9">
           <ArrowLeft className="w-4 h-4" />
@@ -161,27 +143,24 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Facebook-Style Centered Login Card */}
-      <main className="w-full max-w-[400px] mx-auto px-4 py-8 space-y-4">
+      <main className="w-full max-w-[420px] mx-auto px-4 py-8 space-y-4">
         <div className="app-card p-5 sm:p-6 space-y-4">
           <div className="text-center space-y-1">
-            <h1 className="ty-display text-[var(--color-accent)]">Cangaroom</h1>
+            <h1 className="ty-display text-[var(--color-text-primary)]">Cangaroom</h1>
             <p className="ty-body-muted">
               {lang === "th"
-                ? "เข้าสู่ระบบจองห้องพัก หรือจัดการเว็บไซต์ที่พักของคุณ"
-                : "Sign in to manage bookings or run your property site"}
+                ? "บันทึกบอร์ดที่พัก เก็บคูปอง และจองตรง 0% GP"
+                : "Save stays, collect coupons & book direct 0% GP"}
             </p>
           </div>
 
           {user ? (
             <div className="space-y-4 pt-1">
-              <div className="rounded-[10px] bg-[var(--color-background-muted)] p-3.5 flex items-center gap-3">
+              <div className="rounded-[12px] bg-[var(--color-background-muted)] p-3.5 flex items-center gap-3">
                 <UserAvatarCircle user={user} sizeClass="h-12 w-12" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className="ty-subtitle font-bold truncate">
-                      {user.name}
-                    </p>
+                    <p className="ty-subtitle font-bold truncate">{user.name}</p>
                     <StatusPill variant="accent">
                       <ShieldCheck className="w-3 h-3" />
                       <span>{user.role}</span>
@@ -202,13 +181,13 @@ export default function LoginPage() {
                   <span>
                     {user.role === "SUPER_ADMIN"
                       ? "เข้าสู่หน้า Super Admin"
-                      : user.role === "HOTEL_ADMIN"
-                      ? "เข้าจัดการหลังบ้านที่พัก"
-                      : "กลับหน้าจองห้องพัก"}
+                      : user.role === "HOTEL_OWNER"
+                      ? "เข้าสู่ Hotel Studio"
+                      : "ไปหน้าแรกสำรวจที่พัก"}
                   </span>
                 </StandardButton>
 
-                {user.role === "GUEST" && (
+                {user.ownedHotels.length === 0 && (
                   <StandardButton
                     type="button"
                     variant="secondary"
@@ -217,7 +196,7 @@ export default function LoginPage() {
                     onClick={() => router.push("/register-hotel")}
                   >
                     <Building2 className="w-4 h-4 text-[var(--color-accent)]" />
-                    <span>เปิดเว็บที่พักทดลองใช้ฟรี 30 วัน</span>
+                    <span>เปิดเพจที่พักฟรี 0% GP ตลอดชีพ</span>
                   </StandardButton>
                 )}
 
@@ -227,7 +206,11 @@ export default function LoginPage() {
                   size="md"
                   fullWidth
                   disabled={isLoading}
-                  onClick={handleSignOut}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    await signOutUser();
+                    setIsLoading(false);
+                  }}
                 >
                   <LogOut className="w-4 h-4" />
                   <span>ออกจากระบบ</span>
@@ -240,7 +223,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isLoading}
                 onClick={handleGoogleLogin}
-                className="w-full h-11 rounded-[8px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 transition cursor-pointer disabled:opacity-50"
+                className="w-full h-11 rounded-[10px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 transition cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -284,7 +267,7 @@ export default function LoginPage() {
               </div>
 
               {errorMessage && (
-                <p className="w-full rounded-[8px] bg-[var(--color-error-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-error)] text-center">
+                <p className="w-full rounded-[10px] bg-[var(--color-error-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-error)] text-center">
                   {errorMessage}
                 </p>
               )}
@@ -365,7 +348,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Hotel Owner 30-Day Trial Card (Just like Facebook's "Create a Page for a celebrity, brand or business" footer!) */}
         <div className="text-center">
           <Link
             href="/register-hotel"
@@ -373,8 +355,8 @@ export default function LoginPage() {
           >
             <strong className="text-[var(--color-text-primary)]">
               {lang === "th"
-                ? "เปิดเว็บไซต์จองที่พักฟรี 30 วัน"
-                : "Create a Hotel Site"}
+                ? "เปิดเพจที่พักฟรี 0% GP ตลอดชีพ"
+                : "Create a Free 0% GP Hotel Profile"}
             </strong>{" "}
             {lang === "th"
               ? "สำหรับโรงแรม รีสอร์ท และพูลวิลล่าของคุณ"
@@ -384,7 +366,7 @@ export default function LoginPage() {
       </main>
 
       <footer className="w-full py-5 px-4 text-center ty-caption">
-        Cangaroom © {new Date().getFullYear()} · Direct Booking Platform
+        Cangaroom © {new Date().getFullYear()} · Direct Stay Platform
       </footer>
     </div>
   );
