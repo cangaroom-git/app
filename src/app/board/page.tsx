@@ -3,6 +3,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -219,8 +220,32 @@ export default function SavedBoardPage() {
     setPinDetail(null);
   }, []);
 
+  const savedBoardScrollYRef = useRef<number>(0);
+  const wasBoardPinOpenRef = useRef<boolean>(false);
+  const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  useIsomorphicLayoutEffect(() => {
+    const isNowOpen = Boolean(activeBoardPin);
+    if (
+      wasBoardPinOpenRef.current &&
+      !isNowOpen &&
+      typeof window !== "undefined" &&
+      window.innerWidth < 1024
+    ) {
+      window.scrollTo({
+        top: savedBoardScrollYRef.current,
+        behavior: "instant" as ScrollBehavior,
+      });
+    }
+    wasBoardPinOpenRef.current = isNowOpen;
+  }, [activeBoardPin]);
+
   const handleSelectBoardPin = useCallback(
     (pin: PinFeedItemDto, pushStack = true) => {
+      if (typeof window !== "undefined" && !activeBoardPin) {
+        savedBoardScrollYRef.current = window.scrollY;
+      }
       if (pushStack && activeBoardPin && activeBoardPin.id !== pin.id) {
         setPinHistoryStack((prev) =>
           [
@@ -253,9 +278,36 @@ export default function SavedBoardPage() {
     void loadPinDetail(prevPin.id);
   }, [pinHistoryStack, handleCloseBoardPin, loadPinDetail]);
 
+  const prevBoardPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activeBoardPin) return null;
+    if (pinHistoryStack.length > 0) {
+      return pinHistoryStack[pinHistoryStack.length - 1] ?? null;
+    }
+    if (allSavedEntries.length <= 1) return null;
+    const idx = allSavedEntries.findIndex((e) => e.pin.id === activeBoardPin.id);
+    if (idx === -1) return allSavedEntries[0]?.pin ?? null;
+    return (
+      allSavedEntries[
+        (idx - 1 + allSavedEntries.length) % allSavedEntries.length
+      ]?.pin ?? null
+    );
+  }, [activeBoardPin, pinHistoryStack, allSavedEntries]);
+
+  const nextBoardPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activeBoardPin || allSavedEntries.length <= 1) return null;
+    const idx = allSavedEntries.findIndex((e) => e.pin.id === activeBoardPin.id);
+    if (idx === -1) return allSavedEntries[0]?.pin ?? null;
+    return allSavedEntries[(idx + 1) % allSavedEntries.length]?.pin ?? null;
+  }, [activeBoardPin, allSavedEntries]);
+
   const handleNavigateBoardPin = useCallback(
     (direction: "prev" | "next") => {
-      if (!activeBoardPin || allSavedEntries.length <= 1) return;
+      if (!activeBoardPin) return;
+      if (direction === "prev" && pinHistoryStack.length > 0) {
+        handleStepBackBoardPin();
+        return;
+      }
+      if (allSavedEntries.length <= 1) return;
       const idx = allSavedEntries.findIndex(
         (e) => e.pin.id === activeBoardPin.id
       );
@@ -269,7 +321,13 @@ export default function SavedBoardPage() {
         handleSelectBoardPin(nextEntry.pin);
       }
     },
-    [activeBoardPin, allSavedEntries, handleSelectBoardPin]
+    [
+      activeBoardPin,
+      pinHistoryStack.length,
+      allSavedEntries,
+      handleStepBackBoardPin,
+      handleSelectBoardPin,
+    ]
   );
 
   if (!isLoading && !authenticated) {
@@ -530,7 +588,7 @@ export default function SavedBoardPage() {
         </>
       )}
 
-      {/* Top Pin Close-Up Stage (Instant Open Without Sliding | Mobile Fullscreen Overlay) */}
+      {/* Top Pin Close-Up Stage (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
       {activeBoardPin && (
         <PinterestPinDetail
           pin={activeBoardPin}
@@ -539,6 +597,8 @@ export default function SavedBoardPage() {
           comments={activeBoardComments}
           savedPinIds={savedPinIdSet}
           relatedPins={gridBoardEntries.map((e) => e.pin)}
+          prevPinPreview={prevBoardPinPreview}
+          nextPinPreview={nextBoardPinPreview}
           canStepBack={pinHistoryStack.length > 0}
           onBack={handleStepBackBoardPin}
           onClose={handleCloseBoardPin}
@@ -611,13 +671,17 @@ export default function SavedBoardPage() {
               ? "ลองเลือกดูที่พักสวยๆ จากหน้าแรกแล้วกดปุ่ม บันทึก เพื่อเก็บเข้าบอร์ดและติดตามโปรโมชั่น"
               : "Browse the Home feed and click Save on any Pin to collect stays here."}
           </p>
-          <Link href="/" className="btn-promo-solid inline-flex">
+          <Link href="/" className="btn-round-solid inline-flex">
             {language === "th" ? "สำรวจที่พักทั่วไทย" : "Explore Thailand Stays"}
           </Link>
         </div>
       ) : (
         gridBoardEntries.length > 0 && (
-          <section className="space-y-3">
+          <section
+            className={
+              activeBoardPin ? "hidden lg:block space-y-3" : "space-y-3"
+            }
+          >
             {activeBoardPin && (
               <h2 className="hidden lg:block ty-subtitle font-bold pt-2">
                 {language === "th"

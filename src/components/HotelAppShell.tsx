@@ -331,8 +331,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             onChangeSearchQuery={setGlobalSearchQuery}
           />
 
-          <main className="pt-16 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]">
+          <main
+            data-cgr-app-main="true"
+            className="pt-16 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]"
+          >
             <div
+              data-cgr-app-inner="true"
               className={
                 isFluidFeedPage
                   ? "px-1.5 sm:px-6 lg:px-8 pt-2 sm:pt-5"

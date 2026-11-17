@@ -3,6 +3,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -31,6 +32,9 @@ import {
 } from "@/components/home/PinterestPinDetail";
 import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
 
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export default function HomePage() {
   const router = useRouter();
   const {
@@ -42,7 +46,8 @@ export default function HomePage() {
   } = useHotelApp();
 
   const [activeStyleTab, setActiveStyleTab] = useState<string>("all");
-  const [pins, setPins] = useState<PinFeedItemDto[]>([]);
+  const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>([]);
+  const [searchPins, setSearchPins] = useState<PinFeedItemDto[] | null>(null);
   const [isLoadingPins, setIsLoadingPins] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -66,12 +71,18 @@ export default function HomePage() {
     slides: PureMediaSlide[];
     index: number;
   } | null>(null);
+
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const feedSwipeRef = useRef<{
-    startX: number;
-    startY: number;
-    ignore: boolean;
-  } | null>(null);
+  const homeRootRef = useRef<HTMLDivElement | null>(null);
+  const feedSwipeViewportRef = useRef<HTMLElement | null>(null);
+  const feedSwipeTrackRef = useRef<HTMLDivElement | null>(null);
+  const leftTabPanelRef = useRef<HTMLDivElement | null>(null);
+  const rightTabPanelRef = useRef<HTMLDivElement | null>(null);
+  const tabSwipeTimerRef = useRef<number | null>(null);
+  const swipedWhileScrolledRef = useRef<boolean>(false);
+  const justDraggedFeedUntilRef = useRef<number>(0);
+  const savedFeedScrollYRef = useRef<number>(0);
+  const wasPinOpenRef = useRef<boolean>(false);
   const lastFeedTasteSeqRef = useRef<number>(0);
 
   // Sync ?pin=... & ?style=... on initial load / popstate
@@ -90,27 +101,66 @@ export default function HomePage() {
     return () => window.removeEventListener("popstate", syncFromUrl);
   }, []);
 
-  const loadPins = useCallback(
-    async (silent = false) => {
-      if (!silent) setIsLoadingPins(true);
+  const loadMasterPins = useCallback(async (silent = false) => {
+    if (!silent) setIsLoadingPins(true);
+    setFetchError(null);
+    try {
+      const qs = new URLSearchParams();
+      const tasteParam = getEncodedSessionTasteParam();
+      if (tasteParam) {
+        qs.set("taste", tasteParam);
+      }
+      lastFeedTasteSeqRef.current = getSessionInteractionCount();
+
+      const suffix = qs.toString();
+      const res = await fetch(`/api/pins${suffix ? `?${suffix}` : ""}`, {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as {
+        pins?: PinFeedItemDto[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "ไม่สามารถโหลดข้อมูลที่พักได้");
+      }
+      const fetched = data.pins || [];
+      setMasterPins(fetched);
+      setOptimisticSavedIds(
+        new Set(fetched.filter((p) => p.isSavedByMe).map((p) => p.id))
+      );
+    } catch (err) {
+      if (!silent) {
+        setFetchError(
+          err instanceof Error ? err.message : "โหลดข้อมูลที่พักไม่สำเร็จ"
+        );
+      }
+    } finally {
+      if (!silent) setIsLoadingPins(false);
+    }
+  }, []);
+
+  // Initial load of personalized master feed (powers instant 0ms tab switching & previews!)
+  useEffect(() => {
+    void loadMasterPins(false);
+  }, [loadMasterPins]);
+
+  // Debounced 3-Tier Zero-Dead-End Search when globalSearchQuery is active
+  useEffect(() => {
+    const trimmed = globalSearchQuery.trim();
+    if (!trimmed) {
+      setSearchPins(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      if (masterPins.length === 0) setIsLoadingPins(true);
       setFetchError(null);
       try {
         const qs = new URLSearchParams();
-        if (activeStyleTab !== "all") qs.set("style", activeStyleTab);
-        if (globalSearchQuery.trim()) qs.set("q", globalSearchQuery.trim());
-
+        qs.set("q", trimmed);
         const tasteParam = getEncodedSessionTasteParam();
-        if (tasteParam) {
-          qs.set("taste", tasteParam);
-        }
-        lastFeedTasteSeqRef.current = getSessionInteractionCount();
-
-        if (activeStyleTab !== "all") {
-          trackTelemetryEvent({
-            eventType: "SEARCH_FILTER",
-            styleTab: activeStyleTab,
-          });
-        }
+        if (tasteParam) qs.set("taste", tasteParam);
 
         const res = await fetch(`/api/pins?${qs.toString()}`, {
           cache: "no-store",
@@ -120,32 +170,57 @@ export default function HomePage() {
           error?: string;
         };
         if (!res.ok) {
-          throw new Error(data.error || "ไม่สามารถโหลดข้อมูลที่พักได้");
+          throw new Error(data.error || "ไม่สามารถค้นหาที่พักได้");
         }
-        const fetched = data.pins || [];
-        setPins(fetched);
-        setOptimisticSavedIds(
-          new Set(fetched.filter((p) => p.isSavedByMe).map((p) => p.id))
-        );
+        if (!cancelled) {
+          setSearchPins(data.pins || []);
+        }
       } catch (err) {
-        if (!silent) {
+        if (!cancelled && masterPins.length === 0) {
           setFetchError(
-            err instanceof Error ? err.message : "โหลดข้อมูลที่พักไม่สำเร็จ"
+            err instanceof Error ? err.message : "ค้นหาที่พักไม่สำเร็จ"
           );
         }
       } finally {
-        if (!silent) setIsLoadingPins(false);
+        if (!cancelled) setIsLoadingPins(false);
       }
+    }, 140);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [globalSearchQuery, masterPins.length]);
+
+  // Track style tab filter telemetry without flashing skeletons or reshuffling cards
+  useEffect(() => {
+    if (activeStyleTab !== "all") {
+      trackTelemetryEvent({
+        eventType: "SEARCH_FILTER",
+        styleTab: activeStyleTab,
+      });
+    }
+  }, [activeStyleTab]);
+
+  const getPinsForStyleTab = useCallback(
+    (tabId: string): PinFeedItemDto[] => {
+      const base = globalSearchQuery.trim()
+        ? searchPins ?? masterPins
+        : masterPins;
+      const visible = base.filter((p) => !hiddenPinIds.has(p.id));
+      if (tabId === "all") return visible;
+      const matching = visible.filter((p) => p.stayStyles.includes(tabId));
+      return globalSearchQuery.trim() && matching.length === 0
+        ? visible
+        : matching;
     },
-    [activeStyleTab, globalSearchQuery]
+    [globalSearchQuery, searchPins, masterPins, hiddenPinIds]
   );
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadPins(false);
-    }, 140);
-    return () => window.clearTimeout(timer);
-  }, [loadPins]);
+  const pins = useMemo(
+    () => getPinsForStyleTab(activeStyleTab),
+    [getPinsForStyleTab, activeStyleTab]
+  );
 
   const loadPinDetail = useCallback(async (pinId: string) => {
     latestPinReqRef.current = pinId;
@@ -207,11 +282,21 @@ export default function HomePage() {
     if (!selectedPinId) return null;
     if (pinDetail?.pin.id === selectedPinId) return pinDetail.pin;
     if (selectedPinSnapshot?.id === selectedPinId) return selectedPinSnapshot;
-    return pins.find((p) => p.id === selectedPinId) ?? null;
-  }, [pinDetail, selectedPinId, selectedPinSnapshot, pins]);
+    return (
+      pins.find((p) => p.id === selectedPinId) ??
+      masterPins.find((p) => p.id === selectedPinId) ??
+      null
+    );
+  }, [pinDetail, selectedPinId, selectedPinSnapshot, pins, masterPins]);
 
   const handleSelectPin = useCallback(
     (pin: PinFeedItemDto, pushHistoryStack = true) => {
+      if (Date.now() < justDraggedFeedUntilRef.current) return;
+
+      if (typeof window !== "undefined" && !currentOpenPin) {
+        savedFeedScrollYRef.current = window.scrollY;
+      }
+
       if (pushHistoryStack && currentOpenPin && currentOpenPin.id !== pin.id) {
         setPinHistoryStack((prev) =>
           [
@@ -287,6 +372,7 @@ export default function HomePage() {
     if (result.isSaved) {
       const targetPin =
         (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
+        masterPins.find((p) => p.id === pinId) ??
         pins.find((p) => p.id === pinId);
       if (targetPin) trackPinInteraction("PIN_SAVE", targetPin);
     }
@@ -296,10 +382,14 @@ export default function HomePage() {
       else next.delete(pinId);
       return next;
     });
-    setPins((prev) =>
-      prev.map((p) =>
+    const updatePinSave = (list: PinFeedItemDto[]) =>
+      list.map((p) =>
         p.id === pinId ? { ...p, isSavedByMe: result.isSaved } : p
-      )
+      );
+    setMasterPins(updatePinSave);
+    setSearchPins((prev) => (prev ? updatePinSave(prev) : null));
+    setSelectedPinSnapshot((prev) =>
+      prev && prev.id === pinId ? { ...prev, isSavedByMe: result.isSaved } : prev
     );
     if (pinDetail?.pin.id === pinId) {
       setPinDetail((prev) =>
@@ -323,16 +413,23 @@ export default function HomePage() {
     if (data.isLiked) {
       const targetPin =
         (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
+        masterPins.find((p) => p.id === pinId) ??
         pins.find((p) => p.id === pinId);
       if (targetPin) trackPinInteraction("PIN_LIKE", targetPin);
     }
 
-    setPins((prev) =>
-      prev.map((p) =>
+    const updatePinLike = (list: PinFeedItemDto[]) =>
+      list.map((p) =>
         p.id === pinId
           ? { ...p, isLikedByMe: data.isLiked, likesCount: data.likesCount }
           : p
-      )
+      );
+    setMasterPins(updatePinLike);
+    setSearchPins((prev) => (prev ? updatePinLike(prev) : null));
+    setSelectedPinSnapshot((prev) =>
+      prev && prev.id === pinId
+        ? { ...prev, isLikedByMe: data.isLiked, likesCount: data.likesCount }
+        : prev
     );
     if (pinDetail?.pin.id === pinId) {
       setPinDetail((prev) =>
@@ -419,20 +516,38 @@ export default function HomePage() {
 
   const activePin = currentOpenPin;
 
+  // Restore exact Home feed scroll position synchronously BEFORE paint when closing Pin on mobile (< lg)
+  useIsomorphicLayoutEffect(() => {
+    const isNowOpen = Boolean(activePin);
+    if (
+      wasPinOpenRef.current &&
+      !isNowOpen &&
+      typeof window !== "undefined" &&
+      window.innerWidth < 1024
+    ) {
+      window.scrollTo({
+        top: savedFeedScrollYRef.current,
+        behavior: "instant" as ScrollBehavior,
+      });
+    }
+    wasPinOpenRef.current = isNowOpen;
+  }, [activePin]);
+
   const activePinComments = useMemo(
     () =>
       activePin && pinDetail?.pin.id === activePin.id ? pinDetail.comments : [],
     [activePin, pinDetail]
   );
 
-  // Instant client-side similarity sort used during the ~80ms before server `relatedPins` resolves
+  // Instant client-side similarity sort across the entire master catalog (~0ms)
   const instantSimilarFallback = useMemo(() => {
     if (!activePin) return [];
     const anchorStyles = new Set(activePin.stayStyles);
     const anchorRegion = getProvinceById(activePin.provinceId)?.region ?? null;
+    const sourceCatalog = masterPins.length > 0 ? masterPins : pins;
 
     // Exclude same hotel upfront per user rule
-    const otherHotels = pins.filter(
+    const otherHotels = sourceCatalog.filter(
       (p) =>
         p.id !== activePin.id &&
         p.hotelId !== activePin.hotelId &&
@@ -461,13 +576,13 @@ export default function HomePage() {
       };
       return scorePin(b) - scorePin(a);
     });
-  }, [activePin, pins, hiddenPinIds]);
+  }, [activePin, masterPins, pins, hiddenPinIds]);
 
   // When a Pin is open, `gridPins` displays a stable single-pass similarity ranking
   // without re-shuffling cards that are already visible on screen when `/api/pins/[id]` resolves!
   const gridPins = useMemo(() => {
     if (!activePin) {
-      return pins.filter((p) => !hiddenPinIds.has(p.id));
+      return pins;
     }
     if (instantSimilarFallback.length > 0) {
       if (
@@ -491,6 +606,19 @@ export default function HomePage() {
     return [];
   }, [activePin, pinDetail, pins, instantSimilarFallback, hiddenPinIds]);
 
+  const prevPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activePin) return null;
+    if (pinHistoryStack.length > 0) {
+      return pinHistoryStack[pinHistoryStack.length - 1] ?? null;
+    }
+    return gridPins.length > 0 ? gridPins[gridPins.length - 1] ?? null : null;
+  }, [activePin, pinHistoryStack, gridPins]);
+
+  const nextPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activePin || gridPins.length === 0) return null;
+    return gridPins[0] ?? null;
+  }, [activePin, gridPins]);
+
   const handleNavigatePin = useCallback(
     (direction: "prev" | "next") => {
       if (!activePin) return;
@@ -508,6 +636,59 @@ export default function HomePage() {
     [activePin, pinHistoryStack.length, gridPins, handleStepBackPin, handleSelectPin]
   );
 
+  // Adjacent Stay Style Tabs & Cached Previews for 120fps Finger-Tracking Tab Swipe
+  const currentTabIdx = useMemo(
+    () =>
+      Math.max(
+        0,
+        STAY_STYLE_TABS.findIndex((t) => t.id === activeStyleTab)
+      ),
+    [activeStyleTab]
+  );
+  const prevStyleTab =
+    currentTabIdx > 0 ? STAY_STYLE_TABS[currentTabIdx - 1] : null;
+  const nextStyleTab =
+    currentTabIdx < STAY_STYLE_TABS.length - 1
+      ? STAY_STYLE_TABS[currentTabIdx + 1]
+      : null;
+
+  const prevTabPins = useMemo(
+    () => (prevStyleTab ? getPinsForStyleTab(prevStyleTab.id) : []),
+    [prevStyleTab, getPinsForStyleTab]
+  );
+  const nextTabPins = useMemo(
+    () => (nextStyleTab ? getPinsForStyleTab(nextStyleTab.id) : []),
+    [nextStyleTab, getPinsForStyleTab]
+  );
+
+  // Synchronously reset feed swipe track BEFORE browser paint when activeStyleTab commits (0.0px shift!)
+  useIsomorphicLayoutEffect(() => {
+    if (tabSwipeTimerRef.current !== null) {
+      window.clearTimeout(tabSwipeTimerRef.current);
+      tabSwipeTimerRef.current = null;
+    }
+    if (feedSwipeTrackRef.current) {
+      feedSwipeTrackRef.current.style.transition = "none";
+      feedSwipeTrackRef.current.style.transform = "translate3d(0px, 0, 0)";
+    }
+    if (leftTabPanelRef.current) {
+      leftTabPanelRef.current.style.top = "0px";
+    }
+    if (rightTabPanelRef.current) {
+      rightTabPanelRef.current.style.top = "0px";
+    }
+    if (swipedWhileScrolledRef.current && typeof window !== "undefined") {
+      swipedWhileScrolledRef.current = false;
+      const rect = feedSwipeViewportRef.current?.getBoundingClientRect();
+      if (rect && rect.top < 0) {
+        window.scrollTo({
+          top: Math.max(0, Math.round(window.scrollY + rect.top)),
+          behavior: "instant" as ScrollBehavior,
+        });
+      }
+    }
+  }, [activeStyleTab]);
+
   useEffect(() => {
     const btn = tabButtonRefs.current[activeStyleTab];
     if (btn) {
@@ -519,49 +700,176 @@ export default function HomePage() {
     }
   }, [activeStyleTab]);
 
-  const handleFeedTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (activePin || typeof window === "undefined" || window.innerWidth >= 1024) {
-      return;
-    }
-    const t = e.touches[0];
-    if (!t) return;
-    const target = e.target as HTMLElement | null;
-    const ignore = Boolean(
-      target?.closest(
-        "[data-style-tabs-bar='true'], input, textarea, [data-swipe-ignore='true']"
-      )
-    );
-    feedSwipeRef.current = { startX: t.clientX, startY: t.clientY, ignore };
+  // =========================================================================
+  // ENGINE C: 120FPS INTERACTIVE HOME STAY-STYLE TAB SWIPE PAGER (< lg)
+  // =========================================================================
+  const tabSwipeStateRef = useRef({
+    isPinOpen: Boolean(activePin),
+    prevStyleTab,
+    nextStyleTab,
+  });
+  tabSwipeStateRef.current = {
+    isPinOpen: Boolean(activePin),
+    prevStyleTab,
+    nextStyleTab,
   };
 
-  const handleFeedTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    const st = feedSwipeRef.current;
-    feedSwipeRef.current = null;
-    if (
-      !st ||
-      st.ignore ||
-      activePin ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      return;
-    }
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - st.startX;
-    const dy = t.clientY - st.startY;
-    if (Math.abs(dx) >= 56 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-      const currentIdx = STAY_STYLE_TABS.findIndex(
-        (tab) => tab.id === activeStyleTab
-      );
-      if (currentIdx === -1) return;
-      if (dx < 0 && currentIdx < STAY_STYLE_TABS.length - 1) {
-        setActiveStyleTab(STAY_STYLE_TABS[currentIdx + 1].id);
-      } else if (dx > 0 && currentIdx > 0) {
-        setActiveStyleTab(STAY_STYLE_TABS[currentIdx - 1].id);
+  useEffect(() => {
+    const rootEl = homeRootRef.current;
+    if (!rootEl || typeof window === "undefined") return;
+
+    let state: {
+      startX: number;
+      startY: number;
+      lastX: number;
+      lastTime: number;
+      velocityX: number;
+      scrolledOffset: number;
+      locked: "horizontal" | "vertical" | null;
+      ignore: boolean;
+    } | null = null;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (
+        tabSwipeStateRef.current.isPinOpen ||
+        window.innerWidth >= 1024 ||
+        tabSwipeTimerRef.current !== null
+      ) {
+        return;
       }
-    }
-  };
+      const t = e.touches[0];
+      if (!t) return;
+      const target = e.target as HTMLElement | null;
+      const ignore = Boolean(
+        target?.closest(
+          "[data-style-tabs-bar='true'], input, textarea, [data-swipe-ignore='true']"
+        )
+      );
+      const now = performance.now();
+      state = {
+        startX: t.clientX,
+        startY: t.clientY,
+        lastX: t.clientX,
+        lastTime: now,
+        velocityX: 0,
+        scrolledOffset: 0,
+        locked: null,
+        ignore,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (
+        !state ||
+        state.ignore ||
+        tabSwipeStateRef.current.isPinOpen ||
+        window.innerWidth >= 1024 ||
+        tabSwipeTimerRef.current !== null
+      ) {
+        return;
+      }
+      const t = e.touches[0];
+      if (!t) return;
+
+      const dx = t.clientX - state.startX;
+      const dy = t.clientY - state.startY;
+      const now = performance.now();
+      const dt = now - state.lastTime;
+      if (dt > 0) {
+        state.velocityX = (t.clientX - state.lastX) / dt;
+        state.lastX = t.clientX;
+        state.lastTime = now;
+      }
+
+      if (state.locked === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+        if (Math.abs(dx) > Math.abs(dy) * 1.18) {
+          state.locked = "horizontal";
+          const rect = feedSwipeViewportRef.current?.getBoundingClientRect();
+          const topOff = rect && rect.top < 0 ? Math.round(-rect.top) : 0;
+          state.scrolledOffset = topOff;
+          if (leftTabPanelRef.current) {
+            leftTabPanelRef.current.style.top = `${topOff}px`;
+          }
+          if (rightTabPanelRef.current) {
+            rightTabPanelRef.current.style.top = `${topOff}px`;
+          }
+        } else {
+          state.locked = "vertical";
+        }
+      }
+
+      if (state.locked === "horizontal") {
+        if (e.cancelable) e.preventDefault();
+        const track = feedSwipeTrackRef.current;
+        if (!track) return;
+        const { prevStyleTab: prevT, nextStyleTab: nextT } =
+          tabSwipeStateRef.current;
+        const atEdge = (dx > 0 && !prevT) || (dx < 0 && !nextT);
+        const effectiveDx = atEdge ? dx * 0.24 : dx;
+        track.style.transition = "none";
+        track.style.transform = `translate3d(${effectiveDx}px, 0, 0)`;
+      }
+    };
+
+    const finishTabSwipe = (e: TouchEvent) => {
+      if (!state) return;
+      const st = state;
+      state = null;
+      if (st.ignore || st.locked !== "horizontal") return;
+
+      justDraggedFeedUntilRef.current = Date.now() + 260;
+
+      const track = feedSwipeTrackRef.current;
+      if (!track) return;
+
+      const vw =
+        feedSwipeViewportRef.current?.clientWidth || window.innerWidth || 375;
+      const t = e.changedTouches[0];
+      const dx = t ? t.clientX - st.startX : 0;
+      const vx = st.velocityX;
+      const { prevStyleTab: prevT, nextStyleTab: nextT } =
+        tabSwipeStateRef.current;
+
+      const commitNext = Boolean(nextT) && (dx < -vw * 0.18 || vx < -0.32);
+      const commitPrev = Boolean(prevT) && (dx > vw * 0.18 || vx > 0.32);
+
+      if (commitNext && nextT) {
+        swipedWhileScrolledRef.current = st.scrolledOffset > 0;
+        track.style.transition =
+          "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(calc(-100% - 12px), 0, 0)";
+        tabSwipeTimerRef.current = window.setTimeout(() => {
+          tabSwipeTimerRef.current = null;
+          setActiveStyleTab(nextT.id);
+        }, 280);
+      } else if (commitPrev && prevT) {
+        swipedWhileScrolledRef.current = st.scrolledOffset > 0;
+        track.style.transition =
+          "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(calc(100% + 12px), 0, 0)";
+        tabSwipeTimerRef.current = window.setTimeout(() => {
+          tabSwipeTimerRef.current = null;
+          setActiveStyleTab(prevT.id);
+        }, 280);
+      } else {
+        track.style.transition =
+          "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(0px, 0, 0)";
+      }
+    };
+
+    rootEl.addEventListener("touchstart", onTouchStart, { passive: true });
+    rootEl.addEventListener("touchmove", onTouchMove, { passive: false });
+    rootEl.addEventListener("touchend", finishTabSwipe, { passive: true });
+    rootEl.addEventListener("touchcancel", finishTabSwipe, { passive: true });
+
+    return () => {
+      rootEl.removeEventListener("touchstart", onTouchStart);
+      rootEl.removeEventListener("touchmove", onTouchMove);
+      rootEl.removeEventListener("touchend", finishTabSwipe);
+      rootEl.removeEventListener("touchcancel", finishTabSwipe);
+    };
+  }, []);
 
   const hasActiveFilter =
     activeStyleTab !== "all" || Boolean(globalSearchQuery.trim());
@@ -573,8 +881,7 @@ export default function HomePage() {
 
   return (
     <div
-      onTouchStart={handleFeedTouchStart}
-      onTouchEnd={handleFeedTouchEnd}
+      ref={homeRootRef}
       className="cgr-page-fluid space-y-4 sm:space-y-5"
     >
       {/* Horizontal Stay Style Tabs (Hidden when Pin Close-Up Stage is Open) */}
@@ -618,7 +925,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Pin Close-Up Stage at Very Top (Instant Open Without Smooth Slide | Mobile Fullscreen Overlay) */}
+      {/* Pin Close-Up Stage at Very Top (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
       {activePin && (
         <PinterestPinDetail
           pin={activePin}
@@ -627,6 +934,8 @@ export default function HomePage() {
           comments={activePinComments}
           savedPinIds={optimisticSavedIds}
           relatedPins={gridPins}
+          prevPinPreview={prevPinPreview}
+          nextPinPreview={nextPinPreview}
           canStepBack={pinHistoryStack.length > 0}
           onBack={handleStepBackPin}
           onClose={handleClosePin}
@@ -655,7 +964,7 @@ export default function HomePage() {
           </p>
           <button
             type="button"
-            onClick={() => loadPins(false)}
+            onClick={() => void loadMasterPins(false)}
             className="btn-round-solid !h-9 shrink-0"
           >
             {language === "th" ? "ลองใหม่" : "Retry"}
@@ -663,8 +972,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* In-Place Animated Masonry Grid (Expands Clicked Pin Right at Its Row — Zero Jump to Top!) */}
-      {isLoadingPins && !activePin ? (
+      {/* Interactive 3-Panel Swipeable Masonry Stage (Zero Skeleton Flash & Zero Card Re-Sorting!) */}
+      {isLoadingPins && masterPins.length === 0 && !activePin ? (
         <div className="flex flex-wrap justify-center gap-4">
           {Array.from({ length: 14 }).map((_, idx) => (
             <div
@@ -679,65 +988,142 @@ export default function HomePage() {
             />
           ))}
         </div>
-      ) : pins.length === 0 && !activePin ? (
-        <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
-          <h2 className="ty-title">
-            {language === "th"
-              ? "ไม่พบที่พักที่ตรงกับตัวกรองนี้"
-              : "No stays match your active filters"}
-          </h2>
-          <p className="ty-body text-[var(--color-text-secondary)]">
-            {language === "th"
-              ? "ลองเปลี่ยนจังหวัด สไตล์ที่พัก หรือล้างช่วงวันเข้าพักเพื่อชมที่พักทั้งหมดในระบบ"
-              : "Try clearing province, stay style, or date filters."}
-          </p>
-          {hasActiveFilter && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="btn-round-solid inline-flex"
-            >
-              {language === "th" ? "แสดงที่พักทั้งหมด" : "Show All Stays"}
-            </button>
-          )}
-        </div>
       ) : (
-        gridPins.length > 0 && (
-          <section className="space-y-3">
-            {activePin && (
-              <h2 className="hidden lg:block ty-subtitle font-bold pt-2">
-                {language === "th"
-                  ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
-                  : "You may also like"}
-              </h2>
-            )}
-            <MasonryGrid
-              key={
-                activePin
-                  ? `related-${activePin.id}`
-                  : `feed-${activeStyleTab}-${globalSearchQuery.trim() || "all"}`
-              }
-              items={gridPins.map((p) => ({
-                ...p,
-                aspectClass: p.aspectRatio,
-              }))}
-              columnWidth={236}
-              gutter={16}
-              fitContainer={true}
-              renderItem={(pin) => (
-                <PinterestPinCard
-                  pin={pin}
-                  language={language}
-                  isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
-                  onSelectPin={(p) => handleSelectPin(p, true)}
-                  onToggleSave={handleToggleSave}
-                  onSharePin={handleSharePin}
-                  onHidePin={handleHidePin}
+        <section
+          ref={feedSwipeViewportRef}
+          className={
+            activePin
+              ? "hidden lg:block space-y-3"
+              : "relative overflow-x-clip space-y-3"
+          }
+        >
+          <div
+            ref={feedSwipeTrackRef}
+            className="relative w-full will-change-transform"
+          >
+            {/* Left Adjacent Category Tab Preview (< lg) */}
+            {!activePin && prevStyleTab && prevTabPins.length > 0 && (
+              <div
+                ref={leftTabPanelRef}
+                aria-hidden="true"
+                className="lg:hidden absolute left-[calc(-100%-12px)] top-0 w-full pointer-events-none select-none"
+              >
+                <MasonryGrid
+                  items={prevTabPins.slice(0, 10).map((p) => ({
+                    ...p,
+                    aspectClass: p.aspectRatio,
+                  }))}
+                  columnWidth={236}
+                  gutter={16}
+                  fitContainer={true}
+                  renderItem={(pin) => (
+                    <PinterestPinCard
+                      pin={pin}
+                      language={language}
+                      isSaved={
+                        pin.isSavedByMe || optimisticSavedIds.has(pin.id)
+                      }
+                      onSelectPin={() => {}}
+                      onToggleSave={() => {}}
+                      onSharePin={() => {}}
+                    />
+                  )}
                 />
-              )}
-            />
-          </section>
-        )
+              </div>
+            )}
+
+            {/* Right Adjacent Category Tab Preview (< lg) */}
+            {!activePin && nextStyleTab && nextTabPins.length > 0 && (
+              <div
+                ref={rightTabPanelRef}
+                aria-hidden="true"
+                className="lg:hidden absolute left-[calc(100%+12px)] top-0 w-full pointer-events-none select-none"
+              >
+                <MasonryGrid
+                  items={nextTabPins.slice(0, 10).map((p) => ({
+                    ...p,
+                    aspectClass: p.aspectRatio,
+                  }))}
+                  columnWidth={236}
+                  gutter={16}
+                  fitContainer={true}
+                  renderItem={(pin) => (
+                    <PinterestPinCard
+                      pin={pin}
+                      language={language}
+                      isSaved={
+                        pin.isSavedByMe || optimisticSavedIds.has(pin.id)
+                      }
+                      onSelectPin={() => {}}
+                      onToggleSave={() => {}}
+                      onSharePin={() => {}}
+                    />
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Active Center Content */}
+            {pins.length === 0 && !activePin ? (
+              <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+                <h2 className="ty-title">
+                  {language === "th"
+                    ? "ไม่พบที่พักที่ตรงกับหมวดหมู่นี้"
+                    : "No stays match this category"}
+                </h2>
+                <p className="ty-body text-[var(--color-text-secondary)]">
+                  {language === "th"
+                    ? "ปัดซ้าย-ขวาเพื่อดูหมวดหมู่อื่น หรือกดแสดงที่พักทั้งหมดในระบบ"
+                    : "Swipe left or right to browse other categories, or view all stays."}
+                </p>
+                {hasActiveFilter && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="btn-round-solid inline-flex"
+                  >
+                    {language === "th" ? "แสดงที่พักทั้งหมด" : "Show All Stays"}
+                  </button>
+                )}
+              </div>
+            ) : (
+              gridPins.length > 0 && (
+                <div className="space-y-3">
+                  {activePin && (
+                    <h2 className="hidden lg:block ty-subtitle font-bold pt-2">
+                      {language === "th"
+                        ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
+                        : "You may also like"}
+                    </h2>
+                  )}
+                  <MasonryGrid
+                    key={activePin ? `related-${activePin.id}` : "home-feed"}
+                    items={gridPins.map((p) => ({
+                      ...p,
+                      aspectClass: p.aspectRatio,
+                    }))}
+                    columnWidth={236}
+                    gutter={16}
+                    fitContainer={true}
+                    renderItem={(pin) => (
+                      <PinterestPinCard
+                        pin={pin}
+                        language={language}
+                        isSaved={
+                          pin.isSavedByMe || optimisticSavedIds.has(pin.id)
+                        }
+                        onSelectPin={(p) => handleSelectPin(p, true)}
+                        onToggleSave={handleToggleSave}
+                        onSharePin={handleSharePin}
+                        onHidePin={handleHidePin}
+                      />
+                    )}
+                  />
+                </div>
+              )
+            )}
+          </div>
+        </section>
       )}
 
       <PureMediaViewer

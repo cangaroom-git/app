@@ -1045,10 +1045,10 @@ export function PrimaryNavigation({
                   type="button"
                   aria-label={tab.labelEn}
                   onClick={handleOpenFloatingSearch}
-                  className={`h-12 w-12 rounded-[16px] border border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md flex items-center justify-center transition-colors relative cursor-pointer ${
+                  className={`h-12 w-12 rounded-[16px] border border-[var(--color-border)]/80 shadow-[var(--shadow-popover)] backdrop-blur-xl flex items-center justify-center transition-colors relative cursor-pointer ${
                     isSearchActive
                       ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-                      : "bg-[var(--color-background-card)]/95 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                      : "bg-[var(--color-background-card)]/78 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   }`}
                 >
                   <PlatformNavIcon
@@ -1079,10 +1079,10 @@ export function PrimaryNavigation({
                     window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
                   }
                 }}
-                className={`h-12 w-12 rounded-[16px] border border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md flex items-center justify-center transition-colors relative ${
+                className={`h-12 w-12 rounded-[16px] border border-[var(--color-border)]/80 shadow-[var(--shadow-popover)] backdrop-blur-xl flex items-center justify-center transition-colors relative ${
                   isTabActive
                     ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-                    : "bg-[var(--color-background-card)]/95 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    : "bg-[var(--color-background-card)]/78 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 }`}
               >
                 <PlatformNavIcon

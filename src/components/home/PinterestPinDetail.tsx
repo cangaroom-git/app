@@ -612,6 +612,109 @@ export function PinterestPinCard({
   );
 }
 
+function MobileAdjacentPinPreview({
+  pin,
+  language,
+  isSaved,
+}: {
+  pin: PinFeedItemDto;
+  language: LanguageCode;
+  isSaved: boolean;
+}) {
+  const title = language === "th" ? pin.titleTh : pin.titleEn;
+  const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
+  const provinceLabel =
+    language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
+
+  return (
+    <div className="w-full bg-[var(--color-background-card)] select-none pointer-events-none">
+      <div className="relative bg-[var(--color-background-body)] min-h-[280px] flex items-center justify-center overflow-hidden">
+        <img
+          src={pin.coverImageUrl}
+          alt={title}
+          draggable={false}
+          className="w-full max-h-[78vh] object-cover select-none"
+        />
+      </div>
+
+      <div className="px-4 py-3 flex items-center justify-between gap-2 bg-[var(--color-background-card)]">
+        <div className="flex items-center gap-1">
+          <span className="h-10 px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
+            <Heart className="w-[21px] h-[21px]" strokeWidth={2.1} />
+            {pin.likesCount > 0 && <span>{pin.likesCount}</span>}
+          </span>
+          <span className="h-10 px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
+            <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
+            {pin.commentsCount > 0 && <span>{pin.commentsCount}</span>}
+          </span>
+          <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+            <Share className="w-[20px] h-[20px]" strokeWidth={2.1} />
+          </span>
+        </div>
+
+        <span
+          className={`h-10 px-4 rounded-[14px] ty-body font-bold inline-flex items-center justify-center ${
+            isSaved
+              ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
+              : "bg-[var(--color-promo)] !text-white"
+          }`}
+        >
+          {isSaved
+            ? language === "th"
+              ? "บันทึกแล้ว"
+              : "Saved"
+            : language === "th"
+            ? "บันทึก"
+            : "Save"}
+        </span>
+      </div>
+
+      <div className="px-4 pt-2 pb-6 space-y-3 bg-[var(--color-background-card)]">
+        <div className="inline-flex items-center gap-2.5 min-w-0">
+          {pin.hotelLogoUrl ? (
+            <img
+              src={pin.hotelLogoUrl}
+              alt={hotelName}
+              className="h-7 w-7 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
+            />
+          ) : (
+            <span className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0">
+              {hotelName[0] || "C"}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-bold text-[var(--color-text-primary)] truncate flex items-center gap-1">
+              <span className="truncate">{hotelName}</span>
+              {pin.hotelVerificationStatus === "VERIFIED" && (
+                <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
+              )}
+            </p>
+            <p className="text-[11.5px] text-[var(--color-text-secondary)] truncate">
+              {provinceLabel}
+              {pin.nightlyPriceThb
+                ? ` · เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
+                : ""}
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full h-11 rounded-[14px] bg-[var(--color-background-muted)] text-[14px] font-bold text-[var(--color-text-primary)] flex items-center justify-center gap-1.5">
+          <span>
+            {language === "th"
+              ? "เยี่ยมชมที่พัก · ดูห้องว่าง"
+              : "Visit stay & check rooms"}
+          </span>
+          <ArrowUpRight className="w-4 h-4" />
+        </div>
+
+        <h2 className="text-[16.5px] font-bold text-[var(--color-text-primary)] leading-snug">
+          {title}
+        </h2>
+      </div>
+    </div>
+  );
+}
+
 export interface PinterestPinDetailProps {
   pin: PinFeedItemDto;
   language: LanguageCode;
@@ -619,6 +722,9 @@ export interface PinterestPinDetailProps {
   comments: PinCommentDto[];
   savedPinIds: Set<string>;
   relatedPins?: PinFeedItemDto[];
+  prevPinPreview?: PinFeedItemDto | null;
+  nextPinPreview?: PinFeedItemDto | null;
+  mobileOverlayMode?: boolean;
   canStepBack?: boolean;
   onBack?: () => void;
   onClose: () => void;
@@ -641,6 +747,9 @@ export function PinterestPinDetail({
   comments,
   savedPinIds,
   relatedPins = [],
+  prevPinPreview = null,
+  nextPinPreview = null,
+  mobileOverlayMode = false,
   canStepBack = false,
   onBack,
   onClose,
@@ -655,6 +764,7 @@ export function PinterestPinDetail({
   onDeleteComment,
 }: PinterestPinDetailProps) {
   const [slideIndex, setSlideIndex] = useState(0);
+  const [isCarouselAnimated, setIsCarouselAnimated] = useState(false);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [isCommentsSheetOpen, setIsCommentsSheetOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -676,21 +786,18 @@ export function PinterestPinDetail({
   const desktopCommentsSectionRef = useRef<HTMLDivElement | null>(null);
   const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const pageSwipeTrackRef = useRef<HTMLDivElement | null>(null);
+  const leftPeekPanelRef = useRef<HTMLDivElement | null>(null);
+  const rightPeekPanelRef = useRef<HTMLDivElement | null>(null);
   const mediaStageRef = useRef<HTMLDivElement | null>(null);
+  const carouselTrackRef = useRef<HTMLDivElement | null>(null);
   const detailsPanelRef = useRef<HTMLDivElement | null>(null);
-  const mouseDragRef = useRef<{ startX: number; startY: number } | null>(null);
-  const mediaTouchRef = useRef<{
+  const mouseDragRef = useRef<{
     startX: number;
     startY: number;
-    atTop: boolean;
-    locked: "pull-down" | "horizontal" | "vertical" | null;
+    dragging: boolean;
   } | null>(null);
-  const mediaHandledSwipeRef = useRef(false);
-  const pageTouchRef = useRef<{
-    startX: number;
-    startY: number;
-    ignore: boolean;
-  } | null>(null);
+  const swipeCommitTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -706,19 +813,61 @@ export function PinterestPinDetail({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  useBodyScrollLock(isMobileViewport);
+  // Only lock body scroll when using legacy overlay mode (`/{hotelSlug}`) or when mobile comments modal is open!
+  // On `/` and `/board`, native `window` scroll stays active so iOS Safari's bottom bar is 100% translucent!
+  useBodyScrollLock(
+    (mobileOverlayMode && isMobileViewport) ||
+      (isCommentsSheetOpen && isMobileViewport)
+  );
 
   useEffect(() => {
+    if (typeof document === "undefined" || mobileOverlayMode) return;
+    document.documentElement.dataset.mobilePinOpen = "true";
+    return () => {
+      delete document.documentElement.dataset.mobilePinOpen;
+    };
+  }, [mobileOverlayMode]);
+
+  const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  // Synchronously reset swipe & carousel tracks BEFORE browser paint whenever `pin.id` changes (Zero Flash!)
+  useIsomorphicLayoutEffect(() => {
+    if (swipeCommitTimerRef.current !== null) {
+      window.clearTimeout(swipeCommitTimerRef.current);
+      swipeCommitTimerRef.current = null;
+    }
+    setIsCarouselAnimated(false);
     setSlideIndex(0);
     setIsDescriptionOpen(false);
     setIsCommentsSheetOpen(false);
     setReplyingTo(null);
     setPullDownOffset(0);
     setIsPullingDown(false);
-    if (overlayRef.current) {
-      overlayRef.current.scrollTop = 0;
+
+    if (carouselTrackRef.current) {
+      carouselTrackRef.current.style.transition = "none";
+      carouselTrackRef.current.style.transform = "translate3d(0%, 0, 0)";
+    }
+    if (pageSwipeTrackRef.current) {
+      pageSwipeTrackRef.current.style.transition = "none";
+      pageSwipeTrackRef.current.style.transform = "translate3d(0px, 0, 0)";
+    }
+    if (leftPeekPanelRef.current) {
+      leftPeekPanelRef.current.style.top = "0px";
+    }
+    if (rightPeekPanelRef.current) {
+      rightPeekPanelRef.current.style.top = "0px";
     }
 
+    if (mobileOverlayMode) {
+      if (overlayRef.current) overlayRef.current.scrollTop = 0;
+    } else if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+  }, [pin.id, mobileOverlayMode]);
+
+  useEffect(() => {
     const openedAt =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     trackPinInteraction("PIN_OPEN", pin);
@@ -745,9 +894,6 @@ export function PinterestPinDetail({
   }, [isCommentsSheetOpen]);
 
   // Pinterest-style FLIP expansion animation from the clicked card box -> full hero stage
-  const useIsomorphicLayoutEffect =
-    typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
   useIsomorphicLayoutEffect(() => {
     const origin = lastClickedPinOrigin;
     if (
@@ -838,60 +984,27 @@ export function PinterestPinDetail({
     };
   }, [pin.id]);
 
-  // Attach non-passive touchmove on Hero Media so downward pull-to-close is smooth without Safari rubber-banding
-  useEffect(() => {
-    const el = mediaStageRef.current;
-    if (!el || typeof window === "undefined") return;
-    const onNativeTouchMove = (e: TouchEvent) => {
-      if (window.innerWidth >= 1024 || isCommentsSheetOpen) return;
-      const touch = e.touches[0];
-      const st = mediaTouchRef.current;
-      if (!touch || !st) return;
-
-      const dx = touch.clientX - st.startX;
-      const dy = touch.clientY - st.startY;
-
-      if (st.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-        if (dy > 0 && st.atTop && Math.abs(dy) > Math.abs(dx) * 1.15) {
-          st.locked = "pull-down";
-        } else if (Math.abs(dx) > Math.abs(dy) * 1.15) {
-          st.locked = "horizontal";
-        } else {
-          st.locked = "vertical";
-        }
-      }
-
-      if (st.locked === "pull-down") {
-        if (e.cancelable) e.preventDefault();
-        setIsPullingDown(true);
-        setPullDownOffset(Math.max(0, Math.min(220, dy * 0.72)));
-      }
-    };
-
-    el.addEventListener("touchmove", onNativeTouchMove, { passive: false });
-    return () => el.removeEventListener("touchmove", onNativeTouchMove);
-  }, [pin.id, isCommentsSheetOpen]);
-
   const images =
     pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl];
-  const activeImageUrl = images[slideIndex] || pin.coverImageUrl;
 
   const navigateCarouselSlide = (
     nextIdxOrFn: number | ((prev: number) => number)
   ) => {
+    setIsCarouselAnimated(true);
     setSlideIndex((prev) => {
       const resolved =
         typeof nextIdxOrFn === "function" ? nextIdxOrFn(prev) : nextIdxOrFn;
-      if (resolved !== prev && images.length > 1) {
+      const clamped = Math.max(0, Math.min(images.length - 1, resolved));
+      if (clamped !== prev && images.length > 1) {
         trackPinInteraction("CAROUSEL_SWIPE", pin, {
-          carouselDepth: resolved + 1,
+          carouselDepth: clamped + 1,
         });
       }
       if (typeof window !== "undefined") {
         window.requestAnimationFrame(() => {
           const strip = thumbnailStripRef.current;
           const activeThumb = strip?.querySelector<HTMLElement>(
-            `[data-thumb-idx="${resolved}"]`
+            `[data-thumb-idx="${clamped}"]`
           );
           activeThumb?.scrollIntoView({
             behavior: "smooth",
@@ -900,9 +1013,345 @@ export function PinterestPinDetail({
           });
         });
       }
-      return resolved;
+      return clamped;
     });
   };
+
+  // =========================================================================
+  // ENGINE A: 120FPS INTERACTIVE MULTI-PHOTO CAROUSEL + PULL-DOWN GESTURE
+  // =========================================================================
+  const slideIndexRef = useRef(slideIndex);
+  slideIndexRef.current = slideIndex;
+
+  const gestureCallbacksRef = useRef({
+    handleStepBack: () => {},
+    onNavigatePin,
+    prevPinPreview,
+    nextPinPreview,
+    canStepBack,
+    imagesCount: images.length,
+    hasVideo: Boolean(pin.videoUrl),
+    mobileOverlayMode,
+  });
+
+  useEffect(() => {
+    const el = mediaStageRef.current;
+    if (!el || typeof window === "undefined") return;
+
+    let state: {
+      startX: number;
+      startY: number;
+      lastX: number;
+      lastTime: number;
+      velocityX: number;
+      atTop: boolean;
+      locked: "pull-down" | "carousel" | "vertical" | null;
+    } | null = null;
+
+    const getScrollTop = () =>
+      gestureCallbacksRef.current.mobileOverlayMode
+        ? overlayRef.current?.scrollTop ?? 0
+        : window.scrollY;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (window.innerWidth >= 1024 || isCommentsSheetOpen) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const now = performance.now();
+      state = {
+        startX: t.clientX,
+        startY: t.clientY,
+        lastX: t.clientX,
+        lastTime: now,
+        velocityX: 0,
+        atTop: getScrollTop() <= 8,
+        locked: null,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!state || window.innerWidth >= 1024 || isCommentsSheetOpen) return;
+      const t = e.touches[0];
+      if (!t) return;
+
+      const dx = t.clientX - state.startX;
+      const dy = t.clientY - state.startY;
+      const now = performance.now();
+      const dt = now - state.lastTime;
+      if (dt > 0) {
+        state.velocityX = (t.clientX - state.lastX) / dt;
+        state.lastX = t.clientX;
+        state.lastTime = now;
+      }
+
+      const { imagesCount, hasVideo } = gestureCallbacksRef.current;
+      const isMultiPhoto = imagesCount > 1 && !hasVideo;
+
+      if (state.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        if (dy > 0 && state.atTop && Math.abs(dy) > Math.abs(dx) * 1.15) {
+          state.locked = "pull-down";
+        } else if (isMultiPhoto && Math.abs(dx) > Math.abs(dy) * 1.12) {
+          state.locked = "carousel";
+        } else {
+          state.locked = "vertical";
+        }
+      }
+
+      if (state.locked === "pull-down") {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        setIsPullingDown(true);
+        setPullDownOffset(Math.max(0, Math.min(220, dy * 0.72)));
+        return;
+      }
+
+      if (state.locked === "carousel") {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        const track = carouselTrackRef.current;
+        if (!track) return;
+        const curr = slideIndexRef.current;
+        const atLeftEdge = curr === 0 && dx > 0;
+        const atRightEdge = curr === imagesCount - 1 && dx < 0;
+        const effectiveDx = atLeftEdge || atRightEdge ? dx * 0.28 : dx;
+        track.style.transition = "none";
+        track.style.transform = `translate3d(calc(${-curr * 100}% + ${effectiveDx}px), 0, 0)`;
+      }
+    };
+
+    const finishGesture = (e: TouchEvent) => {
+      if (!state) return;
+      const st = state;
+      state = null;
+
+      if (st.locked === "pull-down") {
+        const t = e.changedTouches[0];
+        const dy = t ? t.clientY - st.startY : 0;
+        setIsPullingDown(false);
+        setPullDownOffset(0);
+        if (dy >= 64) {
+          gestureCallbacksRef.current.handleStepBack();
+        }
+        return;
+      }
+
+      if (st.locked === "carousel") {
+        e.stopPropagation();
+        const track = carouselTrackRef.current;
+        const stageW = el.clientWidth || window.innerWidth || 360;
+        const t = e.changedTouches[0];
+        const dx = t ? t.clientX - st.startX : 0;
+        const vx = st.velocityX;
+        const curr = slideIndexRef.current;
+        const count = gestureCallbacksRef.current.imagesCount;
+
+        let targetIdx = curr;
+        if ((dx < -stageW * 0.18 || vx < -0.32) && curr < count - 1) {
+          targetIdx = curr + 1;
+        } else if ((dx > stageW * 0.18 || vx > 0.32) && curr > 0) {
+          targetIdx = curr - 1;
+        }
+
+        if (track) {
+          track.style.transition =
+            "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)";
+          track.style.transform = `translate3d(${-targetIdx * 100}%, 0, 0)`;
+        }
+        navigateCarouselSlide(targetIdx);
+      }
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", finishGesture, { passive: true });
+    el.addEventListener("touchcancel", finishGesture, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", finishGesture);
+      el.removeEventListener("touchcancel", finishGesture);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin.id, isCommentsSheetOpen]);
+
+  // =========================================================================
+  // ENGINE B: 120FPS INTERACTIVE WHOLE-PAGE CARD-TO-CARD SLIDE (< lg)
+  // =========================================================================
+  useEffect(() => {
+    const container = overlayRef.current;
+    if (!container || typeof window === "undefined") return;
+
+    let state: {
+      startX: number;
+      startY: number;
+      lastX: number;
+      lastTime: number;
+      velocityX: number;
+      locked: "horizontal" | "vertical" | null;
+      ignore: boolean;
+    } | null = null;
+
+    const getScrollOffset = () => {
+      if (gestureCallbacksRef.current.mobileOverlayMode) {
+        return container.scrollTop;
+      }
+      const rect = container.getBoundingClientRect();
+      return Math.max(0, -rect.top);
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (
+        window.innerWidth >= 1024 ||
+        isCommentsSheetOpen ||
+        swipeCommitTimerRef.current !== null
+      ) {
+        return;
+      }
+      const t = e.touches[0];
+      if (!t) return;
+      const target = e.target as HTMLElement | null;
+      const { imagesCount, hasVideo } = gestureCallbacksRef.current;
+      const insideMultiPhotoHero =
+        imagesCount > 1 &&
+        !hasVideo &&
+        Boolean(mediaStageRef.current?.contains(target));
+      const ignore =
+        insideMultiPhotoHero ||
+        Boolean(target?.closest("input, textarea, [data-swipe-ignore='true']"));
+
+      const now = performance.now();
+      state = {
+        startX: t.clientX,
+        startY: t.clientY,
+        lastX: t.clientX,
+        lastTime: now,
+        velocityX: 0,
+        locked: null,
+        ignore,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (
+        !state ||
+        state.ignore ||
+        window.innerWidth >= 1024 ||
+        isCommentsSheetOpen ||
+        swipeCommitTimerRef.current !== null
+      ) {
+        return;
+      }
+      const t = e.touches[0];
+      if (!t) return;
+
+      const dx = t.clientX - state.startX;
+      const dy = t.clientY - state.startY;
+      const now = performance.now();
+      const dt = now - state.lastTime;
+      if (dt > 0) {
+        state.velocityX = (t.clientX - state.lastX) / dt;
+        state.lastX = t.clientX;
+        state.lastTime = now;
+      }
+
+      if (state.locked === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+        if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+          state.locked = "horizontal";
+          const scrollOff = getScrollOffset();
+          if (leftPeekPanelRef.current) {
+            leftPeekPanelRef.current.style.top = `${scrollOff}px`;
+          }
+          if (rightPeekPanelRef.current) {
+            rightPeekPanelRef.current.style.top = `${scrollOff}px`;
+          }
+        } else {
+          state.locked = "vertical";
+        }
+      }
+
+      if (state.locked === "horizontal") {
+        if (e.cancelable) e.preventDefault();
+        const track = pageSwipeTrackRef.current;
+        if (!track) return;
+        const { nextPinPreview: nextP, prevPinPreview: prevP, canStepBack: canBack } =
+          gestureCallbacksRef.current;
+        const canGoNext = Boolean(nextP);
+        const canGoPrev = Boolean(prevP || canBack);
+
+        const effectiveDx =
+          (dx < 0 && !canGoNext) || (dx > 0 && !canGoPrev) ? dx * 0.24 : dx;
+        track.style.transition = "none";
+        track.style.transform = `translate3d(${effectiveDx}px, 0, 0)`;
+      }
+    };
+
+    const finishPageSwipe = (e: TouchEvent) => {
+      if (!state) return;
+      const st = state;
+      state = null;
+      if (st.ignore || st.locked !== "horizontal") return;
+
+      const track = pageSwipeTrackRef.current;
+      if (!track) return;
+
+      const vw = window.innerWidth || 375;
+      const t = e.changedTouches[0];
+      const dx = t ? t.clientX - st.startX : 0;
+      const vx = st.velocityX;
+      const {
+        onNavigatePin: navFn,
+        nextPinPreview: nextP,
+        prevPinPreview: prevP,
+        canStepBack: canBack,
+        handleStepBack: backFn,
+      } = gestureCallbacksRef.current;
+
+      const commitNext = Boolean(nextP && navFn) && (dx < -vw * 0.2 || vx < -0.35);
+      const commitPrev =
+        Boolean(prevP || canBack) && (dx > vw * 0.2 || vx > 0.35);
+
+      if (commitNext && navFn) {
+        track.style.transition =
+          "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(-100%, 0, 0)";
+        swipeCommitTimerRef.current = window.setTimeout(() => {
+          swipeCommitTimerRef.current = null;
+          navFn("next");
+        }, 260);
+      } else if (commitPrev) {
+        track.style.transition =
+          "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(100%, 0, 0)";
+        swipeCommitTimerRef.current = window.setTimeout(() => {
+          swipeCommitTimerRef.current = null;
+          if (prevP && navFn) {
+            navFn("prev");
+          } else {
+            backFn();
+          }
+        }, 260);
+      } else {
+        track.style.transition =
+          "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = "translate3d(0px, 0, 0)";
+      }
+    };
+
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", finishPageSwipe, { passive: true });
+    container.addEventListener("touchcancel", finishPageSwipe, {
+      passive: true,
+    });
+
+    return () => {
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", finishPageSwipe);
+      container.removeEventListener("touchcancel", finishPageSwipe);
+    };
+  }, [pin.id, isCommentsSheetOpen]);
 
   // Desktop keyboard ArrowLeft / ArrowRight navigation for multi-image carousels
   useEffect(() => {
@@ -961,6 +1410,17 @@ export function PinterestPinDetail({
     }
   };
 
+  gestureCallbacksRef.current = {
+    handleStepBack,
+    onNavigatePin,
+    prevPinPreview,
+    nextPinPreview,
+    canStepBack,
+    imagesCount: images.length,
+    hasVideo: Boolean(pin.videoUrl),
+    mobileOverlayMode,
+  };
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = commentText.trim();
@@ -1003,116 +1463,33 @@ export function PinterestPinDetail({
         currentUser.ownedHotels.some((h) => h.id === pin.hotelId))
   );
 
-  const handleMediaTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (
-      isCommentsSheetOpen ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      return;
-    }
-    const t = e.touches[0];
-    if (!t) return;
-    mediaTouchRef.current = {
-      startX: t.clientX,
-      startY: t.clientY,
-      atTop: (overlayRef.current?.scrollTop ?? 0) <= 8,
-      locked: null,
+  const handleMediaPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) return;
+    mouseDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      dragging: false,
     };
   };
 
-  const handleMediaTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    const st = mediaTouchRef.current;
-    mediaTouchRef.current = null;
-    if (
-      !st ||
-      isCommentsSheetOpen ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      setIsPullingDown(false);
-      setPullDownOffset(0);
+  const handleMediaPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const st = mouseDragRef.current;
+    if (!st || e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) {
       return;
     }
-
-    const t = e.changedTouches[0];
-    const dx = t ? t.clientX - st.startX : 0;
-    const dy = t ? t.clientY - st.startY : 0;
-
-    if (st.locked === "pull-down") {
-      setIsPullingDown(false);
-      setPullDownOffset(0);
-      if (dy >= 60) {
-        handleStepBack();
-      }
-      return;
+    const dx = e.clientX - st.startX;
+    const dy = e.clientY - st.startY;
+    if (!st.dragging && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+      st.dragging = true;
     }
-
-    setIsPullingDown(false);
-    setPullDownOffset(0);
-
-    // Swipe horizontally on Hero Image when Pin has a multi-image photo set -> switch slides inside set
-    if (
-      images.length > 1 &&
-      !pin.videoUrl &&
-      Math.abs(dx) >= 40 &&
-      Math.abs(dx) > Math.abs(dy) * 1.2
-    ) {
-      mediaHandledSwipeRef.current = true;
-      navigateCarouselSlide((prev) =>
-        dx < 0
-          ? (prev + 1) % images.length
-          : (prev - 1 + images.length) % images.length
-      );
+    if (st.dragging && carouselTrackRef.current) {
+      const curr = slideIndexRef.current;
+      const atEdge =
+        (curr === 0 && dx > 0) || (curr === images.length - 1 && dx < 0);
+      const effDx = atEdge ? dx * 0.28 : dx;
+      carouselTrackRef.current.style.transition = "none";
+      carouselTrackRef.current.style.transform = `translate3d(calc(${-curr * 100}% + ${effDx}px), 0, 0)`;
     }
-  };
-
-  const handlePageTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (
-      isCommentsSheetOpen ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      return;
-    }
-    mediaHandledSwipeRef.current = false;
-    const t = e.touches[0];
-    if (!t) return;
-    const target = e.target as HTMLElement | null;
-    const ignore = Boolean(
-      target?.closest("input, textarea, [data-swipe-ignore='true']")
-    );
-    pageTouchRef.current = { startX: t.clientX, startY: t.clientY, ignore };
-  };
-
-  const handlePageTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    const st = pageTouchRef.current;
-    pageTouchRef.current = null;
-    if (
-      !st ||
-      st.ignore ||
-      isCommentsSheetOpen ||
-      mediaHandledSwipeRef.current ||
-      !onNavigatePin ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      mediaHandledSwipeRef.current = false;
-      return;
-    }
-
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - st.startX;
-    const dy = t.clientY - st.startY;
-    if (Math.abs(dx) >= 52 && Math.abs(dx) > Math.abs(dy) * 1.25) {
-      onNavigatePin(dx < 0 ? "next" : "prev");
-    }
-  };
-
-  const handleMediaPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) return;
-    mouseDragRef.current = { startX: e.clientX, startY: e.clientY };
   };
 
   const handleMediaPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1122,24 +1499,30 @@ export function PinterestPinDetail({
       return;
     }
     const dx = e.clientX - st.startX;
-    const dy = e.clientY - st.startY;
-    if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      navigateCarouselSlide((prev) =>
-        dx < 0
-          ? (prev + 1) % images.length
-          : (prev - 1 + images.length) % images.length
-      );
+    const stageW = mediaStageRef.current?.clientWidth || 500;
+    let targetIdx = slideIndex;
+    if (dx < -Math.min(72, stageW * 0.16) && slideIndex < images.length - 1) {
+      targetIdx = slideIndex + 1;
+    } else if (dx > Math.min(72, stageW * 0.16) && slideIndex > 0) {
+      targetIdx = slideIndex - 1;
     }
+    if (carouselTrackRef.current) {
+      carouselTrackRef.current.style.transition =
+        "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)";
+      carouselTrackRef.current.style.transform = `translate3d(${-targetIdx * 100}%, 0, 0)`;
+    }
+    navigateCarouselSlide(targetIdx);
   };
 
   return (
     <div
       ref={overlayRef}
-      key={pin.id}
-      data-mobile-scroll-container="true"
-      onTouchStart={handlePageTouchStart}
-      onTouchEnd={handlePageTouchEnd}
-      className="fixed inset-0 z-[60] bg-[var(--color-background-body)] overflow-y-auto overscroll-y-contain lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:overflow-visible w-full lg:pb-2 select-none"
+      data-mobile-scroll-container={mobileOverlayMode ? "true" : undefined}
+      className={
+        mobileOverlayMode
+          ? "fixed inset-0 z-[60] bg-[var(--color-background-body)] overflow-y-auto overflow-x-hidden overscroll-y-contain lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:overflow-visible w-full lg:pb-2 select-none"
+          : "relative w-full overflow-x-clip lg:overflow-visible lg:pb-2 select-none bg-[var(--color-background-body)] lg:bg-transparent"
+      }
     >
       {/* GLOBAL STICKY / FIXED BACK BUTTON (Left) & MOBILE MORE BUTTON (Right — 100% Symmetrical Level & Size!) */}
       <button
@@ -1174,6 +1557,40 @@ export function PinterestPinDetail({
         />
       </div>
 
+      {/* WHOLE-PAGE INTERACTIVE CARD-TO-CARD SLIDE TRACK (With Live -100% / +100% Adjacent Card Previews!) */}
+      <div ref={pageSwipeTrackRef} className="relative w-full will-change-transform">
+        {prevPinPreview && (
+          <div
+            ref={leftPeekPanelRef}
+            aria-hidden="true"
+            className="lg:hidden absolute left-[-100%] top-0 w-full min-h-[100dvh] bg-[var(--color-background-body)] pointer-events-none"
+          >
+            <MobileAdjacentPinPreview
+              pin={prevPinPreview}
+              language={language}
+              isSaved={
+                savedPinIds.has(prevPinPreview.id) || prevPinPreview.isSavedByMe
+              }
+            />
+          </div>
+        )}
+
+        {nextPinPreview && (
+          <div
+            ref={rightPeekPanelRef}
+            aria-hidden="true"
+            className="lg:hidden absolute left-[100%] top-0 w-full min-h-[100dvh] bg-[var(--color-background-body)] pointer-events-none"
+          >
+            <MobileAdjacentPinPreview
+              pin={nextPinPreview}
+              language={language}
+              isSaved={
+                savedPinIds.has(nextPinPreview.id) || nextPinPreview.isSavedByMe
+              }
+            />
+          </div>
+        )}
+
       {/* TALL SPLIT PIN CLOSE-UP CARD (Zero Inline Comment Clutter | Squircle Buttons) */}
       <div
         style={
@@ -1197,14 +1614,14 @@ export function PinterestPinDetail({
         }`}
       >
         {/* =================================================================
-            LEFT / HERO STAGE: TRUE UNCROPPED MEDIA (Theme-Matched Background)
+            LEFT / HERO STAGE: TRUE VERTICAL MEDIA + 1:1 SLIDING CAROUSEL TRACK
         ================================================================== */}
         <div
           ref={mediaStageRef}
-          onTouchStart={handleMediaTouchStart}
-          onTouchEnd={handleMediaTouchEnd}
           onPointerDown={handleMediaPointerDown}
+          onPointerMove={handleMediaPointerMove}
           onPointerUp={handleMediaPointerUp}
+          onPointerCancel={handleMediaPointerUp}
           className="lg:col-span-7 relative bg-[var(--color-background-body)] min-h-[280px] lg:h-full flex items-center justify-center overflow-hidden"
         >
           {pin.videoUrl ? (
@@ -1221,12 +1638,30 @@ export function PinterestPinDetail({
             </div>
           ) : (
             <>
-              <img
-                src={activeImageUrl}
-                alt={title}
-                draggable={false}
-                className="w-full max-h-[78vh] lg:h-full lg:max-h-full object-cover select-none"
-              />
+              <div
+                ref={carouselTrackRef}
+                className="flex w-full h-full will-change-transform"
+                style={{
+                  transform: `translate3d(${-slideIndex * 100}%, 0, 0)`,
+                  transition: isCarouselAnimated
+                    ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+                    : "none",
+                }}
+              >
+                {images.map((imgUrl, idx) => (
+                  <div
+                    key={`${imgUrl}-${idx}`}
+                    className="w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={idx === 0 ? title : `${title} (${idx + 1})`}
+                      draggable={false}
+                      className="w-full max-h-[78vh] lg:h-full lg:max-h-full object-cover select-none"
+                    />
+                  </div>
+                ))}
+              </div>
 
               {images.length > 1 && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-[10px] bg-black/50 backdrop-blur-xs px-3 py-1.5">
@@ -1808,6 +2243,7 @@ export function PinterestPinDetail({
           </div>
         </div>
       )}
+      </div>
 
       {/* =====================================================================
           MOBILE / TABLET SLIDE-UP COMMENTS BOTTOM SHEET MODAL (< lg ONLY!)

@@ -781,9 +781,36 @@ export function HotelStorefrontClient({
     setSelectedPinId(prevPin.id);
   }, [pinHistoryStack, handleCloseHotelPin]);
 
+  const prevHotelPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activePin) return null;
+    if (pinHistoryStack.length > 0) {
+      return pinHistoryStack[pinHistoryStack.length - 1] ?? null;
+    }
+    if (storefront.pins.length <= 1) return null;
+    const idx = storefront.pins.findIndex((p) => p.id === activePin.id);
+    if (idx === -1) return storefront.pins[0] ?? null;
+    return (
+      storefront.pins[
+        (idx - 1 + storefront.pins.length) % storefront.pins.length
+      ] ?? null
+    );
+  }, [activePin, pinHistoryStack, storefront.pins]);
+
+  const nextHotelPinPreview = useMemo<PinFeedItemDto | null>(() => {
+    if (!activePin || storefront.pins.length <= 1) return null;
+    const idx = storefront.pins.findIndex((p) => p.id === activePin.id);
+    if (idx === -1) return storefront.pins[0] ?? null;
+    return storefront.pins[(idx + 1) % storefront.pins.length] ?? null;
+  }, [activePin, storefront.pins]);
+
   const handleNavigateHotelPin = useCallback(
     (direction: "prev" | "next") => {
-      if (!activePin || storefront.pins.length <= 1) return;
+      if (!activePin) return;
+      if (direction === "prev" && pinHistoryStack.length > 0) {
+        handleStepBackHotelPin();
+        return;
+      }
+      if (storefront.pins.length <= 1) return;
       const idx = storefront.pins.findIndex((p) => p.id === activePin.id);
       if (idx === -1) return;
       const nextIdx =
@@ -795,7 +822,13 @@ export function HotelStorefrontClient({
         handleSelectPinFromMasonry(nextPin);
       }
     },
-    [activePin, storefront.pins, handleSelectPinFromMasonry]
+    [
+      activePin,
+      pinHistoryStack.length,
+      storefront.pins,
+      handleStepBackHotelPin,
+      handleSelectPinFromMasonry,
+    ]
   );
 
   const handleSharePin = (pin: PinFeedItemDto) => {
@@ -1252,6 +1285,9 @@ export function HotelStorefrontClient({
             comments={activePinComments}
             savedPinIds={optimisticSavedIds}
             relatedPins={gridHotelPins}
+            prevPinPreview={prevHotelPinPreview}
+            nextPinPreview={nextHotelPinPreview}
+            mobileOverlayMode={true}
             canStepBack={pinHistoryStack.length > 0}
             onBack={handleStepBackHotelPin}
             onClose={handleCloseHotelPin}

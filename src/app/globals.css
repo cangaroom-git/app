@@ -901,3 +901,21 @@ html.dark .border-stone-300 {
     transition-duration: 0ms;
   }
 }
+
+/* ============================================================================
+   NATIVE WINDOW-SCROLL PIN DETAIL ON MOBILE/TABLET (< lg)
+   Allows Pin Detail + Related Masonry to scroll natively on `<body>` so iOS
+   Safari renders a 100% translucent frosted-glass bottom bar over the cards!
+   ============================================================================ */
+@media (max-width: 1023px) {
+  html[data-mobile-pin-open="true"] header[aria-label="Top navigation bar"] {
+    display: none !important;
+  }
+  html[data-mobile-pin-open="true"] main[data-cgr-app-main="true"] {
+    padding-top: 0 !important;
+  }
+  html[data-mobile-pin-open="true"] div[data-cgr-app-inner="true"] {
+    padding-inline: 0 !important;
+    padding-top: 0 !important;
+  }
+}
