@@ -789,6 +789,14 @@ function mergeWithDefaultStore(
         ...defaultStore.cms.guidePage,
         ...(incomingCms.guidePage || {}),
       },
+      pinComments: {
+        ...(defaultStore.cms.pinComments || {}),
+        ...(incomingCms.pinComments || {}),
+      },
+      pinLikes: {
+        ...(defaultStore.cms.pinLikes || {}),
+        ...(incomingCms.pinLikes || {}),
+      },
     },
   };
 }

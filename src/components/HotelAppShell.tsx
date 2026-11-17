@@ -197,6 +197,8 @@ export interface HotelAppContextValue {
   setRoomFilterMode: (mode: RoomFilterMode) => void;
   hideSoldOutRooms: boolean;
   setHideSoldOutRooms: React.Dispatch<React.SetStateAction<boolean>>;
+  globalSearchQuery: string;
+  setGlobalSearchQuery: (query: string) => void;
 }
 
 const HotelAppContext = createContext<HotelAppContextValue | null>(null);
@@ -289,11 +291,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   const [lang, setLangState] = useState<Lang>("th");
   const [theme, setThemeState] = useState<ThemeMode>("light");
+  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
 
   const applyThemeClassToDocument = useCallback((mode: ThemeMode) => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("dark", mode === "dark");
-    const themeColorValue = mode === "dark" ? "#242526" : "#ffffff";
+    const themeColorValue = mode === "dark" ? "#121212" : "#ffffff";
     const metaThemeTags = document.querySelectorAll('meta[name="theme-color"]');
     if (metaThemeTags.length > 0) {
       metaThemeTags.forEach((tag) =>
@@ -1388,6 +1391,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       setRoomFilterMode,
       hideSoldOutRooms,
       setHideSoldOutRooms,
+      globalSearchQuery,
+      setGlobalSearchQuery,
       cms,
       isEditMode,
       canShowEditControls,
@@ -1455,6 +1460,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       openShortsAt,
       roomFilterMode,
       hideSoldOutRooms,
+      globalSearchQuery,
     ]
   );
 
@@ -1479,8 +1485,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <HotelAppContext.Provider value={contextValue}>
-      <div className="min-h-screen pt-14 bg-[var(--color-background-body)] text-[var(--color-text-primary)] lg:pl-[244px] transition-colors duration-200">
-        {/* 1. Primary Navigation (Desktop Left Sidebar + Top Navbar + Mobile Bottom Bar & Profile Drawer) */}
+      <div className="min-h-screen pt-16 bg-[var(--color-background-body)] text-[var(--color-text-primary)] lg:pl-[72px] transition-colors duration-200">
+        {/* 1. Primary Navigation (Instagram 72px Minimal Left Rail + Pinterest Top Search Bar) */}
         <PrimaryNavigation
           activeTab={activeTab}
           onSelectTab={navigateToTab}
@@ -1504,6 +1510,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           isChatOpen={isChatDrawerOpen}
           isEditMode={isEditMode}
           onToggleEditMode={toggleEditMode}
+          searchQuery={globalSearchQuery}
+          onChangeSearchQuery={setGlobalSearchQuery}
         />
 
         {cmsToastMessage && (

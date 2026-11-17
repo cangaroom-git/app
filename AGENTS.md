@@ -6,10 +6,13 @@
 
 ## Core Summary of Mandatory Design Rules
 1. **STRICT FORBIDDEN RULE — NO HOVER SCALE ANYWHERE (ห้ามใช้ `hover` แล้ว `scale` ทั้งเว็บเด็ดขาด):**
-   - **NEVER** use `hover:scale-*`, `group-hover:scale-*`, or CSS `transform: scale(...)` on `:hover` on ANY image, card, button, or icon anywhere in the application. Hover feedback may only use subtle color, background, or opacity changes.
-2. **Pure Media Viewing Only (กดรูปหรือวิดีโอ ต้องเปิดดูแค่รูป/วิดีโอเท่านั้น):**
-   - Clicking a photo, photo album/carousel, or video thumbnail MUST open a pure, distraction-free media viewer (photo/video only) — **NEVER** force-open room specification details, countdown timers, or booking checkout drawers when the user simply wants to view media. Booking actions belong strictly on the `/booking` flow.
-3. **Facebook Comet Palette & Instagram Mixed Media Grid:**
-   - Always use CSS variables from `src/app/globals.css`: `--color-accent` (`#0866ff`), `--color-promo` (`#c53829`), `--color-background-body` (`#f2f4f7` Light / `#18191a` Dark), `--color-background-card` (`#ffffff` Light / `#242526` Dark), `--color-text-primary`, `--color-text-secondary`.
+   - **NEVER** use `hover:scale-*`, `group-hover:scale-*`, or CSS `transform: scale(...)` on `:hover` on ANY image, card, button, or icon anywhere in the application.
+2. **Instagram Left Sidebar (`72px`) + Pinterest Masonry & Pin Detail UI:**
+   - Desktop Left Sidebar (`w-[72px]`) uses Instagram's clean pure-white vertical icon rail (top brand mark, centered minimal outline/filled icons, bottom `≡` menu).
+   - Top bar features Pinterest's `#f1f1f1` full-width rounded search bar + user avatar.
+   - Home (`/`) uses a variable-height multi-column **Pinterest Masonry Grid** (`rounded-[16px]` pins). Clicking any pin opens **Pinterest's Split 2-Column Pin Close-Up Card** (`rounded-[28px]`) with live likes, save button (`#e60023`), description, **interactive comments**, and staggered related pins beside & below it.
+3. **Pinterest Gestalt Palette & Pure White Canvas:**
+   - Light Mode: Pure white `#ffffff` canvas, `#f1f1f1` / `#efefef` muted pills & search bar, `#111111` primary ink, `#767676` secondary gray, `#e60023` Save/Promo red, `#0866ff` booking accent.
+   - Dark Mode: `#121212` canvas, `#1e1e1e` cards, `#2b2b2b` muted pills, `#f5f5f5` primary ink.
 4. **Native System Font Stack & 5-Tier Scale:**
-   - Use Facebook's native `system-ui` font stack (`SF Pro + ThonburiUI` on macOS/iOS, `Segoe UI + Leelawadee UI` on Windows) and the 5-tier classes: `.ty-display` (24px), `.ty-title` (20px), `.ty-subtitle` (17px), `.ty-body` (15px), and `.ty-caption` (13px).
+   - Native `system-ui` font stack (`SF Pro + ThonburiUI` on macOS/iOS, `Segoe UI + Leelawadee UI` on Windows) with `.ty-display`, `.ty-title`, `.ty-subtitle`, `.ty-body`, and `.ty-caption`.

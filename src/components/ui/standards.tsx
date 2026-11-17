@@ -129,7 +129,7 @@ export function StandardButton({
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-[8px] font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
+      className={`inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}

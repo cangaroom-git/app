@@ -29,6 +29,7 @@ export default function BookingPage() {
     cms,
     canShowEditControls,
     openCmsEditor,
+    globalSearchQuery,
   } = useHotelApp();
 
   const [selectedCategoryFilter, setSelectedCategoryFilter] =
@@ -104,6 +105,16 @@ export default function BookingPage() {
       if (!isAvail) return false;
     }
 
+    if (globalSearchQuery.trim()) {
+      const q = globalSearchQuery.trim().toLowerCase();
+      const matchesSearch =
+        room.nameTh.toLowerCase().includes(q) ||
+        room.nameEn.toLowerCase().includes(q) ||
+        room.code.toLowerCase().includes(q) ||
+        room.shortDescTh.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+
     if (!selectedCategoryFilter || selectedCategoryFilter === "all") {
       return true;
     }
@@ -133,7 +144,7 @@ export default function BookingPage() {
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-4 select-none">
+    <div className="w-full max-w-[1040px] mx-auto min-w-0 space-y-4 select-none">
       {/* 1. DEDICATED DIRECT BOOKING SEARCH & FILTER HEADER CARD (No Duplicate Cover Photo!) */}
       <section className="app-card p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

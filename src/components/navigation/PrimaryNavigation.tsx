@@ -1,20 +1,26 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Building2,
   Calendar,
   CalendarCheck,
+  Clapperboard,
   Compass,
   Crown,
   Globe,
+  Heart,
+  Home,
   LayoutDashboard,
   LogIn,
   LogOut,
-  MessageCircle,
+  Menu,
   Moon,
   Pencil,
+  PlusSquare,
+  Search,
+  Send,
   ShoppingBag,
   Star,
   Sun,
@@ -22,9 +28,8 @@ import {
   X,
 } from "lucide-react";
 import { WhiteLabelPropertyConfig } from "@/data/rooms";
-import { LanguageCode } from "@/lib/dateFormatters";
+import { formatShortDate, LanguageCode } from "@/lib/dateFormatters";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
-import { StayDatePickerBar } from "@/components/booking/StayDatePickerBar";
 import {
   HOTEL_NAV_TABS,
   HotelNavTabIcon,
@@ -59,6 +64,8 @@ export interface PrimaryNavigationProps {
   isChatOpen?: boolean;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
+  searchQuery?: string;
+  onChangeSearchQuery?: (query: string) => void;
 }
 
 export function PrimaryNavigation({
@@ -69,7 +76,6 @@ export function PrimaryNavigation({
   onChangeLanguage,
   theme = "light",
   onToggleTheme,
-  brandCode,
   availableUnitsCount,
   availableRoomCount,
   pendingAdminCount = 0,
@@ -78,22 +84,19 @@ export function PrimaryNavigation({
   checkInDate,
   checkOutDate,
   guestCount = 2,
-  stayNights = 1,
-  isCalendarDrawerOpen = false,
   onOpenCalendarDrawer,
   isChatOpen = false,
   isEditMode = false,
   onToggleEditMode,
+  searchQuery = "",
+  onChangeSearchQuery,
 }: PrimaryNavigationProps) {
   const [isMobileProfileDrawerOpen, setIsMobileProfileDrawerOpen] =
     useState(false);
+  const [isMorePopoverOpen, setIsMorePopoverOpen] = useState(false);
+  const moreWrapperRef = useRef<HTMLDivElement | null>(null);
   const { user, refreshProfile, signOutUser } = useAuthenticatedProfile();
 
-  const brandBadgeCode = (
-    propertyConfig?.brandCode ??
-    brandCode ??
-    "SU"
-  ).slice(0, 2);
   const freeRoomCount = availableRoomCount ?? availableUnitsCount ?? 0;
   const isDarkTheme = theme === "dark";
 
@@ -116,314 +119,497 @@ export function PrimaryNavigation({
 
   useBodyScrollLock(isMobileProfileDrawerOpen);
 
+  useEffect(() => {
+    if (!isMorePopoverOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (
+        moreWrapperRef.current &&
+        !moreWrapperRef.current.contains(e.target as Node)
+      ) {
+        setIsMorePopoverOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMorePopoverOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [isMorePopoverOpen]);
+
   const propertyShortName =
     language === "th"
       ? propertyConfig?.nameTh?.split("(")[0]?.trim() || "สะปัน อันซีน"
       : propertyConfig?.nameEn || "Sapan Unseen";
 
-  const leftRailSecondaryItems: Array<{
-    id: HotelNavTabId;
-    labelTh: string;
-    labelEn: string;
-    icon: React.ReactNode;
-  }> = [
-    {
-      id: "review",
-      labelTh: "รีวิวผู้เข้าพัก",
-      labelEn: "Guest Reviews",
-      icon: <Star className="w-[18px] h-[18px]" />,
-    },
-    {
-      id: "guide",
-      labelTh: "แผนที่ & ที่เที่ยว",
-      labelEn: "Map & Guide",
-      icon: <Compass className="w-[18px] h-[18px]" />,
-    },
-    {
-      id: "setting",
-      labelTh: "การจองของฉัน",
-      labelEn: "My Bookings",
-      icon: <CalendarCheck className="w-[18px] h-[18px]" />,
-    },
-  ];
-
   return (
     <>
       {/* =====================================================================
-          1. FACEBOOK-STYLE ALWAYS-FIXED TOP BAR (h-14 = 56px)
+          1. INSTAGRAM-STYLE MINIMAL 72px LEFT SIDEBAR (>= lg)
+             - Top: Minimal monochrome brand glyph
+             - Center: Vertically centered pure icon stack + circular user avatar
+             - Bottom: Minimal Hamburger (≡) More menu
       ====================================================================== */}
-      <header
-        aria-label="Top navigation bar"
-        className="fixed top-0 inset-x-0 z-40 h-14 bg-[var(--color-background-card)] border-b border-[var(--color-border)] shadow-[0_1px_2px_rgba(0,0,0,0.06)] pr-[var(--scrollbar-compensation,0px)]"
+      <aside
+        aria-label="Primary sidebar navigation"
+        className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-[72px] flex-col items-center justify-between bg-[var(--color-background-card)] border-r border-[var(--color-border)] py-5 select-none"
       >
-        <div className="w-full h-full px-3 sm:px-4 lg:px-5 flex items-center justify-between gap-2">
-          {/* LEFT: Facebook-Style Brand Circle + Resort Title */}
-          <Link
-            href="/"
-            onClick={(event) => {
-              if (normalizedActiveTab === "home") {
-                event.preventDefault();
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              } else {
-                onSelectTab("home");
-              }
-            }}
-            aria-label="Home"
-            className="inline-flex items-center gap-2.5 min-w-0 shrink-0 cursor-pointer"
+        {/* TOP BRAND GLYPH (Clean Instagram Outline Aesthetic) */}
+        <Link
+          href="/"
+          onClick={(e) => {
+            if (normalizedActiveTab === "home") {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              onSelectTab("home");
+            }
+          }}
+          title={propertyShortName}
+          aria-label="Home"
+          className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="w-[24px] h-[24px]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <span className="h-10 w-10 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center font-bold ty-body shrink-0">
-              {brandBadgeCode}
-            </span>
-            <span className="hidden sm:block ty-subtitle font-bold text-[var(--color-text-primary)] truncate max-w-[200px] lg:max-w-[240px]">
-              {propertyShortName}
-            </span>
-          </Link>
+            <rect width="18" height="18" x="3" y="3" rx="5" />
+            <path d="M8 15.5 12 8.5l4 7" />
+            <circle cx="16.5" cy="7.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </Link>
 
-          {/* CENTER: Compact Date Search Pill (Always accessible like Facebook Search) */}
-          <div className="flex-1 max-w-[440px] flex items-center justify-center min-w-0">
-            {checkInDate && checkOutDate ? (
-              <StayDatePickerBar
-                isCompact
-                language={language}
-                checkInDate={checkInDate}
-                checkOutDate={checkOutDate}
-                guestCount={guestCount}
-                stayNights={stayNights}
-                availableRoomUnitsCount={freeRoomCount}
-                isCalendarOpen={isCalendarDrawerOpen}
-                onOpenCalendarDrawer={onOpenCalendarDrawer || (() => {})}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => onSelectTab("book")}
-                className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-medium inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-[var(--color-accent)]" />
-                <span>
-                  {language === "th" ? "เลือกวันเข้าพัก" : "Select Dates"}
-                </span>
-              </button>
+        {/* CENTER VERTICALLY BALANCED ICON STACK (Exact Instagram Rhythm) */}
+        <nav
+          aria-label="Main navigation"
+          className="flex flex-col items-center gap-2"
+        >
+          {/* 1. Home (Pinterest Masonry Feed) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("home");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            title={language === "th" ? "หน้าแรก" : "Home"}
+            aria-label="Home"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+          >
+            <Home
+              className="w-[24px] h-[24px]"
+              strokeWidth={normalizedActiveTab === "home" ? 2.6 : 1.9}
+              fill={normalizedActiveTab === "home" ? "currentColor" : "none"}
+            />
+          </button>
+
+          {/* 2. Reels / Short Videos */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("shorts");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            title={language === "th" ? "คลิปสั้น Reels" : "Reels"}
+            aria-label="Reels"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer"
+          >
+            <Clapperboard
+              className="w-[24px] h-[24px]"
+              strokeWidth={normalizedActiveTab === "shorts" ? 2.5 : 1.9}
+            />
+          </button>
+
+          {/* 3. Direct Message / AI Concierge (Instagram Paper Plane) */}
+          <button
+            type="button"
+            onClick={() => onSelectTab("chat")}
+            title={language === "th" ? "แชทสอบถามที่พัก" : "Messages"}
+            aria-label="Messages"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+          >
+            <Send
+              className="w-[23px] h-[23px]"
+              strokeWidth={isChatOpen ? 2.5 : 1.9}
+            />
+          </button>
+
+          {/* 4. Check Rooms & Book (/booking) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("book");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            title={language === "th" ? "เช็กห้องว่าง & จอง" : "Book Rooms"}
+            aria-label="Book Rooms"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+          >
+            <Calendar
+              className="w-[24px] h-[24px]"
+              strokeWidth={normalizedActiveTab === "book" ? 2.5 : 1.9}
+            />
+            {freeRoomCount > 0 && (
+              <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
             )}
-          </div>
+          </button>
 
-          {/* RIGHT: Facebook Action Circles (Messenger AI, Coupon Bag, Profile Avatar) */}
-          <div className="flex items-center justify-end gap-2 shrink-0">
-            {/* Desktop AI Chat Circle */}
-            <div className="hidden sm:block shrink-0">
-              <button
-                type="button"
-                onClick={() => onSelectTab("chat")}
-                aria-label={language === "th" ? "ทักแชท AI" : "AI Messenger"}
-                title={language === "th" ? "ทักแชทถามที่พัก" : "Ask AI Concierge"}
-                className={`btn-icon btn-icon-lg relative ${
-                  isChatOpen
-                    ? "!bg-[var(--color-accent-muted)] !text-[var(--color-accent)]"
-                    : ""
-                }`}
-              >
-                <MessageCircle className="w-5 h-5" />
-              </button>
-            </div>
+          {/* 5. Deals & Saved Coupons (Heart Icon like Instagram) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("deal");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            title={language === "th" ? "คูปอง & โปรโมชั่น" : "Deals & Coupons"}
+            aria-label="Deals"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative"
+          >
+            <Heart
+              className="w-[24px] h-[24px]"
+              strokeWidth={normalizedActiveTab === "deal" ? 2.5 : 1.9}
+              fill={normalizedActiveTab === "deal" ? "currentColor" : "none"}
+            />
+            {savedCouponsCount > 0 && (
+              <span className="absolute top-2.5 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
+            )}
+          </button>
 
-            {/* Coupon Bag Circle */}
+          {/* 6. Create / Live Edit (Instagram + Icon) */}
+          {isHotelOrSuperAdmin && onToggleEditMode ? (
             <button
               type="button"
-              onClick={onOpenCouponWallet}
-              aria-label={
-                language === "th" ? "กระเป๋าคูปองส่วนลด" : "Promo Coupon Bag"
-              }
+              onClick={onToggleEditMode}
               title={
-                language === "th" ? "กระเป๋าคูปองส่วนลด" : "Promo Coupon Bag"
+                isEditMode
+                  ? language === "th"
+                    ? "ปิดโหมดแก้ไขหน้าเว็บ"
+                    : "Exit Edit Mode"
+                  : language === "th"
+                  ? "แก้ไขหน้าเว็บจริง"
+                  : "Edit Live Page"
               }
-              className="btn-icon btn-icon-lg relative"
+              aria-label="Create or edit"
+              className={`h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer ${
+                isEditMode
+                  ? "text-[var(--color-accent)] bg-[var(--color-accent-muted)]"
+                  : "text-[var(--color-text-primary)]"
+              }`}
             >
-              <ShoppingBag className="w-5 h-5" />
-              {savedCouponsCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[19px] h-[19px] px-1 rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] ty-caption font-bold inline-flex items-center justify-center leading-none">
-                  {savedCouponsCount}
-                </span>
-              )}
+              <PlusSquare className="w-[24px] h-[24px]" strokeWidth={1.9} />
             </button>
+          ) : (
+            <Link
+              href="/register-hotel"
+              title={
+                language === "th"
+                  ? "สร้างเว็บที่พักฟรี 30 วัน"
+                  : "Create Hotel Site (30-Day Free Trial)"
+              }
+              aria-label="Create hotel site"
+              className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors"
+            >
+              <PlusSquare className="w-[24px] h-[24px]" strokeWidth={1.9} />
+            </Link>
+          )}
 
-            {/* Mobile & Tablet (< lg): Single Profile Avatar Trigger */}
-            <div className="lg:hidden shrink-0">
+          {/* 7. Profile Avatar in Stack (Matches Instagram Image 1) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectTab("setting");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            title={
+              user
+                ? `${user.name} · ${
+                    language === "th" ? "การจองของฉัน" : "My Bookings"
+                  }`
+                : language === "th"
+                ? "การจองของฉัน"
+                : "My Bookings"
+            }
+            aria-label="Profile and bookings"
+            className="h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <span
+              className={`rounded-full p-[1.5px] ${
+                normalizedActiveTab === "setting"
+                  ? "ring-2 ring-[var(--color-text-primary)]"
+                  : ""
+              }`}
+            >
+              <UserAvatarCircle
+                user={user}
+                sizeClass="h-6 w-6"
+                iconSizeClass="w-[22px] h-[22px]"
+              />
+            </span>
+          </button>
+        </nav>
+
+        {/* BOTTOM HAMBURGER (≡) MORE POPOVER (Exact Instagram Bottom-Left Menu) */}
+        <div ref={moreWrapperRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setIsMorePopoverOpen((v) => !v)}
+            title={language === "th" ? "เมนูเพิ่มเติม" : "More"}
+            aria-label="More menu"
+            className={`h-12 w-12 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer ${
+              isMorePopoverOpen ? "bg-[var(--color-background-muted)]" : ""
+            }`}
+          >
+            <Menu
+              className="w-[24px] h-[24px]"
+              strokeWidth={isMorePopoverOpen ? 2.5 : 1.9}
+            />
+          </button>
+
+          {isMorePopoverOpen && (
+            <div className="absolute left-0 bottom-[calc(100%+8px)] w-[256px] rounded-[16px] bg-[var(--color-background-popover)] p-2 shadow-[var(--shadow-popover)] border border-[var(--color-border)] space-y-0.5 z-50">
               <button
                 type="button"
-                aria-label={language === "th" ? "โปรไฟล์และเมนู" : "Profile menu"}
                 onClick={() => {
-                  refreshProfile();
-                  setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen);
+                  setIsMorePopoverOpen(false);
+                  onSelectTab("guide");
                 }}
-                className={`btn-icon btn-icon-lg relative ${
-                  user?.image ? "!p-0" : ""
-                }`}
+                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
               >
-                <UserAvatarCircle
-                  user={user}
-                  sizeClass="h-10 w-10"
-                  iconSizeClass="w-5 h-5"
-                />
-                {isHotelOrSuperAdmin && pendingAdminCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[var(--color-promo)] ring-2 ring-[var(--color-background-card)]" />
-                )}
+                <Compass className="w-[18px] h-[18px]" />
+                <span>
+                  {language === "th" ? "แผนที่ & ที่เที่ยวใกล้เคียง" : "Map & Local Guide"}
+                </span>
               </button>
-            </div>
 
-            {/* Desktop (>= lg): Facebook Profile Dropdown */}
-            <div className="hidden lg:block shrink-0">
-              <UserProfileDropdown
-                language={language}
-                onToggleLanguage={handleToggleLanguage}
-                isDarkTheme={isDarkTheme}
-                onToggleTheme={onToggleTheme}
-                activeTab={normalizedActiveTab}
-                onSelectTab={onSelectTab}
-                savedCouponsCount={savedCouponsCount}
-                onOpenCouponWallet={onOpenCouponWallet}
-                pendingAdminCount={pendingAdminCount}
-                isEditMode={isEditMode}
-                onToggleEditMode={onToggleEditMode}
-              />
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMorePopoverOpen(false);
+                  onSelectTab("review");
+                }}
+                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body cursor-pointer"
+              >
+                <Star className="w-[18px] h-[18px]" />
+                <span>
+                  {language === "th" ? "รีวิวผู้เข้าพักจริง" : "Guest Reviews"}
+                </span>
+              </button>
+
+              {onToggleTheme && (
+                <button
+                  type="button"
+                  onClick={onToggleTheme}
+                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
+                >
+                  <span className="flex items-center gap-3">
+                    {isDarkTheme ? (
+                      <Moon className="w-[18px] h-[18px]" />
+                    ) : (
+                      <Sun className="w-[18px] h-[18px]" />
+                    )}
+                    <span>
+                      {language === "th" ? "สลับโหมดสี" : "Switch appearance"}
+                    </span>
+                  </span>
+                  <span className="ty-caption font-semibold">
+                    {isDarkTheme ? "Dark" : "Light"}
+                  </span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleToggleLanguage}
+                className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body cursor-pointer"
+              >
+                <span className="flex items-center gap-3">
+                  <Globe className="w-[18px] h-[18px]" />
+                  <span>{language === "th" ? "ภาษา" : "Language"}</span>
+                </span>
+                <span className="ty-caption font-semibold">
+                  {language === "th" ? "TH" : "EN"}
+                </span>
+              </button>
+
+              {isHotelOrSuperAdmin && (
+                <>
+                  <div className="my-1 border-t border-[var(--color-border)]" />
+                  <Link
+                    href={adminHref}
+                    onClick={() => setIsMorePopoverOpen(false)}
+                    className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body"
+                  >
+                    <span className="flex items-center gap-3">
+                      <LayoutDashboard className="w-[18px] h-[18px]" />
+                      <span>Hotel Admin</span>
+                    </span>
+                    {pendingAdminCount > 0 && (
+                      <span className="badge-promo">{pendingAdminCount}</span>
+                    )}
+                  </Link>
+                  {user?.role === "SUPER_ADMIN" && (
+                    <Link
+                      href="/super-admin"
+                      onClick={() => setIsMorePopoverOpen(false)}
+                      className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body"
+                    >
+                      <Crown className="w-[18px] h-[18px] text-[var(--color-accent)]" />
+                      <span>Super Admin</span>
+                    </Link>
+                  )}
+                </>
+              )}
+
+              <div className="my-1 border-t border-[var(--color-border)]" />
+              {user ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await signOutUser();
+                    setIsMorePopoverOpen(false);
+                  }}
+                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body text-[var(--color-error)] cursor-pointer"
+                >
+                  <LogOut className="w-[18px] h-[18px]" />
+                  <span>{language === "th" ? "ออกจากระบบ" : "Log out"}</span>
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  onClick={() => setIsMorePopoverOpen(false)}
+                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold"
+                >
+                  <LogIn className="w-[18px] h-[18px]" />
+                  <span>{language === "th" ? "เข้าสู่ระบบ" : "Log in"}</span>
+                </Link>
+              )}
             </div>
+          )}
+        </div>
+      </aside>
+
+      {/* =====================================================================
+          2. PINTEREST-STYLE TOP SEARCH BAR (h-16, pure white #FFFFFF)
+      ====================================================================== */}
+      <header
+        aria-label="Top search bar"
+        className="fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)] px-3 sm:px-5 flex items-center gap-2.5 sm:gap-3 pr-[var(--scrollbar-compensation,0.75rem)]"
+      >
+        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Pill */}
+        <div className="flex-1 h-12 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
+          <Search className="w-[18px] h-[18px] text-[var(--color-text-secondary)] shrink-0" />
+
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onChangeSearchQuery?.(e.target.value)}
+            placeholder={
+              language === "th"
+                ? `ค้นหาใน ${propertyShortName} (เช่น วิวหมอก, อ่างแช่น้ำ, บ้านพัก A1, รีวิว)...`
+                : `Search ${propertyShortName} (villas, mist view, bathtub, reviews)...`
+            }
+            aria-label={language === "th" ? "ค้นหา" : "Search"}
+            className="flex-1 min-w-0 bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+          />
+
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onChangeSearchQuery?.("")}
+              aria-label="Clear search"
+              className="h-6 w-6 rounded-full bg-[var(--color-text-secondary)]/25 hover:bg-[var(--color-text-secondary)]/40 flex items-center justify-center cursor-pointer shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Right-Inside-Search-Pill Quick Date Picker Trigger */}
+          {checkInDate && checkOutDate && (
+            <button
+              type="button"
+              onClick={onOpenCalendarDrawer}
+              title={
+                language === "th"
+                  ? "เลือกวันเช็กอิน - เช็กเอาท์"
+                  : "Select stay dates"
+              }
+              className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
+            >
+              <Calendar className="w-3.5 h-3.5 text-[var(--color-promo)]" />
+              <span>
+                {formatShortDate(checkInDate, language)} · {guestCount}{" "}
+                {language === "th" ? "ท่าน" : "guests"}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Right Action Icons: Saved Coupons + Single User Avatar */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={onOpenCouponWallet}
+            aria-label={
+              language === "th" ? "กระเป๋าคูปองส่วนลด" : "Saved Coupons"
+            }
+            title={language === "th" ? "กระเป๋าคูปองส่วนลด" : "Saved Coupons"}
+            className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] relative transition cursor-pointer"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            {savedCouponsCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[11px] font-bold inline-flex items-center justify-center leading-none">
+                {savedCouponsCount}
+              </span>
+            )}
+          </button>
+
+          {/* Mobile/Tablet (< lg): Single Profile Avatar */}
+          <div className="lg:hidden shrink-0">
+            <button
+              type="button"
+              aria-label={language === "th" ? "โปรไฟล์และเมนู" : "Profile menu"}
+              onClick={() => {
+                refreshProfile();
+                setIsMobileProfileDrawerOpen((prevOpen) => !prevOpen);
+              }}
+              className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center relative cursor-pointer"
+            >
+              <UserAvatarCircle
+                user={user}
+                sizeClass="h-8 w-8"
+                iconSizeClass="w-5 h-5"
+              />
+            </button>
+          </div>
+
+          {/* Desktop (>= lg): Single Profile Avatar + Dropdown */}
+          <div className="hidden lg:block shrink-0">
+            <UserProfileDropdown
+              language={language}
+              onToggleLanguage={handleToggleLanguage}
+              isDarkTheme={isDarkTheme}
+              onToggleTheme={onToggleTheme}
+              activeTab={normalizedActiveTab}
+              onSelectTab={onSelectTab}
+              savedCouponsCount={savedCouponsCount}
+              onOpenCouponWallet={onOpenCouponWallet}
+              pendingAdminCount={pendingAdminCount}
+              isEditMode={isEditMode}
+              onToggleEditMode={onToggleEditMode}
+            />
           </div>
         </div>
       </header>
 
       {/* =====================================================================
-          2. FACEBOOK-STYLE DESKTOP LEFT NAVIGATION RAIL (>= lg, w-[244px])
-             - Always readable, sits cleanly on #F2F4F7 wash without hover-jumping
-      ====================================================================== */}
-      <aside
-        aria-label="Primary sidebar navigation"
-        className="hidden lg:flex fixed top-14 bottom-0 left-0 z-30 w-[244px] flex-col justify-between bg-[var(--color-background-body)] py-3 px-2.5 overflow-y-auto select-none"
-      >
-        <div className="space-y-1">
-          {HOTEL_NAV_TABS.filter((tab) => tab.id !== "chat").map((tab) => {
-            const isTabActive = normalizedActiveTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  onSelectTab(tab.id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className={`w-full h-11 rounded-[8px] flex items-center justify-between px-2.5 ty-body transition-colors cursor-pointer ${
-                  isTabActive
-                    ? "bg-[var(--color-background-subtle)] font-semibold text-[var(--color-accent)]"
-                    : "hover:bg-[var(--color-overlay-hover)] font-medium text-[var(--color-text-primary)]"
-                }`}
-              >
-                <span className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                      isTabActive
-                        ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                        : "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    <HotelNavTabIcon
-                      id={tab.id}
-                      isActive={false}
-                      cutoutColor="transparent"
-                      className="w-[18px] h-[18px]"
-                    />
-                  </span>
-                  <span className="truncate">
-                    {language === "th" ? tab.labelTh : tab.labelEn}
-                  </span>
-                </span>
-
-                {tab.id === "book" && freeRoomCount > 0 && (
-                  <span className="rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] px-2 py-0.5 ty-caption font-semibold">
-                    {freeRoomCount}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div className="my-2 border-t border-[var(--color-border)] mx-2" />
-
-          {leftRailSecondaryItems.map((item) => {
-            const isTabActive = normalizedActiveTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  onSelectTab(item.id);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className={`w-full h-11 rounded-[8px] flex items-center gap-3 px-2.5 ty-body transition-colors cursor-pointer ${
-                  isTabActive
-                    ? "bg-[var(--color-background-subtle)] font-semibold text-[var(--color-accent)]"
-                    : "hover:bg-[var(--color-overlay-hover)] font-medium text-[var(--color-text-primary)]"
-                }`}
-              >
-                <span
-                  className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                    isTabActive
-                      ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                      : "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  {item.icon}
-                </span>
-                <span className="truncate">
-                  {language === "th" ? item.labelTh : item.labelEn}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Bottom Platform CTA / Admin Quick Link */}
-        <div className="pt-3 border-t border-[var(--color-border)] px-1 space-y-2">
-          {isHotelOrSuperAdmin ? (
-            <Link
-              href={adminHref}
-              className="w-full h-10 px-3 rounded-[8px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] shadow-[var(--shadow-card)] flex items-center justify-between ty-body font-semibold text-[var(--color-text-primary)] transition"
-            >
-              <span className="flex items-center gap-2.5">
-                <LayoutDashboard className="w-4 h-4 text-[var(--color-accent)]" />
-                <span>
-                  {language === "th" ? "จัดการที่พัก" : "Hotel Admin"}
-                </span>
-              </span>
-              {pendingAdminCount > 0 && (
-                <span className="badge-promo">{pendingAdminCount}</span>
-              )}
-            </Link>
-          ) : (
-            <Link
-              href="/register-hotel"
-              className="w-full px-3 py-2.5 rounded-[10px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] shadow-[var(--shadow-card)] flex items-center gap-2.5 transition"
-            >
-              <span className="h-8 w-8 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="ty-caption font-bold text-[var(--color-text-primary)] truncate">
-                  {language === "th"
-                    ? "สำหรับเจ้าของที่พัก"
-                    : "For Hotel Owners"}
-                </p>
-                <p className="ty-caption text-[var(--color-accent)] font-semibold truncate">
-                  {language === "th"
-                    ? "ทดลองเปิดเว็บฟรี 30 วัน"
-                    : "30-Day Free Trial"}
-                </p>
-              </div>
-            </Link>
-          )}
-          <p className="px-2 ty-caption">Cangaroom · Direct Booking</p>
-        </div>
-      </aside>
-
-      {/* =====================================================================
-          3. MOBILE PROFILE & MENU RIGHT SIDEBAR DRAWER
+          3. MOBILE PROFILE RIGHT SIDEBAR DRAWER (< lg)
       ====================================================================== */}
       {isMobileProfileDrawerOpen && (
         <div
@@ -470,7 +656,7 @@ export function PrimaryNavigation({
                 <Link
                   href="/login"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-10 px-3.5 rounded-[8px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
+                  className="w-full h-10 px-3.5 rounded-full bg-[var(--color-promo)] text-[var(--color-on-promo)] flex items-center justify-center gap-2 ty-body font-semibold transition mb-2"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>
@@ -486,9 +672,8 @@ export function PrimaryNavigation({
                 onClick={() => {
                   onSelectTab("setting");
                   setIsMobileProfileDrawerOpen(false);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium cursor-pointer"
               >
                 <CalendarCheck className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -502,7 +687,7 @@ export function PrimaryNavigation({
                   setIsMobileProfileDrawerOpen(false);
                   onOpenCouponWallet();
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium cursor-pointer"
               >
                 <span className="flex items-center gap-3">
                   <TicketPercent className="w-5 h-5 text-[var(--color-promo-text)]" />
@@ -520,9 +705,8 @@ export function PrimaryNavigation({
                 onClick={() => {
                   onSelectTab("review");
                   setIsMobileProfileDrawerOpen(false);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium cursor-pointer"
               >
                 <Star className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -535,9 +719,8 @@ export function PrimaryNavigation({
                 onClick={() => {
                   onSelectTab("guide");
                   setIsMobileProfileDrawerOpen(false);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium cursor-pointer"
               >
                 <Compass className="w-5 h-5 text-[var(--color-text-secondary)]" />
                 <span>
@@ -556,11 +739,7 @@ export function PrimaryNavigation({
                         setIsMobileProfileDrawerOpen(false);
                         onToggleEditMode();
                       }}
-                      className={`w-full h-11 px-2.5 rounded-[8px] flex items-center justify-between ty-body font-medium transition cursor-pointer ${
-                        isEditMode
-                          ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] font-semibold"
-                          : "hover:bg-[var(--color-background-muted)]"
-                      }`}
+                      className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium cursor-pointer"
                     >
                       <span className="flex items-center gap-3">
                         <Pencil className="w-5 h-5 text-[var(--color-accent)]" />
@@ -579,15 +758,11 @@ export function PrimaryNavigation({
                   <Link
                     href={adminHref}
                     onClick={() => setIsMobileProfileDrawerOpen(false)}
-                    className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition"
+                    className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium"
                   >
                     <span className="flex items-center gap-3">
                       <LayoutDashboard className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                      <span>
-                        {language === "th"
-                          ? "จัดการที่พัก (Admin)"
-                          : "Hotel Admin"}
-                      </span>
+                      <span>Hotel Admin</span>
                     </span>
                     {pendingAdminCount > 0 && (
                       <span className="badge-promo">{pendingAdminCount}</span>
@@ -598,14 +773,10 @@ export function PrimaryNavigation({
                     <Link
                       href="/super-admin"
                       onClick={() => setIsMobileProfileDrawerOpen(false)}
-                      className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium transition"
+                      className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium"
                     >
                       <Crown className="w-5 h-5 text-[var(--color-accent)]" />
-                      <span>
-                        {language === "th"
-                          ? "ระบบแพลตฟอร์ม (Super Admin)"
-                          : "Super Admin"}
-                      </span>
+                      <span>Super Admin</span>
                     </Link>
                   )}
                 </>
@@ -613,7 +784,7 @@ export function PrimaryNavigation({
                 <Link
                   href="/register-hotel"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold text-[var(--color-accent)] transition"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-semibold text-[var(--color-accent)]"
                 >
                   <Building2 className="w-5 h-5" />
                   <span>
@@ -630,7 +801,7 @@ export function PrimaryNavigation({
                 <button
                   type="button"
                   onClick={onToggleTheme}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium cursor-pointer"
                 >
                   <span className="flex items-center gap-3">
                     {isDarkTheme ? (
@@ -643,13 +814,7 @@ export function PrimaryNavigation({
                     </span>
                   </span>
                   <span className="ty-caption font-semibold">
-                    {language === "th"
-                      ? isDarkTheme
-                        ? "โหมดมืด"
-                        : "โหมดสว่าง"
-                      : isDarkTheme
-                      ? "Dark"
-                      : "Light"}
+                    {isDarkTheme ? "Dark" : "Light"}
                   </span>
                 </button>
               )}
@@ -657,14 +822,14 @@ export function PrimaryNavigation({
               <button
                 type="button"
                 onClick={handleToggleLanguage}
-                className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium transition cursor-pointer"
+                className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium cursor-pointer"
               >
                 <span className="flex items-center gap-3">
                   <Globe className="w-5 h-5 text-[var(--color-text-secondary)]" />
                   <span>{language === "th" ? "ภาษา" : "Language"}</span>
                 </span>
                 <span className="ty-caption font-semibold">
-                  {language === "th" ? "ภาษาไทย" : "English"}
+                  {language === "th" ? "TH" : "EN"}
                 </span>
               </button>
 
@@ -675,12 +840,10 @@ export function PrimaryNavigation({
                     await signOutUser();
                     setIsMobileProfileDrawerOpen(false);
                   }}
-                  className="w-full h-11 px-2.5 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium text-[var(--color-error)] transition cursor-pointer"
+                  className="w-full h-11 px-3 rounded-[12px] hover:bg-[var(--color-background-muted)] flex items-center gap-3 ty-body font-medium text-[var(--color-error)] cursor-pointer"
                 >
                   <LogOut className="w-5 h-5" />
-                  <span>
-                    {language === "th" ? "ออกจากระบบ" : "Log Out"}
-                  </span>
+                  <span>{language === "th" ? "ออกจากระบบ" : "Log Out"}</span>
                 </button>
               )}
             </nav>
@@ -689,8 +852,7 @@ export function PrimaryNavigation({
       )}
 
       {/* =====================================================================
-          4. CLEAN FACEBOOK-STYLE MOBILE BOTTOM TAB BAR (< lg)
-             - Flat, clean, zero floating cartoon bubbles
+          4. MINIMAL INSTAGRAM-STYLE MOBILE BOTTOM ICON BAR (< lg)
       ====================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
@@ -698,7 +860,7 @@ export function PrimaryNavigation({
           normalizedActiveTab === "chat" ? "hidden" : "lg:hidden"
         } fixed inset-x-0 bottom-0 z-40 bg-[var(--color-background-card)] border-t border-[var(--color-border)] pb-[env(safe-area-inset-bottom)] select-none`}
       >
-        <div className="max-w-[540px] mx-auto px-1 h-[54px] grid grid-cols-5 items-stretch">
+        <div className="max-w-[540px] mx-auto px-2 h-[52px] grid grid-cols-5 items-center">
           {HOTEL_NAV_TABS.map((tab) => {
             const effectiveActiveTab: HotelNavTabId = isChatOpen
               ? "chat"
@@ -718,38 +880,26 @@ export function PrimaryNavigation({
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }
                 }}
-                className={`relative flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
+                className={`h-full flex items-center justify-center transition-colors cursor-pointer ${
                   isTabActive
-                    ? "text-[var(--color-accent)]"
+                    ? "text-[var(--color-text-primary)]"
                     : "text-[var(--color-text-secondary)]"
                 }`}
               >
-                {isTabActive && (
-                  <span className="absolute top-0 inset-x-3 h-[2.5px] rounded-b-full bg-[var(--color-accent)]" />
-                )}
-                <span className="relative flex items-center justify-center h-6">
+                <span className="relative flex items-center justify-center">
                   {tab.id === "chat" ? (
-                    <MessageCircle className="w-[21px] h-[21px]" />
+                    <Send
+                      className="w-[22px] h-[22px]"
+                      strokeWidth={isTabActive ? 2.5 : 1.9}
+                    />
                   ) : (
                     <HotelNavTabIcon
                       id={tab.id}
                       isActive={isTabActive}
                       cutoutColor="var(--color-background-card)"
-                      className="w-[21px] h-[21px]"
+                      className="w-[22px] h-[22px]"
                     />
                   )}
-                  {tab.id === "book" && freeRoomCount > 0 && (
-                    <span className="absolute -top-1 -right-2.5 h-4 min-w-[16px] px-1 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] text-[11px] font-bold inline-flex items-center justify-center leading-none">
-                      {freeRoomCount}
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={`text-[11px] leading-tight whitespace-nowrap ${
-                    isTabActive ? "font-semibold" : "font-normal"
-                  }`}
-                >
-                  {language === "th" ? tab.labelTh : tab.labelEn}
                 </span>
               </button>
             );

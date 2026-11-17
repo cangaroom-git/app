@@ -248,6 +248,16 @@ export interface GuidePageCmsConfig {
   faqs: GuideFaqItem[];
 }
 
+export interface PinCommentItem {
+  id: string;
+  authorName: string;
+  authorEmail?: string;
+  authorAvatar?: string | null;
+  text: string;
+  createdAtIso: string;
+  likes: number;
+}
+
 export interface SiteCmsContent {
   home: HomeCmsConfig;
   bookingPage: BookingPageCmsConfig;
@@ -256,6 +266,8 @@ export interface SiteCmsContent {
   dealPage: DealPageCmsConfig;
   reviews: ManagedGuestReview[];
   guidePage: GuidePageCmsConfig;
+  pinComments?: Record<string, PinCommentItem[]>;
+  pinLikes?: Record<string, number>;
 }
 
 const ROOM_INDEX_TO_DEFAULT_ROOM_ID = [
@@ -800,6 +812,34 @@ export const INITIAL_SITE_CMS_CONTENT: SiteCmsContent = {
         aEn: "Once you select your dates and submit your booking details, the system holds your villa for 15 minutes and generates a PromptPay QR code. Upload your transfer slip and our system automatically verifies the slip QR code.",
       },
     ],
+  },
+  pinComments: {
+    "room-room-a1": [
+      {
+        id: "seed-c1",
+        authorName: "กมลชนก พ.",
+        authorAvatar:
+          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80",
+        text: "ไปพักหลัง A1 มาเมื่อเดือนก่อน ตื่นเช้ามาเจอหมอกลอยผ่านหน้าระเบียงแบบนี้เลยค่ะ ประทับใจมาก ❤️",
+        createdAtIso: "2026-11-10T08:30:00.000Z",
+        likes: 12,
+      },
+      {
+        id: "seed-c2",
+        authorName: "Napat K.",
+        authorAvatar:
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80",
+        text: "แสงตอนเช้าสวยจริงครับ กาแฟดริปที่เสิร์ฟหน้าห้องหอมมาก",
+        createdAtIso: "2026-11-14T11:15:00.000Z",
+        likes: 5,
+      },
+    ],
+  },
+  pinLikes: {
+    "room-room-a1": 48,
+    "room-room-a2": 34,
+    "room-room-a3": 62,
+    "room-room-a4": 29,
   },
 };
 
