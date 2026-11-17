@@ -639,10 +639,10 @@ export function StudioCouponsAndProfileTab({
                   key={style.id}
                   type="button"
                   onClick={() => toggleStyle(style.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-colors cursor-pointer ${
                     active
                       ? "bg-[#111111] text-white dark:bg-[#f5f5f5] dark:text-[#111111]"
-                      : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
+                      : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   }`}
                 >
                   {style.labelTh}

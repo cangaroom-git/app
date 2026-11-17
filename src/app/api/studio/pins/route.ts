@@ -13,6 +13,7 @@ const CreatePinSchema = z.object({
   titleTh: z.string().trim().min(2).max(160),
   descriptionTh: z.string().trim().max(800).optional(),
   coverImageUrl: z.string().trim().min(1),
+  mediaUrls: z.array(z.string().trim().min(1)).optional(),
   videoUrl: z.string().trim().optional().nullable(),
   aspectRatio: z.string().trim().optional(),
   stayStyles: z.array(z.string()).optional(),
@@ -42,6 +43,13 @@ export async function POST(request: Request) {
         ? parsed.data.stayStyles
         : hotel.stayStyles;
 
+    const allMediaUrls = Array.from(
+      new Set([
+        parsed.data.coverImageUrl,
+        ...(parsed.data.mediaUrls ?? []),
+      ])
+    );
+
     const pin = await prisma.pin.create({
       data: {
         hotelId: hotel.id,
@@ -51,9 +59,9 @@ export async function POST(request: Request) {
         titleTh: parsed.data.titleTh,
         descriptionTh: parsed.data.descriptionTh || "",
         coverImageUrl: parsed.data.coverImageUrl,
-        mediaUrls: [parsed.data.coverImageUrl],
+        mediaUrls: allMediaUrls,
         videoUrl: parsed.data.videoUrl || null,
-        aspectRatio: parsed.data.aspectRatio || "aspect-[4/5]",
+        aspectRatio: parsed.data.aspectRatio || "aspect-[3/4]",
         provinceId: hotel.provinceId,
         stayStyles: styles,
         semanticTags: styles,

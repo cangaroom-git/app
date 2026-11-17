@@ -223,7 +223,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isLoading}
                 onClick={handleGoogleLogin}
-                className="w-full h-11 rounded-[10px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 transition cursor-pointer disabled:opacity-50"
+                className="w-full h-11 rounded-[14px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center justify-center gap-2.5 px-4 transition cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

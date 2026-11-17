@@ -101,6 +101,23 @@ enum ContactChannel {
   PHONE
 }
 
+enum TelemetryEventType {
+  PIN_IMPRESSION
+  PIN_OPEN
+  PIN_DWELL
+  CAROUSEL_SWIPE
+  MEDIA_EXPAND
+  VIDEO_PROGRESS
+  PIN_SAVE
+  PIN_LIKE
+  PIN_SHARE
+  HOTEL_PROFILE_VIEW
+  ROOM_CALENDAR_SELECT
+  COUPON_CLAIM
+  BOOKING_INITIATE
+  SEARCH_FILTER
+}
+
 model User {
   id           String             @id @default(cuid())
   email        String             @unique
@@ -116,8 +133,10 @@ model User {
   commentLikes PinCommentLike[]
   boards       SavedBoard[]
   boardPins    SavedBoardPin[]
-  couponWallet UserCouponWallet[]
-  bookings     Booking[]
+  couponWallet    UserCouponWallet[]
+  bookings        Booking[]
+  tasteProfile    VisitorTasteProfile?
+  telemetryEvents TelemetryEvent[]
 }
 
 model Hotel {
@@ -550,4 +569,63 @@ model HotelPost {
 
   @@unique([hotelId, slug])
   @@index([hotelId, status, publishedAt])
+}
+
+model VisitorTasteProfile {
+  id                  String   @id @default(cuid())
+  visitorId           String   @unique
+  userId              String?  @unique
+  user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentLevel        String   @default("ANALYTICS")
+  consentUpdatedAt    DateTime @default(now())
+  inferredProvinceId  String?
+  inferredRegion      String?
+  deviceType          String   @default("desktop")
+  osFamily            String   @default("other")
+  viewportBucket      String   @default("lg")
+  preferredLang       String   @default("th")
+  preferredTheme      String   @default("light")
+  styleWeightsJson    Json     @default("{}")
+  provinceWeightsJson Json     @default("{}")
+  tagWeightsJson      Json     @default("{}")
+  priceSumWeighted    Float    @default(0)
+  priceWeightTotal    Float    @default(0)
+  preferredGuests     Int      @default(2)
+  recentViewedPinIds  String[] @default([])
+  recentSkippedPinIds String[] @default([])
+  totalSessions       Int      @default(1)
+  totalPinOpens       Int      @default(0)
+  totalDwellSec       Int      @default(0)
+  lastActiveAt        DateTime @default(now())
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([lastActiveAt])
+  @@index([expiresAt])
+  @@index([inferredProvinceId])
+}
+
+model TelemetryEvent {
+  id               String             @id @default(cuid())
+  visitorId        String?
+  userId           String?
+  user             User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId        String
+  eventType        TelemetryEventType
+  pinId            String?
+  hotelId          String?
+  provinceId       String?
+  originProvinceId String?
+  deviceType       String             @default("desktop")
+  dwellMs          Int?
+  carouselDepth    Int?
+  metadataJson     Json?
+  createdAt        DateTime           @default(now())
+  expiresAt        DateTime
+
+  @@index([hotelId, eventType, createdAt])
+  @@index([pinId, eventType, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([expiresAt])
 }

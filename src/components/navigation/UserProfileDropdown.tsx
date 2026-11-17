@@ -232,7 +232,7 @@ export function UserProfileDropdown({
                 href="/login"
                 role="menuitem"
                 onClick={() => setIsDropdownOpen(false)}
-                className="w-full h-10 px-3.5 rounded-[12px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] flex items-center justify-center gap-2 ty-body font-semibold transition"
+                className="w-full h-10 px-3.5 rounded-[12px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] flex items-center justify-center gap-2 ty-body font-semibold transition-opacity"
               >
                 <LogIn className="w-4 h-4" />
                 <span>

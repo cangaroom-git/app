@@ -288,7 +288,7 @@ export default function RegisterHotelPage() {
                         key={t.id}
                         type="button"
                         onClick={() => toggleStyle(t.id)}
-                        className={`h-9 px-3.5 rounded-full ty-caption font-semibold cursor-pointer transition ${
+                        className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold cursor-pointer transition ${
                           isPicked
                             ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                             : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]"

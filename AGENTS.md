@@ -17,9 +17,10 @@
    - **NEVER** use `bg-gradient-*` or pastel tinted boxes (`--color-promo-muted`, `--color-accent-muted`, `--color-warning-muted`, `--color-success-muted`) on UI cards or section headers.
 3. **STRICT 95/5 MONOCHROME PALETTE & 2-BUTTON HIERARCHY**:
    - **95% Monochrome**: Pure white `#ffffff` (`#121212` Dark) canvas, `#ffffff` (`#1e1e1e` Dark) bordered cards, `#efefef` / `#f2f2f2` (`#262626` Dark) secondary surfaces, `#111111` (`#f5f5f5` Dark) primary ink, `#737373` (`#a3a3a3` Dark) secondary ink.
-   - **2 Buttons Only**:
+   - **2 Buttons Only & Ironclad Unified Squircle Curvature**:
      - **Primary Button**: Solid `#111111` ink (`#f5f5f5` Dark) for primary actions (`จองห้องพัก`, `เก็บคูปอง`, `ค้นหา`, `บันทึกข้อมูล`).
      - **Secondary Button**: Flat `#efefef` (`#262626` Dark) with `#111111` ink for secondary actions (`ดูรายละเอียด`, `ทัก LINE`, `Facebook`, `คัดลอกโค้ด`).
+     - **Unified Squircle Curvature**: Every `<button>` and `<input>` across the app MUST use squircle radii matching the `48px` (`rounded-[16px]`) Mobile Bottom Menu (`rounded-[10px]`–`rounded-[16px]`); **NEVER** use `rounded-full` on buttons or inputs.
      - **FORBIDDEN**: Never use `#0866ff` blue buttons, `#06c755` green buttons, or colored section eyebrows/headings.
    - **5% Reserved Red (`#e60023`)**: Allowed **ONLY** on the Pin `'บันทึก'` (`Save`) button and tiny notification count badges/dots in navigation. Status indicators use a `6px` dot inside a monochrome `#efefef` pill.
 4. **UNIFIED APP SHELL & 3-TIER CONTAINER GRID (Exact Margins & Paddings Everywhere)**:

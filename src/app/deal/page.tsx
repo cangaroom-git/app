@@ -25,8 +25,6 @@ export default function DealMarketplacePage() {
   const {
     lang: language,
     user: currentUser,
-    selectedProvinceId,
-    setSelectedProvinceId,
     globalSearchQuery,
     setGlobalSearchQuery,
     walletCoupons,
@@ -50,9 +48,7 @@ export default function DealMarketplacePage() {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const qs = new URLSearchParams();
-      if (selectedProvinceId) qs.set("provinceId", selectedProvinceId);
-      const res = await fetch(`/api/deals?${qs.toString()}`, {
+      const res = await fetch("/api/deals", {
         cache: "no-store",
       });
       if (!res.ok) {
@@ -69,7 +65,7 @@ export default function DealMarketplacePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProvinceId, language]);
+  }, [language]);
 
   useEffect(() => {
     loadDeals();
@@ -124,44 +120,59 @@ export default function DealMarketplacePage() {
     });
   };
 
+  // Zero-Dead-End Search Ranking on /deal: ranks exact matches first, then style/region matches, then all remaining deals
   const filteredDeals = useMemo(() => {
     const q = globalSearchQuery.trim().toLowerCase();
-    const list = deals.filter((d) => {
-      if (activeStyleTab !== "all" && !d.stayStyles.includes(activeStyleTab)) {
-        return false;
-      }
-      if (q) {
-        const hay = [
-          d.code,
-          d.titleTh,
-          d.titleEn,
-          d.hotelNameTh,
-          d.hotelNameEn,
-          d.provinceNameTh,
-          d.provinceNameEn,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
+    const baseList =
+      activeStyleTab === "all" || q
+        ? deals
+        : deals.filter((d) => d.stayStyles.includes(activeStyleTab));
 
-    return list;
+    if (!q) return baseList;
+
+    const tokens = q.split(/\s+/).filter((t) => t.length >= 2);
+    const terms = tokens.length > 0 ? tokens : [q];
+
+    return [...baseList].sort((a, b) => {
+      const scoreDeal = (d: CouponDealDto) => {
+        let sc = 0;
+        const hotelTh = d.hotelNameTh.toLowerCase();
+        const hotelEn = d.hotelNameEn.toLowerCase();
+        const provTh = d.provinceNameTh.toLowerCase();
+        const provEn = d.provinceNameEn.toLowerCase();
+        const titleTh = d.titleTh.toLowerCase();
+        const titleEn = d.titleEn.toLowerCase();
+        const code = d.code.toLowerCase();
+
+        if (code.includes(q) || hotelTh.includes(q) || hotelEn.includes(q)) {
+          sc += 1000;
+        }
+        if (provTh.includes(q) || provEn.includes(q)) {
+          sc += 850;
+        }
+        if (titleTh.includes(q) || titleEn.includes(q)) {
+          sc += 650;
+        }
+        for (const t of terms) {
+          if (hotelTh.includes(t) || hotelEn.includes(t)) sc += 300;
+          if (provTh.includes(t) || provEn.includes(t)) sc += 260;
+          if (titleTh.includes(t) || titleEn.includes(t)) sc += 180;
+        }
+        if (activeStyleTab !== "all" && d.stayStyles.includes(activeStyleTab)) {
+          sc += 120;
+        }
+        return sc;
+      };
+      return scoreDeal(b) - scoreDeal(a);
+    });
   }, [deals, activeStyleTab, globalSearchQuery]);
 
   const walletCount = currentUser?.savedCouponsCount ?? walletCoupons.length;
-  const activeProvince = selectedProvinceId
-    ? getProvinceById(selectedProvinceId)
-    : null;
   const hasActiveFilter =
-    activeStyleTab !== "all" ||
-    Boolean(selectedProvinceId) ||
-    Boolean(globalSearchQuery.trim());
+    activeStyleTab !== "all" || Boolean(globalSearchQuery.trim());
 
   const handleResetFilters = () => {
     setActiveStyleTab("all");
-    setSelectedProvinceId(null);
     setGlobalSearchQuery("");
   };
 
@@ -197,7 +208,7 @@ export default function DealMarketplacePage() {
     const hotelName = language === "th" ? deal.hotelNameTh : deal.hotelNameEn;
     const provinceName =
       language === "th" ? deal.provinceNameTh : deal.provinceNameEn;
-    const logoSrc = deal.hotelLogoUrl || deal.coverImageUrl || "";
+    const heroImageSrc = deal.coverImageUrl || deal.hotelLogoUrl || "";
 
     const minSpendText =
       deal.minSpendThb > 0
@@ -248,16 +259,16 @@ export default function DealMarketplacePage() {
           >
             {renderNotches(false)}
 
-            {/* Left Brand Logo Zone */}
-            <div className="w-[104px] shrink-0 h-full flex items-center justify-center pl-4 pr-3">
-              {logoSrc ? (
+            {/* Left Full-Bleed Deal / Resort Image Zone */}
+            <div className="w-[116px] sm:w-[124px] shrink-0 h-full overflow-hidden rounded-l-[15px] bg-[var(--color-background-muted)]">
+              {heroImageSrc ? (
                 <img
-                  src={logoSrc}
+                  src={heroImageSrc}
                   alt={hotelName}
-                  className="h-14 w-14 rounded-full object-cover border border-[var(--color-border)] bg-[var(--color-background-muted)]"
+                  className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="h-14 w-14 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center ty-title font-bold">
+                <span className="h-full w-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center ty-title font-bold">
                   {hotelName[0] || "C"}
                 </span>
               )}
@@ -266,7 +277,7 @@ export default function DealMarketplacePage() {
             {/* Vertical Dashed Perforation */}
             <div
               aria-hidden="true"
-              className="h-[72%] border-l border-dashed border-[var(--color-border-emphasized)] shrink-0"
+              className="h-full border-l border-dashed border-[var(--color-border-emphasized)] shrink-0"
             />
 
             {/* Right Clean Value Zone (Strictly 3 Lines) */}
@@ -323,7 +334,7 @@ export default function DealMarketplacePage() {
                   toggleFlip(deal.id);
                 }}
                 aria-label={language === "th" ? "พลิกกลับ" : "Flip back"}
-                className="h-6 w-6 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                className="h-6 w-6 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -423,14 +434,14 @@ export default function DealMarketplacePage() {
         <button
           type="button"
           onClick={openCouponWallet}
-          className="h-10 px-4 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+          className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ty-body font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
         >
           <ShoppingBag className="w-4 h-4" />
           <span>
             {language === "th" ? "กระเป๋าคูปองของฉัน" : "My Wallet"}
           </span>
           {walletCount > 0 && (
-            <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-[var(--color-promo)] !text-white text-[11px] font-bold inline-flex items-center justify-center leading-none">
+            <span className="min-w-[20px] h-5 px-1.5 rounded-[7px] bg-[var(--color-promo)] !text-white text-[11px] font-bold inline-flex items-center justify-center leading-none">
               {walletCount}
             </span>
           )}
@@ -457,21 +468,13 @@ export default function DealMarketplacePage() {
           );
         })}
 
-        {(activeProvince || hasActiveFilter) && (
+        {hasActiveFilter && (
           <button
             type="button"
             onClick={handleResetFilters}
             className="ml-auto shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
-            <span>
-              {activeProvince
-                ? language === "th"
-                  ? `${activeProvince.nameTh} · ล้างตัวกรอง`
-                  : `${activeProvince.nameEn} · Reset`
-                : language === "th"
-                ? "ล้างตัวกรอง"
-                : "Reset"}
-            </span>
+            <span>{language === "th" ? "ล้างการค้นหา" : "Reset"}</span>
             <X className="w-3.5 h-3.5" />
           </button>
         )}

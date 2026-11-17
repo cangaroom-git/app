@@ -111,7 +111,7 @@ export function CouponWalletDrawer({
       <aside className="app-right-drawer z-10 animate-slide-in-right-drawer">
         <header className="px-4 sm:px-5 py-3 bg-[var(--color-background-card)] flex items-center justify-between gap-2.5 shrink-0 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-9 w-9 rounded-full bg-[var(--color-promo-muted)] text-[var(--color-promo-text)] flex items-center justify-center shrink-0">
+            <div className="h-9 w-9 rounded-[12px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center shrink-0">
               <ShoppingBag className="w-4 h-4" />
             </div>
             <div className="flex items-center gap-2 min-w-0">
@@ -143,12 +143,12 @@ export function CouponWalletDrawer({
                   ? "กรอกโค้ดส่วนลดเพื่อเก็บเข้ากระเป๋า..."
                   : "Enter coupon code..."
               }
-              className="h-10 rounded-full bg-[var(--color-background-muted)] px-4 ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-promo)]/30 flex-1 uppercase font-mono"
+              className="h-10 rounded-[12px] bg-[var(--color-background-muted)] px-4 ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border-emphasized)] flex-1 uppercase font-mono"
             />
             <button
               type="submit"
               disabled={!manualCodeInput.trim() || isBusy}
-              className="btn-promo-solid shrink-0 disabled:opacity-50"
+              className="h-10 px-4 rounded-[12px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50 transition-opacity"
             >
               <Plus className="w-4 h-4" />
               <span>{language === "th" ? "เก็บโค้ด" : "Save"}</span>
@@ -192,7 +192,7 @@ export function CouponWalletDrawer({
                 <Link
                   href="/login"
                   onClick={onClose}
-                  className="btn-promo-solid inline-flex"
+                  className="h-10 px-5 rounded-[12px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] ty-body font-semibold inline-flex items-center justify-center transition-opacity"
                 >
                   {language === "th" ? "เข้าสู่ระบบด้วย Google" : "Sign in"}
                 </Link>
@@ -241,7 +241,7 @@ export function CouponWalletDrawer({
                           type="button"
                           onClick={() => onRemoveCoupon(coupon.id)}
                           aria-label="Remove coupon"
-                          className="h-7 w-7 rounded-full inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-error)] cursor-pointer"
+                          className="h-7 w-7 rounded-[9px] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-background-subtle)] hover:text-[var(--color-error)] cursor-pointer transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -259,7 +259,7 @@ export function CouponWalletDrawer({
                       </div>
 
                       {coupon.usedAt ? (
-                        <span className="ty-caption font-semibold px-2.5 py-1 rounded-full bg-[var(--color-background-card)] shrink-0">
+                        <span className="ty-caption font-semibold px-2.5 py-1 rounded-[8px] bg-[var(--color-background-card)] shrink-0">
                           ใช้แล้ว
                         </span>
                       ) : (
@@ -268,7 +268,7 @@ export function CouponWalletDrawer({
                             coupon.code
                           )}`}
                           onClick={onClose}
-                          className="h-8 px-3 rounded-full bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] ty-caption font-semibold inline-flex items-center gap-1 shrink-0"
+                          className="h-8 px-3 rounded-[10px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] ty-caption font-semibold inline-flex items-center gap-1 shrink-0 transition-opacity"
                         >
                           <span>{language === "th" ? "จองเลย" : "Use"}</span>
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -325,7 +325,7 @@ export function CouponWalletDrawer({
                         });
                         setIsBusy(false);
                       }}
-                      className="h-8 px-3 rounded-full bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] ty-caption font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                      className="h-8 px-3 rounded-[10px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] ty-caption font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer transition-opacity"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{language === "th" ? "เก็บ" : "Save"}</span>

@@ -69,7 +69,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
   renderItem,
   columnWidth = 236,
   gutter = 16,
-  fitContainer = false,
+  fitContainer = true,
   maxColumns,
   onCalculatedHeight,
   expandedItemId = null,
@@ -82,7 +82,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
     Record<string, MeasuredBox>
   >({});
   const [stageHeight, setStageHeight] = useState<number>(720);
-  const [enableAnimation, setEnableAnimation] = useState<boolean>(false);
+  const [isResizingViewport, setIsResizingViewport] = useState<boolean>(false);
   const [prefersReducedMotion, setPrefersReducedMotion] =
     useState<boolean>(false);
 
@@ -92,6 +92,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
     Map<string, (el: HTMLDivElement | null) => void>
   >(new Map());
   const resizeTimerRef = useRef<number | null>(null);
+  const resizeAnimEndTimerRef = useRef<number | null>(null);
   const hasInitialWidthRef = useRef<boolean>(false);
   const prevExpandedIdRef = useRef<string | null>(expandedItemId);
   const isFirstMountRef = useRef<boolean>(true);
@@ -136,9 +137,20 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
 
       resizeTimerRef.current = window.setTimeout(() => {
         resizeTimerRef.current = null;
-        setContainerWidth((prev) =>
-          Math.abs(prev - nextW) > 1 ? nextW : prev
-        );
+        setContainerWidth((prev) => {
+          if (Math.abs(prev - nextW) > 1) {
+            setIsResizingViewport(true);
+            if (resizeAnimEndTimerRef.current !== null) {
+              window.clearTimeout(resizeAnimEndTimerRef.current);
+            }
+            resizeAnimEndTimerRef.current = window.setTimeout(() => {
+              resizeAnimEndTimerRef.current = null;
+              setIsResizingViewport(false);
+            }, 280);
+            return nextW;
+          }
+          return prev;
+        });
       }, 120);
     });
 
@@ -148,6 +160,10 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
       if (resizeTimerRef.current !== null) {
         window.clearTimeout(resizeTimerRef.current);
         resizeTimerRef.current = null;
+      }
+      if (resizeAnimEndTimerRef.current !== null) {
+        window.clearTimeout(resizeAnimEndTimerRef.current);
+        resizeAnimEndTimerRef.current = null;
       }
     };
   }, []);
@@ -176,22 +192,6 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
     obs.observe(node);
     return () => obs.disconnect();
   }, [expandedItemId, renderExpandedStage]);
-
-  // Enable smooth CSS transform reflow transitions only after initial positioned paint
-  useEffect(() => {
-    if (containerWidth <= 0 || enableAnimation) return;
-    let raf1 = 0;
-    let raf2 = 0;
-    raf1 = window.requestAnimationFrame(() => {
-      raf2 = window.requestAnimationFrame(() => {
-        setEnableAnimation(true);
-      });
-    });
-    return () => {
-      window.cancelAnimationFrame(raf1);
-      window.cancelAnimationFrame(raf2);
-    };
-  }, [containerWidth, enableAnimation]);
 
   // Shared ResizeObserver to measure real rendered card heights without polling
   useEffect(() => {
@@ -265,19 +265,17 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
       };
     }
 
-    const isNarrowMobile = containerWidth < 500;
-    const activeGutter = isNarrowMobile ? 12 : gutter;
+    const isMobile = containerWidth < 640;
+    const isTablet = containerWidth >= 640 && containerWidth < 1024;
+    const activeGutter = isMobile ? 6 : isTablet ? Math.min(gutter, 10) : gutter;
 
     let cols: number;
     let activeColWidth: number;
     let offsetX: number;
 
-    if (isNarrowMobile) {
+    if (isMobile) {
       cols = 2;
-      activeColWidth = Math.max(
-        120,
-        Math.floor((containerWidth - activeGutter) / 2)
-      );
+      activeColWidth = Math.max(120, (containerWidth - activeGutter) / 2);
       offsetX = 0;
     } else {
       const rawCols = Math.max(
@@ -289,9 +287,10 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
       cols = maxColumns ? Math.min(maxColumns, rawCols) : rawCols;
 
       if (fitContainer && cols > 1) {
-        activeColWidth = Math.floor(
-          (containerWidth - (cols - 1) * activeGutter) / cols
-        );
+        activeColWidth = (containerWidth - (cols - 1) * activeGutter) / cols;
+        offsetX = 0;
+      } else if (fitContainer && cols === 1) {
+        activeColWidth = containerWidth;
         offsetX = 0;
       } else {
         activeColWidth =
@@ -338,7 +337,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
 
       const measured = measuredSizes[item.id];
       const estimatedCardHeight = Math.round(
-        activeColWidth * estimateHeightRatio(item.aspectClass) + 34
+        activeColWidth * estimateHeightRatio(item.aspectClass) + 56
       );
       const itemHeight =
         measured && Math.abs(measured.width - activeColWidth) <= 3
@@ -421,7 +420,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
     }
   }, [layout.totalHeight, containerWidth, onCalculatedHeight]);
 
-  const shouldAnimate = enableAnimation && !prefersReducedMotion;
+  const shouldAnimate = isResizingViewport && !prefersReducedMotion;
 
   return (
     <div
@@ -440,7 +439,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
             <div>{renderExpandedStage()}</div>
           )}
           <div
-            className="grid gap-4 justify-center"
+            className="grid gap-1.5 sm:gap-2.5 lg:gap-4 justify-center"
             style={{
               gridTemplateColumns: `repeat(auto-fill, minmax(150px, ${columnWidth}px))`,
             }}

@@ -58,7 +58,7 @@ export function RoomSpecificationView({
                 setSlideIdx((prev) => (prev - 1 + photos.length) % photos.length)
               }
               aria-label="Previous photo"
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-white/90 text-[#111111] inline-flex items-center justify-center shadow cursor-pointer"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-[12px] bg-white/90 border border-[var(--color-border)] text-[#111111] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-white"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -66,7 +66,7 @@ export function RoomSpecificationView({
               type="button"
               onClick={() => setSlideIdx((prev) => (prev + 1) % photos.length)}
               aria-label="Next photo"
-              className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-white/90 text-[#111111] inline-flex items-center justify-center shadow cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-[12px] bg-white/90 border border-[var(--color-border)] text-[#111111] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-white"
             >
               <ChevronRight className="w-5 h-5" />
             </button>

@@ -45,12 +45,13 @@ Every UI component, layout, drawer, and page in `my-hotel` **MUST** strictly obe
 | `--color-text-secondary` | `#737373` | `#a3a3a3` | Captions, metadata, timestamps |
 | `--color-promo` | `#e60023` | `#e60023` | **ONLY** Pin `'บันทึก'` (`Save`) button & nav count badges |
 
-### Strict 2-Button Hierarchy
+### Strict 2-Button Hierarchy & Ironclad Unified Squircle Curvature
+- **Ironclad Squircle Button Rule (`ห้ามใช้ปุ่ม rounded-full เด็ดขาด`)**: Every `<button>` and `<input>` across the entire application MUST use the unified `1/3` squircle curvature matching the `48×48px` (`rounded-[16px]`) Mobile Bottom Menu (`h-11` -> `rounded-[14px]`, `h-10` -> `rounded-[12px]`/`rounded-[13px]`, `h-9` -> `rounded-[12px]`, `h-8` -> `rounded-[10px]`, `h-7` -> `rounded-[9px]`). `rounded-full` is permitted **ONLY** on circular user/hotel avatars, tiny `6px` status/pagination dots, and switch thumbs.
 1. **Primary Action Button (`.btn-round-solid` / `StandardButton variant="primary"`)**:
-   - Solid `#111111` background + `#ffffff` text in Light Mode (`#f5f5f5` background + `#111111` text in Dark Mode), `rounded-[10px]`, `hover:opacity-90`.
+   - Solid `#111111` background + `#ffffff` text in Light Mode (`#f5f5f5` background + `#111111` text in Dark Mode), squircle `rounded-[12px]`, `hover:opacity-90`.
    - Used for: `จองห้องพัก`, `เก็บคูปอง`, `ใช้โค้ดจอง`, `ค้นหา`, `บันทึกข้อมูล`.
 2. **Secondary Action Button (`.btn-fw-secondary` / `StandardButton variant="secondary"`)**:
-   - Flat `bg-[var(--color-background-muted)]` (`#f1f1f1`) + `text-[var(--color-text-primary)]` (`#111111`), `rounded-[10px]`, `hover:bg-[var(--color-background-subtle)]`.
+   - Flat `bg-[var(--color-background-muted)]` (`#f1f1f1`) + `text-[var(--color-text-primary)]` (`#111111`), squircle `rounded-[12px]`, `hover:bg-[var(--color-background-subtle)]`.
    - Used for: `ดูรายละเอียด`, `ทัก LINE`, `Facebook`, `โทร`, `กระเป๋าคูปอง`, `คัดลอกโค้ด`.
 3. **Status Indicators (`StatusPill`)**:
    - Neutral `bg-[var(--color-background-muted)] text-[var(--color-text-primary)] rounded-full px-2.5 h-6` with a single `6px` (`h-1.5 w-1.5 rounded-full`) semantic dot (`bg-emerald-500`, `bg-amber-500`, `bg-rose-500`). Never tint the pill background.
@@ -60,8 +61,10 @@ Every UI component, layout, drawer, and page in `my-hotel` **MUST** strictly obe
 ## 3. Unified App Shell & 3-Tier Spacing Grid
 
 ### Persistent Navigation Shell (`HotelAppShell.tsx` & `PrimaryNavigation.tsx`)
-- **Desktop Left Sidebar (`w-[72px]`, fixed)**: Persistent across **every** route (`/`, `/board`, `/deal`, `/{hotelSlug}`, `/{hotelSlug}/posts`, `/trips`, `/studio`, `/register-hotel`, `/super-admin`). Standalone fullscreen without sidebar is used **ONLY** on `/login`.
-- **Unified Outer Gutter (`px-4 sm:px-6 lg:px-8`)**: Applied identically to both `<header>` (`h-16`) and `<main>` (`pt-5 pb-12`) inside `HotelAppShell`.
+- **Desktop Left Sidebar (`w-[72px]`, fixed)**: Persistent across **every** route except `/login`. Center stack holds strictly **3 Traveller-First items (`1. Home /`, `2. Deal /deal`, `3. Board /board`)**; secondary/owner routes (`/trips`, `/register-hotel`, `/studio`, `/super-admin`) live cleanly inside the bottom **`More (≡)`** popover.
+- **Mobile/Tablet Top Bar (`< lg`)**: Left displays **`Cangaroom`** brand mark; Right displays **`Search`** (expands Floating Search Bar) + **`More/Profile`** (zero hard province/date filters in the global navbar; availability calendar lives exclusively on `/{hotelSlug}` rooms tab).
+- **Mobile/Tablet Floating Bottom Bar (`< lg`, `z-[70]`)**: Centered floating container (`fixed bottom-[max(14px,env(safe-area-inset-bottom))] z-[70]`) holding **4 separated `48×48px` (`rounded-[16px]`) squircle buttons (`1. Home`, `2. Deal`, `3. Search`, `4. Board`)** (`shadow-[var(--shadow-popover)]`, backdrop blur) so it stays visible above Pin Detail (`z-[60]`) and auto-slides down smoothly on scroll down alongside the Top Header Bar.
+- **Unified Outer Gutter**: Standard routes use `px-4 sm:px-6 lg:px-8` + `pt-5`; fluid feed routes (`/`, `/board`) tighten on mobile to `px-1.5 sm:px-6 lg:px-8 pt-2 sm:pt-5` so Pin cards sit almost flush to screen edges (`6px`).
 - **Page Rule**: Individual `page.tsx` files **MUST NEVER** add outer `px-*` or custom top/bottom `py-*` paddings. Vertical spacing between major sections inside a page uses `space-y-6` (`24px`).
 
 ### Canonical Container Width Classes (`globals.css`)
@@ -75,10 +78,11 @@ Every route's root element MUST use one of these 3 container classes:
 ## 4. Signature Page Specifications
 
 ### A. Home (`/`) & Saved Boards (`/board`)
-- Underline Stay Style filter bar (`border-b border-[var(--color-border)]`, active underline `h-[2px] bg-[var(--color-text-primary)]`).
-- `<MasonryGrid columnWidth={236} gutter={16} expandedItemId={...} renderExpandedStage={...} />` (`120ms` resize settle debounce, `240ms cubic-bezier(0.2, 0, 0, 1)` GPU `translate3d` reflow).
-- **In-Place Row Stage (NEVER jump to `top: 0`)**: Clicking any Pin expands `<PinterestPinDetail />` right at that vertical row inside `<MasonryGrid />` without resetting scroll to the top of the page.
-- **`PinterestPinDetail` Anatomy**: Tall desktop height (`lg:h-[min(84vh,780px)] lg:min-h-[640px]`), Left Media Stage uses `object-contain` (`fitMode="contain"` for videos) so images/videos always display at 100% true uncropped aspect ratio; Right Panel is ultra-clean (no booking CTA banner clutter), showing compact author + 1-line expandable caption + progressive Facebook/Pinterest comments (1 preview comment shown by default; clicking `💬` or the `{N} ความคิดเห็น` chevron reveals all hidden comments) + sticky pill bottom input.
+- Underline Stay Style filter bar (`border-b border-[var(--color-border)]`, active underline `h-[2px] bg-[var(--color-text-primary)]`). On mobile (`< lg`), horizontal swipe left/right across the feed switches category tabs.
+- `<MasonryGrid columnWidth={236} gutter={16} />` (`6px` gutter / 2 flush columns on mobile `< 640px`, `<= 10px` gutter on tablet, `120ms` resize settle debounce, `240ms cubic-bezier(0.2, 0, 0, 1)` GPU `translate3d` reflow).
+- **Desktop Pin Close-Up (`>= lg`)**: Clicking any Pin **hides the Horizontal Stay Style Tabs** and displays `<PinterestPinDetail />` immediately at the very top of the page above `"More to explore"` (`window.scrollTo({ top: 0, behavior: "instant" })` — ZERO smooth sliding scroll).
+- **Mobile Pin Close-Up (`< lg`, `z-[60]`)**: Opens as a full-screen top overlay (`fixed inset-0 z-[60]`, `data-mobile-scroll-container="true"`) keeping the `z-[70]` Mobile Bottom Bar accessible (auto-hiding smoothly on scroll down), with `"More to explore"` 2-column masonry below, a **Drill-Down Back Stack** on the top-left `<` squircle button (`Card C -> Card B -> Card A -> Home`), and native finger gestures (pull down Hero Media `>= 60px` to close, swipe left/right Hero Media when `images.length > 1` to flip photos).
+- **`PinterestPinDetail` Clean Anatomy (Desktop Inline vs Mobile Bottom Sheets `z-[85]`)**: Left Media Stage uses `bg-[var(--color-background-body)]` (never hardcoded black) + `object-contain` (`fitMode="contain"` for videos) with desktop-only `<`/`>` carousel arrows; **On Desktop (`>= lg`)**, comments and the sticky squircle comment composer live **inline inside the Right Panel** (never opening a bottom-sheet modal on Desktop); **On Mobile/Tablet (`< lg`)**, comments are hidden inline and tapping `💬` slides up the **Comments Bottom Sheet Modal** (`lg:hidden z-[85]`, `.animate-slide-up-sheet`), while tapping `•••` opens a standard monochrome dropdown on Desktop (`>= lg`) or slides up the **More Options Bottom Sheet** on Mobile/Tablet (`< lg`).
 
 ### B. Coupon Marketplace (`/deal`) — Minimalist In-Place 3D Flip Ticket
 - Root: `<div className="cgr-page-standard space-y-6">`.

@@ -9,9 +9,10 @@ Before implementing, creating, or modifying any UI component or page in `my-hote
 
 1. **FORBIDDEN — Zero Hover Scale**: Never use `hover:scale-*`, `group-hover:scale-*`, or `:hover { transform: scale(...) }` anywhere in the app.
 2. **FORBIDDEN — Zero Card Shadows & Zero Gradients/Pastels**: Never use `shadow-*` on cards, banners, or buttons (`1px solid var(--color-border)` only). Never use `bg-gradient-*` or pastel tinted pills/cards (`#0866ff` blue, `#06c755` green, pink/yellow/blue washes are banned).
-3. **95/5 Monochrome & 2-Button System**:
+3. **95/5 Monochrome, 2-Button System & Unified Squircle Curvature**:
    - Canvas `#ffffff` (`#121212` Dark), Muted `#efefef` (`#262626` Dark), Ink `#111111` (`#f5f5f5` Dark), Secondary Ink `#737373` (`#a3a3a3` Dark).
    - Primary buttons are solid `#111111` (`#f5f5f5` Dark); Secondary buttons are flat `#efefef` (`#262626` Dark).
+   - All buttons and inputs across the app MUST use squircle curvature matching the `48px` (`rounded-[16px]`) Mobile Bottom Menu (`rounded-[10px]`–`rounded-[16px]`) — **NEVER** use `rounded-full` on buttons or inputs.
    - `#e60023` Red is reserved **exclusively** for Pin `'บันทึก'` (`Save`) buttons and small navigation notification badges/dots.
 4. **Unified Shell & 3-Tier Spacing Grid**:
    - Persistent `72px` Left Sidebar + `64px` Top Bar on every route except `/login`.

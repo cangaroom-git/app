@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   LayoutDashboard,
   PlusSquare,
+  Search,
   TicketPercent,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ export type PlatformNavTabId =
   | "home"
   | "board"
   | "deal"
+  | "search"
   | "studio"
   | "register-hotel"
   | "trips"
@@ -22,16 +24,15 @@ export type PlatformNavTabId =
   | "login";
 
 export const MOBILE_BOTTOM_TABS: ReadonlyArray<{
-  id: "home" | "board" | "deal" | "studio" | "trips";
-  href: string;
+  id: "home" | "deal" | "search" | "board";
+  href?: string;
   labelTh: string;
   labelEn: string;
 }> = [
   { id: "home", href: "/", labelTh: "หน้าแรก", labelEn: "Home" },
-  { id: "board", href: "/board", labelTh: "บอร์ด", labelEn: "Boards" },
-  { id: "deal", href: "/deal", labelTh: "คูปอง", labelEn: "Deals" },
-  { id: "studio", href: "/studio", labelTh: "ที่พัก", labelEn: "Studio" },
-  { id: "trips", href: "/trips", labelTh: "การจอง", labelEn: "Trips" },
+  { id: "deal", href: "/deal", labelTh: "ดีลคูปอง", labelEn: "Deal" },
+  { id: "search", labelTh: "ค้นหา", labelEn: "Search" },
+  { id: "board", href: "/board", labelTh: "บอร์ด", labelEn: "Board" },
 ];
 
 export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
@@ -110,6 +111,14 @@ export function PlatformNavIcon({
         <TicketPercent
           className={className}
           strokeWidth={isActive ? 2.4 : 2}
+        />
+      );
+
+    case "search":
+      return (
+        <Search
+          className={className}
+          strokeWidth={isActive ? 2.6 : 2.1}
         />
       );
 

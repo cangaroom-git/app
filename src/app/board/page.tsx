@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import {
   Bookmark,
@@ -49,14 +55,23 @@ export default function SavedBoardPage() {
   const [newBoardName, setNewBoardName] = useState("");
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [selectedPinSnapshot, setSelectedPinSnapshot] =
+    useState<PinFeedItemDto | null>(null);
+  const [pinHistoryStack, setPinHistoryStack] = useState<PinFeedItemDto[]>([]);
   const [pinDetail, setPinDetail] = useState<{
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
     relatedPins: PinFeedItemDto[];
   } | null>(null);
+  const latestPinReqRef = useRef<string | null>(null);
   const [fullscreenMedia, setFullscreenMedia] = useState<{
     slides: PureMediaSlide[];
     index: number;
+  } | null>(null);
+  const feedSwipeRef = useRef<{
+    startX: number;
+    startY: number;
+    ignore: boolean;
   } | null>(null);
 
   const loadBoards = useCallback(async () => {
@@ -127,27 +142,25 @@ export default function SavedBoardPage() {
         ? boards.flatMap((b) => b.items)
         : boards.find((b) => b.id === activeBoardId)?.items ?? [];
 
+    const filteredByStyle =
+      activeStyleTab === "all"
+        ? raw
+        : raw.filter((entry) => entry.pin.stayStyles.includes(activeStyleTab));
+
     const q = globalSearchQuery.trim().toLowerCase();
-    return raw.filter((entry) => {
-      if (
-        activeStyleTab !== "all" &&
-        !entry.pin.stayStyles.includes(activeStyleTab)
-      ) {
-        return false;
-      }
-      if (selectedProvinceId && entry.pin.provinceId !== selectedProvinceId) {
-        return false;
-      }
-      if (q) {
-        return (
-          entry.pin.titleTh.toLowerCase().includes(q) ||
-          entry.pin.hotelNameTh.toLowerCase().includes(q) ||
-          entry.pin.provinceNameTh.toLowerCase().includes(q)
-        );
-      }
-      return true;
+    if (!q) return filteredByStyle;
+
+    return [...filteredByStyle].sort((a, b) => {
+      const scoreEntry = (entry: (typeof raw)[number]) => {
+        let sc = 0;
+        if (entry.pin.hotelNameTh.toLowerCase().includes(q)) sc += 500;
+        if (entry.pin.provinceNameTh.toLowerCase().includes(q)) sc += 400;
+        if (entry.pin.titleTh.toLowerCase().includes(q)) sc += 300;
+        return sc;
+      };
+      return scoreEntry(b) - scoreEntry(a);
     });
-  }, [boards, activeBoardId, activeStyleTab, selectedProvinceId, globalSearchQuery]);
+  }, [boards, activeBoardId, activeStyleTab, globalSearchQuery]);
 
   const alertItems = useMemo(
     () =>
@@ -162,9 +175,32 @@ export default function SavedBoardPage() {
     [allSavedEntries]
   );
 
-  const activeBoardPin = useMemo(
-    () => (selectedPinId && pinDetail ? pinDetail.pin : null),
-    [selectedPinId, pinDetail]
+  const loadPinDetail = useCallback(async (pinId: string) => {
+    latestPinReqRef.current = pinId;
+    const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (latestPinReqRef.current === pinId) {
+        setPinDetail(data);
+      }
+    }
+  }, []);
+
+  const activeBoardPin = useMemo(() => {
+    if (!selectedPinId) return null;
+    if (pinDetail?.pin.id === selectedPinId) return pinDetail.pin;
+    if (selectedPinSnapshot?.id === selectedPinId) return selectedPinSnapshot;
+    return allSavedEntries.find((e) => e.pin.id === selectedPinId)?.pin ?? null;
+  }, [pinDetail, selectedPinId, selectedPinSnapshot, allSavedEntries]);
+
+  const activeBoardComments = useMemo(
+    () =>
+      activeBoardPin && pinDetail?.pin.id === activeBoardPin.id
+        ? pinDetail.comments
+        : [],
+    [activeBoardPin, pinDetail]
   );
 
   const gridBoardEntries = useMemo(
@@ -175,14 +211,66 @@ export default function SavedBoardPage() {
     [allSavedEntries, activeBoardPin]
   );
 
-  const loadPinDetail = useCallback(async (pinId: string) => {
-    const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      setPinDetail(await res.json());
-    }
+  const handleCloseBoardPin = useCallback(() => {
+    latestPinReqRef.current = null;
+    setPinHistoryStack([]);
+    setSelectedPinId(null);
+    setSelectedPinSnapshot(null);
+    setPinDetail(null);
   }, []);
+
+  const handleSelectBoardPin = useCallback(
+    (pin: PinFeedItemDto, pushStack = true) => {
+      if (pushStack && activeBoardPin && activeBoardPin.id !== pin.id) {
+        setPinHistoryStack((prev) =>
+          [
+            ...prev.filter((p) => p.id !== activeBoardPin.id && p.id !== pin.id),
+            activeBoardPin,
+          ].slice(-16)
+        );
+      }
+      setSelectedPinSnapshot(pin);
+      setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
+      setSelectedPinId(pin.id);
+      void loadPinDetail(pin.id);
+      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      }
+    },
+    [activeBoardPin, loadPinDetail]
+  );
+
+  const handleStepBackBoardPin = useCallback(() => {
+    if (pinHistoryStack.length === 0) {
+      handleCloseBoardPin();
+      return;
+    }
+    const prevPin = pinHistoryStack[pinHistoryStack.length - 1];
+    setPinHistoryStack((prev) => prev.slice(0, -1));
+    setSelectedPinSnapshot(prevPin);
+    setPinDetail(null);
+    setSelectedPinId(prevPin.id);
+    void loadPinDetail(prevPin.id);
+  }, [pinHistoryStack, handleCloseBoardPin, loadPinDetail]);
+
+  const handleNavigateBoardPin = useCallback(
+    (direction: "prev" | "next") => {
+      if (!activeBoardPin || allSavedEntries.length <= 1) return;
+      const idx = allSavedEntries.findIndex(
+        (e) => e.pin.id === activeBoardPin.id
+      );
+      if (idx === -1) return;
+      const nextIdx =
+        direction === "next"
+          ? (idx + 1) % allSavedEntries.length
+          : (idx - 1 + allSavedEntries.length) % allSavedEntries.length;
+      const nextEntry = allSavedEntries[nextIdx];
+      if (nextEntry) {
+        handleSelectBoardPin(nextEntry.pin);
+      }
+    },
+    [activeBoardPin, allSavedEntries, handleSelectBoardPin]
+  );
 
   if (!isLoading && !authenticated) {
     return (
@@ -215,10 +303,64 @@ export default function SavedBoardPage() {
     );
   }
 
+  const handleFeedTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (
+      activeBoardPin ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      return;
+    }
+    const t = e.touches[0];
+    if (!t) return;
+    const target = e.target as HTMLElement | null;
+    const ignore = Boolean(
+      target?.closest(
+        "[data-style-tabs-bar='true'], input, textarea, [data-swipe-ignore='true']"
+      )
+    );
+    feedSwipeRef.current = { startX: t.clientX, startY: t.clientY, ignore };
+  };
+
+  const handleFeedTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const st = feedSwipeRef.current;
+    feedSwipeRef.current = null;
+    if (
+      !st ||
+      st.ignore ||
+      activeBoardPin ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      return;
+    }
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - st.startX;
+    const dy = t.clientY - st.startY;
+    if (Math.abs(dx) >= 56 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+      const currentIdx = STAY_STYLE_TABS.findIndex(
+        (tab) => tab.id === activeStyleTab
+      );
+      if (currentIdx === -1) return;
+      if (dx < 0 && currentIdx < STAY_STYLE_TABS.length - 1) {
+        setActiveStyleTab(STAY_STYLE_TABS[currentIdx + 1].id);
+      } else if (dx > 0 && currentIdx > 0) {
+        setActiveStyleTab(STAY_STYLE_TABS[currentIdx - 1].id);
+      }
+    }
+  };
+
   return (
-    <div className="cgr-page-fluid space-y-5">
-      {/* Header & Board Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div
+      onTouchStart={handleFeedTouchStart}
+      onTouchEnd={handleFeedTouchEnd}
+      className="cgr-page-fluid space-y-5"
+    >
+      {/* Header & Board Controls (Hidden when Pin Close-Up Stage is Open) */}
+      {!activeBoardPin && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="ty-display">
             {language === "th"
@@ -363,7 +505,10 @@ export default function SavedBoardPage() {
       )}
 
       {/* Style Tabs */}
-      <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-b border-[var(--color-border)]">
+      <div
+        data-style-tabs-bar="true"
+        className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-b border-[var(--color-border)]"
+      >
         {STAY_STYLE_TABS.map((tab) => {
           const isActive = activeStyleTab === tab.id;
           return (
@@ -382,6 +527,61 @@ export default function SavedBoardPage() {
           );
         })}
       </div>
+        </>
+      )}
+
+      {/* Top Pin Close-Up Stage (Instant Open Without Sliding | Mobile Fullscreen Overlay) */}
+      {activeBoardPin && (
+        <PinterestPinDetail
+          pin={activeBoardPin}
+          language={language}
+          currentUser={currentUser}
+          comments={activeBoardComments}
+          savedPinIds={savedPinIdSet}
+          relatedPins={gridBoardEntries.map((e) => e.pin)}
+          canStepBack={pinHistoryStack.length > 0}
+          onBack={handleStepBackBoardPin}
+          onClose={handleCloseBoardPin}
+          onSelectPin={(next) => handleSelectBoardPin(next, true)}
+          onNavigatePin={handleNavigateBoardPin}
+          onToggleLike={async (pinId) => {
+            await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
+              method: "POST",
+            });
+            await loadPinDetail(pinId);
+          }}
+          onToggleSave={(pinId) =>
+            handleRemovePinFromBoard(
+              pinId,
+              activeBoardId === "all" ? undefined : activeBoardId
+            )
+          }
+          onSharePin={() => {}}
+          onExpandMedia={(urls, idx) =>
+            setFullscreenMedia({
+              slides: urls.map((u) => ({ type: "image", url: u })),
+              index: idx,
+            })
+          }
+          onAddComment={async (text, parentId) => {
+            await fetch(
+              `/api/pins/${encodeURIComponent(activeBoardPin.id)}/comments`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ body: text, parentId }),
+              }
+            );
+            await loadPinDetail(activeBoardPin.id);
+          }}
+          onDeleteComment={async (commentId) => {
+            await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
+              method: "DELETE",
+            });
+            await loadPinDetail(activeBoardPin.id);
+          }}
+        />
+      )}
 
       {errorMsg && (
         <div className="rounded-[16px] bg-[var(--color-error-muted)] p-4 ty-body text-[var(--color-error)]">
@@ -389,7 +589,7 @@ export default function SavedBoardPage() {
         </div>
       )}
 
-      {/* In-Place Animated Masonry Grid (Zero Scroll Jump to Top) */}
+      {/* Masonry Grid Below Close-Up Stage */}
       {isLoading && !activeBoardPin ? (
         <div className="flex flex-wrap justify-center gap-4">
           {Array.from({ length: 8 }).map((_, idx) => (
@@ -416,92 +616,36 @@ export default function SavedBoardPage() {
           </Link>
         </div>
       ) : (
-        <section>
-          <MasonryGrid
-            items={allSavedEntries.map((e) => ({
-              ...e.pin,
-              aspectClass: e.pin.aspectRatio,
-              boardEntry: e,
-            }))}
-            columnWidth={236}
-            gutter={16}
-            expandedItemId={activeBoardPin?.id ?? null}
-            renderExpandedStage={
-              activeBoardPin
-                ? () => (
-                    <PinterestPinDetail
-                      pin={activeBoardPin}
-                      language={language}
-                      currentUser={currentUser}
-                      comments={pinDetail?.comments ?? []}
-                      savedPinIds={savedPinIdSet}
-                      onClose={() => {
-                        setSelectedPinId(null);
-                        setPinDetail(null);
-                      }}
-                      onSelectPin={(next) => {
-                        setSelectedPinId(next.id);
-                        loadPinDetail(next.id);
-                      }}
-                      onToggleLike={async (pinId) => {
-                        await fetch(
-                          `/api/pins/${encodeURIComponent(pinId)}/like`,
-                          { method: "POST" }
-                        );
-                        await loadPinDetail(pinId);
-                      }}
-                      onToggleSave={(pinId) =>
-                        handleRemovePinFromBoard(
-                          pinId,
-                          activeBoardId === "all" ? undefined : activeBoardId
-                        )
-                      }
-                      onSharePin={() => {}}
-                      onExpandMedia={(urls, idx) =>
-                        setFullscreenMedia({
-                          slides: urls.map((u) => ({ type: "image", url: u })),
-                          index: idx,
-                        })
-                      }
-                      onAddComment={async (text, parentId) => {
-                        await fetch(
-                          `/api/pins/${encodeURIComponent(
-                            activeBoardPin.id
-                          )}/comments`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ body: text, parentId }),
-                          }
-                        );
-                        await loadPinDetail(activeBoardPin.id);
-                      }}
-                      onDeleteComment={async (commentId) => {
-                        await fetch(
-                          `/api/comments/${encodeURIComponent(commentId)}`,
-                          { method: "DELETE" }
-                        );
-                        await loadPinDetail(activeBoardPin.id);
-                      }}
-                    />
-                  )
-                : undefined
-            }
-            renderItem={(item) => (
-              <div className="space-y-1">
-                <PinterestPinCard
-                  pin={item}
-                  language={language}
-                  isSaved={true}
-                  onSelectPin={(pin) => {
-                    setSelectedPinId(pin.id);
-                    loadPinDetail(pin.id);
-                  }}
-                  onToggleSave={(pinId) =>
-                    handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
-                  }
-                  onSharePin={() => {}}
-                />
+        gridBoardEntries.length > 0 && (
+          <section className="space-y-3">
+            {activeBoardPin && (
+              <h2 className="hidden lg:block ty-subtitle font-bold pt-2">
+                {language === "th"
+                  ? "ที่พักอื่นในบอร์ดของคุณ"
+                  : "More in this board"}
+              </h2>
+            )}
+            <MasonryGrid
+              items={gridBoardEntries.map((e) => ({
+                ...e.pin,
+                aspectClass: e.pin.aspectRatio,
+                boardEntry: e,
+              }))}
+              columnWidth={236}
+              gutter={16}
+              fitContainer={true}
+              renderItem={(item) => (
+                <div className="space-y-1">
+                  <PinterestPinCard
+                    pin={item}
+                    language={language}
+                    isSaved={true}
+                    onSelectPin={handleSelectBoardPin}
+                    onToggleSave={(pinId) =>
+                      handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
+                    }
+                    onSharePin={() => {}}
+                  />
                   {(item.boardEntry.priceDropThb > 0 ||
                     item.boardEntry.hasActivePromo) && (
                     <div className="px-1 flex flex-wrap gap-1">
@@ -522,6 +666,7 @@ export default function SavedBoardPage() {
               )}
             />
           </section>
+        )
       )}
 
       <PureMediaViewer

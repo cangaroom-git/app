@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -11,7 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CornerDownRight,
+  EyeOff,
+  Flag,
   Heart,
+  Link2,
   Maximize2,
   MessageCircle,
   MoreHorizontal,
@@ -23,6 +32,8 @@ import {
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { parseVideoSource } from "@/lib/mediaUtils";
+import { trackPinInteraction } from "@/lib/telemetry/clientTelemetry";
+import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type {
   AuthenticatedMeDto,
   PinCommentDto,
@@ -31,6 +42,324 @@ import type {
 import { UniversalVideoPlayer } from "@/components/media/UniversalVideoPlayer";
 import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
 
+interface ClickedPinOrigin {
+  pinId: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  timestamp: number;
+}
+
+let lastClickedPinOrigin: ClickedPinOrigin | null = null;
+
+const QUICK_EMOJIS = ["😍", "🔥", "🌿", "✨", "🌊", "🏡", "❤️", "🙌"];
+
+function formatRelativeCommentDate(
+  isoDateStr: string,
+  language: LanguageCode
+): string {
+  const diffMs = Date.now() - new Date(isoDateStr).getTime();
+  const mins = Math.max(1, Math.floor(diffMs / 60000));
+  if (mins < 60) {
+    return language === "th" ? `${mins} นาที` : `${mins}m`;
+  }
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) {
+    return language === "th" ? `${hrs} ชม.` : `${hrs}h`;
+  }
+  const days = Math.floor(hrs / 24);
+  if (days < 7) {
+    return language === "th" ? `${days} วัน` : `${days}d`;
+  }
+  const weeks = Math.floor(days / 7);
+  return language === "th" ? `${weeks} สัปดาห์` : `${weeks}w`;
+}
+
+interface PinMoreOptionsControlProps {
+  pin: PinFeedItemDto;
+  language: LanguageCode;
+  isSaved: boolean;
+  onToggleSave: (pinId: string) => void;
+  onSharePin: (pin: PinFeedItemDto) => void;
+  onHidePin?: (pinId: string) => void;
+  triggerClassName: string;
+  iconClassName?: string;
+  dropdownAlign?: "left" | "right";
+}
+
+function PinMoreOptionsControl({
+  pin,
+  language,
+  isSaved,
+  onToggleSave,
+  onSharePin,
+  onHidePin,
+  triggerClassName,
+  iconClassName = "w-4 h-4",
+  dropdownAlign = "right",
+}: PinMoreOptionsControlProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMobileSheet, setIsMobileSheet] = useState(false);
+  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useBodyScrollLock(isOpen && isMobileSheet);
+
+  useEffect(() => {
+    if (!isOpen || isMobileSheet) return;
+    const onOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("mousedown", onOutside);
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [isOpen, isMobileSheet]);
+
+  const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
+  const provinceLabel =
+    language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
+
+  const showQuickToast = (msg: string) => {
+    setFeedbackToast(msg);
+    window.setTimeout(() => setFeedbackToast(null), 2000);
+  };
+
+  const handleCopyLink = () => {
+    if (typeof window !== "undefined" && navigator.clipboard) {
+      const shareUrl = `${window.location.origin}/?pin=${encodeURIComponent(pin.id)}`;
+      navigator.clipboard.writeText(shareUrl).catch(() => {});
+    }
+    trackPinInteraction("PIN_SHARE", pin);
+    setIsOpen(false);
+    showQuickToast(language === "th" ? "คัดลอกลิงก์แล้ว" : "Link copied");
+  };
+
+  const handleSendShare = () => {
+    onSharePin(pin);
+    setIsOpen(false);
+  };
+
+  const handleHide = () => {
+    trackPinInteraction("PIN_DWELL", pin, { dwellMs: 600 });
+    setIsOpen(false);
+    onHidePin?.(pin.id);
+    showQuickToast(language === "th" ? "ซ่อนโพสต์นี้แล้ว" : "Pin hidden");
+  };
+
+  const handleReport = () => {
+    setIsOpen(false);
+    showQuickToast(
+      language === "th"
+        ? "ส่งรายงานให้ทีมตรวจสอบแล้ว"
+        : "Reported for review"
+    );
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative inline-flex" data-swipe-ignore="true">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          const mobile =
+            typeof window !== "undefined" && window.innerWidth < 1024;
+          setIsMobileSheet(mobile);
+          setIsOpen((v) => !v);
+        }}
+        aria-label={language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
+        className={triggerClassName}
+      >
+        <MoreHorizontal className={iconClassName} />
+      </button>
+
+      {feedbackToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[95] rounded-[12px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-4 py-2 text-[13px] font-semibold shadow-[var(--shadow-popover)] pointer-events-none">
+          {feedbackToast}
+        </div>
+      )}
+
+      {/* DESKTOP STANDARD DROPDOWN (>= lg) */}
+      {isOpen && !isMobileSheet && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute ${
+            dropdownAlign === "right" ? "right-0" : "left-0"
+          } top-full mt-1.5 z-40 w-56 rounded-[16px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-1.5 space-y-0.5 text-[13.5px]`}
+        >
+          <Link
+            href={`/${pin.hotelSlug}`}
+            onClick={() => {
+              trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
+              setIsOpen(false);
+            }}
+            className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-semibold text-[var(--color-text-primary)]"
+          >
+            <span className="truncate">
+              {language === "th"
+                ? `ไปที่เพจที่พัก (${provinceLabel})`
+                : `Visit stay (${provinceLabel})`}
+            </span>
+            <ArrowUpRight className="w-4 h-4 shrink-0" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              onToggleSave(pin.id);
+              setIsOpen(false);
+            }}
+            className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
+          >
+            <span>
+              {isSaved
+                ? language === "th"
+                  ? "นำออกจากบอร์ด"
+                  : "Remove from board"
+                : language === "th"
+                ? "บันทึกเข้าบอร์ด"
+                : "Save to board"}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendShare}
+            className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
+          >
+            <span>{language === "th" ? "แชร์โพสต์" : "Send / Share"}</span>
+            <Share className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
+          >
+            <span>{language === "th" ? "คัดลอกลิงก์" : "Copy link"}</span>
+            <Link2 className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
+          </button>
+
+          {onHidePin && (
+            <button
+              type="button"
+              onClick={handleHide}
+              className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
+            >
+              <span>{language === "th" ? "ซ่อนโพสต์นี้" : "Hide Pin"}</span>
+              <EyeOff className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleReport}
+            className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+          >
+            <span>{language === "th" ? "รายงานโพสต์" : "Report Pin"}</span>
+            <Flag className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* MOBILE / TABLET SLIDE-UP BOTTOM SHEET (< lg — Matches Pinterest Mobile App) */}
+      {isOpen && isMobileSheet && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="More options"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(false);
+          }}
+          className="fixed inset-0 z-[85] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-t-[24px] bg-[var(--color-background-popover)] border-t border-[var(--color-border)] px-5 pt-4 pb-[max(20px,env(safe-area-inset-bottom))] space-y-3 animate-slide-up-sheet"
+          >
+            <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
+
+            <p className="text-[13px] font-medium text-[var(--color-text-secondary)] pt-1">
+              {language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
+            </p>
+
+            <div className="space-y-0.5">
+              <button
+                type="button"
+                onClick={handleSendShare}
+                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+              >
+                {language === "th" ? "ส่งต่อ / แชร์" : "Send"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+              >
+                {language === "th" ? "คัดลอกลิงก์" : "Copy link"}
+              </button>
+
+              <Link
+                href={`/${pin.hotelSlug}`}
+                onClick={() => {
+                  trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
+                  setIsOpen(false);
+                }}
+                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[16px] font-bold text-[var(--color-text-primary)]"
+              >
+                <span className="truncate">
+                  {language === "th"
+                    ? `ไปที่เพจ ${hotelName}`
+                    : `Visit ${hotelName}`}
+                </span>
+                <ArrowUpRight className="w-4 h-4 shrink-0" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={handleReport}
+                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+              >
+                {language === "th" ? "รายงานโพสต์" : "Report Pin"}
+              </button>
+
+              {onHidePin && (
+                <button
+                  type="button"
+                  onClick={handleHide}
+                  className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  {language === "th" ? "ซ่อนโพสต์นี้" : "Hide"}
+                </button>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="h-11 px-6 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-bold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+              >
+                {language === "th" ? "ปิด" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface PinterestPinCardProps {
   pin: PinFeedItemDto;
   language: LanguageCode;
@@ -38,6 +367,7 @@ export interface PinterestPinCardProps {
   onSelectPin: (pin: PinFeedItemDto) => void;
   onToggleSave: (pinId: string) => void;
   onSharePin: (pin: PinFeedItemDto) => void;
+  onHidePin?: (pinId: string) => void;
 }
 
 export function PinterestPinCard({
@@ -47,10 +377,9 @@ export function PinterestPinCard({
   onSelectPin,
   onToggleSave,
   onSharePin,
+  onHidePin,
 }: PinterestPinCardProps) {
   const title = language === "th" ? pin.titleTh : pin.titleEn;
-  const provinceLabel =
-    language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
 
   const parsedVideo = pin.videoUrl
     ? parseVideoSource(pin.videoUrl, {
@@ -92,25 +421,70 @@ export function PinterestPinCard({
     return () => observer.disconnect();
   }, [isInlineMp4Video, parsedVideo?.embedUrl]);
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const mediaBoxRef = useRef<HTMLDivElement | null>(null);
+  const impressionLoggedRef = useRef(false);
 
+  // Track PIN_IMPRESSION after card is >=55% visible for >=1000ms
   useEffect(() => {
-    if (!menuOpen) return;
-    const onOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+    const el = mediaBoxRef.current;
+    if (
+      !el ||
+      impressionLoggedRef.current ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+    let dwellTimer: number | null = null;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting && !impressionLoggedRef.current) {
+          if (dwellTimer === null) {
+            dwellTimer = window.setTimeout(() => {
+              dwellTimer = null;
+              if (!impressionLoggedRef.current) {
+                impressionLoggedRef.current = true;
+                trackPinInteraction("PIN_IMPRESSION", pin);
+                obs.disconnect();
+              }
+            }, 1000);
+          }
+        } else if (dwellTimer !== null) {
+          window.clearTimeout(dwellTimer);
+          dwellTimer = null;
+        }
+      },
+      { threshold: 0.55 }
+    );
+    obs.observe(el);
+    return () => {
+      obs.disconnect();
+      if (dwellTimer !== null) window.clearTimeout(dwellTimer);
     };
-    document.addEventListener("mousedown", onOutside);
-    return () => document.removeEventListener("mousedown", onOutside);
-  }, [menuOpen]);
+  }, [pin]);
+
+  const handleCardClick = () => {
+    const rect = mediaBoxRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      lastClickedPinOrigin = {
+        pinId: pin.id,
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+        timestamp: Date.now(),
+      };
+    }
+    onSelectPin(pin);
+  };
 
   return (
     <article className="w-full select-none">
       <div
-        onClick={() => onSelectPin(pin)}
-        className={`group relative w-full ${pin.aspectRatio} rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
+        ref={mediaBoxRef}
+        onClick={handleCardClick}
+        className={`group relative w-full ${pin.aspectRatio} rounded-[14px] sm:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
       >
         {isInlineMp4Video && parsedVideo ? (
           <video
@@ -135,8 +509,8 @@ export function PinterestPinCard({
           />
         )}
 
-        {/* Hover Dim Overlay — Strictly Zero Hover Scale */}
-        <div className="pointer-events-none absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex flex-col justify-between p-3">
+        {/* Hover Dim Overlay — Strictly Zero Hover Scale & Squircle Buttons */}
+        <div className="pointer-events-none absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 hidden lg:flex flex-col justify-between p-3">
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -163,7 +537,10 @@ export function PinterestPinCard({
           <div className="flex items-center justify-between gap-2">
             <Link
               href={`/${pin.hotelSlug}`}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
+              }}
               className="pointer-events-auto max-w-[75%] h-8 px-3 rounded-[10px] bg-white/92 hover:bg-white text-[#111111] text-[12px] font-semibold inline-flex items-center gap-1 truncate"
             >
               <span className="truncate">
@@ -187,75 +564,52 @@ export function PinterestPinCard({
         </div>
       </div>
 
-      {/* Minimal '...' Menu Only Underneath (Zero Clutter) */}
-      <div className="pt-1.5 px-1 flex items-center justify-end relative" ref={menuRef}>
-        <button
-          type="button"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="More options"
-          className="h-7 w-7 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
+      {/* Compact 2-Line Title + Like/Comment Counts + '...' Menu Underneath */}
+      <div className="pt-1.5 pb-0.5 px-0.5 space-y-1 relative">
+        <p
+          onClick={handleCardClick}
+          className="text-[12.5px] sm:text-[13px] leading-[1.35] font-semibold text-[var(--color-text-primary)] line-clamp-2 cursor-pointer"
         >
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+          {title}
+        </p>
 
-        {menuOpen && (
-          <div className="absolute right-0 top-8 z-30 w-48 rounded-[14px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-1.5 space-y-0.5 text-[13px]">
-            <Link
-              href={`/${pin.hotelSlug}`}
-              onClick={() => setMenuOpen(false)}
-              className="w-full h-9 px-3 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)]"
-            >
-              <span className="truncate">ไปที่เพจที่พัก ({provinceLabel})</span>
-              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                onToggleSave(pin.id);
-                setMenuOpen(false);
-              }}
-              className="w-full h-9 px-3 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
-            >
-              <span>{isSaved ? "นำออกจากบอร์ด" : "บันทึกเข้าบอร์ด"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onSharePin(pin);
-                setMenuOpen(false);
-              }}
-              className="w-full h-9 px-3 rounded-[8px] hover:bg-[var(--color-background-muted)] flex items-center justify-between font-medium text-[var(--color-text-primary)] cursor-pointer"
-            >
-              <span>คัดลอกลิงก์โพสต์</span>
-            </button>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={handleCardClick}
+            className="flex items-center gap-2.5 text-[11.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
+          >
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <Heart
+                className={`w-3 h-3 ${
+                  pin.isLikedByMe
+                    ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
+                    : ""
+                }`}
+                strokeWidth={2}
+              />
+              <span>{pin.likesCount}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <MessageCircle className="w-3 h-3" strokeWidth={2} />
+              <span>{pin.commentsCount}</span>
+            </span>
+          </button>
+
+          <PinMoreOptionsControl
+            pin={pin}
+            language={language}
+            isSaved={isSaved}
+            onToggleSave={onToggleSave}
+            onSharePin={onSharePin}
+            onHidePin={onHidePin}
+            iconClassName="w-3.5 h-3.5"
+            triggerClassName="h-6 w-6 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors shrink-0"
+          />
+        </div>
       </div>
     </article>
   );
-}
-
-const QUICK_EMOJIS = ["😍", "🔥", "🌿", "✨", "🌊", "🏡", "❤️", "🙌"];
-
-function formatRelativeCommentDate(
-  isoDateStr: string,
-  language: LanguageCode
-): string {
-  const diffMs = Date.now() - new Date(isoDateStr).getTime();
-  const mins = Math.max(1, Math.floor(diffMs / 60000));
-  if (mins < 60) {
-    return language === "th" ? `${mins} นาที` : `${mins}m`;
-  }
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) {
-    return language === "th" ? `${hrs} ชม.` : `${hrs}h`;
-  }
-  const days = Math.floor(hrs / 24);
-  if (days < 7) {
-    return language === "th" ? `${days} วัน` : `${days}d`;
-  }
-  const weeks = Math.floor(days / 7);
-  return language === "th" ? `${weeks} สัปดาห์` : `${weeks}w`;
 }
 
 export interface PinterestPinDetailProps {
@@ -264,8 +618,13 @@ export interface PinterestPinDetailProps {
   currentUser: AuthenticatedMeDto | null;
   comments: PinCommentDto[];
   savedPinIds: Set<string>;
+  relatedPins?: PinFeedItemDto[];
+  canStepBack?: boolean;
+  onBack?: () => void;
   onClose: () => void;
   onSelectPin?: (pin: PinFeedItemDto) => void;
+  onNavigatePin?: (direction: "prev" | "next") => void;
+  onHidePin?: (pinId: string) => void;
   onToggleLike: (pinId: string) => void;
   onToggleSave: (pinId: string) => void;
   onSharePin: (pin: PinFeedItemDto) => void;
@@ -281,7 +640,13 @@ export function PinterestPinDetail({
   currentUser,
   comments,
   savedPinIds,
+  relatedPins = [],
+  canStepBack = false,
+  onBack,
   onClose,
+  onSelectPin,
+  onNavigatePin,
+  onHidePin,
   onToggleLike,
   onToggleSave,
   onSharePin,
@@ -290,10 +655,8 @@ export function PinterestPinDetail({
   onDeleteComment,
 }: PinterestPinDetailProps) {
   const [slideIndex, setSlideIndex] = useState(0);
-  const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
-  const [commentsMode, setCommentsMode] = useState<
-    "preview" | "expanded" | "hidden"
-  >("preview");
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [isCommentsSheetOpen, setIsCommentsSheetOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [replyingTo, setReplyingTo] = useState<{
     id: string;
@@ -302,25 +665,280 @@ export function PinterestPinDetail({
   const [showEmojiBar, setShowEmojiBar] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isDesktopCommentsOpen, setIsDesktopCommentsOpen] = useState(true);
+  const [pullDownOffset, setPullDownOffset] = useState(0);
+  const [isPullingDown, setIsPullingDown] = useState(false);
+  const [isFlipAnimating, setIsFlipAnimating] = useState(false);
+
   const commentInputRef = useRef<HTMLInputElement | null>(null);
+  const desktopCommentInputRef = useRef<HTMLInputElement | null>(null);
+  const desktopCommentsSectionRef = useRef<HTMLDivElement | null>(null);
+  const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const mediaStageRef = useRef<HTMLDivElement | null>(null);
+  const detailsPanelRef = useRef<HTMLDivElement | null>(null);
+  const mouseDragRef = useRef<{ startX: number; startY: number } | null>(null);
+  const mediaTouchRef = useRef<{
+    startX: number;
+    startY: number;
+    atTop: boolean;
+    locked: "pull-down" | "horizontal" | "vertical" | null;
+  } | null>(null);
+  const mediaHandledSwipeRef = useRef(false);
+  const pageTouchRef = useRef<{
+    startX: number;
+    startY: number;
+    ignore: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsMobileViewport(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => {
+      setIsMobileViewport(e.matches);
+      if (!e.matches) {
+        setIsCommentsSheetOpen(false);
+      }
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useBodyScrollLock(isMobileViewport);
 
   useEffect(() => {
     setSlideIndex(0);
-    setIsCaptionExpanded(false);
-    setCommentsMode("preview");
+    setIsDescriptionOpen(false);
+    setIsCommentsSheetOpen(false);
     setReplyingTo(null);
+    setPullDownOffset(0);
+    setIsPullingDown(false);
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = 0;
+    }
+
+    const openedAt =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    trackPinInteraction("PIN_OPEN", pin);
+
+    return () => {
+      const closedAt =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      const dwellMs = Math.round(closedAt - openedAt);
+      if (dwellMs >= 250) {
+        trackPinInteraction("PIN_DWELL", pin, { dwellMs });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin.id]);
+
+  // Close Comments Sheet on Escape
+  useEffect(() => {
+    if (!isCommentsSheetOpen) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsCommentsSheetOpen(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [isCommentsSheetOpen]);
+
+  // Pinterest-style FLIP expansion animation from the clicked card box -> full hero stage
+  const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  useIsomorphicLayoutEffect(() => {
+    const origin = lastClickedPinOrigin;
+    if (
+      !origin ||
+      origin.pinId !== pin.id ||
+      Date.now() - origin.timestamp > 700
+    ) {
+      return;
+    }
+    lastClickedPinOrigin = null;
+
+    if (
+      typeof window === "undefined" ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+
+    const mediaEl = mediaStageRef.current;
+    const detailsEl = detailsPanelRef.current;
+    if (!mediaEl) return;
+
+    const targetRect = mediaEl.getBoundingClientRect();
+    if (targetRect.width <= 0 || targetRect.height <= 0) return;
+
+    const dx = origin.left - targetRect.left;
+    const dy = origin.top - targetRect.top;
+    const sx = origin.width / targetRect.width;
+    const sy = origin.height / targetRect.height;
+
+    setIsFlipAnimating(true);
+
+    mediaEl.style.transition = "none";
+    mediaEl.style.transformOrigin = "0 0";
+    mediaEl.style.borderRadius = "16px";
+    mediaEl.style.zIndex = "30";
+    mediaEl.style.willChange = "transform, border-radius";
+    mediaEl.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale3d(${sx}, ${sy}, 1)`;
+
+    if (detailsEl) {
+      detailsEl.style.transition = "none";
+      detailsEl.style.opacity = "0";
+      detailsEl.style.transform = "translate3d(0, 14px, 0)";
+      detailsEl.style.willChange = "opacity, transform";
+    }
+
+    mediaEl.getBoundingClientRect();
+
+    let rafId = 0;
+    let cleanupTimer: number | null = null;
+
+    const clearStyles = () => {
+      mediaEl.style.transition = "";
+      mediaEl.style.transformOrigin = "";
+      mediaEl.style.borderRadius = "";
+      mediaEl.style.zIndex = "";
+      mediaEl.style.willChange = "";
+      mediaEl.style.transform = "";
+      if (detailsEl) {
+        detailsEl.style.transition = "";
+        detailsEl.style.opacity = "";
+        detailsEl.style.transform = "";
+        detailsEl.style.willChange = "";
+      }
+      setIsFlipAnimating(false);
+    };
+
+    rafId = window.requestAnimationFrame(() => {
+      mediaEl.style.transition =
+        "transform 340ms cubic-bezier(0.22, 1, 0.36, 1), border-radius 340ms cubic-bezier(0.22, 1, 0.36, 1)";
+      mediaEl.style.transform = "translate3d(0, 0, 0) scale3d(1, 1, 1)";
+      mediaEl.style.borderRadius = "0px";
+
+      if (detailsEl) {
+        detailsEl.style.transition =
+          "opacity 260ms ease-out 50ms, transform 280ms cubic-bezier(0.22, 1, 0.36, 1) 50ms";
+        detailsEl.style.opacity = "1";
+        detailsEl.style.transform = "translate3d(0, 0, 0)";
+      }
+
+      cleanupTimer = window.setTimeout(clearStyles, 370);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      if (cleanupTimer !== null) window.clearTimeout(cleanupTimer);
+      clearStyles();
+    };
+  }, [pin.id]);
+
+  // Attach non-passive touchmove on Hero Media so downward pull-to-close is smooth without Safari rubber-banding
+  useEffect(() => {
+    const el = mediaStageRef.current;
+    if (!el || typeof window === "undefined") return;
+    const onNativeTouchMove = (e: TouchEvent) => {
+      if (window.innerWidth >= 1024 || isCommentsSheetOpen) return;
+      const touch = e.touches[0];
+      const st = mediaTouchRef.current;
+      if (!touch || !st) return;
+
+      const dx = touch.clientX - st.startX;
+      const dy = touch.clientY - st.startY;
+
+      if (st.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        if (dy > 0 && st.atTop && Math.abs(dy) > Math.abs(dx) * 1.15) {
+          st.locked = "pull-down";
+        } else if (Math.abs(dx) > Math.abs(dy) * 1.15) {
+          st.locked = "horizontal";
+        } else {
+          st.locked = "vertical";
+        }
+      }
+
+      if (st.locked === "pull-down") {
+        if (e.cancelable) e.preventDefault();
+        setIsPullingDown(true);
+        setPullDownOffset(Math.max(0, Math.min(220, dy * 0.72)));
+      }
+    };
+
+    el.addEventListener("touchmove", onNativeTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onNativeTouchMove);
+  }, [pin.id, isCommentsSheetOpen]);
 
   const images =
     pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl];
   const activeImageUrl = images[slideIndex] || pin.coverImageUrl;
 
+  const navigateCarouselSlide = (
+    nextIdxOrFn: number | ((prev: number) => number)
+  ) => {
+    setSlideIndex((prev) => {
+      const resolved =
+        typeof nextIdxOrFn === "function" ? nextIdxOrFn(prev) : nextIdxOrFn;
+      if (resolved !== prev && images.length > 1) {
+        trackPinInteraction("CAROUSEL_SWIPE", pin, {
+          carouselDepth: resolved + 1,
+        });
+      }
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          const strip = thumbnailStripRef.current;
+          const activeThumb = strip?.querySelector<HTMLElement>(
+            `[data-thumb-idx="${resolved}"]`
+          );
+          activeThumb?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        });
+      }
+      return resolved;
+    });
+  };
+
+  // Desktop keyboard ArrowLeft / ArrowRight navigation for multi-image carousels
+  useEffect(() => {
+    if (
+      images.length <= 1 ||
+      pin.videoUrl ||
+      isCommentsSheetOpen ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (window.innerWidth < 1024) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        navigateCarouselSlide(
+          (prev) => (prev - 1 + images.length) % images.length
+        );
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        navigateCarouselSlide((prev) => (prev + 1) % images.length);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin.id, images.length, pin.videoUrl, isCommentsSheetOpen]);
+
   const title = language === "th" ? pin.titleTh : pin.titleEn;
   const description = language === "th" ? pin.descriptionTh : pin.descriptionEn;
-  const captionText = description || title;
   const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
   const provinceLabel =
     language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
+  const isSaved = pin.isSavedByMe || savedPinIds.has(pin.id);
 
   const totalCommentsCount = useMemo(() => {
     const loadedCount = comments.reduce(
@@ -330,14 +948,18 @@ export function PinterestPinDetail({
     return Math.max(pin.commentsCount, loadedCount);
   }, [comments, pin.commentsCount]);
 
-  const parsedVideo = pin.videoUrl
-    ? parseVideoSource(pin.videoUrl, { autoplay: true, muted: false })
-    : null;
-  const videoAspect: "9/16" | "16/9" = pin.aspectRatio.includes("16/9") ||
-    pin.aspectRatio.includes("4/3")
-    ? "16/9"
-    : "9/16";
-  void parsedVideo;
+  const videoAspect: "9/16" | "16/9" =
+    pin.aspectRatio.includes("16/9") || pin.aspectRatio.includes("4/3")
+      ? "16/9"
+      : "9/16";
+
+  const handleStepBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      onClose();
+    }
+  };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,7 +971,6 @@ export function PinterestPinDetail({
       setCommentText("");
       setReplyingTo(null);
       setShowEmojiBar(false);
-      setCommentsMode("expanded");
     } finally {
       setIsSubmittingComment(false);
     }
@@ -361,19 +982,19 @@ export function PinterestPinDetail({
     window.setTimeout(() => setJustCopied(false), 1800);
   };
 
-  const handleCommentIconClick = () => {
-    setCommentsMode("expanded");
-    window.setTimeout(() => {
-      commentInputRef.current?.focus();
-    }, 30);
-  };
-
-  const handleToggleCommentsHeader = () => {
-    if (commentsMode === "expanded") {
-      setCommentsMode("hidden");
-    } else {
-      setCommentsMode("expanded");
+  const handleOpenCommentsSheet = () => {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setIsDesktopCommentsOpen(true);
+      window.setTimeout(() => {
+        desktopCommentsSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+        desktopCommentInputRef.current?.focus();
+      }, 30);
+      return;
     }
+    setIsCommentsSheetOpen(true);
   };
 
   const isOwnerOfPin = Boolean(
@@ -382,44 +1003,218 @@ export function PinterestPinDetail({
         currentUser.ownedHotels.some((h) => h.id === pin.hotelId))
   );
 
-  const visibleComments =
-    commentsMode === "hidden"
-      ? []
-      : commentsMode === "preview"
-      ? comments.slice(0, 1)
-      : comments;
+  const handleMediaTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (
+      isCommentsSheetOpen ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      return;
+    }
+    const t = e.touches[0];
+    if (!t) return;
+    mediaTouchRef.current = {
+      startX: t.clientX,
+      startY: t.clientY,
+      atTop: (overlayRef.current?.scrollTop ?? 0) <= 8,
+      locked: null,
+    };
+  };
 
-  const hiddenCommentsCount = Math.max(
-    0,
-    totalCommentsCount -
-      (commentsMode === "preview" && comments.length > 0 ? 1 : 0)
-  );
+  const handleMediaTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const st = mediaTouchRef.current;
+    mediaTouchRef.current = null;
+    if (
+      !st ||
+      isCommentsSheetOpen ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      setIsPullingDown(false);
+      setPullDownOffset(0);
+      return;
+    }
+
+    const t = e.changedTouches[0];
+    const dx = t ? t.clientX - st.startX : 0;
+    const dy = t ? t.clientY - st.startY : 0;
+
+    if (st.locked === "pull-down") {
+      setIsPullingDown(false);
+      setPullDownOffset(0);
+      if (dy >= 60) {
+        handleStepBack();
+      }
+      return;
+    }
+
+    setIsPullingDown(false);
+    setPullDownOffset(0);
+
+    // Swipe horizontally on Hero Image when Pin has a multi-image photo set -> switch slides inside set
+    if (
+      images.length > 1 &&
+      !pin.videoUrl &&
+      Math.abs(dx) >= 40 &&
+      Math.abs(dx) > Math.abs(dy) * 1.2
+    ) {
+      mediaHandledSwipeRef.current = true;
+      navigateCarouselSlide((prev) =>
+        dx < 0
+          ? (prev + 1) % images.length
+          : (prev - 1 + images.length) % images.length
+      );
+    }
+  };
+
+  const handlePageTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (
+      isCommentsSheetOpen ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      return;
+    }
+    mediaHandledSwipeRef.current = false;
+    const t = e.touches[0];
+    if (!t) return;
+    const target = e.target as HTMLElement | null;
+    const ignore = Boolean(
+      target?.closest("input, textarea, [data-swipe-ignore='true']")
+    );
+    pageTouchRef.current = { startX: t.clientX, startY: t.clientY, ignore };
+  };
+
+  const handlePageTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const st = pageTouchRef.current;
+    pageTouchRef.current = null;
+    if (
+      !st ||
+      st.ignore ||
+      isCommentsSheetOpen ||
+      mediaHandledSwipeRef.current ||
+      !onNavigatePin ||
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024
+    ) {
+      mediaHandledSwipeRef.current = false;
+      return;
+    }
+
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - st.startX;
+    const dy = t.clientY - st.startY;
+    if (Math.abs(dx) >= 52 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+      onNavigatePin(dx < 0 ? "next" : "prev");
+    }
+  };
+
+  const handleMediaPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) return;
+    mouseDragRef.current = { startX: e.clientX, startY: e.clientY };
+  };
+
+  const handleMediaPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const st = mouseDragRef.current;
+    mouseDragRef.current = null;
+    if (!st || e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) {
+      return;
+    }
+    const dx = e.clientX - st.startX;
+    const dy = e.clientY - st.startY;
+    if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      navigateCarouselSlide((prev) =>
+        dx < 0
+          ? (prev + 1) % images.length
+          : (prev - 1 + images.length) % images.length
+      );
+    }
+  };
 
   return (
-    <div key={pin.id} className="w-full pb-2 select-none animate-pin-stage-in">
-      {/* TALL SPLIT PIN CLOSE-UP CARD (True Media Ratio Left | Clean Comments Right) */}
-      <div className="max-w-[1120px] mx-auto rounded-[24px] bg-[var(--color-background-card)] border border-[var(--color-border)] grid grid-cols-1 lg:grid-cols-12 lg:h-[min(84vh,780px)] lg:min-h-[640px] overflow-hidden">
-        {/* =================================================================
-            LEFT STAGE: TRUE UNCROPPED ASPECT RATIO MEDIA (object-contain)
-        ================================================================== */}
-        <div className="lg:col-span-7 relative bg-[#f6f6f6] dark:bg-[#161616] min-h-[320px] lg:h-full flex items-center justify-center overflow-hidden">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-            className="absolute top-4 left-4 z-20 h-10 w-10 rounded-full bg-white/95 hover:bg-white text-[#111111] border border-black/10 inline-flex items-center justify-center transition cursor-pointer"
-          >
-            <ArrowLeft className="w-5 h-5" strokeWidth={2.2} />
-          </button>
+    <div
+      ref={overlayRef}
+      key={pin.id}
+      data-mobile-scroll-container="true"
+      onTouchStart={handlePageTouchStart}
+      onTouchEnd={handlePageTouchEnd}
+      className="fixed inset-0 z-[60] bg-[var(--color-background-body)] overflow-y-auto overscroll-y-contain lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:overflow-visible w-full lg:pb-2 select-none"
+    >
+      {/* GLOBAL STICKY / FIXED BACK BUTTON (Left) & MOBILE MORE BUTTON (Right — 100% Symmetrical Level & Size!) */}
+      <button
+        type="button"
+        onClick={handleStepBack}
+        title={
+          canStepBack
+            ? language === "th"
+              ? "ย้อนกลับไปการ์ดก่อนหน้า"
+              : "Back to previous Pin"
+            : language === "th"
+            ? "กลับหน้าฟีด"
+            : "Back to feed"
+        }
+        aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
+        className="fixed top-[max(20px,env(safe-area-inset-top))] left-4 lg:top-[104px] lg:left-[max(120px,calc((100vw+72px-1120px)/2+20px))] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+      >
+        <ChevronLeft className="w-6 h-6 lg:hidden" strokeWidth={2.4} />
+        <ArrowLeft className="hidden lg:block w-6 h-6" strokeWidth={2.4} />
+      </button>
 
+      <div className="lg:hidden fixed top-[max(20px,env(safe-area-inset-top))] right-4 z-[68]">
+        <PinMoreOptionsControl
+          pin={pin}
+          language={language}
+          isSaved={isSaved}
+          onToggleSave={onToggleSave}
+          onSharePin={onSharePin}
+          onHidePin={onHidePin}
+          iconClassName="w-6 h-6"
+          triggerClassName="h-12 w-12 rounded-[16px] bg-black/55 hover:bg-black/70 text-white shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+        />
+      </div>
+
+      {/* TALL SPLIT PIN CLOSE-UP CARD (Zero Inline Comment Clutter | Squircle Buttons) */}
+      <div
+        style={
+          isMobileViewport && pullDownOffset > 0
+            ? {
+                transform: `translate3d(0, ${pullDownOffset}px, 0)`,
+                opacity: Math.max(0.75, 1 - pullDownOffset / 380),
+                transition: isPullingDown
+                  ? "none"
+                  : "transform 200ms cubic-bezier(0.2, 0, 0, 1), opacity 200ms ease",
+              }
+            : isMobileViewport
+            ? {
+                transition:
+                  "transform 200ms cubic-bezier(0.2, 0, 0, 1), opacity 200ms ease",
+              }
+            : undefined
+        }
+        className={`max-w-[1120px] mx-auto rounded-none lg:rounded-[24px] bg-[var(--color-background-card)] border-0 lg:border lg:border-[var(--color-border)] grid grid-cols-1 lg:grid-cols-12 lg:h-[min(82vh,740px)] lg:min-h-[560px] ${
+          isFlipAnimating ? "lg:overflow-visible" : "lg:overflow-hidden"
+        }`}
+      >
+        {/* =================================================================
+            LEFT / HERO STAGE: TRUE UNCROPPED MEDIA (Theme-Matched Background)
+        ================================================================== */}
+        <div
+          ref={mediaStageRef}
+          onTouchStart={handleMediaTouchStart}
+          onTouchEnd={handleMediaTouchEnd}
+          onPointerDown={handleMediaPointerDown}
+          onPointerUp={handleMediaPointerUp}
+          className="lg:col-span-7 relative bg-[var(--color-background-body)] min-h-[280px] lg:h-full flex items-center justify-center overflow-hidden"
+        >
           {pin.videoUrl ? (
-            <div className="w-full h-full bg-black flex items-center justify-center">
+            <div className="w-full h-full bg-[var(--color-background-body)] flex items-center justify-center">
               <UniversalVideoPlayer
                 videoUrl={pin.videoUrl}
                 posterUrl={pin.coverImageUrl}
                 title={title}
                 aspectRatio={videoAspect}
-                fitMode="contain"
+                fitMode="cover"
                 autoPlay={true}
                 initialMuted={false}
               />
@@ -429,75 +1224,57 @@ export function PinterestPinDetail({
               <img
                 src={activeImageUrl}
                 alt={title}
-                className="w-full max-h-[78vh] lg:h-full lg:max-h-full object-contain select-none"
+                draggable={false}
+                className="w-full max-h-[78vh] lg:h-full lg:max-h-full object-cover select-none"
               />
 
               {images.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSlideIndex(
-                        (prev) => (prev - 1 + images.length) % images.length
-                      )
-                    }
-                    aria-label="Previous image"
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/95 hover:bg-white text-[#111111] border border-black/10 inline-flex items-center justify-center cursor-pointer"
-                  >
-                    <ChevronLeft className="w-5 h-5" strokeWidth={2.2} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSlideIndex((prev) => (prev + 1) % images.length)
-                    }
-                    aria-label="Next image"
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/95 hover:bg-white text-[#111111] border border-black/10 inline-flex items-center justify-center cursor-pointer"
-                  >
-                    <ChevronRight className="w-5 h-5" strokeWidth={2.2} />
-                  </button>
-
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1">
-                    {images.map((_, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setSlideIndex(idx)}
-                        aria-label={`Photo ${idx + 1}`}
-                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                          idx === slideIndex
-                            ? "w-4 bg-white"
-                            : "w-1.5 bg-white/60"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-[10px] bg-black/50 backdrop-blur-xs px-3 py-1.5">
+                  {images.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => navigateCarouselSlide(idx)}
+                      aria-label={`Photo ${idx + 1}`}
+                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                        idx === slideIndex
+                          ? "w-2 bg-white"
+                          : "w-1.5 bg-white/55 hover:bg-white/80"
+                      }`}
+                    />
+                  ))}
+                </div>
               )}
 
               <button
                 type="button"
-                onClick={() => onExpandMedia(images, slideIndex)}
+                onClick={() => {
+                  trackPinInteraction("MEDIA_EXPAND", pin);
+                  onExpandMedia(images, slideIndex);
+                }}
                 aria-label="Expand image"
-                className="absolute bottom-4 right-4 z-20 h-10 w-10 rounded-full bg-white/95 hover:bg-white text-[#111111] border border-black/10 inline-flex items-center justify-center transition cursor-pointer"
+                className="absolute bottom-4 right-4 z-20 h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-card)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
               >
-                <Maximize2 className="w-4 h-4" strokeWidth={2.1} />
+                <Maximize2 className="w-5 h-5" strokeWidth={2.3} />
               </button>
             </>
           )}
         </div>
 
         {/* =================================================================
-            RIGHT PANEL: CLEAN MINIMAL PINTEREST / FACEBOOK COMMENTS VIEW
+            RIGHT / INFO PANEL: ULTRA-CLEAN PINTEREST ANATOMY (Zero Comment Clutter!)
         ================================================================== */}
-        <div className="lg:col-span-5 flex flex-col justify-between h-full max-h-[78vh] lg:max-h-full bg-[var(--color-background-card)] border-t lg:border-t-0 lg:border-l border-[var(--color-border)]">
-          {/* 1. Clean Top Action Bar (♡ | 💬 | 📤  ...  [บันทึก] [✕]) */}
-          <div className="px-5 py-3.5 flex items-center justify-between gap-2 shrink-0 border-b border-[var(--color-border)]">
+        <div
+          ref={detailsPanelRef}
+          className="lg:col-span-5 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-card)] lg:border-l border-[var(--color-border)]"
+        >
+          {/* 1. Clean Top Action Bar (♡ | 💬 | 📤 | •••  ...  [บันทึก] [✕]) */}
+          <div className="px-4 sm:px-5 py-3 flex items-center justify-between gap-2 shrink-0 lg:border-b border-[var(--color-border)]">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => onToggleLike(pin.id)}
-                className="h-10 px-2.5 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-10 px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 <Heart
                   className={`w-[21px] h-[21px] ${
@@ -507,25 +1284,18 @@ export function PinterestPinDetail({
                   }`}
                   strokeWidth={2.1}
                 />
-                <span>{pin.likesCount}</span>
+                {pin.likesCount > 0 && <span>{pin.likesCount}</span>}
               </button>
 
               <button
                 type="button"
-                onClick={handleCommentIconClick}
-                aria-label="Show all comments"
-                title={
-                  language === "th"
-                    ? "แสดงความคิดเห็นทั้งหมด"
-                    : "Show all comments"
+                onClick={handleOpenCommentsSheet}
+                aria-label={
+                  language === "th" ? "เปิดดูความคิดเห็น" : "Open comments"
                 }
-                className={`h-10 px-2.5 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold transition cursor-pointer ${
-                  commentsMode === "expanded"
-                    ? "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                    : "text-[var(--color-text-primary)]"
-                }`}
+                className="h-10 px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
               >
-                <MessageCircle className="w-[20px] h-[20px]" strokeWidth={2.1} />
+                <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
                 {totalCommentsCount > 0 && <span>{totalCommentsCount}</span>}
               </button>
 
@@ -533,7 +1303,7 @@ export function PinterestPinDetail({
                 type="button"
                 onClick={handleShareWithFeedback}
                 aria-label="Share"
-                className="h-10 w-10 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 {justCopied ? (
                   <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
@@ -541,19 +1311,34 @@ export function PinterestPinDetail({
                   <Share className="w-[20px] h-[20px]" strokeWidth={2.1} />
                 )}
               </button>
+
+              {/* Desktop '...' More Options Dropdown */}
+              <div className="hidden lg:inline-flex">
+                <PinMoreOptionsControl
+                  pin={pin}
+                  language={language}
+                  isSaved={isSaved}
+                  onToggleSave={onToggleSave}
+                  onSharePin={onSharePin}
+                  onHidePin={onHidePin}
+                  dropdownAlign="left"
+                  iconClassName="w-[20px] h-[20px]"
+                  triggerClassName="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => onToggleSave(pin.id)}
-                className={`h-10 px-4 rounded-full ty-body font-semibold transition cursor-pointer ${
-                  pin.isSavedByMe || savedPinIds.has(pin.id)
+                className={`h-10 px-4 rounded-[14px] ty-body font-bold transition cursor-pointer ${
+                  isSaved
                     ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
                     : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
                 }`}
               >
-                {pin.isSavedByMe || savedPinIds.has(pin.id)
+                {isSaved
                   ? language === "th"
                     ? "บันทึกแล้ว"
                     : "Saved"
@@ -565,259 +1350,349 @@ export function PinterestPinDetail({
               <button
                 type="button"
                 onClick={onClose}
+                title={
+                  language === "th" ? "ปิดกลับหน้าแรก" : "Close to Home feed"
+                }
                 aria-label={language === "th" ? "ปิด" : "Close"}
-                className="h-9 w-9 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="hidden lg:inline-flex h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" strokeWidth={2.2} />
               </button>
             </div>
           </div>
 
-          {/* 2. Scrollable Clean Body: Compact Author + Optional Caption + Progressive Comments */}
-          <div className="px-5 py-4 flex-1 overflow-y-auto space-y-4">
-            {/* Compact Property Identity Row */}
-            <div className="flex items-center justify-between gap-3">
+          {/* 2. Clean Minimal Info Body (Author + Multi-Photo Thumbnail Strip + Full-Width CTA + Title/Desc!) */}
+          <div className="px-4 sm:px-5 pt-2 pb-4 lg:py-4 flex-1 lg:overflow-y-auto space-y-3.5">
+            {/* PINTEREST RED-BOX ZONE: Author + Multi-Photo Squircle Thumbnail Strip + Full-Width Visit Button */}
+            <div className="space-y-3">
+              {/* Row 1: Property Identity */}
               <Link
                 href={`/${pin.hotelSlug}`}
-                className="flex items-center gap-2.5 min-w-0 group/author"
+                onClick={() => trackPinInteraction("HOTEL_PROFILE_VIEW", pin)}
+                className="inline-flex items-center gap-2.5 min-w-0 group/author"
               >
                 {pin.hotelLogoUrl ? (
                   <img
                     src={pin.hotelLogoUrl}
                     alt={hotelName}
-                    className="h-9 w-9 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
+                    className="h-7 w-7 lg:h-8 lg:w-8 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
                   />
                 ) : (
-                  <span className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center ty-caption font-bold shrink-0">
+                  <span className="h-7 w-7 lg:h-8 lg:w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0">
                     {hotelName[0] || "C"}
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[var(--color-text-primary)] group-hover/author:underline truncate flex items-center gap-1">
+                  <p className="text-[13.5px] lg:text-[14px] font-bold text-[var(--color-text-primary)] group-hover/author:underline truncate flex items-center gap-1">
                     <span className="truncate">{hotelName}</span>
                     {pin.hotelVerificationStatus === "VERIFIED" && (
                       <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
                     )}
                   </p>
-                  <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                  <p className="text-[11.5px] text-[var(--color-text-secondary)] truncate">
                     {provinceLabel}
+                    {pin.nightlyPriceThb
+                      ? ` · เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
+                      : ""}
                   </p>
                 </div>
               </Link>
 
+              {/* Row 2: Pinterest Multi-Photo Squircle Thumbnail Strip + '>' Next Arrow (Replaces Left/Right Overlay Buttons!) */}
+              {images.length > 1 && !pin.videoUrl && (
+                <div
+                  data-swipe-ignore="true"
+                  className="flex items-center gap-1.5"
+                >
+                  <div
+                    ref={thumbnailStripRef}
+                    className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5"
+                  >
+                    {images.map((imgUrl, idx) => {
+                      const isCurrent = idx === slideIndex;
+                      return (
+                        <button
+                          key={`${imgUrl}-${idx}`}
+                          type="button"
+                          data-thumb-idx={idx}
+                          onClick={() => navigateCarouselSlide(idx)}
+                          aria-label={
+                            language === "th"
+                              ? `ดูภาพที่ ${idx + 1}`
+                              : `View photo ${idx + 1}`
+                          }
+                          className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[13px] overflow-hidden shrink-0 cursor-pointer transition-all ${
+                            isCurrent
+                              ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-card)] opacity-100"
+                              : "border border-[var(--color-border)] opacity-75 hover:opacity-100"
+                          }`}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`${title} ${idx + 1}`}
+                            draggable={false}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigateCarouselSlide((prev) => (prev + 1) % images.length)
+                    }
+                    aria-label={language === "th" ? "ภาพถัดไป" : "Next photo"}
+                    className="h-9 w-9 rounded-[11px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" strokeWidth={2.2} />
+                  </button>
+                </div>
+              )}
+
+              {/* Row 3: Full-Width Secondary Visit Stay Button (Matches Pinterest "เยี่ยมชมเว็บไซต์"!) */}
               <Link
                 href={`/${pin.hotelSlug}`}
-                className="shrink-0 h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1 transition-colors"
+                onClick={() => trackPinInteraction("HOTEL_PROFILE_VIEW", pin)}
+                className="w-full h-11 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-bold text-[var(--color-text-primary)] flex items-center justify-center gap-1.5 transition-colors"
               >
-                <span>{language === "th" ? "ดูที่พัก" : "View stay"}</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>
+                  {language === "th"
+                    ? "เยี่ยมชมที่พัก · ดูห้องว่าง"
+                    : "Visit stay & check rooms"}
+                </span>
+                <ArrowUpRight className="w-4 h-4" />
               </Link>
             </div>
 
-            {/* Compact Collapsible Caption (Hidden by default past 1 line) */}
-            {captionText && (
-              <div className="text-[14px] leading-relaxed text-[var(--color-text-primary)]">
-                <p className={!isCaptionExpanded ? "line-clamp-1" : ""}>
-                  {captionText}
-                </p>
-                {captionText.length > 56 && (
+            {/* Pin Title + Expandable Chevron (Matches Pinterest App Image 1!) */}
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-2.5">
+                <h1 className="text-[16.5px] lg:text-[19px] font-bold text-[var(--color-text-primary)] leading-snug">
+                  {title}
+                </h1>
+
+                {description && description !== title && (
                   <button
                     type="button"
-                    onClick={() => setIsCaptionExpanded((v) => !v)}
-                    className="text-[12px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer mt-0.5"
+                    onClick={() => setIsDescriptionOpen((v) => !v)}
+                    aria-label={
+                      isDescriptionOpen
+                        ? "ซ่อนรายละเอียด"
+                        : "อ่านรายละเอียดเพิ่มเติม"
+                    }
+                    className="lg:hidden shrink-0 h-7 w-7 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer transition-colors mt-0.5"
                   >
-                    {isCaptionExpanded
-                      ? language === "th"
-                        ? "ย่อข้อความ"
-                        : "Show less"
-                      : language === "th"
-                      ? "อ่านเพิ่มเติม"
-                      : "More"}
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform duration-200 ${
+                        isDescriptionOpen ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
                 )}
               </div>
-            )}
 
-            {/* Collapsible Comments Section (Preview 1 -> Click to Expand All) */}
-            <div className="pt-3 border-t border-[var(--color-border)] space-y-3.5">
+              {description && description !== title && (
+                <p
+                  className={`text-[14px] leading-relaxed text-[var(--color-text-secondary)] lg:text-[var(--color-text-primary)] ${
+                    isDescriptionOpen ? "block" : "hidden lg:block"
+                  }`}
+                >
+                  {description}
+                </p>
+              )}
+
+              {pin.semanticTags.length > 0 && (
+                <div
+                  className={`flex-wrap items-center gap-1.5 pt-1 ${
+                    isDescriptionOpen ? "flex" : "hidden lg:flex"
+                  }`}
+                >
+                  {pin.semanticTags.slice(0, 5).map((tag) => (
+                    <span
+                      key={tag}
+                      className="h-7 px-2.5 rounded-[9px] bg-[var(--color-background-muted)] text-[12px] font-medium text-[var(--color-text-secondary)] inline-flex items-center"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* DESKTOP INLINE COMMENTS SECTION (>= lg ONLY — Never Uses Mobile Bottom Sheet!) */}
+            <div
+              ref={desktopCommentsSectionRef}
+              className="hidden lg:block pt-4 border-t border-[var(--color-border)] space-y-3.5"
+            >
               <button
                 type="button"
-                onClick={handleToggleCommentsHeader}
-                className="w-full flex items-center justify-between text-left cursor-pointer group"
+                onClick={() => setIsDesktopCommentsOpen((v) => !v)}
+                className="w-full flex items-center justify-between text-left cursor-pointer group/cmhead"
               >
                 <span className="text-[15px] font-bold text-[var(--color-text-primary)]">
                   {totalCommentsCount > 0
                     ? language === "th"
                       ? `${totalCommentsCount} ความคิดเห็น`
-                      : `${totalCommentsCount} comments`
+                      : `${totalCommentsCount} ${
+                          totalCommentsCount === 1 ? "comment" : "comments"
+                        }`
                     : language === "th"
                     ? "ความคิดเห็น"
                     : "Comments"}
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-transform duration-200 ${
-                    commentsMode === "expanded" ? "rotate-180" : ""
+                  className={`w-4 h-4 text-[var(--color-text-secondary)] group-hover/cmhead:text-[var(--color-text-primary)] transition-transform duration-200 ${
+                    isDesktopCommentsOpen ? "rotate-180" : ""
                   }`}
                 />
               </button>
 
-              {comments.length === 0 ? (
-                <p className="text-[13px] text-[var(--color-text-secondary)] py-1">
-                  {language === "th"
-                    ? "ยังไม่มีความคิดเห็น ร่วมสอบถามที่พักหรือรีวิวเป็นคนแรกได้เลย"
-                    : "No comments yet. Start the conversation below."}
-                </p>
-              ) : (
+              {isDesktopCommentsOpen && (
                 <div className="space-y-3.5">
-                  {visibleComments.map((cm) => {
-                    const canRemove =
-                      isOwnerOfPin || currentUser?.id === cm.userId;
-                    const showReplies = commentsMode === "expanded";
+                  {comments.length === 0 ? (
+                    <p className="text-[13.5px] text-[var(--color-text-secondary)] py-2">
+                      {language === "th"
+                        ? "ยังไม่มีความคิดเห็น · สอบถามรายละเอียดห้องพักหรือพูดคุยเป็นคนแรกได้เลย"
+                        : "No comments yet — ask a question about this stay below."}
+                    </p>
+                  ) : (
+                    comments.map((cm) => {
+                      const canRemove =
+                        isOwnerOfPin || currentUser?.id === cm.userId;
 
-                    return (
-                      <div key={cm.id} className="space-y-2 select-text">
-                        <div className="flex items-start gap-2.5">
-                          {cm.authorAvatar ? (
-                            <img
-                              src={cm.authorAvatar}
-                              alt={cm.authorName}
-                              referrerPolicy="no-referrer"
-                              className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)]"
-                            />
-                          ) : (
-                            <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0 mt-0.5">
-                              {(cm.authorName[0] || "G").toUpperCase()}
-                            </span>
-                          )}
-
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] leading-snug break-words text-[var(--color-text-primary)]">
-                              <strong className="font-bold mr-1.5">
-                                {cm.authorName}
-                              </strong>
-                              {cm.isHotelOwnerReply && (
-                                <span className="mr-1.5 inline-flex items-center rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[11px] font-semibold">
-                                  เจ้าของที่พัก
-                                </span>
-                              )}
-                              <span>{cm.body}</span>
-                            </p>
-
-                            <div className="mt-1 flex items-center gap-3 text-[12px] text-[var(--color-text-secondary)]">
-                              <span>
-                                {formatRelativeCommentDate(
-                                  cm.createdAt,
-                                  language
-                                )}
+                      return (
+                        <div key={`desk-${cm.id}`} className="space-y-2.5 select-text">
+                          <div className="flex items-start gap-2.5">
+                            {cm.authorAvatar ? (
+                              <img
+                                src={cm.authorAvatar}
+                                alt={cm.authorName}
+                                referrerPolicy="no-referrer"
+                                className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)]"
+                              />
+                            ) : (
+                              <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0 mt-0.5">
+                                {(cm.authorName[0] || "G").toUpperCase()}
                               </span>
+                            )}
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCommentsMode("expanded");
-                                  setReplyingTo({
-                                    id: cm.id,
-                                    authorName: cm.authorName,
-                                  });
-                                  commentInputRef.current?.focus();
-                                }}
-                                className="font-semibold hover:text-[var(--color-text-primary)] cursor-pointer"
-                              >
-                                {language === "th" ? "ตอบกลับ" : "Reply"}
-                              </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <strong className="text-[13.5px] font-bold text-[var(--color-text-primary)]">
+                                  {cm.authorName}
+                                </strong>
+                                {cm.isHotelOwnerReply && (
+                                  <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
+                                    เจ้าของที่พัก
+                                  </span>
+                                )}
+                                <span className="text-[11.5px] text-[var(--color-text-secondary)]">
+                                  {formatRelativeCommentDate(
+                                    cm.createdAt,
+                                    language
+                                  )}
+                                </span>
+                              </div>
 
-                              {canRemove && (
+                              <p className="text-[14px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
+                                {cm.body}
+                              </p>
+
+                              <div className="mt-1 flex items-center gap-3.5 text-[12px] text-[var(--color-text-secondary)]">
                                 <button
                                   type="button"
-                                  onClick={() => onDeleteComment(cm.id)}
-                                  className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                                  onClick={() => {
+                                    setReplyingTo({
+                                      id: cm.id,
+                                      authorName: cm.authorName,
+                                    });
+                                    desktopCommentInputRef.current?.focus();
+                                  }}
+                                  className="font-semibold hover:text-[var(--color-text-primary)] cursor-pointer"
                                 >
-                                  <Trash2 className="w-3 h-3" />
-                                  <span>
-                                    {language === "th" ? "ลบ" : "Delete"}
-                                  </span>
+                                  {language === "th" ? "ตอบกลับ" : "Reply"}
                                 </button>
-                              )}
+
+                                {canRemove && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteComment(cm.id)}
+                                    className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>
+                                      {language === "th" ? "ลบ" : "Delete"}
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Nested Replies (Shown when expanded) */}
-                        {showReplies && cm.replies.length > 0 && (
-                          <div className="pl-9 space-y-2.5">
-                            {cm.replies.map((rp) => {
-                              const canRemoveReply =
-                                isOwnerOfPin || currentUser?.id === rp.userId;
-                              return (
-                                <div
-                                  key={rp.id}
-                                  className="flex items-start gap-2"
-                                >
-                                  <CornerDownRight className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0 mt-1" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[14px] leading-snug break-words text-[var(--color-text-primary)]">
-                                      <strong className="font-bold mr-1.5">
-                                        {rp.authorName}
-                                      </strong>
-                                      {rp.isHotelOwnerReply && (
-                                        <span className="mr-1.5 inline-flex items-center rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[11px] font-semibold">
-                                          เจ้าของที่พัก
-                                        </span>
-                                      )}
-                                      <span>{rp.body}</span>
-                                    </p>
-                                    <div className="mt-0.5 flex items-center gap-3 text-[12px] text-[var(--color-text-secondary)]">
-                                      <span>
-                                        {formatRelativeCommentDate(
-                                          rp.createdAt,
-                                          language
+                          {cm.replies.length > 0 && (
+                            <div className="pl-9 space-y-2">
+                              {cm.replies.map((rp) => {
+                                const canRemoveReply =
+                                  isOwnerOfPin || currentUser?.id === rp.userId;
+                                return (
+                                  <div
+                                    key={`desk-rp-${rp.id}`}
+                                    className="flex items-start gap-2"
+                                  >
+                                    <CornerDownRight className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0 mt-1" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <strong className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                                          {rp.authorName}
+                                        </strong>
+                                        {rp.isHotelOwnerReply && (
+                                          <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
+                                            เจ้าของที่พัก
+                                          </span>
                                         )}
-                                      </span>
+                                        <span className="text-[11px] text-[var(--color-text-secondary)]">
+                                          {formatRelativeCommentDate(
+                                            rp.createdAt,
+                                            language
+                                          )}
+                                        </span>
+                                      </div>
+                                      <p className="text-[13.5px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
+                                        {rp.body}
+                                      </p>
                                       {canRemoveReply && (
                                         <button
                                           type="button"
                                           onClick={() => onDeleteComment(rp.id)}
-                                          className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                                          className="mt-1 text-[11.5px] text-[var(--color-text-secondary)] hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
                                         >
                                           <Trash2 className="w-3 h-3" />
                                           <span>
-                                            {language === "th"
-                                              ? "ลบ"
-                                              : "Delete"}
+                                            {language === "th" ? "ลบ" : "Delete"}
                                           </span>
                                         </button>
                                       )}
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {commentsMode !== "expanded" && hiddenCommentsCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setCommentsMode("expanded")}
-                      className="text-[13px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
-                    >
-                      {language === "th"
-                        ? `ดูความคิดเห็นที่ซ่อนอยู่อีก ${hiddenCommentsCount} รายการ`
-                        : `View ${hiddenCommentsCount} more comments`}
-                    </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               )}
             </div>
           </div>
 
-          {/* 3. Sticky Bottom Pill Comment Input (Clean Pinterest Style) */}
-          <div className="px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-background-card)] shrink-0 space-y-2">
+          {/* DESKTOP STICKY INLINE COMMENT COMPOSER (>= lg ONLY) */}
+          <div className="hidden lg:block shrink-0 px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-background-card)] space-y-2">
             {replyingTo && (
-              <div className="flex items-center justify-between px-3 py-1 rounded-[8px] bg-[var(--color-background-muted)] text-[12px]">
+              <div className="flex items-center justify-between px-3 py-1.5 rounded-[10px] bg-[var(--color-background-muted)] text-[12px]">
                 <span>
                   กำลังตอบกลับ <strong>{replyingTo.authorName}</strong>
                 </span>
@@ -832,16 +1707,16 @@ export function PinterestPinDetail({
             )}
 
             {showEmojiBar && (
-              <div className="flex items-center gap-1 px-1">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {QUICK_EMOJIS.map((em) => (
                   <button
-                    key={em}
+                    key={`desk-em-${em}`}
                     type="button"
                     onClick={() => {
                       setCommentText((prev) => `${prev}${em}`);
-                      commentInputRef.current?.focus();
+                      desktopCommentInputRef.current?.focus();
                     }}
-                    className="h-8 w-8 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[16px] cursor-pointer"
+                    className="h-8 w-8 rounded-[9px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[15px] cursor-pointer shrink-0"
                   >
                     {em}
                   </button>
@@ -853,13 +1728,22 @@ export function PinterestPinDetail({
               onSubmit={handleSubmitComment}
               className="flex items-center gap-2"
             >
+              <button
+                type="button"
+                onClick={() => setShowEmojiBar((v) => !v)}
+                aria-label="Toggle emoji bar"
+                className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer shrink-0 transition-colors"
+              >
+                <Smile className="w-[18px] h-[18px]" />
+              </button>
+
               {currentUser && (
                 <UserAvatarCircle user={currentUser} sizeClass="h-8 w-8" />
               )}
 
-              <div className="flex-1 h-11 rounded-full bg-[var(--color-background-muted)]/60 border border-[var(--color-border)] focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-border-emphasized)] pl-4 pr-1.5 flex items-center gap-1.5 transition-colors">
+              <div className="flex-1 h-10 rounded-[12px] bg-[var(--color-background-muted)]/65 border border-[var(--color-border)] focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-border-emphasized)] pl-3.5 pr-1.5 flex items-center gap-1.5 transition-colors">
                 <input
-                  ref={commentInputRef}
+                  ref={desktopCommentInputRef}
                   type="text"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -872,24 +1756,15 @@ export function PinterestPinDetail({
                       ? "เข้าสู่ระบบเพื่อแสดงความคิดเห็น..."
                       : "Sign in to comment..."
                   }
-                  className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+                  className="flex-1 min-w-0 bg-transparent text-[13.5px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
                 />
-
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiBar((v) => !v)}
-                  aria-label="Add emoji"
-                  className="h-8 w-8 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] cursor-pointer shrink-0"
-                >
-                  <Smile className="w-[18px] h-[18px]" />
-                </button>
 
                 {commentText.trim().length > 0 && (
                   <button
                     type="submit"
                     disabled={isSubmittingComment}
                     aria-label="Send comment"
-                    className="h-8 w-8 rounded-full bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] hover:opacity-90 inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
+                    className="h-7 w-7 rounded-[9px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] hover:opacity-90 inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" />
                   </button>
@@ -899,6 +1774,328 @@ export function PinterestPinDetail({
           </div>
         </div>
       </div>
+
+      {/* MOBILE / TABLET "YOU MAY ALSO LIKE" 2-COLUMN TIGHT MASONRY RIGHT UNDER TITLE */}
+      {relatedPins.length > 0 && (
+        <div className="lg:hidden px-1.5 pt-3 pb-[calc(88px+env(safe-area-inset-bottom))] space-y-2.5 bg-[var(--color-background-body)]">
+          <h2 className="px-1 text-[15px] font-bold text-[var(--color-text-primary)]">
+            {language === "th"
+              ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
+              : "More to explore"}
+          </h2>
+          <div className="flex gap-1.5 items-start">
+            {[0, 1].map((colIdx) => (
+              <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-1.5">
+                {relatedPins
+                  .slice(0, 14)
+                  .filter((_, idx) => idx % 2 === colIdx)
+                  .map((relPin) => (
+                    <PinterestPinCard
+                      key={relPin.id}
+                      pin={relPin}
+                      language={language}
+                      isSaved={
+                        savedPinIds.has(relPin.id) || relPin.isSavedByMe
+                      }
+                      onSelectPin={(next) => onSelectPin?.(next)}
+                      onToggleSave={onToggleSave}
+                      onSharePin={onSharePin}
+                      onHidePin={onHidePin}
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          MOBILE / TABLET SLIDE-UP COMMENTS BOTTOM SHEET MODAL (< lg ONLY!)
+      ====================================================================== */}
+      {isCommentsSheetOpen && isMobileViewport && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={language === "th" ? "ความคิดเห็น" : "Comments"}
+          data-swipe-ignore="true"
+          onClick={() => setIsCommentsSheetOpen(false)}
+          className="lg:hidden fixed inset-0 z-[85] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[560px] h-[78dvh] sm:h-[75dvh] rounded-t-[24px] bg-[var(--color-background-popover)] border-t sm:border-x border-[var(--color-border)] flex flex-col justify-between overflow-hidden animate-slide-up-sheet"
+          >
+            {/* Top Handle + Header (✕ | N comments | 📤) */}
+            <div className="shrink-0 pt-2.5 pb-2.5 px-4 border-b border-[var(--color-border)] space-y-2">
+              <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setIsCommentsSheetOpen(false)}
+                  aria-label={language === "th" ? "ปิดหน้าต่างความคิดเห็น" : "Close comments"}
+                  className="h-9 w-9 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <h2 className="text-[15px] font-bold text-[var(--color-text-primary)]">
+                  {totalCommentsCount > 0
+                    ? language === "th"
+                      ? `${totalCommentsCount} ความคิดเห็น`
+                      : `${totalCommentsCount} ${
+                          totalCommentsCount === 1 ? "comment" : "comments"
+                        }`
+                    : language === "th"
+                    ? "ความคิดเห็น"
+                    : "Comments"}
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={handleShareWithFeedback}
+                  aria-label={language === "th" ? "แชร์โพสต์" : "Share"}
+                  className="h-9 w-9 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                >
+                  {justCopied ? (
+                    <Check className="w-4 h-4 text-[var(--color-success)]" />
+                  ) : (
+                    <Share className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Threaded Comments List */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              {comments.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center py-10 space-y-1.5">
+                  <MessageCircle className="w-7 h-7 text-[var(--color-text-secondary)]" />
+                  <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                    {language === "th"
+                      ? "ยังไม่มีความคิดเห็น"
+                      : "No comments yet"}
+                  </p>
+                  <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                    {language === "th"
+                      ? "สอบถามรายละเอียดห้องพักหรือพูดคุยเป็นคนแรกได้เลย"
+                      : "Ask a question or share your thoughts below."}
+                  </p>
+                </div>
+              ) : (
+                comments.map((cm) => {
+                  const canRemove =
+                    isOwnerOfPin || currentUser?.id === cm.userId;
+
+                  return (
+                    <div key={cm.id} className="space-y-2.5 select-text">
+                      <div className="flex items-start gap-2.5">
+                        {cm.authorAvatar ? (
+                          <img
+                            src={cm.authorAvatar}
+                            alt={cm.authorName}
+                            referrerPolicy="no-referrer"
+                            className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)]"
+                          />
+                        ) : (
+                          <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0 mt-0.5">
+                            {(cm.authorName[0] || "G").toUpperCase()}
+                          </span>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-[13.5px] font-bold text-[var(--color-text-primary)]">
+                              {cm.authorName}
+                            </strong>
+                            {cm.isHotelOwnerReply && (
+                              <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
+                                เจ้าของที่พัก
+                              </span>
+                            )}
+                            <span className="text-[11.5px] text-[var(--color-text-secondary)]">
+                              {formatRelativeCommentDate(
+                                cm.createdAt,
+                                language
+                              )}
+                            </span>
+                          </div>
+
+                          <p className="text-[14px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
+                            {cm.body}
+                          </p>
+
+                          <div className="mt-1.5 flex items-center gap-3.5 text-[12px] text-[var(--color-text-secondary)]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyingTo({
+                                  id: cm.id,
+                                  authorName: cm.authorName,
+                                });
+                                commentInputRef.current?.focus();
+                              }}
+                              className="font-semibold hover:text-[var(--color-text-primary)] cursor-pointer"
+                            >
+                              {language === "th" ? "ตอบกลับ" : "Reply"}
+                            </button>
+
+                            {canRemove && (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteComment(cm.id)}
+                                className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>
+                                  {language === "th" ? "ลบ" : "Delete"}
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {cm.replies.length > 0 && (
+                        <div className="pl-9 space-y-2.5">
+                          {cm.replies.map((rp) => {
+                            const canRemoveReply =
+                              isOwnerOfPin || currentUser?.id === rp.userId;
+                            return (
+                              <div
+                                key={rp.id}
+                                className="flex items-start gap-2"
+                              >
+                                <CornerDownRight className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0 mt-1" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <strong className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                                      {rp.authorName}
+                                    </strong>
+                                    {rp.isHotelOwnerReply && (
+                                      <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
+                                        เจ้าของที่พัก
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-[var(--color-text-secondary)]">
+                                      {formatRelativeCommentDate(
+                                        rp.createdAt,
+                                        language
+                                      )}
+                                    </span>
+                                  </div>
+                                  <p className="text-[13.5px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
+                                    {rp.body}
+                                  </p>
+                                  {canRemoveReply && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onDeleteComment(rp.id)}
+                                      className="mt-1 text-[11.5px] text-[var(--color-text-secondary)] hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      <span>
+                                        {language === "th" ? "ลบ" : "Delete"}
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Bottom Quick-Prompt Squircle Chips + Squircle Composer (Matches Image 2!) */}
+            <div className="shrink-0 px-4 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-[var(--color-border)] bg-[var(--color-background-popover)] space-y-2.5">
+              {replyingTo && (
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-[10px] bg-[var(--color-background-muted)] text-[12px]">
+                  <span>
+                    กำลังตอบกลับ <strong>{replyingTo.authorName}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="font-semibold text-[var(--color-text-primary)] cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              )}
+
+              {showEmojiBar && (
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                  {QUICK_EMOJIS.map((em) => (
+                    <button
+                      key={em}
+                      type="button"
+                      onClick={() => {
+                        setCommentText((prev) => `${prev}${em}`);
+                        commentInputRef.current?.focus();
+                      }}
+                      className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[16px] cursor-pointer shrink-0"
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSubmitComment}
+                className="flex items-center gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiBar((v) => !v)}
+                  aria-label="Toggle emoji bar"
+                  className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer shrink-0 transition-colors"
+                >
+                  <Smile className="w-[18px] h-[18px]" />
+                </button>
+
+                {currentUser && (
+                  <UserAvatarCircle user={currentUser} sizeClass="h-8 w-8" />
+                )}
+
+                <div className="flex-1 h-11 rounded-[14px] bg-[var(--color-background-muted)]/65 border border-[var(--color-border)] focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-border-emphasized)] pl-3.5 pr-1.5 flex items-center gap-1.5 transition-colors">
+                  <input
+                    ref={commentInputRef}
+                    type="text"
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={
+                      currentUser
+                        ? language === "th"
+                          ? "เพิ่มความคิดเห็น..."
+                          : "Add a comment..."
+                        : language === "th"
+                        ? "เข้าสู่ระบบเพื่อแสดงความคิดเห็น..."
+                        : "Sign in to comment..."
+                    }
+                    className="flex-1 min-w-0 bg-transparent text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+                  />
+
+                  {commentText.trim().length > 0 && (
+                    <button
+                      type="submit"
+                      disabled={isSubmittingComment}
+                      aria-label="Send comment"
+                      className="h-8 w-8 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] hover:opacity-90 inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

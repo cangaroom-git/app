@@ -232,14 +232,14 @@ export default function TripsAndAccountPage() {
               value={lookupCode}
               onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
               placeholder="รหัสใบจอง เช่น CGR-261117-1234"
-              className="h-10 flex-1 rounded-full bg-[var(--color-background-card)] px-4 ty-body font-mono uppercase focus:outline-none"
+              className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-card)] px-4 ty-body font-mono uppercase focus:outline-none"
             />
             <input
               type="tel"
               value={lookupPhone}
               onChange={(e) => setLookupPhone(e.target.value)}
               placeholder="เบอร์โทรที่ใช้จอง"
-              className="h-10 flex-1 rounded-full bg-[var(--color-background-card)] px-4 ty-body focus:outline-none"
+              className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-card)] px-4 ty-body focus:outline-none"
             />
             <StandardButton type="submit" variant="primary" size="md">
               <Search className="w-4 h-4" />

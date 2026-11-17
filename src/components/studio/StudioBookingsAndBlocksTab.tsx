@@ -149,7 +149,7 @@ export function StudioBookingsAndBlocksTab({
                       type="button"
                       disabled={busyId === b.id}
                       onClick={() => handleBookingStatus(b.id, "CONFIRMED")}
-                      className="h-9 px-3.5 rounded-full bg-[var(--color-success)] text-white ty-caption font-bold inline-flex items-center gap-1 cursor-pointer"
+                      className="h-9 px-3.5 rounded-[12px] bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111] hover:opacity-90 ty-caption font-bold inline-flex items-center gap-1 cursor-pointer transition-opacity"
                     >
                       <Check className="w-4 h-4" />
                       <span>ยืนยันจอง</span>
@@ -161,7 +161,7 @@ export function StudioBookingsAndBlocksTab({
                       type="button"
                       disabled={busyId === b.id}
                       onClick={() => handleBookingStatus(b.id, "CANCELLED")}
-                      className="h-9 px-3 rounded-full bg-[var(--color-error-muted)] text-[var(--color-error)] ty-caption font-bold inline-flex items-center gap-1 cursor-pointer"
+                      className="h-9 px-3 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-error)] ty-caption font-bold inline-flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <X className="w-4 h-4" />
                       <span>ยกเลิก/คืนห้อง</span>

@@ -306,7 +306,7 @@ export default function SuperAdminConsolePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาชื่อที่พัก / slug / email..."
-              className="w-full h-10 rounded-full bg-[var(--color-background-muted)] pl-9 pr-4 ty-body focus:outline-none"
+              className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] pl-9 pr-4 ty-body focus:outline-none"
             />
           </div>
         </div>
@@ -363,7 +363,7 @@ export default function SuperAdminConsolePage() {
                       onClick={() =>
                         handleUpdateHotelVerification(h.id, "VERIFIED")
                       }
-                      className="h-9 px-3.5 rounded-full bg-[var(--color-accent)] text-white ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-9 px-3.5 rounded-[12px] bg-[var(--color-accent)] text-white ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <BadgeCheck className="w-4 h-4" />
                       <span>อนุมัติ Verified</span>
@@ -376,7 +376,7 @@ export default function SuperAdminConsolePage() {
                       onClick={() =>
                         handleUpdateHotelVerification(h.id, "SUSPENDED")
                       }
-                      className="h-9 px-3.5 rounded-full bg-[var(--color-error-muted)] text-[var(--color-error)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-9 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-error)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Ban className="w-3.5 h-3.5" />
                       <span>ระงับ</span>
@@ -422,10 +422,10 @@ export default function SuperAdminConsolePage() {
                     <button
                       type="button"
                       onClick={() => handleToggleFeaturedDeal(c)}
-                      className={`h-9 px-3.5 rounded-full ty-caption font-semibold shrink-0 cursor-pointer ${
+                      className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold shrink-0 cursor-pointer ${
                         c.isFeaturedDeal
-                          ? "bg-[var(--color-promo)] text-white"
-                          : "bg-[var(--color-background-muted)]"
+                          ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
+                          : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]"
                       }`}
                     >
                       {c.isFeaturedDeal ? "กำลังปักหมุดเด่น" : "ตั้งเป็นดีลเด่น"}
@@ -467,10 +467,10 @@ export default function SuperAdminConsolePage() {
                     <button
                       type="button"
                       onClick={() => handleTogglePinSponsored(p)}
-                      className={`h-9 px-3.5 rounded-full ty-caption font-semibold shrink-0 cursor-pointer ${
+                      className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold shrink-0 cursor-pointer ${
                         p.isSponsored
                           ? "bg-[var(--color-accent)] text-white"
-                          : "bg-[var(--color-background-muted)]"
+                          : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]"
                       }`}
                     >
                       {p.isSponsored ? "Sponsored ON" : "Boost Pin"}

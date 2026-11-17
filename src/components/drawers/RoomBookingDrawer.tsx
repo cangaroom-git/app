@@ -476,7 +476,7 @@ export function RoomBookingDrawer({
                     <button
                       type="button"
                       onClick={() => onChangeGuests(Math.max(1, guests - 1))}
-                      className="h-8 w-8 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
+                      className="h-8 w-8 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer hover:bg-[var(--color-background-muted)] transition-colors"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
@@ -486,7 +486,7 @@ export function RoomBookingDrawer({
                     <button
                       type="button"
                       onClick={() => onChangeGuests(Math.min(16, guests + 1))}
-                      className="h-8 w-8 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
+                      className="h-8 w-8 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer hover:bg-[var(--color-background-muted)] transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>

@@ -85,7 +85,7 @@ export function PureMediaViewer({
       >
         <div className="min-w-0 flex items-center gap-2.5">
           {total > 1 && (
-            <span className="rounded-full bg-white/15 px-3 py-1 ty-caption !text-white font-semibold tabular-nums">
+            <span className="rounded-[10px] bg-white/15 px-3 py-1 ty-caption !text-white font-semibold tabular-nums">
               {currentIndex + 1} / {total}
             </span>
           )}
@@ -100,7 +100,7 @@ export function PureMediaViewer({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="h-10 w-10 rounded-full bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer shrink-0"
+          className="h-10 w-10 rounded-[14px] bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer shrink-0"
         >
           <X className="w-5 h-5" />
         </button>
@@ -115,7 +115,7 @@ export function PureMediaViewer({
               goPrev();
             }}
             aria-label="Previous"
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-11 sm:w-11 rounded-[14px] bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
@@ -161,7 +161,7 @@ export function PureMediaViewer({
               goNext();
             }}
             aria-label="Next"
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 sm:h-11 sm:w-11 rounded-[14px] bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center transition cursor-pointer"
           >
             <ChevronRight className="w-6 h-6" />
           </button>

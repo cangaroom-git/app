@@ -148,7 +148,7 @@ export function StudioRoomsAndAddonsTab({
               <button
                 type="button"
                 onClick={() => handleDeleteRoom(r.id)}
-                className="h-8 w-8 rounded-full hover:bg-[var(--color-error-muted)] text-[var(--color-error)] inline-flex items-center justify-center cursor-pointer shrink-0"
+                className="h-8 w-8 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-error)] inline-flex items-center justify-center cursor-pointer shrink-0 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

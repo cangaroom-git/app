@@ -46,10 +46,15 @@ export function UniversalVideoPlayer({
       ? "aspect-[9/16]"
       : "aspect-[16/9]";
 
+  const surfaceBgClass =
+    fitMode === "contain"
+      ? "bg-[var(--color-background-body)] text-[var(--color-text-secondary)]"
+      : "bg-black text-white/70";
+
   if (!videoUrl.trim()) {
     return (
       <div
-        className={`relative w-full ${aspectClass} bg-black flex items-center justify-center text-white/70 ty-caption ${className}`}
+        className={`relative w-full ${aspectClass} ${surfaceBgClass} flex items-center justify-center ty-caption ${className}`}
       >
         ยังไม่ได้ใส่ลิงก์วิดีโอ
       </div>
@@ -65,7 +70,7 @@ export function UniversalVideoPlayer({
               ? "h-full max-w-[440px] mx-auto"
               : "aspect-[16/9] my-auto"
             : aspectClass
-        } bg-black overflow-hidden ${className}`}
+        } ${fitMode === "contain" ? "bg-[var(--color-background-body)]" : "bg-black"} overflow-hidden ${className}`}
       >
         <iframe
           key={parsed.embedUrl}
@@ -94,7 +99,11 @@ export function UniversalVideoPlayer({
 
   return (
     <div
-      className={`group relative w-full ${aspectClass} bg-black overflow-hidden flex items-center justify-center ${className}`}
+      className={`group relative w-full ${aspectClass} ${
+        fitMode === "contain"
+          ? "bg-[var(--color-background-body)]"
+          : "bg-black"
+      } overflow-hidden flex items-center justify-center ${className}`}
     >
       <video
         ref={videoRef}
@@ -116,7 +125,7 @@ export function UniversalVideoPlayer({
           type="button"
           onClick={handleTogglePlay}
           aria-label="Play video"
-          className="absolute inset-0 m-auto h-14 w-14 rounded-full bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer"
+          className="absolute inset-0 m-auto h-14 w-14 rounded-[18px] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer"
         >
           <Play className="w-6 h-6 fill-white ml-0.5" />
         </button>
@@ -127,7 +136,7 @@ export function UniversalVideoPlayer({
           type="button"
           onClick={() => setIsMutedMp4((prev) => !prev)}
           aria-label={isMutedMp4 ? "Unmute" : "Mute"}
-          className="h-9 w-9 rounded-full bg-black/55 backdrop-blur-md text-white flex items-center justify-center cursor-pointer"
+          className="h-9 w-9 rounded-[12px] bg-black/55 backdrop-blur-md text-white flex items-center justify-center cursor-pointer"
         >
           {isMutedMp4 ? (
             <VolumeX className="w-4 h-4" />
@@ -140,7 +149,7 @@ export function UniversalVideoPlayer({
           type="button"
           onClick={handleTogglePlay}
           aria-label={isPlayingMp4 ? "Pause" : "Play"}
-          className="h-9 w-9 rounded-full bg-black/55 backdrop-blur-md text-white flex items-center justify-center cursor-pointer"
+          className="h-9 w-9 rounded-[12px] bg-black/55 backdrop-blur-md text-white flex items-center justify-center cursor-pointer"
         >
           {isPlayingMp4 ? (
             <Pause className="w-4 h-4 fill-white" />

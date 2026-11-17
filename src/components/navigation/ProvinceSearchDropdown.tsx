@@ -147,7 +147,7 @@ export function ProvinceSearchDropdown({
         <div className="hidden lg:block absolute right-0 top-[calc(100%+10px)] z-[85] w-[820px] xl:w-[880px] rounded-[20px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[0_12px_40px_rgba(0,0,0,0.16)] p-4 space-y-3">
           {/* Top Instant Filter Row */}
           <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-[var(--color-border)]">
-            <div className="h-9 w-[280px] rounded-[10px] bg-[var(--color-background-muted)] px-3 flex items-center gap-2">
+            <div className="h-9 flex-1 rounded-[10px] bg-[var(--color-background-muted)] px-3 flex items-center gap-2">
               <Search className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
               <input
                 type="text"
@@ -172,43 +172,15 @@ export function ProvinceSearchDropdown({
               )}
             </div>
 
-            {/* Popular Quick-Pick Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1">
+            {selectedProvinceId && (
               <button
                 type="button"
                 onClick={() => handlePick(null)}
-                className={`h-8 px-3 rounded-[9px] ty-caption font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  !selectedProvinceId
-                    ? "bg-[#2067da] !text-white"
-                    : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                }`}
+                className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
               >
-                <span className={!selectedProvinceId ? "!text-white" : ""}>
-                  {language === "th" ? "ทุกจังหวัด (77)" : "All 77"}
-                </span>
+                {language === "th" ? "ล้างจังหวัด" : "Clear"}
               </button>
-
-              {popularProvinces.slice(0, 6).map((pop) => {
-                const isSelected = selectedProvinceId === pop.id;
-                const shortTh = pop.nameTh.split("(")[0].trim();
-                return (
-                  <button
-                    key={`pop-${pop.id}`}
-                    type="button"
-                    onClick={() => handlePick(isSelected ? null : pop.id)}
-                    className={`h-8 px-2.5 rounded-[9px] ty-caption font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-[#2067da] !text-white"
-                        : "bg-[var(--color-background-muted)]/70 hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    <span className={isSelected ? "!text-white" : ""}>
-                      {language === "th" ? shortTh : pop.nameEn}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            )}
           </div>
 
           {/* All 77 Provinces in a Compact 7-Column Grid (Zero Scroll!) */}
@@ -230,14 +202,14 @@ export function ProvinceSearchDropdown({
                     onClick={() => handlePick(isSelected ? null : prov.id)}
                     className={`h-[31px] px-2 rounded-[8px] text-left truncate transition-colors cursor-pointer flex items-center justify-between gap-1 ${
                       isSelected
-                        ? "bg-[#2067da] !text-white font-semibold"
+                        ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] font-semibold"
                         : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                     }`}
                   >
                     <span
                       className={`text-[13px] truncate ${
                         isSelected
-                          ? "!text-white font-semibold"
+                          ? "!text-white dark:!text-[#111111] font-semibold"
                           : prov.isPopular
                           ? "font-semibold text-[var(--color-text-primary)]"
                           : "font-normal text-[var(--color-text-primary)]"

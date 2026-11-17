@@ -342,7 +342,7 @@ function StudioWorkspaceContent() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-[12px] text-[13px] font-bold whitespace-nowrap transition-colors cursor-pointer ${
                 isActive
                   ? "bg-[#111111] text-white dark:bg-[#f5f5f5] dark:text-[#111111]"
                   : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -351,7 +351,7 @@ function StudioWorkspaceContent() {
               {tab.icon}
               <span>{tab.label}</span>
               {typeof tab.badge === "number" && tab.badge > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--color-promo)] text-white">
+                <span className="px-1.5 py-0.5 rounded-[6px] text-[11px] font-bold bg-[var(--color-promo)] text-white">
                   {tab.badge}
                 </span>
               )}

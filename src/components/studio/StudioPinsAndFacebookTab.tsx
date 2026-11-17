@@ -34,11 +34,113 @@ const PIN_CATEGORY_OPTIONS: Array<{ value: PinCategoryDto; label: string }> = [
 ];
 
 const ASPECT_RATIO_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "aspect-[4/5]", label: "แนวตั้ง 4:5 (แนะนำสำหรับ Feed)" },
-  { value: "aspect-[3/4]", label: "แนวตั้ง 3:4" },
-  { value: "aspect-square", label: "จัตุรัส 1:1" },
-  { value: "aspect-[9/16]", label: "วิดีโอแนวตั้ง 9:16" },
+  { value: "aspect-[3/4]", label: "แนวตั้ง 3:4 (1080×1440 · แนะนำสูงสุดแบบ Pinterest)" },
+  { value: "aspect-[4/5]", label: "แนวตั้ง 4:5 (1080×1350 · มาตรฐาน IG/FB)" },
+  { value: "aspect-[2/3]", label: "แนวตั้งยาว 2:3 (1000×1500 · เต็มจอมือถือ)" },
+  { value: "aspect-[9/16]", label: "วิดีโอแนวตั้ง 9:16 (1080×1920 · Reels/Shorts)" },
 ];
+
+/**
+ * Normalize external URL (Unsplash / Cloudinary) into 3:4 Vertical Portrait (1080x1440)
+ */
+function normalizeUrlToVerticalPortrait(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes("images.unsplash.com/")) {
+    try {
+      const u = new URL(trimmed);
+      u.searchParams.set("auto", "format");
+      u.searchParams.set("fit", "crop");
+      u.searchParams.set("w", "1080");
+      u.searchParams.set("h", "1440");
+      u.searchParams.set("q", "85");
+      return u.toString();
+    } catch {
+      return trimmed;
+    }
+  }
+  if (
+    trimmed.includes("res.cloudinary.com/") &&
+    trimmed.includes("/upload/") &&
+    !trimmed.includes("c_fill")
+  ) {
+    return trimmed.replace(
+      "/upload/",
+      "/upload/c_fill,g_auto,w_1080,h_1440,q_auto,f_auto/"
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * If a user selects a horizontal image file from their device, center-crop it to 3:4 Vertical Portrait (1080x1440)
+ */
+async function ensureVerticalImageFile(file: File): Promise<{
+  file: File;
+  wasAutoCropped: boolean;
+}> {
+  if (typeof window === "undefined" || !file.type.startsWith("image/")) {
+    return { file, wasAutoCropped: false };
+  }
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      // Already vertical portrait (height > width * 1.08)
+      if (h >= w * 1.08) {
+        resolve({ file, wasAutoCropped: false });
+        return;
+      }
+      // Horizontal or square -> center-crop to 3:4 vertical portrait
+      const targetRatio = 3 / 4;
+      let cropW = w;
+      let cropH = h;
+      if (w / h > targetRatio) {
+        cropW = Math.round(h * targetRatio);
+        cropH = h;
+      } else {
+        cropW = w;
+        cropH = Math.round(w / targetRatio);
+      }
+      const startX = Math.max(0, Math.round((w - cropW) / 2));
+      const startY = Math.max(0, Math.round((h - cropH) / 2));
+
+      const outW = Math.min(1080, cropW);
+      const outH = Math.round(outW / targetRatio);
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve({ file, wasAutoCropped: false });
+        return;
+      }
+      ctx.drawImage(img, startX, startY, cropW, cropH, 0, 0, outW, outH);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve({ file, wasAutoCropped: false });
+            return;
+          }
+          const croppedFile = new File([blob], file.name, {
+            type: "image/jpeg",
+          });
+          resolve({ file: croppedFile, wasAutoCropped: true });
+        },
+        "image/jpeg",
+        0.9
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ file, wasAutoCropped: false });
+    };
+    img.src = objectUrl;
+  });
+}
 
 export function StudioPinsAndFacebookTab({
   data,
@@ -78,9 +180,15 @@ export function StudioPinsAndFacebookTab({
   const [pinDesc, setPinDesc] = useState("");
   const [pinCategory, setPinCategory] = useState<PinCategoryDto>("VIEWS");
   const [pinRoomId, setPinRoomId] = useState("");
-  const [pinAspectRatio, setPinAspectRatio] = useState("aspect-[4/5]");
+  const [pinAspectRatio, setPinAspectRatio] = useState("aspect-[3/4]");
   const [pinCoverUrl, setPinCoverUrl] = useState("");
+  const [extraMediaUrls, setExtraMediaUrls] = useState<string[]>([]);
+  const [newExtraUrlInput, setNewExtraUrlInput] = useState("");
   const [pinVideoUrl, setPinVideoUrl] = useState("");
+  const [coverDimensions, setCoverDimensions] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isCreatingPin, setIsCreatingPin] = useState(false);
 
@@ -174,13 +282,33 @@ export function StudioPinsAndFacebookTab({
   const handleUploadPinCover = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setIsUploadingCover(true);
     try {
-      const url = await uploadMediaFile(file, "pins");
-      setPinCoverUrl(url);
-      onNotify("อัปโหลดรูปภาพหน้าปก Pin สำเร็จ");
+      const uploadedUrls: string[] = [];
+      let autoCroppedCount = 0;
+      for (const rawFile of files) {
+        const { file, wasAutoCropped } = await ensureVerticalImageFile(rawFile);
+        if (wasAutoCropped) autoCroppedCount += 1;
+        const url = await uploadMediaFile(file, "pins");
+        uploadedUrls.push(url);
+      }
+      if (uploadedUrls.length > 0) {
+        if (!pinCoverUrl) {
+          setPinCoverUrl(uploadedUrls[0]);
+          if (uploadedUrls.length > 1) {
+            setExtraMediaUrls((prev) => [...prev, ...uploadedUrls.slice(1)]);
+          }
+        } else {
+          setExtraMediaUrls((prev) => [...prev, ...uploadedUrls]);
+        }
+      }
+      onNotify(
+        autoCroppedCount > 0
+          ? `อัปโหลดและครอปเป็นภาพแนวตั้ง 3:4 อัตโนมัติสำเร็จ (${uploadedUrls.length} รูป)`
+          : `อัปโหลดรูปภาพแนวตั้งสำหรับ Pin สำเร็จ (${uploadedUrls.length} รูป)`
+      );
     } catch {
       onNotify("อัปโหลดรูปภาพไม่สำเร็จ");
     } finally {
@@ -195,6 +323,12 @@ export function StudioPinsAndFacebookTab({
       return;
     }
 
+    const normalizedCover = normalizeUrlToVerticalPortrait(pinCoverUrl);
+    const normalizedGallery = [
+      normalizedCover,
+      ...extraMediaUrls.map(normalizeUrlToVerticalPortrait),
+    ];
+
     setIsCreatingPin(true);
     try {
       const res = await fetch("/api/studio/pins", {
@@ -206,7 +340,8 @@ export function StudioPinsAndFacebookTab({
           category: pinCategory,
           titleTh: pinTitle.trim(),
           descriptionTh: pinDesc.trim(),
-          coverImageUrl: pinCoverUrl.trim(),
+          coverImageUrl: normalizedCover,
+          mediaUrls: normalizedGallery,
           videoUrl: pinVideoUrl.trim() || null,
           aspectRatio: pinAspectRatio,
         }),
@@ -220,8 +355,11 @@ export function StudioPinsAndFacebookTab({
       setPinDesc("");
       setPinRoomId("");
       setPinCoverUrl("");
+      setExtraMediaUrls([]);
+      setNewExtraUrlInput("");
       setPinVideoUrl("");
-      onNotify("เผยแพร่ Pin ใหม่ขึ้นหน้าฟีดทันทีแล้ว");
+      setCoverDimensions(null);
+      onNotify("เผยแพร่ Pin แนวตั้งขึ้นหน้าฟีดทันทีแล้ว");
       await onReload();
     } finally {
       setIsCreatingPin(false);
@@ -588,19 +726,32 @@ export function StudioPinsAndFacebookTab({
           </div>
 
           <div className="space-y-3">
+            {/* Vertical Media Standard Banner */}
+            <div className="rounded-[14px] bg-[var(--color-background-muted)] p-3 space-y-1">
+              <p className="text-[13px] font-bold text-[var(--color-text-primary)]">
+                มาตรฐานภาพแนวตั้ง Cangaroom (3:4 หรือ 4:5 แบบ Pinterest)
+              </p>
+              <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
+                แนะนำใช้ภาพหรือวิดีโอแนวตั้ง (เช่น <strong>1080×1440 px</strong>) เพื่อให้แสดงผลเต็มกรอบแบบไม่มีขอบว่าง หากอัปโหลดไฟล์ภาพแนวนอน ระบบจะช่วยครอปเป็นแนวตั้ง 3:4 ให้อัตโนมัติครับ
+              </p>
+            </div>
+
             <div>
               <span className="ty-body font-semibold block mb-1.5">
-                รูปภาพหน้าปก Pin *
+                รูปภาพหน้าปก & อัลบั้มแนวตั้ง (เลือกได้หลายรูป) *
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="btn-fw-secondary cursor-pointer shrink-0">
                   <Upload className="w-4 h-4" />
                   <span>
-                    {isUploadingCover ? "กำลังอัปโหลด..." : "เลือกไฟล์รูป"}
+                    {isUploadingCover
+                      ? "กำลังอัปโหลด & ปรับแนวตั้ง..."
+                      : "เลือกไฟล์รูป (1 หรือหลายรูป)"}
                   </span>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     className="sr-only"
                     onChange={handleUploadPinCover}
                   />
@@ -608,25 +759,129 @@ export function StudioPinsAndFacebookTab({
                 <input
                   type="url"
                   className="fw-input flex-1 min-w-[180px]"
-                  placeholder="หรือวาง URL รูปภาพโดยตรง"
+                  placeholder="หรือวาง URL รูปภาพหลัก"
                   value={pinCoverUrl}
-                  onChange={(e) => setPinCoverUrl(e.target.value)}
+                  onChange={(e) => {
+                    setPinCoverUrl(e.target.value);
+                    setCoverDimensions(null);
+                  }}
                 />
               </div>
             </div>
 
+            {/* Additional Album Photos Input */}
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                className="fw-input flex-1"
+                placeholder="เพิ่ม URL รูปที่ 2, 3, 4 ในอัลบั้มเดียวกัน..."
+                value={newExtraUrlInput}
+                onChange={(e) => setNewExtraUrlInput(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const norm = normalizeUrlToVerticalPortrait(newExtraUrlInput);
+                  if (!norm) return;
+                  if (!pinCoverUrl) {
+                    setPinCoverUrl(norm);
+                  } else {
+                    setExtraMediaUrls((prev) => [...prev, norm]);
+                  }
+                  setNewExtraUrlInput("");
+                }}
+                className="h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] shrink-0 cursor-pointer"
+              >
+                + เพิ่มรูปในชุด
+              </button>
+            </div>
+
             {pinCoverUrl && (
-              <div className="rounded-[14px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-background-muted)] h-44">
-                <img
-                  src={pinCoverUrl}
-                  alt="ตัวอย่างภาพ Pin"
-                  className="w-full h-full object-cover"
-                />
+              <div className="flex flex-wrap items-start gap-3 pt-1">
+                {/* Live Vertical 3:4 Pinterest Frame Preview */}
+                <div className="w-36 aspect-[3/4] rounded-[14px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-background-muted)] shrink-0 relative">
+                  <img
+                    src={pinCoverUrl}
+                    alt="ตัวอย่างภาพ Pin แนวตั้ง"
+                    onLoad={(e) => {
+                      const img = e.currentTarget;
+                      if (img.naturalWidth && img.naturalHeight) {
+                        setCoverDimensions({
+                          w: img.naturalWidth,
+                          h: img.naturalHeight,
+                        });
+                      }
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-[6px] bg-black/65 text-white text-[10px] font-bold">
+                    Preview 3:4
+                  </span>
+                </div>
+
+                <div className="flex-1 min-w-[180px] space-y-2">
+                  {coverDimensions &&
+                    coverDimensions.w >= coverDimensions.h && (
+                      <div className="rounded-[12px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] p-2.5 space-y-1.5">
+                        <p className="text-[12px] font-bold text-[var(--color-text-primary)]">
+                          ตรวจพบภาพแนวนอน ({coverDimensions.w}×{coverDimensions.h} px)
+                        </p>
+                        <p className="text-[11.5px] text-[var(--color-text-secondary)]">
+                          แนะนำให้แปลงเป็นสัดส่วนแนวตั้ง 3:4 เพื่อแสดงเต็มหน้าจอแบบ Pinterest
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPinCoverUrl((prev) =>
+                              normalizeUrlToVerticalPortrait(prev)
+                            );
+                            setCoverDimensions({ w: 1080, h: 1440 });
+                          }}
+                          className="h-8 px-3 rounded-[9px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12px] font-semibold cursor-pointer"
+                        >
+                          ปรับเป็นแนวตั้ง 3:4 อัตโนมัติ
+                        </button>
+                      </div>
+                    )}
+
+                  {extraMediaUrls.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[12px] font-semibold text-[var(--color-text-secondary)]">
+                        รูปในอัลบั้ม ({extraMediaUrls.length + 1} รูป):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {extraMediaUrls.map((u, idx) => (
+                          <div
+                            key={`${u}-${idx}`}
+                            className="relative h-12 w-12 rounded-[10px] overflow-hidden border border-[var(--color-border)]"
+                          >
+                            <img
+                              src={u}
+                              alt={`Slide ${idx + 2}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExtraMediaUrls((prev) =>
+                                  prev.filter((_, i) => i !== idx)
+                                )
+                              }
+                              className="absolute top-0.5 right-0.5 h-4 w-4 rounded-[4px] bg-black/70 text-white flex items-center justify-center text-[10px] cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             <StandardInput
-              label="ลิงก์วิดีโอ MP4 / Short"
+              label="ลิงก์วิดีโอแนวตั้ง MP4 / Short (9:16 หรือ 3:4)"
               optionalText="ไม่บังคับ"
               placeholder="https://.../tour.mp4"
               value={pinVideoUrl}
@@ -636,7 +891,7 @@ export function StudioPinsAndFacebookTab({
             <div className="pt-1 flex items-center justify-between gap-2">
               <span className="ty-caption inline-flex items-center gap-1">
                 <Video className="w-3.5 h-3.5" />
-                <span>ถ้าใส่ URL วิดีโอ ระบบจะแสดงเป็น Video Pin</span>
+                <span>ถ้าใส่ URL วิดีโอ ระบบจะแสดงเป็น Video Pin แนวตั้ง</span>
               </span>
               <StandardButton
                 type="submit"

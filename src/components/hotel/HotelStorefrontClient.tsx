@@ -42,6 +42,7 @@ import {
   formatDateStr,
 } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
+import { trackTelemetryEvent } from "@/lib/telemetry/clientTelemetry";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
@@ -287,7 +288,7 @@ function InlineRoomCalendarFilter({
                   type="button"
                   disabled={isPast}
                   onClick={() => handleDayClick(dateStr)}
-                  className={`relative z-10 h-8 w-8 rounded-full flex items-center justify-center text-[13px] transition-colors ${
+                  className={`relative z-10 h-8 w-8 rounded-[10px] flex items-center justify-center text-[13px] transition-colors ${
                     isPast
                       ? "text-[var(--color-text-disabled)] cursor-not-allowed"
                       : isStart || isEnd
@@ -550,10 +551,14 @@ export function HotelStorefrontClient({
   const [onlyAvailableRooms, setOnlyAvailableRooms] = useState(false);
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [selectedPinSnapshot, setSelectedPinSnapshot] =
+    useState<PinFeedItemDto | null>(null);
+  const [pinHistoryStack, setPinHistoryStack] = useState<PinFeedItemDto[]>([]);
   const [pinDetail, setPinDetail] = useState<{
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
   } | null>(null);
+  const latestPinReqRef = useRef<string | null>(null);
   const [optimisticSavedIds, setOptimisticSavedIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -675,44 +680,123 @@ export function HotelStorefrontClient({
   }, [checkIn, checkOut, currentUser?.id, loadStorefront]);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
+    latestPinReqRef.current = pinId;
     const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
       cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
-      setPinDetail({ pin: data.pin, comments: data.comments });
+      if (latestPinReqRef.current === pinId) {
+        setPinDetail({ pin: data.pin, comments: data.comments });
+      }
     }
   }, []);
 
   useEffect(() => {
     if (selectedPinId) {
+      setPinDetail((prev) => (prev?.pin.id === selectedPinId ? prev : null));
       loadPinDetail(selectedPinId);
     } else {
+      latestPinReqRef.current = null;
+      setSelectedPinSnapshot(null);
       setPinDetail(null);
     }
   }, [selectedPinId, loadPinDetail]);
 
   const activePin = useMemo(() => {
     if (!selectedPinId) return null;
-    return (
-      pinDetail?.pin ||
-      storefront.pins.find((p) => p.id === selectedPinId) ||
-      null
-    );
-  }, [pinDetail, selectedPinId, storefront.pins]);
+    if (pinDetail?.pin.id === selectedPinId) return pinDetail.pin;
+    if (selectedPinSnapshot?.id === selectedPinId) return selectedPinSnapshot;
+    return storefront.pins.find((p) => p.id === selectedPinId) || null;
+  }, [pinDetail, selectedPinId, selectedPinSnapshot, storefront.pins]);
+
+  const activePinComments = useMemo(
+    () =>
+      activePin && pinDetail?.pin.id === activePin.id ? pinDetail.comments : [],
+    [activePin, pinDetail]
+  );
 
   const openRoomModal = (
     room: RoomAvailabilityDto,
     step: RoomBookingDrawerStep = "details"
   ) => {
+    trackTelemetryEvent({
+      eventType: step === "checkout" ? "BOOKING_INITIATE" : "HOTEL_PROFILE_VIEW",
+      hotelId: storefront.hotel.id,
+      provinceId: storefront.hotel.provinceId,
+      stayStyles: storefront.hotel.stayStyles.slice(0, 6),
+      priceThb: room.weekdayPriceThb,
+      guests,
+    });
     setDrawerRoom(room);
     setDrawerInitialStep(step);
     setIsBookingDrawerOpen(true);
   };
 
-  const handleSelectPinFromMasonry = (pin: PinFeedItemDto) => {
-    setSelectedPinId(pin.id);
-  };
+  const gridHotelPins = useMemo(
+    () =>
+      activePin
+        ? storefront.pins.filter((p) => p.id !== activePin.id)
+        : storefront.pins,
+    [storefront.pins, activePin]
+  );
+
+  const handleCloseHotelPin = useCallback(() => {
+    latestPinReqRef.current = null;
+    setPinHistoryStack([]);
+    setSelectedPinId(null);
+    setSelectedPinSnapshot(null);
+    setPinDetail(null);
+  }, []);
+
+  const handleSelectPinFromMasonry = useCallback(
+    (pin: PinFeedItemDto, pushStack = true) => {
+      if (pushStack && activePin && activePin.id !== pin.id) {
+        setPinHistoryStack((prev) =>
+          [
+            ...prev.filter((p) => p.id !== activePin.id && p.id !== pin.id),
+            activePin,
+          ].slice(-16)
+        );
+      }
+      setSelectedPinSnapshot(pin);
+      setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
+      setSelectedPinId(pin.id);
+      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      }
+    },
+    [activePin]
+  );
+
+  const handleStepBackHotelPin = useCallback(() => {
+    if (pinHistoryStack.length === 0) {
+      handleCloseHotelPin();
+      return;
+    }
+    const prevPin = pinHistoryStack[pinHistoryStack.length - 1];
+    setPinHistoryStack((prev) => prev.slice(0, -1));
+    setSelectedPinSnapshot(prevPin);
+    setPinDetail(null);
+    setSelectedPinId(prevPin.id);
+  }, [pinHistoryStack, handleCloseHotelPin]);
+
+  const handleNavigateHotelPin = useCallback(
+    (direction: "prev" | "next") => {
+      if (!activePin || storefront.pins.length <= 1) return;
+      const idx = storefront.pins.findIndex((p) => p.id === activePin.id);
+      if (idx === -1) return;
+      const nextIdx =
+        direction === "next"
+          ? (idx + 1) % storefront.pins.length
+          : (idx - 1 + storefront.pins.length) % storefront.pins.length;
+      const nextPin = storefront.pins[nextIdx];
+      if (nextPin) {
+        handleSelectPinFromMasonry(nextPin);
+      }
+    },
+    [activePin, storefront.pins, handleSelectPinFromMasonry]
+  );
 
   const handleSharePin = (pin: PinFeedItemDto) => {
     if (typeof window === "undefined") return;
@@ -1152,7 +1236,7 @@ export function HotelStorefrontClient({
           5 SSR DOM TAB PANELS (ALL RENDERED IN HTML FOR 100% SEO & AI)
       ====================================================================== */}
 
-      {/* TAB 1: FLUSH 5-COLUMN PINTEREST MASONRY (Zero Side Whitespace, Zero Jump to Top) */}
+      {/* TAB 1: TOP PIN DETAIL STAGE + FLUSH 5-COLUMN PINTEREST MASONRY */}
       <section
         id="panel-posts"
         role="tabpanel"
@@ -1160,114 +1244,109 @@ export function HotelStorefrontClient({
         aria-hidden={activeProfileTab !== "posts"}
         className={activeProfileTab === "posts" ? "space-y-5" : "hidden"}
       >
+        {activePin && (
+          <PinterestPinDetail
+            pin={activePin}
+            language={language}
+            currentUser={currentUser}
+            comments={activePinComments}
+            savedPinIds={optimisticSavedIds}
+            relatedPins={gridHotelPins}
+            canStepBack={pinHistoryStack.length > 0}
+            onBack={handleStepBackHotelPin}
+            onClose={handleCloseHotelPin}
+            onSelectPin={(next) => handleSelectPinFromMasonry(next, true)}
+            onNavigatePin={handleNavigateHotelPin}
+            onToggleLike={async (pinId) => {
+              if (!currentUser) {
+                router.push(`/login?callbackUrl=/${cleanSlug}`);
+                return;
+              }
+              await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
+                method: "POST",
+              });
+              await Promise.all([loadStorefront(true), loadPinDetail(pinId)]);
+            }}
+            onToggleSave={async (pinId) => {
+              if (!currentUser) {
+                router.push(`/login?callbackUrl=/${cleanSlug}`);
+                return;
+              }
+              await fetch("/api/boards/toggle-pin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pinId }),
+              });
+              await Promise.all([loadStorefront(true), refreshMe()]);
+            }}
+            onSharePin={handleSharePin}
+            onExpandMedia={(urls, idx) =>
+              setFullscreenMedia({
+                slides: urls.map((u) => ({ type: "image", url: u })),
+                index: idx,
+              })
+            }
+            onAddComment={async (text, parentId) => {
+              if (!currentUser) {
+                router.push(`/login?callbackUrl=/${cleanSlug}`);
+                return;
+              }
+              await fetch(
+                `/api/pins/${encodeURIComponent(activePin.id)}/comments`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ body: text, parentId }),
+                }
+              );
+              await loadPinDetail(activePin.id);
+            }}
+            onDeleteComment={async (commentId) => {
+              await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
+                method: "DELETE",
+              });
+              await loadPinDetail(activePin.id);
+            }}
+          />
+        )}
+
         {storefront.pins.length === 0 ? (
           <div className="rounded-[18px] bg-[var(--color-background-muted)] p-10 text-center ty-body text-[var(--color-text-secondary)]">
             ยังไม่มีรูปภาพหรือวิดีโอที่เผยแพร่สำหรับที่พักนี้
           </div>
         ) : (
-          <MasonryGrid
-            items={storefront.pins.map((p) => ({
-              ...p,
-              aspectClass: p.aspectRatio,
-            }))}
-            columnWidth={208}
-            gutter={16}
-            fitContainer={true}
-            expandedItemId={activePin?.id ?? null}
-            renderExpandedStage={
-              activePin
-                ? () => (
-                    <PinterestPinDetail
-                      pin={activePin}
-                      language={language}
-                      currentUser={currentUser}
-                      comments={pinDetail?.comments ?? []}
-                      savedPinIds={optimisticSavedIds}
-                      onClose={() => setSelectedPinId(null)}
-                      onSelectPin={handleSelectPinFromMasonry}
-                      onToggleLike={async (pinId) => {
-                        if (!currentUser) {
-                          router.push(`/login?callbackUrl=/${cleanSlug}`);
-                          return;
-                        }
-                        await fetch(
-                          `/api/pins/${encodeURIComponent(pinId)}/like`,
-                          { method: "POST" }
-                        );
-                        await Promise.all([
-                          loadStorefront(true),
-                          loadPinDetail(pinId),
-                        ]);
-                      }}
-                      onToggleSave={async (pinId) => {
-                        if (!currentUser) {
-                          router.push(`/login?callbackUrl=/${cleanSlug}`);
-                          return;
-                        }
-                        await fetch("/api/boards/toggle-pin", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ pinId }),
-                        });
-                        await Promise.all([loadStorefront(true), refreshMe()]);
-                      }}
-                      onSharePin={handleSharePin}
-                      onExpandMedia={(urls, idx) =>
-                        setFullscreenMedia({
-                          slides: urls.map((u) => ({ type: "image", url: u })),
-                          index: idx,
-                        })
-                      }
-                      onAddComment={async (text, parentId) => {
-                        if (!currentUser) {
-                          router.push(`/login?callbackUrl=/${cleanSlug}`);
-                          return;
-                        }
-                        await fetch(
-                          `/api/pins/${encodeURIComponent(
-                            activePin.id
-                          )}/comments`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ body: text, parentId }),
-                          }
-                        );
-                        await loadPinDetail(activePin.id);
-                      }}
-                      onDeleteComment={async (commentId) => {
-                        await fetch(
-                          `/api/comments/${encodeURIComponent(commentId)}`,
-                          { method: "DELETE" }
-                        );
-                        await loadPinDetail(activePin.id);
-                      }}
-                    />
-                  )
-                : undefined
-            }
-            renderItem={(pin) => (
-              <PinterestPinCard
-                pin={pin}
-                language={language}
-                isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
-                onSelectPin={handleSelectPinFromMasonry}
-                onToggleSave={async (pinId) => {
-                  if (!currentUser) {
-                    router.push(`/login?callbackUrl=/${cleanSlug}`);
-                    return;
-                  }
-                  await fetch("/api/boards/toggle-pin", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ pinId }),
-                  });
-                  await Promise.all([loadStorefront(true), refreshMe()]);
-                }}
-                onSharePin={handleSharePin}
-              />
-            )}
-          />
+          gridHotelPins.length > 0 && (
+            <MasonryGrid
+              items={gridHotelPins.map((p) => ({
+                ...p,
+                aspectClass: p.aspectRatio,
+              }))}
+              columnWidth={208}
+              gutter={16}
+              fitContainer={true}
+              renderItem={(pin) => (
+                <PinterestPinCard
+                  pin={pin}
+                  language={language}
+                  isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
+                  onSelectPin={handleSelectPinFromMasonry}
+                  onToggleSave={async (pinId) => {
+                    if (!currentUser) {
+                      router.push(`/login?callbackUrl=/${cleanSlug}`);
+                      return;
+                    }
+                    await fetch("/api/boards/toggle-pin", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ pinId }),
+                    });
+                    await Promise.all([loadStorefront(true), refreshMe()]);
+                  }}
+                  onSharePin={handleSharePin}
+                />
+              )}
+            />
+          )
         )}
       </section>
 
@@ -1287,6 +1366,14 @@ export function HotelStorefrontClient({
           onChangeDates={(nextIn, nextOut) => {
             setCheckIn(nextIn);
             setCheckOut(nextOut);
+            trackTelemetryEvent({
+              eventType: "ROOM_CALENDAR_SELECT",
+              hotelId: storefront.hotel.id,
+              provinceId: storefront.hotel.provinceId,
+              stayStyles: storefront.hotel.stayStyles.slice(0, 6),
+              priceThb: rooms[0]?.weekdayPriceThb ?? undefined,
+              guests,
+            });
           }}
           guestCount={guests}
           onChangeGuestCount={setGuests}

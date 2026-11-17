@@ -210,7 +210,7 @@ export function PromptPayPaymentCard({
                 type="button"
                 onClick={handleCopyPromptPayId}
                 aria-label="Copy PromptPay ID"
-                className="h-7 w-7 rounded-full hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-7 w-7 rounded-[9px] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 {hasCopiedPromptPayId ? (
                   <Check className="w-3.5 h-3.5 text-[var(--color-success)]" />
@@ -308,7 +308,7 @@ export function BookingDigitalVoucherCard({
           type="button"
           onClick={() => typeof window !== "undefined" && window.print()}
           aria-label="Print Voucher"
-          className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition cursor-pointer shrink-0"
+          className="h-9 w-9 rounded-[12px] bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition cursor-pointer shrink-0"
         >
           <Printer className="w-4 h-4" />
         </button>

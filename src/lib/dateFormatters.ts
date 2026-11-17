@@ -84,7 +84,9 @@ export function formatShortDate(
   dateString: string,
   language: LanguageCode
 ): string {
-  const parsedDate = new Date(dateString + "T00:00:00");
+  const parsedDate = dateString.includes("T")
+    ? new Date(dateString)
+    : new Date(dateString + "T00:00:00");
   if (isNaN(parsedDate.getTime())) {
     return dateString;
   }

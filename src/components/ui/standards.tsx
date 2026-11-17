@@ -101,9 +101,9 @@ export function StandardButton({
   ...props
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: "h-8 px-3 text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
-    md: "h-9 px-4 text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
-    lg: "h-10 px-5 text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    sm: "h-8 px-3 rounded-[10px] text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
+    md: "h-9 px-4 rounded-[12px] text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    lg: "h-10 px-5 rounded-[13px] text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
@@ -121,7 +121,7 @@ export function StandardButton({
 
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
+      className={`inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${
         sizeClasses[size]
       } ${variantClasses[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
@@ -145,8 +145,8 @@ export function StandardIconButton({
   ...props
 }: StandardIconButtonProps) {
   const sizeMap = {
-    sm: "h-9 w-9 [&_svg]:w-4 [&_svg]:h-4",
-    md: "h-10 w-10 [&_svg]:w-5 [&_svg]:h-5",
+    sm: "h-9 w-9 rounded-[12px] [&_svg]:w-4 [&_svg]:h-4",
+    md: "h-10 w-10 rounded-[13px] [&_svg]:w-5 [&_svg]:h-5",
   };
 
   const variantMap = {
@@ -165,7 +165,7 @@ export function StandardIconButton({
   return (
     <button
       type="button"
-      className={`inline-flex items-center justify-center shrink-0 rounded-[10px] transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${sizeMap[size]} ${variantMap[variant]} ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none cursor-pointer select-none ${sizeMap[size]} ${variantMap[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -200,7 +200,7 @@ export function StandardInput({
       </span>
       <input
         id={inputId}
-        className={`h-10 w-full rounded-[10px] border border-[var(--color-border)] ${
+        className={`h-10 w-full rounded-[12px] border border-[var(--color-border)] ${
           hasCustomBg ? "" : "bg-[var(--color-background-muted)]"
         } px-3.5 text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] transition-colors focus:outline-none focus:border-[var(--color-border-emphasized)] focus:bg-[var(--color-background-card)] ${className}`}
         {...props}

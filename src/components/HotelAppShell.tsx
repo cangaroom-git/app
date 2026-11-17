@@ -19,6 +19,7 @@ import {
 } from "@/components/navigation/NavigationIcons";
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
+import { CookieConsentBanner } from "@/components/privacy/CookieConsentBanner";
 
 const CouponWalletDrawer = dynamic(
   () =>
@@ -232,6 +233,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   const showSearchBar =
     activeTab === "home" || activeTab === "board" || activeTab === "deal";
+  const isFluidFeedPage = activeTab === "home" || activeTab === "board";
 
   const contextValue: PlatformAppContextValue = useMemo(
     () => ({
@@ -329,8 +331,16 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             onChangeSearchQuery={setGlobalSearchQuery}
           />
 
-          <main className="pt-16 pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]">
-            <div className="px-4 sm:px-6 lg:px-8 pt-5">{children}</div>
+          <main className="pt-16 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]">
+            <div
+              className={
+                isFluidFeedPage
+                  ? "px-1.5 sm:px-6 lg:px-8 pt-2 sm:pt-5"
+                  : "px-4 sm:px-6 lg:px-8 pt-5"
+              }
+            >
+              {children}
+            </div>
           </main>
 
           <CouponWalletDrawer
@@ -343,6 +353,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             onClaimCoupon={claimCouponToWallet}
             onRemoveCoupon={removeCouponFromWallet}
           />
+
+          <CookieConsentBanner language={lang} theme={theme} />
         </div>
       )}
     </PlatformAppContext.Provider>

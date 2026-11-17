@@ -78,9 +78,9 @@
   --right-drawer-tablet-width: 460px;
   --right-drawer-desktop-width: 520px;
 
-  /* Clean Architectural Radii */
+  /* Clean Architectural Squircle Radii (Unified with Mobile Bottom Menu) */
   --radius-inner: 10px;
-  --radius-button: 10px;
+  --radius-button: 14px;
   --radius-element: 14px;
   --radius-container: 16px;
   --radius-page: 20px;
@@ -494,7 +494,7 @@ html.dark .border-stone-300 {
   width: 2.25rem;  /* 36px */
   height: 2.25rem;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background-color: var(--color-background-muted);
   color: var(--color-text-primary);
   border: none;
@@ -525,8 +525,9 @@ html.dark .border-stone-300 {
 }
 
 .btn-icon-lg {
-  width: 2.5rem;   /* 40px Facebook Top Bar Icon Circle */
+  width: 2.5rem;   /* 40px Top Bar Squircle Icon */
   height: 2.5rem;
+  border-radius: 13px;
 }
 
 .badge-promo {
@@ -536,7 +537,7 @@ html.dark .border-stone-300 {
   gap: 0.25rem;
   height: 1.5rem;
   padding-inline: 0.625rem;
-  border-radius: 9999px;
+  border-radius: 8px;
   background-color: var(--color-promo);
   color: var(--color-on-promo);
   font-size: var(--font-size-caption);
@@ -551,7 +552,7 @@ html.dark .border-stone-300 {
   gap: 0.25rem;
   height: 1.5rem;
   padding-inline: 0.625rem;
-  border-radius: 9999px;
+  border-radius: 8px;
   background-color: var(--color-promo-muted);
   color: var(--color-promo-text);
   border: none;
@@ -597,7 +598,7 @@ html.dark .border-stone-300 {
   width: 2.5rem;
   height: 2.5rem;
   flex-shrink: 0;
-  border-radius: 9999px;
+  border-radius: 14px;
   background-color: var(--color-background-subtle);
   color: var(--color-text-primary);
   border: none;
@@ -646,7 +647,7 @@ html.dark .border-stone-300 {
   color: var(--color-text-primary);
   background: var(--color-background-muted);
   border: none;
-  border-radius: var(--radius-element);
+  border-radius: 13px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -655,7 +656,7 @@ html.dark .border-stone-300 {
 
 .fw-input {
   height: 2.5rem;
-  border-radius: var(--radius-element);
+  border-radius: 12px;
   background-color: var(--color-background-muted);
   color: var(--color-text-primary);
   padding-inline: 0.875rem;
@@ -790,6 +791,21 @@ html.dark .border-stone-300 {
   will-change: transform;
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
+}
+
+@keyframes slideUpBottomSheet {
+  0% {
+    transform: translate3d(0, 100%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-slide-up-sheet {
+  animation: slideUpBottomSheet 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .animate-fade-in-backdrop {
