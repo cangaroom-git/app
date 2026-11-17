@@ -451,3 +451,4 @@ export const CURATED_THAILAND_PARTNER_PINS: CuratedPartnerPin[] = [
     baseLikes: 88,
   },
 ];
+

@@ -26,10 +26,9 @@ Every component, page, and interactive widget MUST strictly follow these design 
   - Prefer crisp squircle radii (`rounded-[16px]` / `rounded-[14px]` / `rounded-[12px]`) over `rounded-full` circles for icon buttons, Pin Detail `←` Back button (`h-12 w-12 rounded-[16px] bg-white`), `บันทึก` buttons, and action buttons.
 
 ## 3. Home Feed (`/`) & Saved Board (`/board`)
-- **Top Discovery Header**: Cangaroom Thailand Visual Stays identity banner with quick destination spotlight tiles and `/board` & `/register-hotel` CTAs.
-- **2-Column Discovery Workspace (`/` Feed Mode)**:
-  - **Left (`lg:col-span-8 xl:col-span-9`)**: Underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, `วิว & มุมถ่ายรูป`, `อาหาร & บาร์`, `รีวิวผู้เข้าพัก`, `โปรโมชั่นจองตรง`) + shortest-column `<MasonryGrid />` with varied aspect ratios across both photos and videos (`16:9`, `9:16`, `3:4`, `2:3`, `4/5`).
-  - **Right (`lg:col-span-4 xl:col-span-3`)**: Sticky `<ThailandDiscoverySidebar />` with Fastwork-style visual Stay Style cards (`Mountain`, `Pool Villa`, `Sea`, `Bars`, `Bathtub`, `Glamping`) + searchable/region-grouped **77 Thailand Provinces** cross-filter.
+- **2-Column Clean Minimal Workspace (`/` Feed Mode — NO cluttered top banner)**:
+  - **Left (`flex-1`)**: Underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, `วิว & มุมถ่ายรูป`, `อาหาร & บาร์`, `รีวิวผู้เข้าพัก`, `โปรโมชั่นจองตรง`) + shortest-column `<MasonryGrid />` with varied aspect ratios across both photos and videos (`16:9`, `9:16`, `3:4`, `2:3`, `4/5`).
+  - **Right (`lg:w-[236px] xl:w-[248px]`)**: Slim borderless minimal `<ThailandDiscoverySidebar />` with clean icon-and-label Stay Style rows + quiet searchable **77 Thailand Provinces** cross-filter (no heavy boxes, no price/star clutter, no ad banners).
 - **Pin Close-Up View (`/?pin=...`)**:
   - Split 2-Column Card (`rounded-[28px]`) inside `xl:col-span-8` with `underMainCardPins` rendered immediately below it (`space-y-6`) so there is ZERO empty whitespace beneath the image, paired with `rightColumnPins` in `xl:col-span-4`.
 - **Personal Saved Boards (`/board`)**:

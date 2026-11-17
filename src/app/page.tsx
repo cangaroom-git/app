@@ -2,15 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Bookmark,
-  Building2,
-  Calendar,
-  MapPin,
-  RotateCcw,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { MapPin, RotateCcw, X } from "lucide-react";
 import { PinCommentItem } from "@/data/cmsDefaults";
 import {
   STAY_STYLE_CATEGORIES,
@@ -37,70 +29,6 @@ import {
 } from "@/components/home/PinterestPinDetail";
 import { ThailandDiscoverySidebar } from "@/components/home/ThailandDiscoverySidebar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
-
-const QUICK_DESTINATION_SPOTLIGHTS: ReadonlyArray<{
-  provinceId: string;
-  labelTh: string;
-  labelEn: string;
-  subTh: string;
-  subEn: string;
-  imageUrl: string;
-}> = [
-  {
-    provinceId: "nan",
-    labelTh: "น่าน · สะปัน",
-    labelEn: "Nan · Sapan",
-    subTh: "ขุนเขา & สายหมอก",
-    subEn: "Mist & Valleys",
-    imageUrl:
-      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    provinceId: "chiang-mai",
-    labelTh: "เชียงใหม่",
-    labelEn: "Chiang Mai",
-    subTh: "แม่ริม & ออนเซ็น",
-    subEn: "Forest & Onsen",
-    imageUrl:
-      "https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    provinceId: "phuket",
-    labelTh: "ภูเก็ต",
-    labelEn: "Phuket",
-    subTh: "พูลวิลล่าวิวทะเล",
-    subEn: "Ocean Pool Villas",
-    imageUrl:
-      "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    provinceId: "nakhon-ratchasima",
-    labelTh: "เขาใหญ่",
-    labelEn: "Khao Yai",
-    subTh: "แกลมปิ้ง & ไวน์บาร์",
-    subEn: "Glamping & Vineyards",
-    imageUrl:
-      "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    provinceId: "krabi",
-    labelTh: "กระบี่",
-    labelEn: "Krabi",
-    subTh: "อ่าวนาง & หน้าผาหินปูน",
-    subEn: "Cliffs & Sunset",
-    imageUrl:
-      "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=500&q=80",
-  },
-  {
-    provinceId: "bangkok",
-    labelTh: "กรุงเทพฯ",
-    labelEn: "Bangkok",
-    subTh: "ริมเจ้าพระยา & รูฟท็อป",
-    subEn: "River & Rooftop Bars",
-    imageUrl:
-      "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=500&q=80",
-  },
-];
 
 const VALID_PIN_CATEGORIES: ReadonlySet<string> = new Set([
   "all",
@@ -283,11 +211,6 @@ export default function HomePage() {
     );
     return [...sameCategoryOrStyle, ...others];
   }, [allPins, selectedPin]);
-
-  const savedPinsCount = useMemo(
-    () => Object.values(savedPinsMap).filter(Boolean).length,
-    [savedPinsMap]
-  );
 
   const handleToggleStyle = (style: StayStyleTag) => {
     setSelectedStyles((prev) =>
@@ -488,307 +411,182 @@ export default function HomePage() {
         />
       ) : (
         /* =====================================================================
-           MODE B: CANGAROOM TOP DISCOVERY BANNER + 2-COLUMN WORKSPACE
-              - Top: Distinct Cangaroom Thailand Hotel Discovery Header
-              - Left: Staggered Variable-Height Masonry (Photos + Videos)
-              - Right: Fastwork-Inspired Stay Styles & 77 Provinces Cross-Filter
+           MODE B: CLEAN 2-COLUMN MINIMAL WORKSPACE
+              - Left: Category Underline Tabs + Staggered Masonry (Photos + Videos)
+              - Right: Minimal Stay Styles & 77 Provinces Cross-Filter
         ====================================================================== */
-        <>
-          {/* 1. DISTINCT CANGAROOM TOP DISCOVERY SECTION */}
-          <section className="rounded-[24px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)] p-4 sm:p-6">
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-center">
-              {/* Brand Headline & Quick Actions */}
-              <div className="xl:col-span-6 space-y-3">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-caption font-semibold text-[var(--color-text-primary)]">
-                  <Sparkles className="w-3.5 h-3.5 text-[var(--color-promo)]" />
-                  <span>
-                    {language === "th"
-                      ? "CANGAROOM · แหล่งรวมที่พักสวยทั่วไทย 77 จังหวัด"
-                      : "CANGAROOM · THAILAND VISUAL STAYS MARKETPLACE"}
-                  </span>
+        <div className="flex flex-col lg:flex-row items-start gap-7">
+          {/* LEFT COLUMN: Category Tabs + Active Filter Bar + Variable-Height Masonry */}
+          <div className="flex-1 min-w-0 w-full space-y-4">
+            {/* Category Underline Tabs */}
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
+              <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
+                {categoryTabs.map((tab) => {
+                  const isActive = activeCategory === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveCategory(tab.id)}
+                      className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        isActive
+                          ? "text-[var(--color-text-primary)]"
+                          : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                      }`}
+                    >
+                      <span>
+                        {language === "th" ? tab.labelTh : tab.labelEn}
+                      </span>
+                      {isActive && (
+                        <span className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {canShowEditControls && (
+                <div className="flex items-center gap-1.5 pb-2 shrink-0">
+                  <EditSpotButton
+                    icon="add"
+                    label="เพิ่มรูป"
+                    onClick={() => openCmsEditor({ type: "gallery-photos" })}
+                  />
+                  <EditSpotButton
+                    icon="add"
+                    label="เพิ่มคลิป"
+                    onClick={() => openCmsEditor({ type: "short-video" })}
+                  />
+                  <EditSpotButton
+                    icon="add"
+                    label="เพิ่มห้อง"
+                    onClick={() => openCmsEditor({ type: "room" })}
+                  />
                 </div>
+              )}
+            </div>
 
-                <div className="space-y-1">
-                  <h1 className="ty-display">
-                    {language === "th"
-                      ? "ค้นหา บันทึกที่พักในฝัน และจองตรงราคาดีที่สุด"
-                      : "Discover, Save & Book Boutique Stays Across Thailand"}
-                  </h1>
-                  <p className="ty-body-muted max-w-2xl">
-                    {language === "th"
-                      ? "สำรวจภาพถ่ายจริงและคลิปบรรยากาศจากรีสอร์ท พูลวิลล่า และโฮมสเตย์ทั่วไทย กดบันทึกเก็บเข้าบอร์ดทริปส่วนตัว หรือเลือกจองตรงกับที่พักได้ทันที"
-                      : "Explore real photos and atmosphere videos from resorts & pool villas across all 77 provinces. Save favorites to your personal trip board or book direct."}
-                  </p>
-                </div>
+            {/* Active Cross-Filter Chips Bar */}
+            {(activeProvinceMeta || selectedStyles.length > 0) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="ty-caption font-medium">
+                  {language === "th"
+                    ? `${filteredPins.length} รายการ:`
+                    : `${filteredPins.length} stays:`}
+                </span>
 
-                <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                  <Link
-                    href="/board"
-                    className="h-11 px-4 rounded-[14px] bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] text-[var(--color-on-promo)] inline-flex items-center gap-2 ty-body font-semibold transition-colors"
-                  >
-                    <Bookmark className="w-[18px] h-[18px]" fill="currentColor" />
-                    <span>
-                      {language === "th"
-                        ? `บอร์ดที่บันทึกไว้${
-                            savedPinsCount > 0 ? ` (${savedPinsCount})` : ""
-                          }`
-                        : `My Saved Board${
-                            savedPinsCount > 0 ? ` (${savedPinsCount})` : ""
-                          }`}
-                    </span>
-                  </Link>
-
+                {activeProvinceMeta && (
                   <button
                     type="button"
-                    onClick={() => navigateToTab("book")}
-                    className="h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] border border-[var(--color-border)] inline-flex items-center gap-2 ty-body font-semibold transition-colors cursor-pointer"
+                    onClick={() => setSelectedProvinceId(null)}
+                    className="h-8 px-3 rounded-[10px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
                   >
-                    <Calendar className="w-[18px] h-[18px] text-[var(--color-accent)]" />
+                    <MapPin className="w-3.5 h-3.5" />
                     <span>
                       {language === "th"
-                        ? "เช็กห้องว่าง & จองตรง"
-                        : "Check Availability"}
+                        ? activeProvinceMeta.nameTh.split("(")[0].trim()
+                        : activeProvinceMeta.nameEn}
                     </span>
+                    <X className="w-3.5 h-3.5 opacity-80" />
                   </button>
-
-                  <Link
-                    href="/register-hotel"
-                    className="h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] border border-[var(--color-border)] inline-flex items-center gap-2 ty-body font-semibold transition-colors"
-                  >
-                    <Building2 className="w-[18px] h-[18px] text-[var(--color-text-secondary)]" />
-                    <span>
-                      {language === "th"
-                        ? "เจ้าของที่พัก: ลงที่พักฟรี 30 วัน"
-                        : "List Your Hotel Free"}
-                    </span>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Quick Destination Spotlight Grid (One-Click Province Cross-Filter) */}
-              <div className="xl:col-span-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {QUICK_DESTINATION_SPOTLIGHTS.map((spot) => {
-                    const isSelected = selectedProvinceId === spot.provinceId;
-                    return (
-                      <button
-                        key={spot.provinceId}
-                        type="button"
-                        onClick={() =>
-                          setSelectedProvinceId(
-                            isSelected ? null : spot.provinceId
-                          )
-                        }
-                        className={`relative h-[86px] rounded-[16px] overflow-hidden text-left p-3 flex flex-col justify-end transition-shadow cursor-pointer ${
-                          isSelected
-                            ? "ring-2 ring-[var(--color-promo)] shadow-sm"
-                            : "hover:opacity-95"
-                        }`}
-                      >
-                        <img
-                          src={spot.imageUrl}
-                          alt={spot.labelTh}
-                          loading="lazy"
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/5" />
-                        <div className="relative z-10 min-w-0">
-                          <p className="text-white text-[13px] font-bold leading-tight truncate">
-                            {language === "th" ? spot.labelTh : spot.labelEn}
-                          </p>
-                          <p className="text-white/80 text-[11px] font-medium truncate">
-                            {language === "th" ? spot.subTh : spot.subEn}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-[6px] bg-[var(--color-promo)] text-white text-[10px] font-bold">
-                            {language === "th" ? "เลือกอยู่" : "Active"}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 2. MAIN 2-COLUMN DISCOVERY WORKSPACE (Left Masonry Feed + Right Fastwork Cross-Filter) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* LEFT COLUMN: Category Tabs + Active Filter Bar + Variable-Height Masonry */}
-            <div className="lg:col-span-8 xl:col-span-9 min-w-0 space-y-4">
-              {/* Category Underline Tabs (Matches Fastwork & Pinterest) */}
-              <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
-                <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
-                  {categoryTabs.map((tab) => {
-                    const isActive = activeCategory === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveCategory(tab.id)}
-                        className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                          isActive
-                            ? "text-[var(--color-text-primary)]"
-                            : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                        }`}
-                      >
-                        <span>
-                          {language === "th" ? tab.labelTh : tab.labelEn}
-                        </span>
-                        {isActive && (
-                          <span className="absolute bottom-0 inset-x-0 h-[2.5px] rounded-full bg-[var(--color-text-primary)]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {canShowEditControls && (
-                  <div className="flex items-center gap-1.5 pb-2 shrink-0">
-                    <EditSpotButton
-                      icon="add"
-                      label="เพิ่มรูป"
-                      onClick={() => openCmsEditor({ type: "gallery-photos" })}
-                    />
-                    <EditSpotButton
-                      icon="add"
-                      label="เพิ่มคลิป"
-                      onClick={() => openCmsEditor({ type: "short-video" })}
-                    />
-                    <EditSpotButton
-                      icon="add"
-                      label="เพิ่มห้อง"
-                      onClick={() => openCmsEditor({ type: "room" })}
-                    />
-                  </div>
                 )}
-              </div>
 
-              {/* Active Cross-Filter Chips Bar */}
-              {(activeProvinceMeta || selectedStyles.length > 0) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="ty-caption font-semibold">
-                    {language === "th"
-                      ? `ผลลัพธ์ ${filteredPins.length} รายการ:`
-                      : `${filteredPins.length} stays:`}
-                  </span>
-
-                  {activeProvinceMeta && (
+                {selectedStyles.map((stId) => {
+                  const stMeta = STAY_STYLE_CATEGORIES.find(
+                    (c) => c.id === stId
+                  );
+                  if (!stMeta) return null;
+                  return (
                     <button
+                      key={stId}
                       type="button"
-                      onClick={() => setSelectedProvinceId(null)}
-                      className="h-8 px-3 rounded-[10px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
+                      onClick={() => handleToggleStyle(stId)}
+                      className="h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
                     >
-                      <MapPin className="w-3.5 h-3.5" />
                       <span>
                         {language === "th"
-                          ? activeProvinceMeta.nameTh
-                          : activeProvinceMeta.nameEn}
+                          ? stMeta.subtitleTh.replace("ที่พัก", "")
+                          : stMeta.titleEn}
                       </span>
-                      <X className="w-3.5 h-3.5 opacity-80" />
+                      <X className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
                     </button>
-                  )}
+                  );
+                })}
 
-                  {selectedStyles.map((stId) => {
-                    const stMeta = STAY_STYLE_CATEGORIES.find(
-                      (c) => c.id === stId
-                    );
-                    if (!stMeta) return null;
-                    return (
-                      <button
-                        key={stId}
-                        type="button"
-                        onClick={() => handleToggleStyle(stId)}
-                        className="h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1.5 ty-caption font-semibold cursor-pointer"
-                      >
-                        <span>
-                          {language === "th" ? stMeta.titleTh : stMeta.titleEn}
-                        </span>
-                        <X className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-                      </button>
-                    );
-                  })}
+                <button
+                  type="button"
+                  onClick={handleResetAllFilters}
+                  className="h-8 px-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-1 ty-caption font-medium cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{language === "th" ? "ล้าง" : "Reset"}</span>
+                </button>
+              </div>
+            )}
 
+            {/* True Shortest-Column Staggered Masonry Grid (Photos + Mixed Aspect Videos) */}
+            {filteredPins.length === 0 ? (
+              <div className="py-16 px-4 text-center space-y-3">
+                <p className="ty-title">
+                  {language === "th"
+                    ? "ยังไม่มีที่พักที่ตรงกับตัวกรองนี้"
+                    : "No stays match the selected filters"}
+                </p>
+                <p className="ty-body-muted max-w-md mx-auto">
+                  {language === "th"
+                    ? "ลองล้างตัวกรองเพื่อดูที่พักทั้งหมด หรือนำที่พักของคุณในจังหวัดนี้เข้าร่วมฟรี 30 วัน"
+                    : "Try resetting filters to browse all curated Thailand stays."}
+                </p>
+                <div className="flex items-center justify-center gap-2.5 pt-1">
                   <button
                     type="button"
                     onClick={handleResetAllFilters}
-                    className="h-8 px-2.5 rounded-[10px] text-[var(--color-promo)] hover:underline inline-flex items-center gap-1 ty-caption font-semibold cursor-pointer"
+                    className="h-10 px-4 rounded-[12px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] ty-body font-semibold cursor-pointer"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>
-                      {language === "th" ? "ล้างทั้งหมด" : "Reset all"}
-                    </span>
+                    {language === "th" ? "ดูที่พักทั้งหมด" : "Show All Stays"}
                   </button>
-                </div>
-              )}
-
-              {/* True Shortest-Column Staggered Masonry Grid (Photos + Mixed Aspect Videos) */}
-              {filteredPins.length === 0 ? (
-                <div className="rounded-[24px] border border-[var(--color-border)] bg-[var(--color-background-muted)]/40 py-16 px-4 text-center space-y-3">
-                  <p className="ty-title">
+                  <Link
+                    href="/register-hotel"
+                    className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center"
+                  >
                     {language === "th"
-                      ? "ยังไม่มีที่พักที่ตรงกับตัวกรองนี้"
-                      : "No stays match the selected filters"}
-                  </p>
-                  <p className="ty-body-muted max-w-md mx-auto">
-                    {language === "th"
-                      ? "เรากำลังเปิดรับที่พักสวยทั่วไทยทั้ง 77 จังหวัด ลองล้างตัวกรองเพื่อดูที่พักแนะนำทั้งหมด หรือลงทะเบียนที่พักของคุณฟรี 30 วัน"
-                      : "Try resetting province or stay style filters to browse all curated Thailand stays."}
-                  </p>
-                  <div className="flex items-center justify-center gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleResetAllFilters}
-                      className="h-10 px-4 rounded-[12px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] ty-body font-semibold cursor-pointer"
-                    >
-                      {language === "th"
-                        ? "ดูที่พักแนะนำทั้งหมด"
-                        : "Show All Stays"}
-                    </button>
-                    <Link
-                      href="/register-hotel"
-                      className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] border border-[var(--color-border)] ty-body font-semibold inline-flex items-center"
-                    >
-                      {language === "th"
-                        ? "+ ลงที่พักในจังหวัดนี้"
-                        : "+ List a Property Here"}
-                    </Link>
-                  </div>
+                      ? "+ ลงที่พักฟรี 30 วัน"
+                      : "+ List Property Free"}
+                  </Link>
                 </div>
-              ) : (
-                <MasonryGrid
-                  items={filteredPins}
-                  columnBreakpoints={[2, 2, 3, 3, 4]}
-                  gapClass="gap-4"
-                  renderItem={(pin) => (
-                    <PinterestPinCard
-                      pin={pin}
-                      language={language}
-                      isSaved={Boolean(savedPinsMap[pin.id])}
-                      canEdit={canShowEditControls}
-                      onSelectPin={handleSelectPin}
-                      onToggleSave={handleToggleSavePin}
-                      onSharePin={handleSharePin}
-                    />
-                  )}
-                />
-              )}
-            </div>
-
-            {/* RIGHT COLUMN: Fastwork-Style Stay Styles + All 77 Provinces Cross-Filter */}
-            <div className="lg:col-span-4 xl:col-span-3 lg:sticky lg:top-20">
-              <ThailandDiscoverySidebar
-                language={language}
-                selectedProvinceId={selectedProvinceId}
-                onSelectProvince={setSelectedProvinceId}
-                selectedStyles={selectedStyles}
-                onToggleStyle={handleToggleStyle}
-                onResetAllFilters={handleResetAllFilters}
+              </div>
+            ) : (
+              <MasonryGrid
+                items={filteredPins}
+                columnBreakpoints={[2, 2, 3, 4, 5]}
+                gapClass="gap-4"
+                renderItem={(pin) => (
+                  <PinterestPinCard
+                    pin={pin}
+                    language={language}
+                    isSaved={Boolean(savedPinsMap[pin.id])}
+                    canEdit={canShowEditControls}
+                    onSelectPin={handleSelectPin}
+                    onToggleSave={handleToggleSavePin}
+                    onSharePin={handleSharePin}
+                  />
+                )}
               />
-            </div>
+            )}
           </div>
-        </>
+
+          {/* RIGHT COLUMN: Slim Ultra-Minimal Stay Styles & 77 Provinces Rail */}
+          <div className="w-full lg:w-[236px] xl:w-[248px] shrink-0 lg:sticky lg:top-20">
+            <ThailandDiscoverySidebar
+              language={language}
+              selectedProvinceId={selectedProvinceId}
+              onSelectProvince={setSelectedProvinceId}
+              selectedStyles={selectedStyles}
+              onToggleStyle={handleToggleStyle}
+              onResetAllFilters={handleResetAllFilters}
+            />
+          </div>
+        </div>
       )}
 
       {/* Optional Fullscreen Image Zoom */}
