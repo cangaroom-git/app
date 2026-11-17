@@ -588,57 +588,59 @@ export function PrimaryNavigation({
              - Larger icons + squircle action buttons
       ====================================================================== */}
       <header
-        aria-label="Top search bar"
-        className="fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)] px-3 sm:px-5 flex items-center gap-2.5 sm:gap-3 pr-[var(--scrollbar-compensation,0.75rem)]"
+        aria-label="Top navigation bar"
+        className="fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)] px-3 sm:px-5 flex items-center justify-end gap-2.5 sm:gap-3 pr-[var(--scrollbar-compensation,0.75rem)]"
       >
-        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Bar */}
-        <div className="flex-1 h-12 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
-          <Search className="w-[20px] h-[20px] text-[var(--color-text-secondary)] shrink-0" />
+        {/* Full-Width Soft Gray #F1F1F1 Pinterest Search Bar (Hidden on Hotel Profile /{hotelSlug}) */}
+        {normalizedActiveTab !== "book" && (
+          <div className="flex-1 h-12 rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/65 focus-within:bg-[var(--color-background-muted)] focus-within:ring-2 focus-within:ring-[var(--color-accent)]/30 px-4 flex items-center gap-3 transition-colors min-w-0">
+            <Search className="w-[20px] h-[20px] text-[var(--color-text-secondary)] shrink-0" />
 
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onChangeSearchQuery?.(e.target.value)}
-            placeholder={
-              language === "th"
-                ? "ค้นหาที่พักทั่วไทย 77 จังหวัด (เช่น สะปัน, พูลวิลล่าภูเก็ต, ทะเลหมอก, รีวิว)..."
-                : "Search stays across 77 Thailand provinces (villas, sea, mist, bars)..."
-            }
-            aria-label={language === "th" ? "ค้นหา" : "Search"}
-            className="flex-1 min-w-0 bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
-          />
-
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => onChangeSearchQuery?.("")}
-              aria-label="Clear search"
-              className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Right-Inside-Search-Pill Quick Date Picker Trigger */}
-          {checkInDate && checkOutDate && (
-            <button
-              type="button"
-              onClick={onOpenCalendarDrawer}
-              title={
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onChangeSearchQuery?.(e.target.value)}
+              placeholder={
                 language === "th"
-                  ? "เลือกวันเช็กอิน - เช็กเอาท์"
-                  : "Select stay dates"
+                  ? "ค้นหาที่พักทั่วไทย 77 จังหวัด (เช่น สะปัน, พูลวิลล่าภูเก็ต, ทะเลหมอก, รีวิว)..."
+                  : "Search stays across 77 Thailand provinces (villas, sea, mist, bars)..."
               }
-              className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
-            >
-              <Calendar className="w-4 h-4 text-[var(--color-promo)]" />
-              <span>
-                {formatShortDate(checkInDate, language)} · {guestCount}{" "}
-                {language === "th" ? "ท่าน" : "guests"}
-              </span>
-            </button>
-          )}
-        </div>
+              aria-label={language === "th" ? "ค้นหา" : "Search"}
+              className="flex-1 min-w-0 bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+            />
+
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onChangeSearchQuery?.("")}
+                aria-label="Clear search"
+                className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Right-Inside-Search-Pill Quick Date Picker Trigger */}
+            {checkInDate && checkOutDate && (
+              <button
+                type="button"
+                onClick={onOpenCalendarDrawer}
+                title={
+                  language === "th"
+                    ? "เลือกวันเช็กอิน - เช็กเอาท์"
+                    : "Select stay dates"
+                }
+                className="hidden sm:inline-flex items-center gap-2 h-9 px-3.5 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] ty-caption font-semibold shadow-2xs hover:opacity-90 transition cursor-pointer shrink-0"
+              >
+                <Calendar className="w-4 h-4 text-[var(--color-promo)]" />
+                <span>
+                  {formatShortDate(checkInDate, language)} · {guestCount}{" "}
+                  {language === "th" ? "ท่าน" : "guests"}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Right Action Icons: Saved Board Shortcut + Saved Coupons + Single User Avatar */}
         <div className="flex items-center gap-1.5 shrink-0">

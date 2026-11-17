@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bath,
   Check,
   ChevronDown,
-  ChevronUp,
+  MapPin,
   Mountain,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Tent,
   Waves,
@@ -24,7 +24,7 @@ import {
 } from "@/data/thailandProvinces";
 import { LanguageCode } from "@/lib/dateFormatters";
 
-export interface ThailandDiscoverySidebarProps {
+export interface ThailandTopFilterBarProps {
   language: LanguageCode;
   selectedProvinceId: string | null;
   onSelectProvince: (provinceId: string | null) => void;
@@ -34,7 +34,7 @@ export interface ThailandDiscoverySidebarProps {
   resultCount?: number;
 }
 
-const MINIMAL_STAY_STYLES: ReadonlyArray<{
+const STAY_STYLE_OPTIONS: ReadonlyArray<{
   id: StayStyleTag;
   labelTh: string;
   labelEn: string;
@@ -78,7 +78,7 @@ const MINIMAL_STAY_STYLES: ReadonlyArray<{
   },
 ];
 
-export function ThailandDiscoverySidebar({
+export function ThailandTopFilterBar({
   language,
   selectedProvinceId,
   onSelectProvince,
@@ -86,12 +86,34 @@ export function ThailandDiscoverySidebar({
   onToggleStyle,
   onResetAllFilters,
   resultCount,
-}: ThailandDiscoverySidebarProps) {
+}: ThailandTopFilterBarProps) {
+  const [openMenu, setOpenMenu] = useState<"province" | "style" | null>(null);
   const [provinceSearch, setProvinceSearch] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<
     "all" | ThailandRegionId
   >("all");
-  const [showAllProvinces, setShowAllProvinces] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpenMenu(null);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenMenu(null);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [openMenu]);
 
   const filteredProvinces = useMemo(() => {
     const q = provinceSearch.trim().toLowerCase();
@@ -107,15 +129,6 @@ export function ThailandDiscoverySidebar({
     });
   }, [provinceSearch, selectedRegion]);
 
-  const isExpandedList =
-    showAllProvinces ||
-    provinceSearch.trim().length > 0 ||
-    selectedRegion !== "all";
-
-  const displayedProvinces = isExpandedList
-    ? filteredProvinces
-    : filteredProvinces.slice(0, 8);
-
   const activeProvinceObj = selectedProvinceId
     ? THAILAND_77_PROVINCES.find((p) => p.id === selectedProvinceId) ?? null
     : null;
@@ -124,255 +137,272 @@ export function ThailandDiscoverySidebar({
     Boolean(selectedProvinceId) || selectedStyles.length > 0;
 
   return (
-    <aside className="space-y-6 select-none lg:pl-2">
-      {/* ACTIVE FILTER CHIPS (Moved from Left Masonry Column to Right Sidebar so cards never jump!) */}
-      {hasAnyFilter && (
-        <section className="rounded-[14px] bg-[var(--color-background-muted)]/60 p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="ty-caption font-semibold text-[var(--color-text-primary)]">
-              {language === "th"
-                ? `ตัวกรอง (${resultCount ?? 0} รายการ)`
-                : `Filtered (${resultCount ?? 0})`}
-            </span>
-            <button
-              type="button"
-              onClick={onResetAllFilters}
-              className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-promo)] hover:underline cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>{language === "th" ? "ล้าง" : "Reset"}</span>
-            </button>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {activeProvinceObj && (
-              <button
-                type="button"
-                onClick={() => onSelectProvince(null)}
-                className="h-7 px-2.5 rounded-[8px] bg-[#111111] !text-white inline-flex items-center gap-1 ty-caption font-semibold cursor-pointer"
-              >
-                <span>
-                  {language === "th"
-                    ? activeProvinceObj.nameTh.split("(")[0].trim()
-                    : activeProvinceObj.nameEn}
-                </span>
-                <X className="w-3 h-3" />
-              </button>
-            )}
-
-            {selectedStyles.map((stId) => {
-              const stMeta = MINIMAL_STAY_STYLES.find((s) => s.id === stId);
-              if (!stMeta) return null;
-              return (
-                <button
-                  key={stId}
-                  type="button"
-                  onClick={() => onToggleStyle(stId)}
-                  className="h-7 px-2.5 rounded-[8px] bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center gap-1 ty-caption font-medium cursor-pointer"
-                >
-                  <span>
-                    {language === "th" ? stMeta.labelTh : stMeta.labelEn}
-                  </span>
-                  <X className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* =====================================================================
-          1. MINIMAL STAY STYLE CROSS-FILTER
-      ====================================================================== */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-[13px] font-semibold tracking-tight text-[var(--color-text-secondary)]">
-            {language === "th" ? "สไตล์ที่พัก" : "Stay Style"}
-          </h2>
-
-          {hasAnyFilter && (
-            <button
-              type="button"
-              onClick={onResetAllFilters}
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>{language === "th" ? "ล้างค่า" : "Reset"}</span>
-            </button>
-          )}
-        </div>
-
-        <div className="space-y-0.5">
-          {MINIMAL_STAY_STYLES.map(({ id, labelTh, labelEn, Icon }) => {
-            const isSelected = selectedStyles.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onToggleStyle(id)}
-                className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer ${
-                  isSelected
-                    ? "bg-[var(--color-text-primary)] text-[var(--color-background-card)] font-semibold"
-                    : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] font-normal"
-                }`}
-              >
-                <span className="flex items-center gap-3 min-w-0">
-                  <Icon
-                    className={`w-[18px] h-[18px] shrink-0 ${
-                      isSelected
-                        ? "text-[var(--color-background-card)]"
-                        : "text-[var(--color-text-secondary)]"
-                    }`}
-                    strokeWidth={isSelected ? 2.2 : 1.8}
-                  />
-                  <span className="text-[14px] truncate">
-                    {language === "th" ? labelTh : labelEn}
-                  </span>
-                </span>
-
-                {isSelected && (
-                  <Check className="w-4 h-4 shrink-0" strokeWidth={2.4} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <div className="border-t border-[var(--color-border)]" />
-
-      {/* =====================================================================
-          2. MINIMAL 77 PROVINCES FILTER
-      ====================================================================== */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-[13px] font-semibold tracking-tight text-[var(--color-text-secondary)]">
-            {language === "th" ? "จังหวัด (77)" : "Provinces (77)"}
-          </h2>
-
-          {activeProvinceObj && (
-            <button
-              type="button"
-              onClick={() => onSelectProvince(null)}
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--color-text-primary)] hover:opacity-75 cursor-pointer"
-            >
-              <span>
-                {language === "th"
-                  ? activeProvinceObj.nameTh.split("(")[0].trim()
-                  : activeProvinceObj.nameEn}
-              </span>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Minimal Search Input */}
-        <div className="h-9 rounded-[10px] bg-[var(--color-background-muted)] px-3 flex items-center gap-2">
-          <Search className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
-          <input
-            type="text"
-            value={provinceSearch}
-            onChange={(e) => setProvinceSearch(e.target.value)}
-            placeholder={
-              language === "th" ? "ค้นหาจังหวัด..." : "Search province..."
-            }
-            className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+    <div
+      ref={containerRef}
+      className="relative flex items-center gap-2 shrink-0 select-none"
+    >
+      {/* 1. COMPACT PROVINCE DROPDOWN TRIGGER (All 77 Provinces) */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() =>
+            setOpenMenu((prev) => (prev === "province" ? null : "province"))
+          }
+          className={`h-9 px-3 rounded-[12px] inline-flex items-center gap-1.5 ty-caption font-semibold transition-colors cursor-pointer ${
+            activeProvinceObj
+              ? "bg-[#111111] !text-white"
+              : openMenu === "province"
+              ? "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+          }`}
+        >
+          <MapPin
+            className={`w-3.5 h-3.5 shrink-0 ${
+              activeProvinceObj
+                ? "!text-white"
+                : "text-[var(--color-text-secondary)]"
+            }`}
           />
-          {provinceSearch && (
-            <button
-              type="button"
-              onClick={() => setProvinceSearch("")}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+          <span className={activeProvinceObj ? "!text-white" : ""}>
+            {activeProvinceObj
+              ? language === "th"
+                ? activeProvinceObj.nameTh.split("(")[0].trim()
+                : activeProvinceObj.nameEn
+              : language === "th"
+              ? "จังหวัด (77)"
+              : "Provinces (77)"}
+          </span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 shrink-0 ${
+              activeProvinceObj ? "!text-white" : ""
+            }`}
+          />
+        </button>
 
-        {/* Quiet Region Tabs (Shown only when expanded or filtering) */}
-        {isExpandedList && (
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
-            {THAILAND_REGIONS.map((reg) => {
-              const isRegActive = selectedRegion === reg.id;
+        {openMenu === "province" && (
+          <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[320px] sm:w-[360px] rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3.5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ty-caption font-bold text-[var(--color-text-primary)]">
+                {language === "th"
+                  ? "เลือกจังหวัดในประเทศไทย (ครบ 77 จังหวัด)"
+                  : "Filter by Thailand Province (77)"}
+              </span>
+              {activeProvinceObj && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectProvince(null);
+                    setOpenMenu(null);
+                  }}
+                  className="ty-caption font-semibold text-[var(--color-promo)] hover:underline cursor-pointer"
+                >
+                  {language === "th" ? "ดูทุกจังหวัด" : "All provinces"}
+                </button>
+              )}
+            </div>
+
+            {/* Search Input */}
+            <div className="h-9 rounded-[10px] bg-[var(--color-background-muted)] px-3 flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
+              <input
+                type="text"
+                value={provinceSearch}
+                onChange={(e) => setProvinceSearch(e.target.value)}
+                placeholder={
+                  language === "th"
+                    ? "พิมพ์ค้นหาจังหวัด เช่น น่าน, ภูเก็ต, เชียงใหม่..."
+                    : "Search province..."
+                }
+                autoFocus
+                className="flex-1 min-w-0 bg-transparent ty-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+              />
+              {provinceSearch && (
+                <button
+                  type="button"
+                  onClick={() => setProvinceSearch("")}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Region Tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+              {THAILAND_REGIONS.map((reg) => {
+                const isRegActive = selectedRegion === reg.id;
+                return (
+                  <button
+                    key={reg.id}
+                    type="button"
+                    onClick={() => setSelectedRegion(reg.id)}
+                    className={`h-7 px-2.5 rounded-[8px] ty-caption font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isRegActive
+                        ? "bg-[#111111] !text-white"
+                        : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span className={isRegActive ? "!text-white" : ""}>
+                      {language === "th" ? reg.labelTh : reg.labelEn}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 77 Provinces Grid */}
+            <div className="max-h-[240px] overflow-y-auto pr-1 flex flex-wrap gap-1.5">
+              {filteredProvinces.map((prov) => {
+                const isSelected = selectedProvinceId === prov.id;
+                const shortTh = prov.nameTh.split("(")[0].trim();
+                return (
+                  <button
+                    key={prov.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectProvince(isSelected ? null : prov.id);
+                      setOpenMenu(null);
+                    }}
+                    className={`h-8 px-2.5 rounded-[9px] ty-caption font-medium transition-colors cursor-pointer ${
+                      isSelected
+                        ? "bg-[var(--color-promo)] !text-white font-semibold"
+                        : "bg-[var(--color-background-muted)]/80 hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span className={isSelected ? "!text-white" : ""}>
+                      {language === "th" ? shortTh : prov.nameEn}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. COMPACT STAY STYLE MULTI-SELECT DROPDOWN TRIGGER */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() =>
+            setOpenMenu((prev) => (prev === "style" ? null : "style"))
+          }
+          className={`h-9 px-3 rounded-[12px] inline-flex items-center gap-1.5 ty-caption font-semibold transition-colors cursor-pointer ${
+            selectedStyles.length > 0
+              ? "bg-[#111111] !text-white"
+              : openMenu === "style"
+              ? "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+          }`}
+        >
+          <SlidersHorizontal
+            className={`w-3.5 h-3.5 shrink-0 ${
+              selectedStyles.length > 0
+                ? "!text-white"
+                : "text-[var(--color-text-secondary)]"
+            }`}
+          />
+          <span className={selectedStyles.length > 0 ? "!text-white" : ""}>
+            {selectedStyles.length > 0
+              ? language === "th"
+                ? `สไตล์ที่พัก (${selectedStyles.length})`
+                : `Style (${selectedStyles.length})`
+              : language === "th"
+              ? "สไตล์ที่พัก"
+              : "Stay Style"}
+          </span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 shrink-0 ${
+              selectedStyles.length > 0 ? "!text-white" : ""
+            }`}
+          />
+        </button>
+
+        {openMenu === "style" && (
+          <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[264px] rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-2.5 space-y-1">
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="ty-caption font-bold text-[var(--color-text-primary)]">
+                {language === "th"
+                  ? "เลือกผสมได้หลายสไตล์"
+                  : "Select Stay Styles"}
+              </span>
+              {selectedStyles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onResetAllFilters}
+                  className="ty-caption font-semibold text-[var(--color-promo)] hover:underline cursor-pointer"
+                >
+                  {language === "th" ? "ล้าง" : "Clear"}
+                </button>
+              )}
+            </div>
+
+            {STAY_STYLE_OPTIONS.map(({ id, labelTh, labelEn, Icon }) => {
+              const isSelected = selectedStyles.includes(id);
               return (
                 <button
-                  key={reg.id}
+                  key={id}
                   type="button"
-                  onClick={() => setSelectedRegion(reg.id)}
-                  className={`h-7 px-2.5 rounded-[8px] text-[12px] whitespace-nowrap transition-colors cursor-pointer ${
-                    isRegActive
-                      ? "bg-[var(--color-text-primary)] text-[var(--color-background-card)] font-semibold"
-                      : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
+                  onClick={() => onToggleStyle(id)}
+                  className={`w-full h-10 px-3 rounded-[12px] flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer ${
+                    isSelected
+                      ? "bg-[#111111] !text-white font-semibold"
+                      : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]"
                   }`}
                 >
-                  {language === "th" ? reg.labelTh : reg.labelEn}
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <Icon
+                      className={`w-4 h-4 shrink-0 ${
+                        isSelected
+                          ? "!text-white"
+                          : "text-[var(--color-text-secondary)]"
+                      }`}
+                      strokeWidth={2}
+                    />
+                    <span
+                      className={`ty-caption truncate ${
+                        isSelected
+                          ? "!text-white font-semibold"
+                          : "text-[var(--color-text-primary)] font-medium"
+                      }`}
+                    >
+                      {language === "th" ? labelTh : labelEn}
+                    </span>
+                  </span>
+
+                  {isSelected && (
+                    <Check
+                      className="w-4 h-4 shrink-0 !text-white"
+                      strokeWidth={2.5}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
         )}
-
-        {/* Clean Minimal Province Chips */}
-        <div
-          className={`${
-            isExpandedList ? "max-h-[260px] overflow-y-auto pr-1" : ""
-          } flex flex-wrap gap-1.5`}
-        >
-          {displayedProvinces.map((prov) => {
-            const isSelected = selectedProvinceId === prov.id;
-            const shortTh = prov.nameTh.split("(")[0].trim();
-            return (
-              <button
-                key={prov.id}
-                type="button"
-                onClick={() => onSelectProvince(isSelected ? null : prov.id)}
-                className={`h-8 px-3 rounded-[10px] text-[13px] transition-colors cursor-pointer ${
-                  isSelected
-                    ? "text-[var(--color-background-card)] font-semibold"
-                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                }`}
-              >
-                {language === "th" ? shortTh : prov.nameEn}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Quiet Toggle for All 77 Provinces */}
-        {!provinceSearch && selectedRegion === "all" && (
-          <button
-            type="button"
-            onClick={() => setShowAllProvinces((v) => !v)}
-            className="px-1 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
-          >
-            <span>
-              {showAllProvinces
-                ? language === "th"
-                  ? "แสดงเฉพาะจังหวัดยอดนิยม"
-                  : "Show popular provinces"
-                : language === "th"
-                ? "ดูครบทั้ง 77 จังหวัด"
-                : "View all 77 provinces"}
-            </span>
-            {showAllProvinces ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
-        )}
-      </section>
-
-      <div className="border-t border-[var(--color-border)] pt-4 px-1">
-        <Link
-          href="/register-hotel"
-          className="text-[12px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-        >
-          {language === "th"
-            ? "สำหรับเจ้าของที่พัก · ลงที่พักฟรี 30 วัน →"
-            : "For property owners · List free for 30 days →"}
-        </Link>
       </div>
-    </aside>
+
+      {/* 3. COMPACT RESET BUTTON (Only when filters active — fixed inline height, never shifts grid!) */}
+      {hasAnyFilter && (
+        <button
+          type="button"
+          onClick={onResetAllFilters}
+          title={
+            language === "th"
+              ? `ล้างตัวกรอง (${resultCount ?? 0} รายการ)`
+              : `Reset filters (${resultCount ?? 0})`
+          }
+          className="h-9 px-2.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1 ty-caption font-semibold transition-colors cursor-pointer"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">
+            {language === "th" ? "ล้าง" : "Reset"}
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
+
+export { ThailandTopFilterBar as ThailandDiscoverySidebar };

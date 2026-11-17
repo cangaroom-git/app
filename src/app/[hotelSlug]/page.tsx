@@ -3,7 +3,6 @@
 import React, { use, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Clock,
-  MapPin,
   Phone,
   ShieldCheck,
   Star,
@@ -342,29 +341,11 @@ export default function HotelFastworkProfilePage({
         propertyConfig.nameEn
       );
 
-  const displayLocation = partnerPreview
-    ? pickLocalizedText(
-        language,
-        partnerPreview.provinceLabelTh,
-        partnerPreview.provinceLabelEn
-      )
-    : pickLocalizedText(
-        language,
-        propertyConfig.locationTh,
-        propertyConfig.locationEn
-      );
-
   const avatarUrl = partnerPreview
     ? partnerPreview.imageUrl
     : cms.home.heroImageUrl ||
       propertyConfig.heroImageUrl ||
       rooms[0]?.images[0]?.url;
-
-  const coverBannerUrl = partnerPreview
-    ? partnerPreview.galleryUrls[1] || partnerPreview.imageUrl
-    : rooms[0]?.images[0]?.url ||
-      cms.home.heroImageUrl ||
-      propertyConfig.heroImageUrl;
 
   const minRoomPrice = useMemo(() => {
     if (partnerPreview) return partnerPreview.nightlyPriceThb;
@@ -385,11 +366,6 @@ export default function HotelFastworkProfilePage({
     { id: "reviews", labelTh: "รีวิว", labelEn: "Reviews" },
     { id: "about", labelTh: "เกี่ยวกับ", labelEn: "About" },
   ];
-
-  const highlightPills =
-    language === "th"
-      ? ["Mountain & Mist", "Private Villa", "Onsen Bathtub", "Direct Booking"]
-      : ["Mountain & Mist", "Private Villa", "Onsen Bathtub", "Direct Booking"];
 
   return (
     <div className="w-full min-w-0 space-y-6">
@@ -449,9 +425,9 @@ export default function HotelFastworkProfilePage({
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* LEFT: Identity + 4-Metric Box */}
-              <div className="lg:col-span-5 space-y-4">
+            <div className="space-y-4">
+              {/* Identity + 4-Metric Box */}
+              <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="relative shrink-0">
                     <img
@@ -527,52 +503,15 @@ export default function HotelFastworkProfilePage({
                   </div>
                 </div>
               </div>
-
-              {/* RIGHT: Wide Rounded Cover Image + Tag Pills + Location */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="relative h-[185px] sm:h-[210px] w-full rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
-                  <img
-                    src={coverBannerUrl}
-                    alt={displayHotelName}
-                    className="h-full w-full object-cover"
-                  />
-                  {canShowEditControls && (
-                    <div className="absolute bottom-3 right-3">
-                      <EditSpotButton
-                        label="เปลี่ยนภาพปก"
-                        onClick={() => openCmsEditor({ type: "home-hero" })}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {highlightPills.map((tag) => (
-                      <span
-                        key={tag}
-                        className="h-7 px-3.5 rounded-full border border-[var(--color-border)] inline-flex items-center text-[12px] text-[var(--color-text-primary)]"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-
-                  <span className="inline-flex items-center gap-1 text-[12px] text-[var(--color-text-secondary)]">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{displayLocation}, Thailand</span>
-                  </span>
-                </div>
-              </div>
             </div>
           </section>
 
           {/* =================================================================
               2. FASTWORK 2-COLUMN WORKSPACE
-                 - Left: Underline Tabs + Masonry Portfolio
+                 - Left: Underline Tabs + Masonry Portfolio (Same Card Density as Home!)
                  - Right: Room Types & Pricing Cards ("ประเภทห้องพัก")
           ================================================================== */}
-          <div className="flex flex-col lg:flex-row items-start gap-7 pt-1">
+          <div className="flex flex-col lg:flex-row items-start gap-6 pt-1">
             {/* LEFT COLUMN: Underline Tabs + Masonry Grid */}
             <div className="flex-1 min-w-0 w-full space-y-4">
               <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
@@ -684,7 +623,7 @@ export default function HotelFastworkProfilePage({
               ) : (
                 <MasonryGrid
                   items={filteredPins}
-                  columnBreakpoints={[2, 2, 3, 3, 3]}
+                  columnBreakpoints={[2, 3, 3, 4, 4]}
                   gapClass="gap-4"
                   renderItem={(pin) => (
                     <PinterestPinCard
@@ -702,7 +641,7 @@ export default function HotelFastworkProfilePage({
             </div>
 
             {/* RIGHT COLUMN: Fastwork-Style Room Types & Pricing Cards ("ประเภทห้องพัก") */}
-            <aside className="w-full lg:w-[360px] xl:w-[390px] shrink-0 lg:sticky lg:top-20 space-y-3.5 select-none">
+            <aside className="w-full lg:w-[310px] xl:w-[330px] shrink-0 lg:sticky lg:top-20 space-y-3.5 select-none">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="ty-subtitle font-bold">
                   {language === "th" ? "ประเภทห้องพัก" : "Rooms & Villas"}

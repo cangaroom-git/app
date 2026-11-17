@@ -27,12 +27,12 @@ Every component, page, and interactive widget MUST strictly follow these design 
   - Middle stack: Vertically centered `26px` outline/solid icons inside `h-12 w-12 rounded-[16px]` squircle buttons (`Home (/)`, `Saved Board (/board)`, `Messages`, `Property Profile (/sapanunseen)`, `Deals (/deal)`, `List Hotel (/register-hotel)`, `Profile Avatar`).
   - Bottom slot: `26px` `≡` More menu icon with popover settings.
 - **Home Feed (`/`)**:
-  - **Left (`flex-1`)**: Underline category tabs + `<MasonryGrid />` (never jumps vertically when filtering).
-  - **Right (`lg:w-[236px] xl:w-[248px]`)**: Slim minimal `<ThailandDiscoverySidebar />` containing active filter chips, Stay Style rows, and searchable **77 Thailand Provinces** cross-filter.
+  - **Full-Width Masonry (No Right Sidebar)**: Top bar combines underline category tabs on the left + compact dropdown triggers (`จังหวัด (77)` & `สไตล์ที่พัก`) on the right, followed by full-width `<MasonryGrid columnBreakpoints={[2, 3, 4, 5, 5]} />`.
 - **Saved Boards (`/board`)**:
   - Includes the same underline category tabs (`ทั้งหมด`, `ที่พัก & พูลวิลล่า`, `คลิปบรรยากาศ`, etc.) + custom Trip Boards & Province filter pills.
 - **Hotel Profile Page (`/{hotelSlug}`, e.g. `/sapanunseen` — Replaces `/booking`)**:
-  - Fastwork Profile layout: Top 2-column profile header (Avatar + Name + `@slug` + 4-Metric box on left, Wide Cover Banner + Tag Pills + Location on right), Left Masonry Portfolio with underline tabs, and Right Sidebar showing **ประเภทห้องพักพร้อมราคา** (`Rooms & Villas` horizontal cards) that open the Room Booking Drawer on click.
+  - Top search bar is hidden on `/{hotelSlug}`.
+  - Compact Top Profile Header (Avatar + Name + `@slug` + 4-Metric box, without right cover banner), Left Masonry Portfolio (`columnBreakpoints={[2, 3, 3, 4, 4]}` matching Home card sizing), and Right Sidebar (`lg:w-[310px] xl:w-[330px]`) showing **ประเภทห้องพักพร้อมราคา** (`Rooms & Villas` horizontal cards) that open the Room Booking Drawer on click.
 
 ## 4. Pinterest Gestalt Color Palette & Native System Font
 - **Canvas & Card**: `#ffffff` (Light) / `#121212` & `#1e1e1e` (Dark).

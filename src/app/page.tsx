@@ -403,42 +403,51 @@ export default function HomePage() {
         />
       ) : (
         /* =====================================================================
-           MODE B: CLEAN 2-COLUMN MINIMAL WORKSPACE
-              - Left: Category Underline Tabs + Staggered Masonry (Photos + Videos)
-              - Right: Minimal Stay Styles & 77 Provinces Cross-Filter
+           MODE B: FULL-WIDTH PINTEREST MASONRY + COMPACT TOP FILTER BAR
+              - Top Row: Category Underline Tabs (Left) + Compact Province/Style Filter Dropdowns (Right)
+              - Main: Full-Width Variable-Height Masonry Grid (No Right Sidebar!)
         ====================================================================== */
-        <div className="flex flex-col lg:flex-row items-start gap-7">
-          {/* LEFT COLUMN: Category Tabs + Active Filter Bar + Variable-Height Masonry */}
-          <div className="flex-1 min-w-0 w-full space-y-4">
-            {/* Category Underline Tabs */}
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)]">
-              <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
-                {categoryTabs.map((tab) => {
-                  const isActive = activeCategory === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActiveCategory(tab.id)}
-                      className={`relative pb-3 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                        isActive
-                          ? "text-[var(--color-text-primary)]"
-                          : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                      }`}
-                    >
-                      <span>
-                        {language === "th" ? tab.labelTh : tab.labelEn}
-                      </span>
-                      {isActive && (
-                        <span className="absolute bottom-0 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="w-full min-w-0 space-y-4">
+          {/* Single Compact Top Bar: Category Underline Tabs + Right Filter Dropdowns */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-2">
+            <div className="flex items-center gap-5 sm:gap-6 overflow-x-auto no-scrollbar">
+              {categoryTabs.map((tab) => {
+                const isActive = activeCategory === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveCategory(tab.id)}
+                    className={`relative py-1.5 ty-body font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isActive
+                        ? "text-[var(--color-text-primary)]"
+                        : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span>
+                      {language === "th" ? tab.labelTh : tab.labelEn}
+                    </span>
+                    {isActive && (
+                      <span className="absolute -bottom-2 inset-x-0 h-[2px] rounded-full bg-[var(--color-text-primary)]" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <ThailandDiscoverySidebar
+                language={language}
+                selectedProvinceId={selectedProvinceId}
+                onSelectProvince={setSelectedProvinceId}
+                selectedStyles={selectedStyles}
+                onToggleStyle={handleToggleStyle}
+                onResetAllFilters={handleResetAllFilters}
+                resultCount={filteredPins.length}
+              />
 
               {canShowEditControls && (
-                <div className="flex items-center gap-1.5 pb-2 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <EditSpotButton
                     icon="add"
                     label="เพิ่มรูป"
@@ -457,70 +466,59 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* True Shortest-Column Staggered Masonry Grid (Photos + Mixed Aspect Videos) */}
-            {filteredPins.length === 0 ? (
-              <div className="py-16 px-4 text-center space-y-3">
-                <p className="ty-title">
-                  {language === "th"
-                    ? "ยังไม่มีที่พักที่ตรงกับตัวกรองนี้"
-                    : "No stays match the selected filters"}
-                </p>
-                <p className="ty-body-muted max-w-md mx-auto">
-                  {language === "th"
-                    ? "ลองล้างตัวกรองเพื่อดูที่พักทั้งหมด หรือนำที่พักของคุณในจังหวัดนี้เข้าร่วมฟรี 30 วัน"
-                    : "Try resetting filters to browse all curated Thailand stays."}
-                </p>
-                <div className="flex items-center justify-center gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleResetAllFilters}
-                    className="h-10 px-4 rounded-[12px] bg-[var(--color-text-primary)] text-[var(--color-background-card)] ty-body font-semibold cursor-pointer"
-                  >
+          {/* Full-Width Staggered Masonry Grid (No Right Sidebar) */}
+          {filteredPins.length === 0 ? (
+            <div className="py-16 px-4 text-center space-y-3">
+              <p className="ty-title">
+                {language === "th"
+                  ? "ยังไม่มีที่พักที่ตรงกับตัวกรองนี้"
+                  : "No stays match the selected filters"}
+              </p>
+              <p className="ty-body-muted max-w-md mx-auto">
+                {language === "th"
+                  ? "ลองล้างตัวกรองเพื่อดูที่พักทั้งหมด หรือนำที่พักของคุณในจังหวัดนี้เข้าร่วมฟรี 30 วัน"
+                  : "Try resetting filters to browse all curated Thailand stays."}
+              </p>
+              <div className="flex items-center justify-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetAllFilters}
+                  className="h-10 px-4 rounded-[12px] bg-[#111111] !text-white ty-body font-semibold cursor-pointer"
+                >
+                  <span className="!text-white">
                     {language === "th" ? "ดูที่พักทั้งหมด" : "Show All Stays"}
-                  </button>
-                  <Link
-                    href="/register-hotel"
-                    className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center"
-                  >
-                    {language === "th"
-                      ? "+ ลงที่พักฟรี 30 วัน"
-                      : "+ List Property Free"}
-                  </Link>
-                </div>
+                  </span>
+                </button>
+                <Link
+                  href="/register-hotel"
+                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] ty-body font-semibold inline-flex items-center"
+                >
+                  {language === "th"
+                    ? "+ ลงที่พักฟรี 30 วัน"
+                    : "+ List Property Free"}
+                </Link>
               </div>
-            ) : (
-              <MasonryGrid
-                items={filteredPins}
-                columnBreakpoints={[2, 2, 3, 4, 5]}
-                gapClass="gap-4"
-                renderItem={(pin) => (
-                  <PinterestPinCard
-                    pin={pin}
-                    language={language}
-                    isSaved={Boolean(savedPinsMap[pin.id])}
-                    canEdit={canShowEditControls}
-                    onSelectPin={handleSelectPin}
-                    onToggleSave={handleToggleSavePin}
-                    onSharePin={handleSharePin}
-                  />
-                )}
-              />
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: Slim Ultra-Minimal Stay Styles & 77 Provinces Rail */}
-          <div className="w-full lg:w-[236px] xl:w-[248px] shrink-0 lg:sticky lg:top-20">
-            <ThailandDiscoverySidebar
-              language={language}
-              selectedProvinceId={selectedProvinceId}
-              onSelectProvince={setSelectedProvinceId}
-              selectedStyles={selectedStyles}
-              onToggleStyle={handleToggleStyle}
-              onResetAllFilters={handleResetAllFilters}
-              resultCount={filteredPins.length}
+            </div>
+          ) : (
+            <MasonryGrid
+              items={filteredPins}
+              columnBreakpoints={[2, 3, 4, 5, 5]}
+              gapClass="gap-4"
+              renderItem={(pin) => (
+                <PinterestPinCard
+                  pin={pin}
+                  language={language}
+                  isSaved={Boolean(savedPinsMap[pin.id])}
+                  canEdit={canShowEditControls}
+                  onSelectPin={handleSelectPin}
+                  onToggleSave={handleToggleSavePin}
+                  onSharePin={handleSharePin}
+                />
+              )}
             />
-          </div>
+          )}
         </div>
       )}
 
