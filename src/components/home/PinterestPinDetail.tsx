@@ -477,16 +477,20 @@ export function PinterestPinCard({
   }, [pin]);
 
   const handleCardClick = () => {
-    const rect = mediaBoxRef.current?.getBoundingClientRect();
-    if (rect && rect.width > 0 && rect.height > 0) {
-      lastClickedPinOrigin = {
-        pinId: pin.id,
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-        timestamp: Date.now(),
-      };
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      const rect = mediaBoxRef.current?.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        lastClickedPinOrigin = {
+          pinId: pin.id,
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+          timestamp: Date.now(),
+        };
+      }
+    } else {
+      lastClickedPinOrigin = null;
     }
     onSelectPin(pin);
   };
@@ -811,7 +815,6 @@ export function PinterestPinDetail({
   const [isDesktopCommentsOpen, setIsDesktopCommentsOpen] = useState(true);
   const [pullDownOffset, setPullDownOffset] = useState(0);
   const [isPullingDown, setIsPullingDown] = useState(false);
-  const [isFlipAnimating, setIsFlipAnimating] = useState(false);
 
   const commentInputRef = useRef<HTMLInputElement | null>(null);
   const desktopCommentInputRef = useRef<HTMLInputElement | null>(null);
@@ -945,6 +948,7 @@ export function PinterestPinDetail({
 
     if (
       typeof window === "undefined" ||
+      window.innerWidth >= 1024 ||
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
     ) {
       return;
@@ -961,8 +965,6 @@ export function PinterestPinDetail({
     const dy = origin.top - targetRect.top;
     const sx = origin.width / targetRect.width;
     const sy = origin.height / targetRect.height;
-
-    setIsFlipAnimating(true);
 
     mediaEl.style.transition = "none";
     mediaEl.style.transformOrigin = "0 0";
@@ -996,7 +998,6 @@ export function PinterestPinDetail({
         detailsEl.style.transform = "";
         detailsEl.style.willChange = "";
       }
-      setIsFlipAnimating(false);
     };
 
     rafId = window.requestAnimationFrame(() => {
@@ -1582,7 +1583,7 @@ export function PinterestPinDetail({
             : "Back to feed"
         }
         aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-        className="fixed top-[max(18px,env(safe-area-inset-top))] left-4 sm:left-6 lg:top-[104px] lg:left-[max(120px,calc((100vw+72px-1120px)/2+20px))] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+        className="fixed top-[max(18px,env(safe-area-inset-top))] left-4 sm:left-6 lg:top-[96px] lg:left-[104px] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
       >
         <ChevronLeft className="w-6 h-6 lg:hidden" strokeWidth={2.4} />
         <ArrowLeft className="hidden lg:block w-6 h-6" strokeWidth={2.4} />
@@ -1653,14 +1654,12 @@ export function PinterestPinDetail({
               }
             : undefined
         }
-        className={`max-w-[1120px] mx-auto rounded-none lg:rounded-[24px] bg-[var(--color-background-card)] border-0 lg:border lg:border-[var(--color-border)] grid grid-cols-1 lg:grid-cols-12 lg:h-[min(82vh,740px)] lg:min-h-[560px] ${
-          isFlipAnimating ? "lg:overflow-visible" : "lg:overflow-hidden"
-        }`}
+        className="max-w-[1120px] mx-auto rounded-none lg:rounded-[24px] lg:border lg:border-[var(--color-border)] bg-[var(--color-background-card)] grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:h-[min(85vh,780px)] lg:min-h-[560px] lg:overflow-hidden"
       >
         {/* =================================================================
             LEFT / HERO STAGE: TRUE VERTICAL MEDIA + 1:1 SLIDING CAROUSEL TRACK
         ================================================================== */}
-        <div className="lg:col-span-7 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-3 bg-[var(--color-background-card)] flex items-center justify-center lg:h-full">
+        <div className="lg:col-span-6 min-h-0 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-3 bg-[var(--color-background-card)] flex items-center justify-center lg:h-full">
           <div
             ref={mediaStageRef}
             onPointerDown={handleMediaPointerDown}
@@ -1672,7 +1671,7 @@ export function PinterestPinDetail({
                 ? ({ "--pin-aspect": heroAspectCss } as React.CSSProperties)
                 : undefined
             }
-            className={`relative w-full ${
+            className={`relative w-full min-h-0 ${
               !pin.videoUrl
                 ? "max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[78svh] lg:max-h-none"
                 : "min-h-[280px]"
@@ -1723,7 +1722,7 @@ export function PinterestPinDetail({
                       fetchPriority={idx === 0 ? "high" : "auto"}
                       decoding={idx === 0 ? "sync" : "async"}
                       draggable={false}
-                      className="relative z-10 w-full h-full object-cover select-none"
+                      className="absolute inset-0 z-10 w-full h-full object-cover select-none"
                     />
                   </div>
                 ))}
@@ -1768,7 +1767,7 @@ export function PinterestPinDetail({
         ================================================================== */}
         <div
           ref={detailsPanelRef}
-          className="lg:col-span-5 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-card)] lg:border-l border-[var(--color-border)]"
+          className="lg:col-span-6 min-h-0 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-card)] lg:border-l border-[var(--color-border)]"
         >
           {/* 1. Clean Top Action Bar (♡ | 💬 | 📤 | •••  ...  [บันทึก] [✕]) */}
           <div className="px-4 sm:px-5 py-3 flex items-center justify-between gap-2 shrink-0 lg:border-b border-[var(--color-border)]">
@@ -1864,7 +1863,7 @@ export function PinterestPinDetail({
           </div>
 
           {/* 2. Clean Minimal Info Body (Author + Multi-Photo Thumbnail Strip + Full-Width CTA + Title/Desc!) */}
-          <div className="px-4 sm:px-5 pt-2 pb-4 lg:py-4 flex-1 lg:overflow-y-auto space-y-3.5">
+          <div className="px-4 sm:px-5 pt-2 pb-4 lg:py-4 flex-1 min-h-0 lg:overflow-y-auto space-y-3.5">
             {/* PINTEREST RED-BOX ZONE: Author + Multi-Photo Squircle Thumbnail Strip + Full-Width Visit Button */}
             <div className="space-y-3">
               {/* Row 1: Property Identity */}
@@ -2329,10 +2328,10 @@ export function PinterestPinDetail({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[560px] h-[78dvh] sm:h-[75dvh] rounded-t-[24px] bg-[var(--color-background-popover)] border-t sm:border-x border-[var(--color-border)] flex flex-col justify-between overflow-hidden animate-slide-up-sheet"
+            className="w-full sm:w-[calc(100%-32px)] md:w-[calc(100%-48px)] sm:max-w-[760px] md:max-w-[860px] h-[78dvh] sm:h-[76dvh] rounded-t-[24px] bg-[var(--color-background-popover)] border-t sm:border-x border-[var(--color-border)] flex flex-col justify-between overflow-hidden animate-slide-up-sheet"
           >
             {/* Top Handle + Header (✕ | N comments | 📤) */}
-            <div className="shrink-0 pt-2.5 pb-2.5 px-4 border-b border-[var(--color-border)] space-y-2">
+            <div className="shrink-0 pt-2.5 pb-2.5 px-4 sm:px-6 border-b border-[var(--color-border)] space-y-2">
               <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
               <div className="flex items-center justify-between">
                 <button
@@ -2372,7 +2371,7 @@ export function PinterestPinDetail({
             </div>
 
             {/* Scrollable Threaded Comments List */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
               {comments.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center py-10 space-y-1.5">
                   <MessageCircle className="w-7 h-7 text-[var(--color-text-secondary)]" />
@@ -2517,7 +2516,7 @@ export function PinterestPinDetail({
             </div>
 
             {/* Bottom Quick-Prompt Squircle Chips + Squircle Composer (Matches Image 2!) */}
-            <div className="shrink-0 px-4 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-[var(--color-border)] bg-[var(--color-background-popover)] space-y-2.5">
+            <div className="shrink-0 px-4 sm:px-6 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-[var(--color-border)] bg-[var(--color-background-popover)] space-y-2.5">
               {replyingTo && (
                 <div className="flex items-center justify-between px-3 py-1.5 rounded-[10px] bg-[var(--color-background-muted)] text-[12px]">
                   <span>

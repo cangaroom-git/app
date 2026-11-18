@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Calendar, Minus, Plus, ShoppingBag, Tag, Timer } from "lucide-react";
+import { Calendar, Minus, Plus, ShieldCheck, ShoppingBag, Tag, Timer } from "lucide-react";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
+import { getFacilityIconMeta } from "@/lib/facilityIcons";
 import type { StayPricingBreakdown } from "@/lib/bookingMath";
 import { StandardInput } from "@/components/ui/standards";
 import {
@@ -94,10 +95,10 @@ export function BookingCheckoutStep({
     return (
       <div className="space-y-4">
         {activeBooking.status === "HOLD_PENDING_PAYMENT" && (
-          <div className="rounded-[16px] bg-[var(--color-warning-muted)] p-4 space-y-2">
+          <div className="rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Timer className="w-5 h-5 text-[var(--color-warning)] shrink-0" />
+                <Timer className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
                 <div className="min-w-0">
                   <p className="ty-body font-bold truncate">
                     {language === "th"
@@ -111,7 +112,7 @@ export function BookingCheckoutStep({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center h-7 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] px-3 font-mono ty-caption font-bold shrink-0">
+              <span className="inline-flex items-center h-7 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-3 font-mono ty-caption font-bold shrink-0">
                 {String(Math.floor(holdRemainingSeconds / 60)).padStart(2, "0")}:
                 {String(holdRemainingSeconds % 60).padStart(2, "0")}
               </span>
@@ -162,13 +163,13 @@ export function BookingCheckoutStep({
       className="space-y-6"
     >
       {bookingError && (
-        <div className="rounded-[14px] bg-[var(--color-error-muted)] p-3.5 ty-caption font-semibold text-[var(--color-error)]">
+        <div className="rounded-[14px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-3.5 ty-caption font-semibold text-[var(--color-error)]">
           {bookingError}
         </div>
       )}
 
       {/* Selected Room & Dates Summary */}
-      <div className="rounded-[16px] bg-[var(--color-background-muted)] p-3.5 flex items-center justify-between gap-3">
+      <div className="rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-3.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {room.galleryUrls[0] && (
             <img
@@ -179,7 +180,7 @@ export function BookingCheckoutStep({
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center h-5 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] px-2 ty-caption font-bold">
+              <span className="inline-flex items-center h-5 rounded-[7px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-2 ty-caption font-bold">
                 {room.code}
               </span>
               <h3 className="ty-body font-bold truncate">
@@ -198,7 +199,7 @@ export function BookingCheckoutStep({
         <button
           type="button"
           onClick={onEditStayDates}
-          className="ty-caption font-semibold text-[var(--color-accent)] hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
+          className="ty-caption font-semibold text-[var(--color-text-primary)] hover:underline inline-flex items-center gap-1 shrink-0 cursor-pointer"
         >
           <Calendar className="w-3.5 h-3.5" />
           <span>{language === "th" ? "เปลี่ยนวัน" : "Edit"}</span>
@@ -216,21 +217,42 @@ export function BookingCheckoutStep({
           <div className="space-y-2">
             {addons.map((addon) => {
               const qty = addonQuantities[addon.id] || 0;
+              const fallbackMeta = getFacilityIconMeta(addon.nameTh);
+              const FallbackIcon = fallbackMeta.Icon;
               return (
                 <div
                   key={addon.id}
-                  className="rounded-[14px] bg-[var(--color-background-muted)] p-3 flex items-center justify-between gap-3"
+                  className="rounded-[14px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-2.5 sm:p-3 flex items-center justify-between gap-3"
                 >
-                  <div className="min-w-0 flex-1">
-                    <h4 className="ty-body font-bold truncate">
-                      {language === "th" ? addon.nameTh : addon.nameEn}
-                    </h4>
-                    <p className="ty-caption">
-                      <strong>+฿{addon.priceThb.toLocaleString()}</strong> /{" "}
-                      {language === "th"
-                        ? addon.unitLabelTh
-                        : addon.unitLabelEn}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {addon.imageUrl ? (
+                      <img
+                        src={addon.imageUrl}
+                        alt={language === "th" ? addon.nameTh : addon.nameEn}
+                        className="h-14 w-14 rounded-[10px] object-cover shrink-0 bg-[var(--color-background-card)] border border-[var(--color-border)]"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center shrink-0 text-[var(--color-text-primary)]">
+                        <FallbackIcon className="w-5 h-5" />
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="ty-body font-bold truncate">
+                        {language === "th" ? addon.nameTh : addon.nameEn}
+                      </h4>
+                      {addon.descriptionTh && (
+                        <p className="ty-caption text-[var(--color-text-secondary)] line-clamp-1">
+                          {addon.descriptionTh}
+                        </p>
+                      )}
+                      <p className="ty-caption mt-0.5">
+                        <strong>+฿{addon.priceThb.toLocaleString()}</strong> /{" "}
+                        {language === "th"
+                          ? addon.unitLabelTh
+                          : addon.unitLabelEn}
+                      </p>
+                    </div>
                   </div>
 
                   {qty > 0 ? (
@@ -238,7 +260,7 @@ export function BookingCheckoutStep({
                       <button
                         type="button"
                         onClick={() => onUpdateAddonQuantity(addon.id, -1)}
-                        className="h-8 w-8 rounded-[10px] bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer"
+                        className="h-8 w-8 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -248,7 +270,7 @@ export function BookingCheckoutStep({
                       <button
                         type="button"
                         onClick={() => onUpdateAddonQuantity(addon.id, 1)}
-                        className="h-8 w-8 rounded-[10px] bg-[var(--color-accent)] text-[var(--color-on-accent)] flex items-center justify-center cursor-pointer"
+                        className="h-8 w-8 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] flex items-center justify-center cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -257,7 +279,7 @@ export function BookingCheckoutStep({
                     <button
                       type="button"
                       onClick={() => onUpdateAddonQuantity(addon.id, 1)}
-                      className="h-8 rounded-[10px] px-3 ty-caption font-semibold bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center gap-1 cursor-pointer shrink-0"
+                      className="h-8 rounded-[10px] px-3 ty-caption font-semibold bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] inline-flex items-center gap-1 cursor-pointer shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{language === "th" ? "เพิ่ม" : "Add"}</span>
@@ -349,19 +371,30 @@ export function BookingCheckoutStep({
           <div className="flex flex-wrap gap-1.5">
             {coupons.map((c) => {
               const isApplied = appliedCouponCode === c.code;
+              const discountText =
+                c.discountType === "PERCENT"
+                  ? language === "th"
+                    ? `ลด ${c.discountValue}%`
+                    : `${c.discountValue}% OFF`
+                  : language === "th"
+                  ? `ลด ฿${c.discountValue.toLocaleString()}`
+                  : `−฿${c.discountValue.toLocaleString()}`;
               return (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => onApplyCoupon(c.code)}
-                  className={`inline-flex items-center gap-1 rounded-[9px] px-3 h-7 ty-caption font-mono font-bold cursor-pointer transition ${
+                  className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 h-8 ty-caption font-mono font-bold cursor-pointer transition border ${
                     isApplied
-                      ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                      ? "bg-[#111111] border-[#111111] !text-white dark:bg-[#f5f5f5] dark:border-[#f5f5f5] dark:!text-[#111111]"
+                      : "bg-[var(--color-background-muted)] border-[var(--color-border)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <Tag className="w-3 h-3" />
+                  <Tag className="w-3 h-3 shrink-0" />
                   <span>{c.code}</span>
+                  <span className="font-sans font-semibold opacity-85">
+                    · {discountText}
+                  </span>
                 </button>
               );
             })}
@@ -403,12 +436,21 @@ export function BookingCheckoutStep({
             <span>−฿{pricingBreakdown.discountThb.toLocaleString()}</span>
           </div>
         )}
-        <div className="rounded-[14px] bg-[var(--color-background-muted)] px-4 py-3 flex justify-between items-baseline">
+        <div className="rounded-[14px] bg-[var(--color-background-muted)] border border-[var(--color-border)] px-4 py-3 flex justify-between items-baseline">
           <span className="ty-body font-bold text-[var(--color-text-primary)]">
             {language === "th" ? "ยอดชำระสุทธิ (0% GP)" : "Net Total (0% GP)"}
           </span>
-          <span className="ty-title text-[var(--color-accent)]">
+          <span className="ty-title text-[var(--color-text-primary)]">
             ฿{pricingBreakdown.netTotalThb.toLocaleString()}
+          </span>
+        </div>
+
+        <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-card)] px-3.5 py-2.5 ty-caption text-[var(--color-text-secondary)] flex items-start gap-2">
+          <ShieldCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+          <span>
+            {language === "th"
+              ? "กดยืนยันเพื่อล็อคห้องพัก 15 นาที · สแกนจ่าย PromptPay เข้าบัญชีที่พักโดยตรง (0% GP) และรับใบจองดิจิทัลทันที"
+              : "Press Confirm for an instant 15-min hold · Transfer directly via PromptPay (0% GP) and receive your booking voucher immediately."}
           </span>
         </div>
       </section>

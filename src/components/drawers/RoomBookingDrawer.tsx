@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   ChevronLeft,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   calculateStayPricing,
+  computeCouponDiscount,
   computeNightsBetween,
 } from "@/lib/bookingMath";
 import type { LanguageCode } from "@/lib/dateFormatters";
@@ -35,6 +36,22 @@ import type {
 } from "@/types/cangaroom";
 
 export type RoomBookingDrawerStep = "details" | "dates" | "checkout";
+
+export function selectBestEligibleCoupon(
+  coupons: ReadonlyArray<CouponDealDto>,
+  subtotalThb: number
+): { coupon: CouponDealDto; discountThb: number } | null {
+  let best: { coupon: CouponDealDto; discountThb: number } | null = null;
+  for (const coupon of coupons) {
+    const res = computeCouponDiscount(coupon, subtotalThb);
+    if (!res.error && res.discountThb > 0) {
+      if (!best || res.discountThb > best.discountThb) {
+        best = { coupon, discountThb: res.discountThb };
+      }
+    }
+  }
+  return best;
+}
 
 export function RoomBookingDrawer({
   isOpen,
@@ -58,6 +75,7 @@ export function RoomBookingDrawer({
   defaultGuestPhone = "",
   defaultGuestEmail = "",
   onOpenCouponWallet,
+  onExpandPhotos,
   onBookingCompleted,
 }: {
   isOpen: boolean;
@@ -81,6 +99,7 @@ export function RoomBookingDrawer({
   defaultGuestPhone?: string;
   defaultGuestEmail?: string;
   onOpenCouponWallet?: () => void;
+  onExpandPhotos?: (photos: string[], index: number) => void;
   onBookingCompleted?: () => void;
 }) {
   const [step, setStep] = useState<RoomBookingDrawerStep>(initialStep);
@@ -105,57 +124,9 @@ export function RoomBookingDrawer({
   const [isVerifyingSlip, setIsVerifyingSlip] = useState(false);
   const [slipError, setSlipError] = useState<string | null>(null);
   const [slipFeedback, setSlipFeedback] = useState<string | null>(null);
+  const wasOpenRef = useRef(false);
 
   useBodyScrollLock(isOpen);
-
-  useEffect(() => {
-    if (isOpen) {
-      setStep(initialStep);
-      setBookingError(null);
-      setSlipError(null);
-      setSlipFeedback(null);
-      setActiveBooking(null);
-      if (initialCouponCode) {
-        setCouponInput(initialCouponCode);
-        setAppliedCouponCode(initialCouponCode);
-      }
-      setGuestForm((prev) => ({
-        ...prev,
-        guestName: prev.guestName || defaultGuestName,
-        guestPhone: prev.guestPhone || defaultGuestPhone,
-        guestEmail: prev.guestEmail || defaultGuestEmail,
-      }));
-    }
-  }, [
-    isOpen,
-    initialStep,
-    initialCouponCode,
-    defaultGuestName,
-    defaultGuestPhone,
-    defaultGuestEmail,
-  ]);
-
-  useEffect(() => {
-    if (
-      !activeBooking ||
-      activeBooking.status !== "HOLD_PENDING_PAYMENT" ||
-      !activeBooking.holdExpiresAt
-    ) {
-      return;
-    }
-    const tick = () => {
-      const rem = Math.max(
-        0,
-        Math.floor(
-          (new Date(activeBooking.holdExpiresAt!).getTime() - Date.now()) / 1000
-        )
-      );
-      setHoldRemainingSeconds(rem);
-    };
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, [activeBooking]);
 
   const stayNights = computeNightsBetween(checkInDate, checkOutDate);
 
@@ -206,6 +177,72 @@ export function RoomBookingDrawer({
     matchedCoupon,
     stayNights,
   ]);
+
+  const bestCouponPreview = useMemo(() => {
+    const best = selectBestEligibleCoupon(
+      coupons,
+      pricingBreakdown.subtotalBeforeDiscountThb
+    );
+    return best ? { code: best.coupon.code, discountThb: best.discountThb } : null;
+  }, [coupons, pricingBreakdown.subtotalBeforeDiscountThb]);
+
+  useEffect(() => {
+    const justOpened = isOpen && !wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+
+    if (isOpen) {
+      setStep(initialStep);
+      setBookingError(null);
+      setSlipError(null);
+      setSlipFeedback(null);
+      setActiveBooking(null);
+      if (initialCouponCode) {
+        setCouponInput(initialCouponCode);
+        setAppliedCouponCode(initialCouponCode);
+      } else if (justOpened && !appliedCouponCode && bestCouponPreview) {
+        setCouponInput(bestCouponPreview.code);
+        setAppliedCouponCode(bestCouponPreview.code);
+        setCouponError(null);
+      }
+      setGuestForm((prev) => ({
+        ...prev,
+        guestName: prev.guestName || defaultGuestName,
+        guestPhone: prev.guestPhone || defaultGuestPhone,
+        guestEmail: prev.guestEmail || defaultGuestEmail,
+      }));
+    }
+  }, [
+    isOpen,
+    initialStep,
+    initialCouponCode,
+    defaultGuestName,
+    defaultGuestPhone,
+    defaultGuestEmail,
+    appliedCouponCode,
+    bestCouponPreview,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeBooking ||
+      activeBooking.status !== "HOLD_PENDING_PAYMENT" ||
+      !activeBooking.holdExpiresAt
+    ) {
+      return;
+    }
+    const tick = () => {
+      const rem = Math.max(
+        0,
+        Math.floor(
+          (new Date(activeBooking.holdExpiresAt!).getTime() - Date.now()) / 1000
+        )
+      );
+      setHoldRemainingSeconds(rem);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeBooking]);
 
   if (!isOpen || !selectedRoom) return null;
 
@@ -412,8 +449,12 @@ export function RoomBookingDrawer({
               room={selectedRoom}
               hotel={hotel}
               language={language}
+              checkInDate={checkInDate}
+              checkOutDate={checkOutDate}
               stayNights={stayNights}
               pricingBreakdown={pricingBreakdown}
+              bestCouponPreview={bestCouponPreview}
+              onExpandPhotos={onExpandPhotos}
             />
           )}
 
@@ -528,18 +569,24 @@ export function RoomBookingDrawer({
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span
-                          className={`ty-caption font-bold px-2.5 py-1 rounded-full ${
-                            r.availableUnits > 0 && canFit
-                              ? "bg-[var(--color-success-muted)] text-[var(--color-success)]"
-                              : "bg-[var(--color-error-muted)] text-[var(--color-error)]"
-                          }`}
-                        >
-                          {!canFit
-                            ? `เกิน ${r.maxGuests} ท่าน`
-                            : r.availableUnits > 0
-                            ? `ว่าง ${r.availableUnits}`
-                            : "เต็ม"}
+                        <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] border border-[var(--color-border)] px-2.5 h-7 ty-caption font-bold text-[var(--color-text-primary)]">
+                          <span
+                            aria-hidden="true"
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              !canFit
+                                ? "bg-amber-500"
+                                : r.availableUnits > 0
+                                ? "bg-emerald-500"
+                                : "bg-rose-500"
+                            }`}
+                          />
+                          <span>
+                            {!canFit
+                              ? `เกิน ${r.maxGuests} ท่าน`
+                              : r.availableUnits > 0
+                              ? `ว่าง ${r.availableUnits}`
+                              : "เต็ม"}
+                          </span>
                         </span>
                       </div>
                     </button>

@@ -38,10 +38,13 @@ import {
 } from "lucide-react";
 import {
   addDaysToDate,
+  calculateNightlyRateForDate,
+  calculateStayPricing,
   computeNightsBetween,
   formatDateStr,
 } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
+import { getFacilityIconMeta } from "@/lib/facilityIcons";
 import { trackTelemetryEvent } from "@/lib/telemetry/clientTelemetry";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
@@ -56,6 +59,7 @@ import {
 } from "@/components/media/PureMediaViewer";
 import {
   RoomBookingDrawer,
+  selectBestEligibleCoupon,
   type RoomBookingDrawerStep,
 } from "@/components/drawers/RoomBookingDrawer";
 import type {
@@ -64,6 +68,7 @@ import type {
   PinCommentDto,
   PinFeedItemDto,
   RoomAvailabilityDto,
+  RoomDateOverrideDto,
 } from "@/types/cangaroom";
 
 export type HotelProfileTabId =
@@ -126,44 +131,39 @@ function buildMondayFirstMonthCells(year: number, monthIndex: number) {
   return cells;
 }
 
-interface InlineRoomCalendarProps {
+interface AirbnbInlineStayCalendarProps {
   language: LanguageCode;
   todayDate: Date;
   checkInDate: string;
   checkOutDate: string;
   onChangeDates: (nextIn: string, nextOut: string) => void;
-  guestCount: number;
-  onChangeGuestCount: (guests: number) => void;
   stayNights: number;
-  isRefreshing: boolean;
+  hotelName: string;
   rooms: RoomAvailabilityDto[];
-  matchingRoomsCount: number;
-  onlyAvailableFilter: boolean;
-  onToggleOnlyAvailable: (next: boolean) => void;
-  onQuickSelectRoom: (room: RoomAvailabilityDto) => void;
+  selectedRoom: RoomAvailabilityDto | null;
+  onSelectRoom: (roomId: string) => void;
+  dateOverrides: RoomDateOverrideDto[];
 }
 
-function InlineRoomCalendarFilter({
+function AirbnbInlineStayCalendar({
   language,
   todayDate,
   checkInDate,
   checkOutDate,
   onChangeDates,
-  guestCount,
-  onChangeGuestCount,
   stayNights,
-  isRefreshing,
+  hotelName,
   rooms,
-  matchingRoomsCount,
-  onlyAvailableFilter,
-  onToggleOnlyAvailable,
-  onQuickSelectRoom,
-}: InlineRoomCalendarProps) {
+  selectedRoom,
+  onSelectRoom,
+  dateOverrides,
+}: AirbnbInlineStayCalendarProps) {
   const [selectingPhase, setSelectingPhase] = useState<"checkin" | "checkout">(
     "checkin"
   );
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
+  const isTh = language === "th";
   const todayStr = useMemo(() => formatDateStr(todayDate), [todayDate]);
 
   const [baseYearMonth, setBaseYearMonth] = useState<{
@@ -181,6 +181,17 @@ function InlineRoomCalendarFilter({
     }
     return { year: leftMonth.year, month: leftMonth.month + 1 };
   }, [leftMonth]);
+
+  const overrideByDate = useMemo(() => {
+    const map = new Map<string, RoomDateOverrideDto>();
+    if (!selectedRoom) return map;
+    for (const ov of dateOverrides) {
+      if (ov.roomId === selectedRoom.id) {
+        map.set(ov.dateStr, ov);
+      }
+    }
+    return map;
+  }, [dateOverrides, selectedRoom]);
 
   const canGoPrevMonth =
     leftMonth.year > todayDate.getFullYear() ||
@@ -219,46 +230,69 @@ function InlineRoomCalendarFilter({
     }
   };
 
+  const handleResetDates = () => {
+    const tomorrow = addDaysToDate(todayStr, 1);
+    const nextOut = addDaysToDate(tomorrow, 1);
+    onChangeDates(tomorrow, nextOut);
+    setSelectingPhase("checkin");
+    setHoverDate(null);
+  };
+
   const effectiveRangeEnd =
     selectingPhase === "checkout" && hoverDate && hoverDate > checkInDate
       ? hoverDate
       : checkOutDate;
 
-  const weekdayLabels = language === "th" ? WEEKDAYS_TH : WEEKDAYS_EN;
+  const weekdayLabels = isTh ? WEEKDAYS_TH : WEEKDAYS_EN;
 
   const formatMonthTitle = (year: number, monthIdx: number) =>
-    language === "th"
+    isTh
       ? `${MONTHS_TH[monthIdx]} ${year + 543}`
       : `${MONTHS_EN[monthIdx]} ${year}`;
+
+  const formatCompactRate = (thb: number) => {
+    if (thb >= 1000) {
+      const k = thb / 1000;
+      return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)}k`;
+    }
+    return String(thb);
+  };
 
   const renderMonthGrid = (year: number, monthIdx: number) => {
     const cells = buildMondayFirstMonthCells(year, monthIdx);
     return (
-      <div className="w-full max-w-[272px] mx-auto select-none">
-        <div className="grid grid-cols-7 mb-1">
+      <div className="w-full select-none">
+        <div className="grid grid-cols-7 mb-1.5">
           {weekdayLabels.map((wd) => (
             <div
               key={wd}
-              className="h-7 flex items-center justify-center text-[12px] font-semibold text-[var(--color-text-secondary)]"
+              className="h-7 flex items-center justify-center text-[11.5px] font-semibold text-[var(--color-text-secondary)]"
             >
               {wd}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-y-0.5">
+        <div className="grid grid-cols-7 gap-y-1">
           {cells.map((cell, idx) => {
             if (!cell) {
-              return <div key={`empty-${idx}`} className="h-8.5" />;
+              return <div key={`empty-${idx}`} className="h-11" />;
             }
 
             const { dateStr, dayNumber } = cell;
             const isPast = dateStr < todayStr;
+            const ov = overrideByDate.get(dateStr);
+            const isBlocked = Boolean(
+              selectedRoom && ov && ov.blockedUnits >= selectedRoom.totalUnits
+            );
             const isStart = dateStr === checkInDate;
             const isEnd = dateStr === effectiveRangeEnd;
             const isBetween =
               dateStr > checkInDate && dateStr < effectiveRangeEnd;
             const hasRange = effectiveRangeEnd > checkInDate;
+            const nightlyRate = selectedRoom
+              ? calculateNightlyRateForDate(selectedRoom, dateStr, dateOverrides)
+              : null;
 
             return (
               <div
@@ -273,7 +307,7 @@ function InlineRoomCalendarFilter({
                     setHoverDate(null);
                   }
                 }}
-                className="relative h-8.5 flex items-center justify-center"
+                className="relative h-11 flex items-center justify-center"
               >
                 {hasRange && isBetween && (
                   <div className="absolute inset-x-0 inset-y-0.5 bg-[var(--color-background-muted)] pointer-events-none" />
@@ -289,15 +323,35 @@ function InlineRoomCalendarFilter({
                   type="button"
                   disabled={isPast}
                   onClick={() => handleDayClick(dateStr)}
-                  className={`relative z-10 h-8 w-8 rounded-[10px] flex items-center justify-center text-[13px] transition-colors ${
+                  aria-label={`${dateStr}${isBlocked ? (isTh ? " เต็ม" : " unavailable") : ""}`}
+                  className={`relative z-10 h-10 w-full max-w-[44px] rounded-[10px] flex flex-col items-center justify-center transition-colors ${
                     isPast
                       ? "text-[var(--color-text-disabled)] cursor-not-allowed"
                       : isStart || isEnd
                       ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111] font-bold cursor-pointer"
+                      : isBlocked
+                      ? "text-[var(--color-text-disabled)] line-through hover:bg-[var(--color-background-muted)]/50 cursor-pointer"
                       : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] font-medium cursor-pointer"
                   }`}
                 >
-                  <span>{dayNumber}</span>
+                  <span className="text-[13px] leading-none">{dayNumber}</span>
+                  {!isPast && (isBlocked || nightlyRate) && (
+                    <span
+                      className={`text-[9.5px] leading-none mt-1 tabular-nums ${
+                        isStart || isEnd
+                          ? "opacity-85"
+                          : isBlocked
+                          ? "text-[var(--color-text-disabled)]"
+                          : "text-[var(--color-text-secondary)]"
+                      }`}
+                    >
+                      {isBlocked
+                        ? isTh
+                          ? "เต็ม"
+                          : "full"
+                        : formatCompactRate(nightlyRate!)}
+                    </span>
+                  )}
                 </button>
               </div>
             );
@@ -308,208 +362,110 @@ function InlineRoomCalendarFilter({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-      {/* LEFT 7 COLS: COMPACT PROPORTIONAL 2-MONTH CALENDAR (Zero Horizontal Stretch) */}
-      <div className="lg:col-span-7 rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 sm:p-5 flex flex-col justify-between gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--color-border)]">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
-            <span className="text-[14px] font-bold text-[var(--color-text-primary)]">
-              {language === "th"
-                ? "เลือกวันเช็กอิน – เช็กเอาต์"
-                : "Select Check-in & Check-out"}
-            </span>
-          </div>
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h2 className="ty-title text-[var(--color-text-primary)]">
+          {selectingPhase === "checkout"
+            ? isTh
+              ? "เลือกวันเช็กเอาต์"
+              : "Select check-out date"
+            : isTh
+            ? `${stayNights} คืนที่ ${hotelName}`
+            : `${stayNights} ${stayNights === 1 ? "night" : "nights"} at ${hotelName}`}
+        </h2>
+        <p className="ty-caption text-[var(--color-text-secondary)]">
+          {formatShortDate(checkInDate, language)} –{" "}
+          {formatShortDate(checkOutDate, language)} ·{" "}
+          {selectingPhase === "checkout"
+            ? isTh
+              ? "จิ้มวันที่ต้องการเช็กเอาต์บนปฏิทิน"
+              : "Tap your check-out date"
+            : isTh
+            ? "ราคาใต้ตัวเลขเป็นเรท/คืนของห้องที่เลือก"
+            : "Rates shown below each date reflect the selected room"}
+        </p>
+      </div>
 
-          <span className="text-[12px] text-[var(--color-text-secondary)]">
-            {selectingPhase === "checkout"
-              ? language === "th"
-                ? "จิ้มวันเช็กเอาต์ต่อได้เลย"
-                : "Now tap check-out date"
-              : language === "th"
-              ? "จิ้มวันที่เพื่อเช็กห้องว่างทันที"
-              : "Tap dates to check live availability"}
+      {rooms.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="ty-caption text-[var(--color-text-secondary)] mr-1">
+            {isTh ? "ดูเรทราคาห้อง:" : "Rate preview:"}
           </span>
+          {rooms.map((rm) => {
+            const isSelected = selectedRoom?.id === rm.id;
+            return (
+              <button
+                key={rm.id}
+                type="button"
+                onClick={() => onSelectRoom(rm.id)}
+                className={`h-7 px-2.5 rounded-[8px] text-[12px] font-semibold transition-colors cursor-pointer ${
+                  isSelected
+                    ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
+                    : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                }`}
+              >
+                {rm.code}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="space-y-3 pt-1">
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+          <button
+            type="button"
+            disabled={!canGoPrevMonth}
+            onClick={handlePrevMonth}
+            aria-label="Previous month"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 rounded-[10px] inline-flex items-center justify-center transition-colors ${
+              canGoPrevMonth
+                ? "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] cursor-pointer"
+                : "text-[var(--color-text-disabled)] cursor-not-allowed"
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <h3 className="text-center text-[14px] font-bold text-[var(--color-text-primary)]">
+            {formatMonthTitle(leftMonth.year, leftMonth.month)}
+          </h3>
+
+          <h3 className="hidden sm:block text-center text-[14px] font-bold text-[var(--color-text-primary)]">
+            {formatMonthTitle(rightMonth.year, rightMonth.month)}
+          </h3>
+
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            aria-label="Next month"
+            className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="space-y-3">
-          <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <button
-              type="button"
-              disabled={!canGoPrevMonth}
-              onClick={handlePrevMonth}
-              aria-label="Previous month"
-              className={`absolute left-0 top-1/2 -translate-y-1/2 h-7 w-7 rounded-[8px] inline-flex items-center justify-center transition-colors ${
-                canGoPrevMonth
-                  ? "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] cursor-pointer"
-                  : "text-[var(--color-text-disabled)] cursor-not-allowed"
-              }`}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <h3 className="text-center text-[14px] font-bold text-[var(--color-text-primary)]">
-              {formatMonthTitle(leftMonth.year, leftMonth.month)}
-            </h3>
-
-            <h3 className="hidden sm:block text-center text-[14px] font-bold text-[var(--color-text-primary)]">
-              {formatMonthTitle(rightMonth.year, rightMonth.month)}
-            </h3>
-
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              aria-label="Next month"
-              className="absolute right-0 top-1/2 -translate-y-1/2 h-7 w-7 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>{renderMonthGrid(leftMonth.year, leftMonth.month)}</div>
-            <div className="hidden sm:block">
-              {renderMonthGrid(rightMonth.year, rightMonth.month)}
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+          <div>{renderMonthGrid(leftMonth.year, leftMonth.month)}</div>
+          <div className="hidden sm:block">
+            {renderMonthGrid(rightMonth.year, rightMonth.month)}
           </div>
         </div>
       </div>
 
-      {/* RIGHT 5 COLS: LIVE ROOM AVAILABILITY SUMMARY FOR SELECTED DATES */}
-      <div className="lg:col-span-5 rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 sm:p-5 flex flex-col justify-between gap-3.5">
-        <div className="space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--color-border)]">
-            <div className="min-w-0">
-              <p className="text-[14px] font-bold text-[var(--color-text-primary)] truncate">
-                {formatShortDate(checkInDate, language)} –{" "}
-                {formatShortDate(checkOutDate, language)} ({stayNights}{" "}
-                {language === "th" ? "คืน" : "nights"})
-              </p>
-              <p className="text-[12px] text-[var(--color-text-secondary)]">
-                {isRefreshing
-                  ? language === "th"
-                    ? "กำลังอัปเดตสถานะห้องว่าง..."
-                    : "Checking room availability..."
-                  : language === "th"
-                  ? `สถานะห้องพักว่าง ${matchingRoomsCount} จาก ${rooms.length} แบบห้อง`
-                  : `${matchingRoomsCount} of ${rooms.length} room types available`}
-              </p>
-            </div>
-
-            {/* Guest Count Stepper */}
-            <div className="h-8 px-2.5 rounded-[8px] bg-[var(--color-background-muted)] inline-flex items-center gap-2 shrink-0">
-              <Users className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-              <button
-                type="button"
-                onClick={() => onChangeGuestCount(Math.max(1, guestCount - 1))}
-                aria-label="Decrease guests"
-                className="h-5 w-5 rounded-[5px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="text-[12px] font-bold min-w-[28px] text-center">
-                {guestCount} {language === "th" ? "ท่าน" : ""}
-              </span>
-              <button
-                type="button"
-                onClick={() => onChangeGuestCount(Math.min(12, guestCount + 1))}
-                aria-label="Increase guests"
-                className="h-5 w-5 rounded-[5px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Per-Room Live Availability Breakdown */}
-          <div className="space-y-1.5 max-h-[196px] overflow-y-auto pr-0.5">
-            {rooms.map((rm) => {
-              const hasUnits = rm.availableUnits > 0;
-              const fitsGuests = rm.maxGuests >= guestCount;
-              const isReady = hasUnits && fitsGuests;
-
-              return (
-                <button
-                  key={rm.id}
-                  type="button"
-                  onClick={() => onQuickSelectRoom(rm)}
-                  className={`w-full px-3 py-2 rounded-[10px] border border-[var(--color-border)] flex items-center justify-between gap-2 text-left transition-colors cursor-pointer ${
-                    isReady
-                      ? "bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)]/60"
-                      : "bg-[var(--color-background-muted)]/50 opacity-70"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="px-1.5 py-0.5 rounded-[5px] bg-[var(--color-background-muted)] text-[11px] font-bold text-[var(--color-text-primary)] shrink-0">
-                      {rm.code}
-                    </span>
-                    <span className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
-                      {language === "th" ? rm.nameTh : rm.nameEn}
-                    </span>
-                  </div>
-
-                  <span className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold">
-                    <span
-                      aria-hidden="true"
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        !hasUnits
-                          ? "bg-rose-500"
-                          : !fitsGuests
-                          ? "bg-amber-500"
-                          : "bg-emerald-500"
-                      }`}
-                    />
-                    <span
-                      className={
-                        isReady
-                          ? "text-[var(--color-text-primary)]"
-                          : "text-[var(--color-text-secondary)]"
-                      }
-                    >
-                      {!hasUnits
-                        ? language === "th"
-                          ? "เต็มช่วงนี้"
-                          : "Sold out"
-                        : !fitsGuests
-                        ? language === "th"
-                          ? `สูงสุด ${rm.maxGuests} ท่าน`
-                          : `Max ${rm.maxGuests}`
-                        : language === "th"
-                        ? `ว่าง ${rm.availableUnits} · ฿${rm.weekdayPriceThb.toLocaleString()}`
-                        : `${rm.availableUnits} left · ฿${rm.weekdayPriceThb.toLocaleString()}`}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="pt-2 border-t border-[var(--color-border)] flex items-center justify-between gap-2">
-          <span className="text-[12px] text-[var(--color-text-secondary)]">
-            {language === "th"
-              ? "คลิกห้องด้านบนเพื่อดูรายละเอียดหรือกรองการ์ดด้านล่าง"
-              : "Click any room above or filter cards below"}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => onToggleOnlyAvailable(!onlyAvailableFilter)}
-            className={`h-8 px-3 rounded-[8px] text-[12px] font-semibold shrink-0 cursor-pointer transition-colors ${
-              onlyAvailableFilter
-                ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-                : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
-            }`}
-          >
-            {onlyAvailableFilter
-              ? language === "th"
-                ? `เฉพาะห้องว่าง (${matchingRoomsCount})`
-                : `Available (${matchingRoomsCount})`
-              : language === "th"
-              ? "กรองเฉพาะห้องว่าง"
-              : "Filter available"}
-          </button>
-        </div>
+      <div className="pt-1 flex items-center justify-between gap-2">
+        <span className="text-[12px] text-[var(--color-text-secondary)]">
+          {isTh
+            ? "ตัวเลขใต้แต่ละวัน = ราคาประมาณ/คืน (ศุกร์–เสาร์เป็นเรทวันหยุด)"
+            : "Under-date labels show nightly rate (Fri–Sat weekend rate)"}
+        </span>
+        <button
+          type="button"
+          onClick={handleResetDates}
+          className="h-8 px-2.5 rounded-[9px] text-[12.5px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] underline cursor-pointer shrink-0 transition-colors"
+        >
+          {isTh ? "ล้างวันที่" : "Clear dates"}
+        </button>
       </div>
     </div>
   );
@@ -550,6 +506,10 @@ export function HotelStorefrontClient({
     useState<HotelProfileTabId>(initialTab);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
   const [onlyAvailableRooms, setOnlyAvailableRooms] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(
+    () => initialStorefront.rooms[0]?.id ?? null
+  );
+  const calendarSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedPinSnapshot, setSelectedPinSnapshot] =
@@ -912,6 +872,81 @@ export function HotelStorefrontClient({
     rooms[0]?.weekdayPriceThb ?? 0
   );
 
+  const activeBookingRoom = useMemo(
+    () =>
+      rooms.find((r) => r.id === selectedRoomId) ||
+      matchingAvailableRooms[0] ||
+      rooms[0] ||
+      null,
+    [rooms, selectedRoomId, matchingAvailableRooms]
+  );
+
+  const allUniqueAmenities = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const r of rooms) {
+      for (const item of r.amenities) {
+        const clean = item.trim();
+        if (clean && !seen.has(clean)) {
+          seen.add(clean);
+          list.push(clean);
+        }
+      }
+    }
+    return list.slice(0, 10);
+  }, [rooms]);
+
+  const stickyBasePricing = useMemo(
+    () =>
+      activeBookingRoom
+        ? calculateStayPricing({
+            room: activeBookingRoom,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            guests,
+            overrides: dateOverrides,
+          })
+        : null,
+    [activeBookingRoom, checkIn, checkOut, guests, dateOverrides]
+  );
+
+  const stickyBestCoupon = useMemo(
+    () =>
+      stickyBasePricing
+        ? selectBestEligibleCoupon(coupons, stickyBasePricing.roomSubtotalThb)
+        : null,
+    [coupons, stickyBasePricing]
+  );
+
+  const stickyPricing = useMemo(
+    () =>
+      activeBookingRoom
+        ? calculateStayPricing({
+            room: activeBookingRoom,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            guests,
+            overrides: dateOverrides,
+            coupon: stickyBestCoupon?.coupon ?? null,
+          })
+        : null,
+    [
+      activeBookingRoom,
+      checkIn,
+      checkOut,
+      guests,
+      dateOverrides,
+      stickyBestCoupon,
+    ]
+  );
+
+  const scrollToCalendarSection = () => {
+    calendarSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   const coverBannerUrl =
     hotel.coverImageUrl ||
     rooms[0]?.galleryUrls[0] ||
@@ -990,7 +1025,7 @@ export function HotelStorefrontClient({
           aria-label={
             language === "th" ? "เปิดดูรูปภาพหน้าปก" : "View cover photos"
           }
-          className="relative w-full h-[210px] sm:h-[290px] lg:h-[340px] rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] border border-[var(--color-border)] cursor-pointer"
+          className="relative -mx-4 sm:-mx-6 -mt-5 lg:mx-0 lg:mt-0 lg:w-full h-[220px] sm:h-[300px] lg:h-[340px] rounded-none lg:rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] border-b lg:border border-[var(--color-border)] cursor-pointer"
         >
           <img
             src={coverBannerUrl}
@@ -1016,7 +1051,7 @@ export function HotelStorefrontClient({
             <img
               src={avatarUrl}
               alt={hotel.nameTh}
-              className="-mt-12 sm:-mt-16 ml-4 sm:ml-6 h-24 w-24 sm:h-32 sm:w-32 rounded-full object-cover bg-[var(--color-background-card)] ring-4 ring-[var(--color-background-body)] border border-[var(--color-border)] shrink-0 relative z-10"
+              className="-mt-12 sm:-mt-16 ml-0 sm:ml-1 lg:ml-6 h-24 w-24 sm:h-32 sm:w-32 rounded-full object-cover bg-[var(--color-background-card)] ring-4 ring-[var(--color-background-body)] border border-[var(--color-border)] shrink-0 relative z-10"
             />
 
             <div className="pb-0.5 space-y-1 min-w-0">
@@ -1388,249 +1423,663 @@ export function HotelStorefrontClient({
         )}
       </section>
 
-      {/* TAB 2: COMPACT CALENDAR + LIVE MATRIX + EQUAL-HEIGHT ROOM CARDS */}
+      {/* TAB 2: AIRBNB-STYLE MINIMAL 2-COLUMN SECTION LAYOUT + STICKY RESERVATION WIDGET */}
       <section
         id="panel-rooms"
         role="tabpanel"
         aria-labelledby="tab-rooms"
         aria-hidden={activeProfileTab !== "rooms"}
-        className={activeProfileTab === "rooms" ? "space-y-5" : "hidden"}
+        className={
+          activeProfileTab === "rooms"
+            ? "grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-start"
+            : "hidden"
+        }
       >
-        <InlineRoomCalendarFilter
-          language={language}
-          todayDate={today}
-          checkInDate={checkIn}
-          checkOutDate={checkOut}
-          onChangeDates={(nextIn, nextOut) => {
-            setCheckIn(nextIn);
-            setCheckOut(nextOut);
-            trackTelemetryEvent({
-              eventType: "ROOM_CALENDAR_SELECT",
-              hotelId: storefront.hotel.id,
-              provinceId: storefront.hotel.provinceId,
-              stayStyles: storefront.hotel.stayStyles.slice(0, 6),
-              priceThb: rooms[0]?.weekdayPriceThb ?? undefined,
-              guests,
-            });
-          }}
-          guestCount={guests}
-          onChangeGuestCount={setGuests}
-          stayNights={stayNights}
-          isRefreshing={isRefreshingDates}
-          rooms={rooms}
-          matchingRoomsCount={matchingAvailableRooms.length}
-          onlyAvailableFilter={onlyAvailableRooms}
-          onToggleOnlyAvailable={setOnlyAvailableRooms}
-          onQuickSelectRoom={(rm) =>
-            openRoomModal(
-              rm,
-              rm.availableUnits > 0 && rm.maxGuests >= guests
-                ? "checkout"
-                : "details"
-            )
-          }
-        />
-
-        {onlyAvailableRooms && matchingAvailableRooms.length === 0 && (
-          <div className="rounded-[18px] bg-[var(--color-background-muted)] p-8 text-center space-y-3">
-            <h3 className="ty-subtitle font-bold">
-              {language === "th"
-                ? `ไม่มีห้องว่างสำหรับวันที่ ${formatShortDate(
-                    checkIn,
-                    language
-                  )} – ${formatShortDate(checkOut, language)} (${guests} ท่าน)`
-                : `No available rooms for ${formatShortDate(
-                    checkIn,
-                    language
-                  )} – ${formatShortDate(checkOut, language)} (${guests} guests)`}
-            </h3>
-            <p className="ty-caption">
-              {language === "th"
-                ? "ลองจิ้มเปลี่ยนวันเข้าพักบนปฏิทินด้านบน หรือกดดูห้องพักทั้งหมดของที่พัก"
-                : "Tap different dates on the calendar above or view all property room types."}
-            </p>
+        {/* LEFT COLUMN (7 COLS): COMPACT MOBILE BAR + ROOM SELECTION + OFFERINGS + INLINE 2-MONTH CALENDAR */}
+        <div className="lg:col-span-7 divide-y divide-[var(--color-border)] min-w-0">
+          {/* Mobile / Tablet Compact Date & Guest Trip Strip (< lg) */}
+          <div className="lg:hidden pb-5 flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => setOnlyAvailableRooms(false)}
-              className="btn-round-solid inline-flex"
+              onClick={scrollToCalendarSection}
+              className="flex-1 min-w-[200px] h-11 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] border border-[var(--color-border)] flex items-center justify-between gap-2 text-left cursor-pointer"
             >
-              {language === "th"
-                ? `ดูห้องพักทั้งหมด (${rooms.length})`
-                : `Show All Rooms (${rooms.length})`}
+              <span className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
+                <span className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
+                  {formatShortDate(checkIn, language)} –{" "}
+                  {formatShortDate(checkOut, language)} ({stayNights}{" "}
+                  {language === "th" ? "คืน" : "N"})
+                </span>
+              </span>
+              <span className="text-[12px] font-semibold text-[var(--color-text-secondary)] underline shrink-0">
+                {language === "th" ? "เปลี่ยนวัน" : "Edit"}
+              </span>
             </button>
-          </div>
-        )}
 
-        {/* Strictly Equal-Height Room Cards Across All Rows (sm:h-[216px]) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          {rooms.map((room) => {
-            const hasUnits = room.availableUnits > 0;
-            const fitsGuests = room.maxGuests >= guests;
-            const matchesInstantFilter = hasUnits && fitsGuests;
-            const isHiddenByFilter =
-              onlyAvailableRooms && !matchesInstantFilter;
-            const roomCover =
-              room.galleryUrls[0] ||
-              hotel.coverImageUrl ||
-              "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
-            const estSubtotal = room.weekdayPriceThb * stayNights;
-            const descText =
-              (language === "th"
-                ? room.shortDescTh
-                : room.shortDescEn || room.shortDescTh) ||
-              (language === "th"
-                ? "ห้องพักจองตรง 0% GP พร้อมสิ่งอำนวยความสะดวกครบครัน"
-                : "Direct 0% GP stay with full resort amenities.");
-
-            return (
-              <article
-                key={room.id}
-                aria-hidden={isHiddenByFilter}
-                className={
-                  isHiddenByFilter
-                    ? "hidden"
-                    : `sm:h-[216px] rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 flex flex-col sm:flex-row gap-4 transition-opacity ${
-                        !matchesInstantFilter ? "opacity-75" : ""
-                      }`
-                }
+            <div className="h-11 px-3 rounded-[12px] bg-[var(--color-background-muted)] border border-[var(--color-border)] inline-flex items-center gap-2.5 shrink-0">
+              <Users className="w-4 h-4 text-[var(--color-text-secondary)]" />
+              <button
+                type="button"
+                onClick={() => setGuests(Math.max(1, guests - 1))}
+                aria-label="Decrease guests"
+                className="h-6 w-6 rounded-[7px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
               >
-                <button
-                  type="button"
-                  onClick={() => openRoomModal(room, "details")}
-                  className="relative w-full sm:w-[208px] h-[180px] sm:h-full rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 cursor-pointer text-left"
-                >
-                  <img
-                    src={roomCover}
-                    alt={language === "th" ? room.nameTh : room.nameEn}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[6px] bg-black/75 backdrop-blur-md !text-white text-[11px] font-bold">
-                    {room.code}
-                  </span>
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="text-[13px] font-bold min-w-[36px] text-center">
+                {guests} {language === "th" ? "ท่าน" : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => setGuests(Math.min(12, guests + 1))}
+                aria-label="Increase guests"
+                className="h-6 w-6 rounded-[7px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
 
-                  {!hasUnits && (
-                    <span className="absolute inset-0 bg-black/45 flex items-center justify-center !text-white text-[12px] font-bold">
-                      {language === "th" ? "เต็มช่วงวันที่เลือก" : "Sold Out"}
-                    </span>
-                  )}
+          {/* SECTION 1: ROOM SELECTION CARDS */}
+          <div className="pt-5 lg:pt-0 pb-7 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="ty-title text-[var(--color-text-primary)]">
+                  {language === "th"
+                    ? "เลือกห้องพักที่ต้องการ"
+                    : "Choose your stay"}
+                </h2>
+                <p className="ty-caption text-[var(--color-text-secondary)]">
+                  {isRefreshingDates
+                    ? language === "th"
+                      ? "กำลังอัปเดตสถานะห้องว่าง..."
+                      : "Updating live room availability..."
+                    : language === "th"
+                    ? `ว่างพร้อมเข้าพัก ${matchingAvailableRooms.length} จาก ${rooms.length} แบบห้อง (${formatShortDate(
+                        checkIn,
+                        language
+                      )} – ${formatShortDate(checkOut, language)})`
+                    : `${matchingAvailableRooms.length} of ${rooms.length} room types available (${formatShortDate(
+                        checkIn,
+                        language
+                      )} – ${formatShortDate(checkOut, language)})`}
+                </p>
+              </div>
 
-                  {room.galleryUrls.length > 1 && (
-                    <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold inline-flex items-center gap-1">
-                      <Images className="w-3 h-3" />
-                      {room.galleryUrls.length}
-                    </span>
-                  )}
-                </button>
+              <button
+                type="button"
+                onClick={() => setOnlyAvailableRooms((v) => !v)}
+                className={`h-9 px-3.5 rounded-[10px] text-[12.5px] font-semibold cursor-pointer transition-colors ${
+                  onlyAvailableRooms
+                    ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
+                    : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                }`}
+              >
+                {onlyAvailableRooms
+                  ? language === "th"
+                    ? `เฉพาะห้องว่าง (${matchingAvailableRooms.length})`
+                    : `Available (${matchingAvailableRooms.length})`
+                  : language === "th"
+                  ? "กรองเฉพาะห้องว่าง"
+                  : "Available only"}
+              </button>
+            </div>
 
-                <div className="flex-1 min-w-0 h-full flex flex-col justify-between gap-2">
-                  <div className="space-y-1.5 min-w-0">
-                    {/* Fixed 24px Title + Date Status Pill */}
-                    <div className="h-[24px] flex items-center justify-between gap-2">
-                      <h3 className="text-[16px] leading-[22px] font-bold text-[var(--color-text-primary)] truncate">
-                        {language === "th" ? room.nameTh : room.nameEn}
-                      </h3>
-                      <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2.5 h-6 text-[11px] font-semibold">
-                        <span
-                          aria-hidden="true"
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            !hasUnits
-                              ? "bg-rose-500"
-                              : !fitsGuests
-                              ? "bg-amber-500"
-                              : "bg-emerald-500"
-                          }`}
-                        />
-                        <span>
-                          {!hasUnits
-                            ? language === "th"
-                              ? "เต็มช่วงนี้"
-                              : "Full"
-                            : !fitsGuests
-                            ? language === "th"
-                              ? `สูงสุด ${room.maxGuests} ท่าน`
-                              : `Max ${room.maxGuests}`
-                            : language === "th"
-                            ? `ว่าง ${room.availableUnits} ห้อง`
-                            : `${room.availableUnits} left`}
-                        </span>
+            {onlyAvailableRooms && matchingAvailableRooms.length === 0 && (
+              <div className="rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-6 text-center space-y-3">
+                <h3 className="ty-subtitle font-bold">
+                  {language === "th"
+                    ? `ไม่มีห้องว่างสำหรับวันที่ ${formatShortDate(
+                        checkIn,
+                        language
+                      )} – ${formatShortDate(checkOut, language)} (${guests} ท่าน)`
+                    : `No rooms available for ${formatShortDate(
+                        checkIn,
+                        language
+                      )} – ${formatShortDate(checkOut, language)} (${guests} guests)`}
+                </h3>
+                <p className="ty-caption text-[var(--color-text-secondary)]">
+                  {language === "th"
+                    ? "ลองเลื่อนลงไปดูวันว่างรายเดือนบนปฏิทินด้านล่าง หรือกดดูห้องพักทั้งหมด"
+                    : "Check open dates on the calendar below or view all room types."}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={scrollToCalendarSection}
+                    className="h-9 px-4 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] text-[13px] font-semibold text-[var(--color-text-primary)] cursor-pointer"
+                  >
+                    {language === "th" ? "ดูวันว่างบนปฏิทิน" : "Jump to calendar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOnlyAvailableRooms(false)}
+                    className="h-9 px-4 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[13px] font-semibold cursor-pointer"
+                  >
+                    {language === "th"
+                      ? `ดูห้องพักทั้งหมด (${rooms.length})`
+                      : `Show All (${rooms.length})`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {rooms.map((room) => {
+                const hasUnits = room.availableUnits > 0;
+                const fitsGuests = room.maxGuests >= guests;
+                const matchesInstantFilter = hasUnits && fitsGuests;
+                const isHiddenByFilter =
+                  onlyAvailableRooms && !matchesInstantFilter;
+                const isSelectedForBooking = activeBookingRoom?.id === room.id;
+                const roomCover =
+                  room.galleryUrls[0] ||
+                  hotel.coverImageUrl ||
+                  "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
+                const roomPricing = calculateStayPricing({
+                  room,
+                  checkInDate: checkIn,
+                  checkOutDate: checkOut,
+                  guests,
+                  overrides: dateOverrides,
+                });
+                const descText =
+                  (language === "th"
+                    ? room.shortDescTh
+                    : room.shortDescEn || room.shortDescTh) ||
+                  (language === "th"
+                    ? "ห้องพักจองตรง 0% GP พร้อมสิ่งอำนวยความสะดวกครบครัน"
+                    : "Direct 0% GP stay with full resort amenities.");
+
+                return (
+                  <article
+                    key={room.id}
+                    aria-hidden={isHiddenByFilter}
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className={
+                      isHiddenByFilter
+                        ? "hidden"
+                        : `rounded-[18px] bg-[var(--color-background-card)] border p-4 flex flex-col sm:flex-row gap-4 transition-colors cursor-pointer ${
+                            isSelectedForBooking
+                              ? "border-[#111111] dark:border-[#f5f5f5]"
+                              : "border-[var(--color-border)] hover:border-[var(--color-border-emphasized)]"
+                          } ${!matchesInstantFilter ? "opacity-80" : ""}`
+                    }
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRoomId(room.id);
+                        openRoomModal(room, "details");
+                      }}
+                      className="relative w-full sm:w-[212px] h-[184px] sm:h-[168px] rounded-[13px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 cursor-pointer text-left"
+                    >
+                      <img
+                        src={roomCover}
+                        alt={language === "th" ? room.nameTh : room.nameEn}
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-black/75 backdrop-blur-md !text-white text-[11px] font-bold">
+                        {room.code}
                       </span>
-                    </div>
 
-                    {/* Fixed 36px 2-Line Description */}
-                    <p className="h-[36px] text-[13px] leading-[18px] text-[var(--color-text-secondary)] line-clamp-2">
-                      {descText}
-                    </p>
-
-                    {/* Fixed 24px Single-Row Specs */}
-                    <div className="h-[24px] flex items-center gap-1.5 overflow-hidden">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap">
-                        <Users className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                        สูงสุด {room.maxGuests} ท่าน
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap">
-                        <Maximize className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                        {room.sizeSqm} ตร.ม.
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap">
-                        <BedDouble className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                        {room.bedrooms} นอน
-                      </span>
-                      {room.petsAllowed && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap">
-                          <PawPrint className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                          Pet
+                      {!hasUnits && (
+                        <span className="absolute inset-0 bg-black/45 flex items-center justify-center !text-white text-[12px] font-bold">
+                          {language === "th" ? "เต็มช่วงวันที่เลือก" : "Sold Out"}
                         </span>
                       )}
+
+                      {room.galleryUrls.length > 1 && (
+                        <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-[8px] bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold inline-flex items-center gap-1">
+                          <Images className="w-3 h-3" />
+                          {room.galleryUrls.length}
+                        </span>
+                      )}
+                    </button>
+
+                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-3">
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-[16.5px] leading-snug font-bold text-[var(--color-text-primary)] truncate">
+                            {language === "th" ? room.nameTh : room.nameEn}
+                          </h3>
+                          <span className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2.5 h-6 text-[11px] font-semibold">
+                            <span
+                              aria-hidden="true"
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                !hasUnits
+                                  ? "bg-rose-500"
+                                  : !fitsGuests
+                                  ? "bg-amber-500"
+                                  : "bg-emerald-500"
+                              }`}
+                            />
+                            <span>
+                              {!hasUnits
+                                ? language === "th"
+                                  ? "เต็มช่วงนี้"
+                                  : "Full"
+                                : !fitsGuests
+                                ? language === "th"
+                                  ? `สูงสุด ${room.maxGuests} ท่าน`
+                                  : `Max ${room.maxGuests}`
+                                : language === "th"
+                                ? `ว่าง ${room.availableUnits} ห้อง`
+                                : `${room.availableUnits} left`}
+                            </span>
+                          </span>
+                        </div>
+
+                        <p className="text-[12.5px] font-medium text-[var(--color-text-secondary)]">
+                          {language === "th"
+                            ? `สูงสุด ${room.maxGuests} ท่าน · ${room.bedrooms} ห้องนอน · ${room.beds} เตียง · ${room.bathrooms} น้ำ · ${room.sizeSqm} ตร.ม.`
+                            : `Up to ${room.maxGuests} guests · ${room.bedrooms} bed · ${room.bathrooms} bath · ${room.sizeSqm} sqm`}
+                        </p>
+
+                        <p className="text-[13px] leading-relaxed text-[var(--color-text-secondary)] line-clamp-2">
+                          {descText}
+                        </p>
+
+                        {room.amenities.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            {room.amenities.slice(0, 3).map((item) => (
+                              <span
+                                key={item}
+                                className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)]"
+                              >
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-2.5 border-t border-[var(--color-border)] flex flex-wrap items-end justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[18px] leading-tight font-extrabold text-[var(--color-text-primary)]">
+                            ฿{room.weekdayPriceThb.toLocaleString()}
+                            <span className="text-[12px] font-normal text-[var(--color-text-secondary)]">
+                              {" "}
+                              / {language === "th" ? "คืน" : "night"}
+                            </span>
+                          </p>
+                          <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                            {language === "th"
+                              ? `รวม ${stayNights} คืน ฿${roomPricing.roomSubtotalThb.toLocaleString()}`
+                              : `${stayNights} nights total ฿${roomPricing.roomSubtotalThb.toLocaleString()}`}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRoomId(room.id);
+                              openRoomModal(room, "details");
+                            }}
+                            className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
+                          >
+                            {language === "th" ? "รายละเอียด" : "Details"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!hasUnits}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRoomId(room.id);
+                              openRoomModal(room, "checkout");
+                            }}
+                            className="h-9 px-3.5 rounded-[10px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[13px] font-semibold cursor-pointer transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {hasUnits
+                              ? language === "th"
+                                ? "จองเลย"
+                                : "Book"
+                              : language === "th"
+                              ? "เต็มช่วงนี้"
+                              : "Sold out"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SECTION 2: WHAT THIS STAY OFFERS (AIRBNB CLEAN 2-COLUMN ICON LIST) */}
+          <div className="py-7 space-y-4">
+            <h2 className="ty-title text-[var(--color-text-primary)]">
+              {language === "th"
+                ? "สิ่งอำนวยความสะดวกและนโยบายเข้าพัก"
+                : "What this place offers"}
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6">
+              <div className="flex items-center gap-3 ty-body text-[var(--color-text-primary)]">
+                <Clock className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
+                <span>
+                  {language === "th"
+                    ? `เช็กอิน ${hotel.checkInTime} น. · เช็กเอาต์ ${hotel.checkOutTime} น.`
+                    : `Check-in ${hotel.checkInTime} · Check-out ${hotel.checkOutTime}`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 ty-body text-[var(--color-text-primary)]">
+                <ShieldCheck className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
+                <span>
+                  {language === "th"
+                    ? "โอนตรงบัญชีที่พัก 0% GP · ตรวจสลิปอัตโนมัติ"
+                    : "Direct 0% GP PromptPay · Instant slip verification"}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 ty-body text-[var(--color-text-primary)]">
+                <PawPrint className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
+                <span>
+                  {hotel.petsAllowed
+                    ? hotel.petPolicyTh ||
+                      (language === "th"
+                        ? "ต้อนรับสัตว์เลี้ยงเข้าพักได้"
+                        : "Pets allowed")
+                    : hotel.petPolicyTh ||
+                      (language === "th"
+                        ? "งดนำสัตว์เลี้ยงเข้าพัก"
+                        : "No pets allowed")}
+                </span>
+              </div>
+
+              {allUniqueAmenities.map((item) => {
+                const meta = getFacilityIconMeta(item);
+                const Icon = meta.Icon;
+                return (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 ty-body text-[var(--color-text-primary)] min-w-0"
+                  >
+                    <Icon className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
+                    <span className="truncate">{item}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SECTION 3: AIRBNB-STYLE INLINE 2-MONTH CALENDAR WITH LIVE RATE HINTS */}
+          <div
+            ref={calendarSectionRef}
+            id="rooms-calendar-section"
+            className="pt-7 scroll-mt-24"
+          >
+            <AirbnbInlineStayCalendar
+              language={language}
+              todayDate={today}
+              checkInDate={checkIn}
+              checkOutDate={checkOut}
+              onChangeDates={(nextIn, nextOut) => {
+                setCheckIn(nextIn);
+                setCheckOut(nextOut);
+                trackTelemetryEvent({
+                  eventType: "ROOM_CALENDAR_SELECT",
+                  hotelId: storefront.hotel.id,
+                  provinceId: storefront.hotel.provinceId,
+                  stayStyles: storefront.hotel.stayStyles.slice(0, 6),
+                  priceThb:
+                    activeBookingRoom?.weekdayPriceThb ??
+                    rooms[0]?.weekdayPriceThb ??
+                    undefined,
+                  guests,
+                });
+              }}
+              stayNights={stayNights}
+              hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
+              rooms={rooms}
+              selectedRoom={activeBookingRoom}
+              onSelectRoom={(nextRoomId) => setSelectedRoomId(nextRoomId)}
+              dateOverrides={dateOverrides}
+            />
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN (5 COLS): STICKY AIRBNB RESERVATION WIDGET */}
+        <aside className="lg:col-span-5 lg:sticky lg:top-[88px]">
+          {activeBookingRoom && stickyPricing && (
+            <div className="rounded-[20px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-5 sm:p-6 space-y-4">
+              {/* Price Header */}
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[22px] font-extrabold tracking-tight text-[var(--color-text-primary)]">
+                    ฿{activeBookingRoom.weekdayPriceThb.toLocaleString()}
+                  </span>
+                  <span className="ty-caption text-[var(--color-text-secondary)]">
+                    / {language === "th" ? "คืน" : "night"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-text-primary)]">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    {hotel.ratingAvg.toFixed(1)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-text-primary)]">
+                    <span
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        activeBookingRoom.availableUnits > 0
+                          ? "bg-emerald-500"
+                          : "bg-rose-500"
+                      }`}
+                    />
+                    <span>
+                      {activeBookingRoom.availableUnits > 0
+                        ? language === "th"
+                          ? `ว่าง ${activeBookingRoom.availableUnits}`
+                          : `${activeBookingRoom.availableUnits} left`
+                        : language === "th"
+                        ? "เต็ม"
+                        : "Full"}
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Airbnb Unified Bordered Input Box (Dates + Room + Guests) */}
+              <div className="rounded-[14px] border border-[var(--color-border-emphasized)] overflow-hidden divide-y divide-[var(--color-border-emphasized)] bg-[var(--color-background-card)]">
+                <div className="grid grid-cols-2 divide-x divide-[var(--color-border-emphasized)]">
+                  <button
+                    type="button"
+                    onClick={scrollToCalendarSection}
+                    className="px-3.5 py-2.5 text-left hover:bg-[var(--color-background-muted)]/60 transition-colors cursor-pointer"
+                  >
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      {language === "th" ? "เช็กอิน" : "CHECK-IN"}
+                    </span>
+                    <span className="block text-[13.5px] font-semibold text-[var(--color-text-primary)] mt-0.5">
+                      {formatShortDate(checkIn, language)}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={scrollToCalendarSection}
+                    className="px-3.5 py-2.5 text-left hover:bg-[var(--color-background-muted)]/60 transition-colors cursor-pointer"
+                  >
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      {language === "th" ? "เช็กเอาต์" : "CHECKOUT"}
+                    </span>
+                    <span className="block text-[13.5px] font-semibold text-[var(--color-text-primary)] mt-0.5">
+                      {formatShortDate(checkOut, language)}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="px-3.5 py-2.5">
+                  <label
+                    htmlFor="sticky-room-selector"
+                    className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]"
+                  >
+                    {language === "th" ? "แบบห้องพัก" : "ROOM TYPE"}
+                  </label>
+                  <select
+                    id="sticky-room-selector"
+                    value={activeBookingRoom.id}
+                    onChange={(e) => setSelectedRoomId(e.target.value)}
+                    className="w-full bg-transparent text-[13.5px] font-semibold text-[var(--color-text-primary)] mt-0.5 focus:outline-none cursor-pointer"
+                  >
+                    {rooms.map((rm) => (
+                      <option key={rm.id} value={rm.id}>
+                        {rm.code} · {language === "th" ? rm.nameTh : rm.nameEn}{" "}
+                        (฿{rm.weekdayPriceThb.toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      {language === "th" ? "ผู้เข้าพัก" : "GUESTS"}
+                    </span>
+                    <span className="block text-[13.5px] font-semibold text-[var(--color-text-primary)] mt-0.5">
+                      {guests} {language === "th" ? "ท่าน" : "guests"}{" "}
+                      <span className="text-[11.5px] font-normal text-[var(--color-text-secondary)]">
+                        ({language === "th" ? "สูงสุด" : "max"}{" "}
+                        {activeBookingRoom.maxGuests})
+                      </span>
+                    </span>
                   </div>
 
-                  <div className="pt-2.5 border-t border-[var(--color-border)] flex items-end justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[19px] leading-tight font-extrabold text-[var(--color-text-primary)]">
-                        ฿{room.weekdayPriceThb.toLocaleString()}
-                        <span className="text-[12px] font-normal text-[var(--color-text-secondary)]">
-                          {" "}
-                          / คืน
-                        </span>
-                      </p>
-                      <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                        รวม {stayNights} คืน ฿{estSubtotal.toLocaleString()}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openRoomModal(room, "details")}
-                        className="h-9 px-3 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
-                      >
-                        รายละเอียด
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!hasUnits}
-                        onClick={() => openRoomModal(room, "checkout")}
-                        className="h-9 px-3.5 rounded-[8px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[13px] font-semibold cursor-pointer transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {hasUnits ? "จองตรงทันที" : "เต็มช่วงนี้"}
-                      </button>
-                    </div>
+                  <div className="inline-flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setGuests(Math.max(1, guests - 1))}
+                      aria-label="Decrease guests"
+                      className="h-7 w-7 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-5 text-center text-[13px] font-bold tabular-nums">
+                      {guests}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGuests(Math.min(12, guests + 1))}
+                      aria-label="Increase guests"
+                      className="h-7 w-7 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-              </article>
-            );
-          })}
-        </div>
+              </div>
 
-        <div className="rounded-[14px] bg-[var(--color-background-muted)] border border-[var(--color-border)] px-4 py-3 ty-caption flex flex-wrap items-center justify-between gap-2 text-[var(--color-text-primary)] font-medium">
-          <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
-            <span>โอนตรงบัญชีที่พัก 0% GP · ระบบสแกนตรวจสลิปอัตโนมัติ</span>
-          </span>
-          <span className="text-[var(--color-text-secondary)]">
-            เช็กอิน {hotel.checkInTime} น. · เช็กเอาต์ {hotel.checkOutTime} น.
-          </span>
-        </div>
+              {/* Primary Reserve CTA */}
+              {activeBookingRoom.availableUnits > 0 &&
+              activeBookingRoom.maxGuests >= guests ? (
+                <button
+                  type="button"
+                  onClick={() => openRoomModal(activeBookingRoom, "checkout")}
+                  className="w-full h-12 rounded-[14px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[15px] font-bold cursor-pointer transition-opacity"
+                >
+                  {language === "th"
+                    ? `จองตรงห้อง ${activeBookingRoom.code} ทันที`
+                    : `Reserve ${activeBookingRoom.code} directly`}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={scrollToCalendarSection}
+                  className="w-full h-12 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-bold cursor-pointer transition-colors"
+                >
+                  {activeBookingRoom.availableUnits === 0
+                    ? language === "th"
+                      ? "ห้องเต็มช่วงนี้ · กดเลือกวันใหม่"
+                      : "Sold out · Choose new dates"
+                    : language === "th"
+                    ? `เกิน ${activeBookingRoom.maxGuests} ท่าน · เปลี่ยนห้องหรือจำนวนคน`
+                    : `Exceeds ${activeBookingRoom.maxGuests} max guests`}
+                </button>
+              )}
+
+              <p className="text-center text-[12px] text-[var(--color-text-secondary)]">
+                {language === "th"
+                  ? "ยังไม่เรียกเก็บเงินตอนนี้ · ล็อคห้อง 15 นาทีเพื่อสแกนจ่ายตรงที่พัก"
+                  : "You won't be charged yet · 15-min direct PromptPay hold"}
+              </p>
+
+              {/* Price Breakdown */}
+              <div className="space-y-2 pt-2 border-t border-[var(--color-border)] ty-body">
+                <div className="flex justify-between text-[var(--color-text-secondary)]">
+                  <span>
+                    ฿
+                    {Math.round(
+                      (stickyBasePricing?.roomSubtotalThb ??
+                        activeBookingRoom.weekdayPriceThb * stayNights) /
+                        stayNights
+                    ).toLocaleString()}{" "}
+                    × {stayNights} {language === "th" ? "คืน" : "nights"}
+                  </span>
+                  <span className="text-[var(--color-text-primary)] font-medium">
+                    ฿
+                    {(
+                      (stickyBasePricing?.roomSubtotalThb ?? 0) -
+                      (stickyBasePricing?.extraGuestTotalThb ?? 0)
+                    ).toLocaleString()}
+                  </span>
+                </div>
+
+                {stickyBasePricing && stickyBasePricing.extraGuestTotalThb > 0 && (
+                  <div className="flex justify-between text-[var(--color-text-secondary)]">
+                    <span>
+                      {language === "th" ? "ค่าผู้เข้าพักเสริม" : "Extra guest fee"}
+                    </span>
+                    <span className="text-[var(--color-text-primary)] font-medium">
+                      +฿{stickyBasePricing.extraGuestTotalThb.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+
+                {stickyPricing.discountThb > 0 && stickyBestCoupon && (
+                  <div className="flex justify-between text-[var(--color-text-primary)] font-semibold">
+                    <span className="inline-flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5" />
+                      <span>
+                        {language === "th"
+                          ? `คูปอง ${stickyBestCoupon.coupon.code}`
+                          : `Coupon ${stickyBestCoupon.coupon.code}`}
+                      </span>
+                    </span>
+                    <span>−฿{stickyPricing.discountThb.toLocaleString()}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-[var(--color-text-secondary)]">
+                  <span>
+                    {language === "th"
+                      ? "ค่าธรรมเนียมแพลตฟอร์ม (0% GP)"
+                      : "Platform service fee (0% GP)"}
+                  </span>
+                  <span className="text-[var(--color-text-primary)] font-semibold">
+                    ฿0
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-[var(--color-border)] flex items-baseline justify-between">
+                  <span className="ty-body font-bold text-[var(--color-text-primary)]">
+                    {language === "th" ? "ยอดรวมประมาณการ" : "Estimated total"}
+                  </span>
+                  <span className="ty-title font-extrabold text-[var(--color-text-primary)]">
+                    ฿{stickyPricing.netTotalThb.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
       </section>
 
       {/* TAB 3: HOTEL STORIES & SEO GUIDES */}
@@ -2020,6 +2469,12 @@ export function HotelStorefrontClient({
         defaultGuestPhone={currentUser?.phone || ""}
         defaultGuestEmail={currentUser?.email || ""}
         onOpenCouponWallet={openCouponWallet}
+        onExpandPhotos={(urls, idx) =>
+          setFullscreenMedia({
+            slides: urls.map((u) => ({ type: "image", url: u })),
+            index: idx,
+          })
+        }
         onBookingCompleted={() => loadStorefront(true)}
       />
 
