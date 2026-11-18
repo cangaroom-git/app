@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -23,7 +23,18 @@ import {
   X,
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
-import { openPrivacySettingsModal } from "@/lib/telemetry/clientTelemetry";
+import {
+  openPrivacySettingsModal,
+  recordRecentSearch,
+} from "@/lib/telemetry/clientTelemetry";
+import type {
+  SmartSearchMatchedHotel,
+  SmartSearchRecentPin,
+} from "@/lib/services/smartSearchService";
+import {
+  SmartSearchDropdown,
+  type SmartSearchSelectQueryPayload,
+} from "@/components/navigation/SmartSearchDropdown";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type { AuthenticatedMeDto } from "@/types/cangaroom";
 import {
@@ -84,8 +95,26 @@ export function PrimaryNavigation({
   const [isMorePopoverOpen, setIsMorePopoverOpen] = useState(false);
   const [isMobileNavHidden, setIsMobileNavHidden] = useState(false);
   const [isFloatingSearchOpen, setIsFloatingSearchOpen] = useState(false);
+  const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false);
+
+  const shouldHideMobileBottomNav =
+    isMobileNavHidden && !isMobileProfileDrawerOpen && !isFloatingSearchOpen;
+  const [isBottomNavRendered, setIsBottomNavRendered] = useState(
+    !shouldHideMobileBottomNav
+  );
+
+  useEffect(() => {
+    if (!shouldHideMobileBottomNav) {
+      setIsBottomNavRendered(true);
+    } else {
+      const timer = window.setTimeout(() => setIsBottomNavRendered(false), 300);
+      return () => window.clearTimeout(timer);
+    }
+  }, [shouldHideMobileBottomNav]);
 
   const moreWrapperRef = useRef<HTMLDivElement | null>(null);
+  const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
+  const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const floatingSearchInputRef = useRef<HTMLInputElement | null>(null);
   const lastScrollYRef = useRef<number>(0);
   const lastScrollTargetRef = useRef<EventTarget | null>(null);
@@ -95,7 +124,24 @@ export function PrimaryNavigation({
   useEffect(() => {
     setIsMobileNavHidden(false);
     setIsFloatingSearchOpen(false);
+    setIsDesktopSearchOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isDesktopSearchOpen) return;
+    const handleOutsideSearch = (e: MouseEvent) => {
+      if (
+        desktopSearchWrapperRef.current &&
+        !desktopSearchWrapperRef.current.contains(e.target as Node)
+      ) {
+        setIsDesktopSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideSearch);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideSearch);
+    };
+  }, [isDesktopSearchOpen]);
 
   useEffect(() => {
     if (!isFloatingSearchOpen) return;
@@ -131,12 +177,22 @@ export function PrimaryNavigation({
         target === document.documentElement ||
         target === document.body
       ) {
-        currentY = Math.max(0, window.scrollY);
+        currentY = window.scrollY;
+        const maxScrollY =
+          document.documentElement.scrollHeight - window.innerHeight;
+        // Ignore iOS rubber-band overscroll beyond the top or bottom
+        if (currentY < 0 || (maxScrollY > 0 && currentY > maxScrollY)) {
+          return;
+        }
       } else if (
         target instanceof HTMLElement &&
         target.dataset.mobileScrollContainer === "true"
       ) {
-        currentY = Math.max(0, target.scrollTop);
+        currentY = target.scrollTop;
+        const maxScrollTop = target.scrollHeight - target.clientHeight;
+        if (currentY < 0 || (maxScrollTop > 0 && currentY > maxScrollTop)) {
+          return;
+        }
       } else {
         return;
       }
@@ -212,17 +268,78 @@ export function PrimaryNavigation({
   const pendingStudioBookings =
     user?.ownedHotels?.reduce((sum, h) => sum + h.pendingBookingsCount, 0) ?? 0;
 
-  const ensureOnDiscoveryFeed = () => {
+  const ensureOnDiscoveryFeed = useCallback(() => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
     }
     if (activeTab !== "home" && activeTab !== "deal" && activeTab !== "board") {
       router.push("/");
     }
-  };
+  }, [activeTab, router]);
+
+  const handleSelectSmartQuery = useCallback(
+    (payload: SmartSearchSelectQueryPayload) => {
+      const clean = payload.query.trim();
+      if (clean) {
+        recordRecentSearch({
+          query: clean,
+          imageUrl: payload.imageUrl,
+          subtitle: payload.subtitle,
+        });
+      }
+      onChangeSearchQuery(clean);
+      setIsDesktopSearchOpen(false);
+      setIsFloatingSearchOpen(false);
+      desktopSearchInputRef.current?.blur();
+      floatingSearchInputRef.current?.blur();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
+      }
+      if (activeTab !== "home" && activeTab !== "deal" && activeTab !== "board") {
+        router.push("/");
+      } else if (activeTab !== "home") {
+        // Navigating to / ensures curated style/idea clicks show pins directly
+        router.push("/");
+      }
+    },
+    [activeTab, onChangeSearchQuery, router]
+  );
+
+  const handleSelectSmartHotel = useCallback(
+    (hotel: SmartSearchMatchedHotel) => {
+      recordRecentSearch({
+        query: language === "th" ? hotel.nameTh : hotel.nameEn,
+        imageUrl: hotel.imageUrl,
+        subtitle:
+          language === "th" ? hotel.provinceNameTh : hotel.provinceNameEn,
+        hotelSlug: hotel.slug,
+      });
+      setIsDesktopSearchOpen(false);
+      setIsFloatingSearchOpen(false);
+      desktopSearchInputRef.current?.blur();
+      floatingSearchInputRef.current?.blur();
+      router.push(`/${hotel.slug}`);
+    },
+    [language, router]
+  );
+
+  const handleSelectSmartPin = useCallback(
+    (pin: SmartSearchRecentPin) => {
+      setIsDesktopSearchOpen(false);
+      setIsFloatingSearchOpen(false);
+      desktopSearchInputRef.current?.blur();
+      floatingSearchInputRef.current?.blur();
+      router.push(`/?stay=${encodeURIComponent(pin.id)}`);
+    },
+    [router]
+  );
 
   const handleFloatingSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const clean = searchQuery.trim();
+    if (clean) {
+      recordRecentSearch({ query: clean });
+    }
     setIsFloatingSearchOpen(false);
     ensureOnDiscoveryFeed();
   };
@@ -652,32 +769,70 @@ export function PrimaryNavigation({
 
         {/* DESKTOP PURE FULL-WIDTH SEARCH BAR (>= lg) */}
         {showSearchBar ? (
-          <div className="hidden lg:flex flex-1 h-11 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/70 focus-within:bg-[var(--color-background-muted)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-3.5 pr-2 items-center gap-2 transition-colors min-w-0">
-            <Search className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
+          <div
+            ref={desktopSearchWrapperRef}
+            className="hidden lg:block relative flex-1 min-w-0"
+          >
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const clean = searchQuery.trim();
+                if (clean) {
+                  recordRecentSearch({ query: clean });
+                }
+                setIsDesktopSearchOpen(false);
+                desktopSearchInputRef.current?.blur();
+                ensureOnDiscoveryFeed();
+              }}
+              className="flex w-full h-11 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/70 focus-within:bg-[var(--color-background-muted)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-3.5 pr-2 items-center gap-2 transition-colors min-w-0"
+            >
+              <Search className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
 
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onChangeSearchQuery(e.target.value)}
-              placeholder={
-                language === "th"
-                  ? "ค้นหาชื่อที่พัก จังหวัด อำเภอ หรือสไตล์ที่ชอบ..."
-                  : "Search stays, provinces, districts, or styles..."
-              }
-              aria-label={language === "th" ? "ค้นหา" : "Search"}
-              className="flex-1 min-w-[60px] bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+              <input
+                ref={desktopSearchInputRef}
+                type="text"
+                value={searchQuery}
+                onFocus={() => setIsDesktopSearchOpen(true)}
+                onChange={(e) => {
+                  onChangeSearchQuery(e.target.value);
+                  if (!isDesktopSearchOpen) setIsDesktopSearchOpen(true);
+                }}
+                placeholder={
+                  language === "th"
+                    ? "ค้นหาชื่อที่พัก จังหวัด อำเภอ หรือสไตล์ที่ชอบ..."
+                    : "Search stays, provinces, districts, or styles..."
+                }
+                aria-label={language === "th" ? "ค้นหา" : "Search"}
+                className="flex-1 min-w-[60px] bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+              />
+
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChangeSearchQuery("");
+                    desktopSearchInputRef.current?.focus();
+                    setIsDesktopSearchOpen(true);
+                  }}
+                  aria-label="Clear search"
+                  className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </form>
+
+            <SmartSearchDropdown
+              isOpen={isDesktopSearchOpen}
+              query={searchQuery}
+              language={language}
+              variant="desktop"
+              inputRef={desktopSearchInputRef}
+              onSelectQuery={handleSelectSmartQuery}
+              onSelectHotel={handleSelectSmartHotel}
+              onSelectPin={handleSelectSmartPin}
+              onClose={() => setIsDesktopSearchOpen(false)}
             />
-
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onChangeSearchQuery("")}
-                aria-label="Clear search"
-                className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
         ) : (
           <div className="hidden lg:block flex-1" />
@@ -737,11 +892,11 @@ export function PrimaryNavigation({
           <div className="relative z-10 px-3 pt-[max(12px,env(safe-area-inset-top))]">
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3"
+              className="w-full max-h-[82dvh] flex flex-col rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3"
             >
               <form
                 onSubmit={handleFloatingSearchSubmit}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 shrink-0"
               >
                 <div className="flex-1 h-11 rounded-[13px] bg-[var(--color-background-muted)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-3.5 pr-2 flex items-center gap-2 min-w-0">
                   <Search className="w-[18px] h-[18px] text-[var(--color-text-secondary)] shrink-0" />
@@ -779,6 +934,18 @@ export function PrimaryNavigation({
                   {language === "th" ? "ค้นหา" : "Search"}
                 </button>
               </form>
+
+              <SmartSearchDropdown
+                isOpen={isFloatingSearchOpen}
+                query={searchQuery}
+                language={language}
+                variant="mobile"
+                inputRef={floatingSearchInputRef}
+                onSelectQuery={handleSelectSmartQuery}
+                onSelectHotel={handleSelectSmartHotel}
+                onSelectPin={handleSelectSmartPin}
+                onClose={() => setIsFloatingSearchOpen(false)}
+              />
             </div>
           </div>
         </div>
@@ -1022,18 +1189,27 @@ export function PrimaryNavigation({
       {/* =====================================================================
           5. FLOATING SEPARATED SQUIRCLE MOBILE BOTTOM BAR (< lg, z-[70])
              4 Buttons Only: 1) Home (/), 2) Deal (/deal), 3) Search (Floating), 4) Board (/board)
+             Matches WebKit Liquid Glass floating pill pattern (no inset-x-0 full-width container!)
       ====================================================================== */}
       <nav
         aria-label="Mobile bottom navigation"
-        className={`fixed bottom-[max(14px,env(safe-area-inset-bottom))] inset-x-0 z-[70] lg:hidden pointer-events-none flex items-center justify-center px-3 select-none transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
-          isMobileNavHidden &&
-          !isMobileProfileDrawerOpen &&
-          !isFloatingSearchOpen
-            ? "translate-y-[calc(100%+28px)]"
-            : "translate-y-0"
-        }`}
+        aria-hidden={shouldHideMobileBottomNav}
+        className={`fixed inset-x-3 sm:inset-x-6 max-w-fit mx-auto z-[70] lg:hidden pointer-events-none bg-transparent flex items-center justify-center select-none transition-all duration-300 ease-in-out ${
+          shouldHideMobileBottomNav
+            ? "translate-y-2 opacity-0"
+            : "translate-y-0 opacity-100"
+        } ${!isBottomNavRendered && shouldHideMobileBottomNav ? "hidden" : ""}`}
+        style={{
+          bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+        }}
       >
-        <div className="pointer-events-auto flex items-center gap-2.5">
+        <div
+          className={
+            shouldHideMobileBottomNav
+              ? "pointer-events-none flex items-center gap-2.5"
+              : "pointer-events-auto flex items-center gap-2.5"
+          }
+        >
           {MOBILE_BOTTOM_TABS.map((tab) => {
             const activeCutoutColor = isDarkTheme ? "#f5f5f5" : "#111111";
 

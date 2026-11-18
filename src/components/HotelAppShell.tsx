@@ -142,16 +142,23 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     setTheme(theme === "dark" ? "light" : "dark");
   }, [theme, setTheme]);
 
-  const loadWalletAndDeals = useCallback(async () => {
+  const loadWalletCoupons = useCallback(async () => {
     try {
-      const [walletRes, dealsRes] = await Promise.all([
-        fetch("/api/wallet/coupons", { cache: "no-store" }),
-        fetch("/api/deals", { cache: "no-store" }),
-      ]);
+      const walletRes = await fetch("/api/wallet/coupons", {
+        cache: "no-store",
+      });
       if (walletRes.ok) {
         const wData = (await walletRes.json()) as { coupons?: CouponDealDto[] };
         setWalletCoupons(wData.coupons || []);
       }
+    } catch {
+      // ignore transient network errors
+    }
+  }, []);
+
+  const loadRecommendedDeals = useCallback(async () => {
+    try {
+      const dealsRes = await fetch("/api/deals", { cache: "no-store" });
       if (dealsRes.ok) {
         const dData = (await dealsRes.json()) as { deals?: CouponDealDto[] };
         setRecommendedDeals(dData.deals || []);
@@ -161,9 +168,17 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loadWalletAndDeals = useCallback(async () => {
+    await Promise.all([loadWalletCoupons(), loadRecommendedDeals()]);
+  }, [loadWalletCoupons, loadRecommendedDeals]);
+
   useEffect(() => {
-    loadWalletAndDeals();
-  }, [user?.id, loadWalletAndDeals]);
+    if (!user?.id) {
+      setWalletCoupons([]);
+      return;
+    }
+    void loadWalletCoupons();
+  }, [user?.id, loadWalletCoupons]);
 
   const claimCouponToWallet = useCallback(
     async (params: { couponId?: string; code?: string; hotelId?: string }) => {
@@ -261,7 +276,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       signOutUser,
       walletCoupons,
       openCouponWallet: () => {
-        loadWalletAndDeals();
+        if (user?.id) {
+          void loadWalletCoupons();
+        }
+        if (recommendedDeals.length === 0) {
+          void loadRecommendedDeals();
+        }
         setIsWalletOpen(true);
       },
       claimCouponToWallet,
@@ -286,7 +306,9 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       refreshProfile,
       signOutUser,
       walletCoupons,
-      loadWalletAndDeals,
+      recommendedDeals.length,
+      loadWalletCoupons,
+      loadRecommendedDeals,
       claimCouponToWallet,
     ]
   );
@@ -297,11 +319,11 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   return (
     <PlatformAppContext.Provider value={contextValue}>
       {isAuthFullScreenPage ? (
-        <main className="min-h-[100dvh] bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
+        <main className="flex min-h-screen flex-col">
           {children}
         </main>
       ) : (
-        <div className="min-h-[100dvh] bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
+        <div className="flex min-h-screen flex-col">
           <PrimaryNavigation
             activeTab={activeTab}
             showSearchBar={showSearchBar}

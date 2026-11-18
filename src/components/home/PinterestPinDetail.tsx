@@ -31,7 +31,12 @@ import {
   X,
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
-import { parseVideoSource } from "@/lib/mediaUtils";
+import {
+  getOptimizedPinImageUrl,
+  parseVideoSource,
+  preloadPinHeroImages,
+  resolveAspectRatioCss,
+} from "@/lib/mediaUtils";
 import { trackPinInteraction } from "@/lib/telemetry/clientTelemetry";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type {
@@ -52,6 +57,10 @@ interface ClickedPinOrigin {
 }
 
 let lastClickedPinOrigin: ClickedPinOrigin | null = null;
+
+export function clearLastClickedPinOrigin(): void {
+  lastClickedPinOrigin = null;
+}
 
 const QUICK_EMOJIS = ["😍", "🔥", "🌿", "✨", "🌊", "🏡", "❤️", "🙌"];
 
@@ -135,7 +144,7 @@ function PinMoreOptionsControl({
 
   const handleCopyLink = () => {
     if (typeof window !== "undefined" && navigator.clipboard) {
-      const shareUrl = `${window.location.origin}/?pin=${encodeURIComponent(pin.id)}`;
+      const shareUrl = `${window.location.origin}/?stay=${encodeURIComponent(pin.id)}`;
       navigator.clipboard.writeText(shareUrl).catch(() => {});
     }
     trackPinInteraction("PIN_SHARE", pin);
@@ -364,6 +373,7 @@ export interface PinterestPinCardProps {
   pin: PinFeedItemDto;
   language: LanguageCode;
   isSaved: boolean;
+  priority?: boolean;
   onSelectPin: (pin: PinFeedItemDto) => void;
   onToggleSave: (pinId: string) => void;
   onSharePin: (pin: PinFeedItemDto) => void;
@@ -374,12 +384,14 @@ export function PinterestPinCard({
   pin,
   language,
   isSaved,
+  priority = false,
   onSelectPin,
   onToggleSave,
   onSharePin,
   onHidePin,
 }: PinterestPinCardProps) {
   const title = language === "th" ? pin.titleTh : pin.titleEn;
+  const cardImageUrl = getOptimizedPinImageUrl(pin.coverImageUrl, "card");
 
   const parsedVideo = pin.videoUrl
     ? parseVideoSource(pin.videoUrl, {
@@ -484,13 +496,15 @@ export function PinterestPinCard({
       <div
         ref={mediaBoxRef}
         onClick={handleCardClick}
+        onMouseEnter={() => preloadPinHeroImages(pin)}
+        onTouchStart={() => preloadPinHeroImages(pin)}
         className={`group relative w-full ${pin.aspectRatio} rounded-[14px] sm:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
       >
         {isInlineMp4Video && parsedVideo ? (
           <video
             ref={videoRef}
             src={parsedVideo.embedUrl}
-            poster={pin.coverImageUrl}
+            poster={cardImageUrl}
             autoPlay
             muted
             loop
@@ -500,17 +514,18 @@ export function PinterestPinCard({
           />
         ) : (
           <img
-            src={pin.coverImageUrl}
+            src={cardImageUrl}
             alt={title}
-            loading="lazy"
-            decoding="async"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding={priority ? "sync" : "async"}
             draggable={false}
             className="h-full w-full object-cover object-center"
           />
         )}
 
         {/* Hover Dim Overlay — Strictly Zero Hover Scale & Squircle Buttons */}
-        <div className="pointer-events-none absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 hidden lg:flex flex-col justify-between p-3">
+        <div className="pointer-events-none absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 hidden lg:flex flex-col justify-between p-2.5">
           <div className="flex items-center justify-end">
             <button
               type="button"
@@ -518,7 +533,7 @@ export function PinterestPinCard({
                 e.stopPropagation();
                 onToggleSave(pin.id);
               }}
-              className={`pointer-events-auto h-10 px-4 rounded-[14px] text-[14px] font-bold transition-colors cursor-pointer ${
+              className={`pointer-events-auto h-9 px-3.5 rounded-[12px] text-[13px] font-bold transition-colors cursor-pointer ${
                 isSaved
                   ? "bg-[#111111] !text-white"
                   : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
@@ -625,15 +640,32 @@ function MobileAdjacentPinPreview({
   const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
   const provinceLabel =
     language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
+  const heroAspectCss = resolveAspectRatioCss(pin.aspectRatio);
+  const coverSource =
+    pin.mediaUrls.length > 0 ? pin.mediaUrls[0] : pin.coverImageUrl;
 
   return (
-    <div className="w-full bg-[var(--color-background-card)] select-none pointer-events-none">
-      <div className="relative bg-[var(--color-background-body)] min-h-[280px] flex items-center justify-center overflow-hidden">
+    <div className="w-full px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 bg-[var(--color-background-card)] select-none pointer-events-none">
+      <div
+        style={{ aspectRatio: heroAspectCss }}
+        className="relative w-full max-h-[78svh] mx-auto rounded-[24px] sm:rounded-[26px] bg-[var(--color-background-muted)] overflow-hidden"
+      >
         <img
-          src={pin.coverImageUrl}
-          alt={title}
+          src={getOptimizedPinImageUrl(coverSource, "card")}
+          alt=""
+          aria-hidden="true"
+          loading="eager"
+          decoding="sync"
           draggable={false}
-          className="w-full max-h-[78vh] object-cover select-none"
+          className="absolute inset-0 w-full h-full object-cover select-none"
+        />
+        <img
+          src={getOptimizedPinImageUrl(coverSource, "hero")}
+          alt={title}
+          loading="eager"
+          decoding="sync"
+          draggable={false}
+          className="relative z-10 w-full h-full object-cover select-none"
         />
       </div>
 
@@ -883,6 +915,12 @@ export function PinterestPinDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin.id]);
 
+  // Preload adjacent card hero images so horizontal card-to-card swipes never flash
+  useEffect(() => {
+    preloadPinHeroImages(prevPinPreview);
+    preloadPinHeroImages(nextPinPreview);
+  }, [prevPinPreview, nextPinPreview]);
+
   // Close Comments Sheet on Escape
   useEffect(() => {
     if (!isCommentsSheetOpen) return;
@@ -965,7 +1003,10 @@ export function PinterestPinDetail({
       mediaEl.style.transition =
         "transform 340ms cubic-bezier(0.22, 1, 0.36, 1), border-radius 340ms cubic-bezier(0.22, 1, 0.36, 1)";
       mediaEl.style.transform = "translate3d(0, 0, 0) scale3d(1, 1, 1)";
-      mediaEl.style.borderRadius = "0px";
+      mediaEl.style.borderRadius =
+        typeof window !== "undefined" && window.innerWidth >= 1024
+          ? "20px"
+          : "24px";
 
       if (detailsEl) {
         detailsEl.style.transition =
@@ -1317,6 +1358,7 @@ export function PinterestPinDetail({
         track.style.transform = "translate3d(-100%, 0, 0)";
         swipeCommitTimerRef.current = window.setTimeout(() => {
           swipeCommitTimerRef.current = null;
+          lastClickedPinOrigin = null;
           navFn("next");
         }, 260);
       } else if (commitPrev) {
@@ -1325,6 +1367,7 @@ export function PinterestPinDetail({
         track.style.transform = "translate3d(100%, 0, 0)";
         swipeCommitTimerRef.current = window.setTimeout(() => {
           swipeCommitTimerRef.current = null;
+          lastClickedPinOrigin = null;
           if (prevP && navFn) {
             navFn("prev");
           } else {
@@ -1401,6 +1444,7 @@ export function PinterestPinDetail({
     pin.aspectRatio.includes("16/9") || pin.aspectRatio.includes("4/3")
       ? "16/9"
       : "9/16";
+  const heroAspectCss = resolveAspectRatioCss(pin.aspectRatio);
 
   const handleStepBack = () => {
     if (onBack) {
@@ -1538,13 +1582,13 @@ export function PinterestPinDetail({
             : "Back to feed"
         }
         aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-        className="fixed top-[max(20px,env(safe-area-inset-top))] left-4 lg:top-[104px] lg:left-[max(120px,calc((100vw+72px-1120px)/2+20px))] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+        className="fixed top-[max(18px,env(safe-area-inset-top))] left-4 sm:left-6 lg:top-[104px] lg:left-[max(120px,calc((100vw+72px-1120px)/2+20px))] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
       >
         <ChevronLeft className="w-6 h-6 lg:hidden" strokeWidth={2.4} />
         <ArrowLeft className="hidden lg:block w-6 h-6" strokeWidth={2.4} />
       </button>
 
-      <div className="lg:hidden fixed top-[max(20px,env(safe-area-inset-top))] right-4 z-[68]">
+      <div className="lg:hidden fixed top-[max(18px,env(safe-area-inset-top))] right-4 sm:right-6 z-[68]">
         <PinMoreOptionsControl
           pin={pin}
           language={language}
@@ -1616,19 +1660,29 @@ export function PinterestPinDetail({
         {/* =================================================================
             LEFT / HERO STAGE: TRUE VERTICAL MEDIA + 1:1 SLIDING CAROUSEL TRACK
         ================================================================== */}
-        <div
-          ref={mediaStageRef}
-          onPointerDown={handleMediaPointerDown}
-          onPointerMove={handleMediaPointerMove}
-          onPointerUp={handleMediaPointerUp}
-          onPointerCancel={handleMediaPointerUp}
-          className="lg:col-span-7 relative bg-[var(--color-background-body)] min-h-[280px] lg:h-full flex items-center justify-center overflow-hidden"
-        >
+        <div className="lg:col-span-7 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-3 bg-[var(--color-background-card)] flex items-center justify-center lg:h-full">
+          <div
+            ref={mediaStageRef}
+            onPointerDown={handleMediaPointerDown}
+            onPointerMove={handleMediaPointerMove}
+            onPointerUp={handleMediaPointerUp}
+            onPointerCancel={handleMediaPointerUp}
+            style={
+              !pin.videoUrl
+                ? ({ "--pin-aspect": heroAspectCss } as React.CSSProperties)
+                : undefined
+            }
+            className={`relative w-full ${
+              !pin.videoUrl
+                ? "max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[78svh] lg:max-h-none"
+                : "min-h-[280px]"
+            } lg:h-full rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-muted)] flex items-center justify-center overflow-hidden`}
+          >
           {pin.videoUrl ? (
             <div className="w-full h-full bg-[var(--color-background-body)] flex items-center justify-center">
               <UniversalVideoPlayer
                 videoUrl={pin.videoUrl}
-                posterUrl={pin.coverImageUrl}
+                posterUrl={getOptimizedPinImageUrl(pin.coverImageUrl, "card")}
                 title={title}
                 aspectRatio={videoAspect}
                 fitMode="cover"
@@ -1651,13 +1705,25 @@ export function PinterestPinDetail({
                 {images.map((imgUrl, idx) => (
                   <div
                     key={`${imgUrl}-${idx}`}
-                    className="w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                    className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
                   >
                     <img
-                      src={imgUrl}
-                      alt={idx === 0 ? title : `${title} (${idx + 1})`}
+                      src={getOptimizedPinImageUrl(imgUrl, "card")}
+                      alt=""
+                      aria-hidden="true"
+                      loading={idx === 0 ? "eager" : "lazy"}
+                      decoding="sync"
                       draggable={false}
-                      className="w-full max-h-[78vh] lg:h-full lg:max-h-full object-cover select-none"
+                      className="absolute inset-0 w-full h-full object-cover select-none"
+                    />
+                    <img
+                      src={getOptimizedPinImageUrl(imgUrl, "hero")}
+                      alt={idx === 0 ? title : `${title} (${idx + 1})`}
+                      loading={idx === 0 ? "eager" : "lazy"}
+                      fetchPriority={idx === 0 ? "high" : "auto"}
+                      decoding={idx === 0 ? "sync" : "async"}
+                      draggable={false}
+                      className="relative z-10 w-full h-full object-cover select-none"
                     />
                   </div>
                 ))}
@@ -1694,6 +1760,7 @@ export function PinterestPinDetail({
               </button>
             </>
           )}
+          </div>
         </div>
 
         {/* =================================================================
@@ -1841,7 +1908,7 @@ export function PinterestPinDetail({
                 >
                   <div
                     ref={thumbnailStripRef}
-                    className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-0.5"
+                    className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar pl-1 py-1 px-0.5"
                   >
                     {images.map((imgUrl, idx) => {
                       const isCurrent = idx === slideIndex;
@@ -1863,8 +1930,10 @@ export function PinterestPinDetail({
                           }`}
                         >
                           <img
-                            src={imgUrl}
+                            src={getOptimizedPinImageUrl(imgUrl, "thumb")}
                             alt={`${title} ${idx + 1}`}
+                            loading="eager"
+                            decoding="async"
                             draggable={false}
                             className="w-full h-full object-cover"
                           />
@@ -2224,11 +2293,12 @@ export function PinterestPinDetail({
                 {relatedPins
                   .slice(0, 14)
                   .filter((_, idx) => idx % 2 === colIdx)
-                  .map((relPin) => (
+                  .map((relPin, itemIdx) => (
                     <PinterestPinCard
                       key={relPin.id}
                       pin={relPin}
                       language={language}
+                      priority={itemIdx < 2}
                       isSaved={
                         savedPinIds.has(relPin.id) || relPin.isSavedByMe
                       }

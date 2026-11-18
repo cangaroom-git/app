@@ -30,6 +30,24 @@ export function useAuthenticatedProfile() {
 
   const refreshProfile = useCallback(async () => {
     try {
+      if (
+        typeof window !== "undefined" &&
+        window.location.search.includes("neon_auth_session_verifier")
+      ) {
+        await authClient.getSession().catch(() => null);
+        try {
+          const nextUrl = new URL(window.location.href);
+          if (
+            nextUrl.searchParams.has("neon_auth_session_verifier") &&
+            nextUrl.pathname !== "/login"
+          ) {
+            nextUrl.searchParams.delete("neon_auth_session_verifier");
+            window.history.replaceState({}, "", nextUrl.toString());
+          }
+        } catch {
+          // ignore URL cleanup error
+        }
+      }
       const res = await fetch("/api/me", { cache: "no-store" });
       if (res.ok) {
         const data = (await res.json()) as { user?: AuthenticatedMeDto | null };

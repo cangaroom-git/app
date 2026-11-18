@@ -46,6 +46,7 @@ import { trackTelemetryEvent } from "@/lib/telemetry/clientTelemetry";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
+  clearLastClickedPinOrigin,
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
@@ -647,7 +648,7 @@ export function HotelStorefrontClient({
       setActiveProfileTab("rooms");
     }
 
-    const paramPin = sp.get("pin");
+    const paramPin = sp.get("stay") || sp.get("pin");
     if (paramPin) {
       setSelectedPinId(paramPin);
       setActiveProfileTab("posts");
@@ -806,6 +807,7 @@ export function HotelStorefrontClient({
   const handleNavigateHotelPin = useCallback(
     (direction: "prev" | "next") => {
       if (!activePin) return;
+      clearLastClickedPinOrigin();
       if (direction === "prev" && pinHistoryStack.length > 0) {
         handleStepBackHotelPin();
         return;
@@ -833,7 +835,7 @@ export function HotelStorefrontClient({
 
   const handleSharePin = (pin: PinFeedItemDto) => {
     if (typeof window === "undefined") return;
-    const shareUrl = `${window.location.origin}/${storefront.hotel.slug}?pin=${encodeURIComponent(
+    const shareUrl = `${window.location.origin}/${storefront.hotel.slug}?stay=${encodeURIComponent(
       pin.id
     )}`;
     navigator.clipboard?.writeText(shareUrl).catch(() => {});

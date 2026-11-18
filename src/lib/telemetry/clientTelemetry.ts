@@ -318,6 +318,124 @@ export function getEncodedSessionTasteParam(): string {
   return encodeCompactTasteSignal(signal);
 }
 
+export interface RecentSearchItem {
+  query: string;
+  imageUrl?: string;
+  subtitle?: string;
+  hotelSlug?: string;
+  searchedAt: number;
+}
+
+export const RECENT_SEARCH_STORAGE_KEY = "cgr_recent_searches_v1";
+const MAX_RECENT_SEARCHES = 10;
+
+export function getRecentSearches(): RecentSearchItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_SEARCH_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is RecentSearchItem =>
+          Boolean(item) &&
+          typeof item === "object" &&
+          typeof (item as RecentSearchItem).query === "string" &&
+          (item as RecentSearchItem).query.trim().length > 0
+      )
+      .slice(0, MAX_RECENT_SEARCHES);
+  } catch {
+    return [];
+  }
+}
+
+export function recordRecentSearch(
+  entry: string | Omit<RecentSearchItem, "searchedAt">
+): RecentSearchItem[] {
+  if (typeof window === "undefined") return [];
+  const normalized: Omit<RecentSearchItem, "searchedAt"> =
+    typeof entry === "string" ? { query: entry } : entry;
+  const trimmed = normalized.query.trim();
+  if (!trimmed) return getRecentSearches();
+
+  const existing = getRecentSearches();
+  const prevMatch = existing.find(
+    (item) => item.query.toLowerCase() === trimmed.toLowerCase()
+  );
+  const nextItem: RecentSearchItem = {
+    query: trimmed,
+    imageUrl: normalized.imageUrl ?? prevMatch?.imageUrl,
+    subtitle: normalized.subtitle ?? prevMatch?.subtitle,
+    hotelSlug: normalized.hotelSlug ?? prevMatch?.hotelSlug,
+    searchedAt: Date.now(),
+  };
+  const next = [
+    nextItem,
+    ...existing.filter(
+      (item) => item.query.toLowerCase() !== trimmed.toLowerCase()
+    ),
+  ].slice(0, MAX_RECENT_SEARCHES);
+  try {
+    window.localStorage.setItem(RECENT_SEARCH_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage quota errors
+  }
+  return next;
+}
+
+export function removeRecentSearch(query: string): RecentSearchItem[] {
+  if (typeof window === "undefined") return [];
+  const next = getRecentSearches().filter(
+    (item) => item.query.toLowerCase() !== query.trim().toLowerCase()
+  );
+  try {
+    window.localStorage.setItem(RECENT_SEARCH_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage quota errors
+  }
+  return next;
+}
+
+export function clearRecentSearches(): RecentSearchItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    window.localStorage.removeItem(RECENT_SEARCH_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+  return [];
+}
+
+export function getLiveClientTasteSnapshot(): {
+  topStyleIds: string[];
+  topProvinceIds: string[];
+  recentOpenedPinIds: string[];
+  targetBudgetThb: number | null;
+} {
+  const topStyleIds = Object.entries(sessionState.styleScores)
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id]) => id);
+  const topProvinceIds = Object.entries(sessionState.provinceScores)
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([id]) => id.trim())
+    .filter((id) => id.length > 0);
+  const targetBudgetThb =
+    sessionState.priceWeightTotal > 0
+      ? Math.round(sessionState.priceWeightedSum / sessionState.priceWeightTotal)
+      : null;
+  return {
+    topStyleIds,
+    topProvinceIds,
+    recentOpenedPinIds: [...sessionState.openedPinIds].slice(-8).reverse(),
+    targetBudgetThb,
+  };
+}
+
 export function getSessionInteractionCount(): number {
   return sessionState.interactionCounter;
 }
@@ -333,6 +451,7 @@ export function resetClientSessionTaste(): void {
   sessionState.impressionCounts = {};
   sessionState.interactionCounter = 0;
   eventQueue = [];
+  clearRecentSearches();
 }
 
 export function openPrivacySettingsModal(): void {

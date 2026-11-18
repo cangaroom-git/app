@@ -32,10 +32,12 @@ export function estimateHeightRatio(aspectClass: string): number {
 
 export interface MasonryGridProps<T extends MasonryItemWithRatio> {
   items: T[];
-  renderItem: (item: T) => React.ReactNode;
-  /** Target column width in pixels (default 236px) */
+  renderItem: (item: T, index: number) => React.ReactNode;
+  /** Target / minimum column width in pixels when fitContainer is false */
   columnWidth?: number;
-  /** Horizontal and vertical gutter spacing in pixels (default 16px) */
+  /** Maximum card width in pixels when fitContainer is true (prevents card ballooning before column drops) */
+  maxColumnWidth?: number;
+  /** Horizontal and vertical gutter spacing in pixels (default 14px) */
   gutter?: number;
   /** Stretch columns edge-to-edge (offsetX = 0) so bounded containers have zero side whitespace */
   fitContainer?: boolean;
@@ -67,8 +69,9 @@ interface PositionedItem<T> {
 export function MasonryGrid<T extends MasonryItemWithRatio>({
   items,
   renderItem,
-  columnWidth = 236,
-  gutter = 16,
+  columnWidth = 184,
+  maxColumnWidth,
+  gutter = 14,
   fitContainer = true,
   maxColumns,
   onCalculatedHeight,
@@ -265,15 +268,36 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
       };
     }
 
-    const isMobile = containerWidth < 640;
-    const isTablet = containerWidth >= 640 && containerWidth < 1024;
-    const activeGutter = isMobile ? 6 : isTablet ? Math.min(gutter, 10) : gutter;
+    const isCompactPhone = containerWidth < 480;
+    const isTablet = containerWidth >= 480 && containerWidth < 1024;
+    const activeGutter = isCompactPhone
+      ? 6
+      : isTablet
+      ? Math.min(gutter, 10)
+      : Math.min(gutter, 14);
 
     let cols: number;
     let activeColWidth: number;
     let offsetX: number;
 
-    if (isMobile) {
+    if (fitContainer) {
+      const effectiveMaxColW = maxColumnWidth ?? 235;
+      const rawCols = isCompactPhone
+        ? 2
+        : Math.max(
+            2,
+            Math.ceil(
+              (containerWidth + activeGutter) /
+                (effectiveMaxColW + activeGutter)
+            )
+          );
+      cols = maxColumns ? Math.min(maxColumns, rawCols) : rawCols;
+      activeColWidth =
+        cols > 1
+          ? Math.max(120, (containerWidth - (cols - 1) * activeGutter) / cols)
+          : containerWidth;
+      offsetX = 0;
+    } else if (isCompactPhone) {
       cols = 2;
       activeColWidth = Math.max(120, (containerWidth - activeGutter) / 2);
       offsetX = 0;
@@ -285,21 +309,12 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
         )
       );
       cols = maxColumns ? Math.min(maxColumns, rawCols) : rawCols;
-
-      if (fitContainer && cols > 1) {
-        activeColWidth = (containerWidth - (cols - 1) * activeGutter) / cols;
-        offsetX = 0;
-      } else if (fitContainer && cols === 1) {
-        activeColWidth = containerWidth;
-        offsetX = 0;
-      } else {
-        activeColWidth =
-          cols === 1 && containerWidth < columnWidth
-            ? containerWidth
-            : columnWidth;
-        const gridTotalW = cols * activeColWidth + (cols - 1) * activeGutter;
-        offsetX = Math.max(0, Math.floor((containerWidth - gridTotalW) / 2));
-      }
+      activeColWidth =
+        cols === 1 && containerWidth < columnWidth
+          ? containerWidth
+          : columnWidth;
+      const gridTotalW = cols * activeColWidth + (cols - 1) * activeGutter;
+      offsetX = Math.max(0, Math.floor((containerWidth - gridTotalW) / 2));
     }
 
     const colHeights = new Array<number>(cols).fill(0);
@@ -365,6 +380,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
     containerWidth,
     items,
     columnWidth,
+    maxColumnWidth,
     gutter,
     fitContainer,
     maxColumns,
@@ -421,61 +437,66 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
   }, [layout.totalHeight, containerWidth, onCalculatedHeight]);
 
   const shouldAnimate = isResizingViewport && !prefersReducedMotion;
+  const isMeasured = containerWidth > 0;
+
+  const posById = useMemo(() => {
+    const map = new Map<string, PositionedItem<T>>();
+    for (const pos of layout.positions) {
+      map.set(pos.item.id, pos);
+    }
+    return map;
+  }, [layout.positions]);
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full min-w-0"
+      className={
+        isMeasured
+          ? "relative w-full min-w-0"
+          : "columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 2xl:columns-7 gap-1.5 sm:gap-2.5 lg:gap-3.5 w-full min-w-0"
+      }
       style={{
         height:
-          containerWidth > 0 && layout.totalHeight > 0
+          isMeasured && layout.totalHeight > 0
             ? `${layout.totalHeight}px`
             : undefined,
       }}
     >
-      {containerWidth <= 0 ? (
-        <div className="space-y-5">
-          {hasExpandedStage && renderExpandedStage && (
-            <div>{renderExpandedStage()}</div>
-          )}
+      {hasExpandedStage &&
+        renderExpandedStage &&
+        (!isMeasured || layout.stageY !== null) && (
           <div
-            className="grid gap-1.5 sm:gap-2.5 lg:gap-4 justify-center"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(150px, ${columnWidth}px))`,
-            }}
+            ref={isMeasured ? stageNodeRef : undefined}
+            className={!isMeasured ? "mb-5" : undefined}
+            style={
+              isMeasured && layout.stageY !== null
+                ? {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translate3d(0px, ${layout.stageY}px, 0)`,
+                    zIndex: 20,
+                  }
+                : { columnSpan: "all" }
+            }
           >
-            {items
-              .filter((it) => it.id !== expandedItemId)
-              .map((item) => (
-                <div key={item.id}>{renderItem(item)}</div>
-              ))}
+            {renderExpandedStage()}
           </div>
-        </div>
-      ) : (
-        <>
-          {hasExpandedStage &&
-            renderExpandedStage &&
-            layout.stageY !== null && (
-              <div
-                ref={stageNodeRef}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translate3d(0px, ${layout.stageY}px, 0)`,
-                  zIndex: 20,
-                }}
-              >
-                {renderExpandedStage()}
-              </div>
-            )}
+        )}
 
-          {layout.positions.map((pos) => (
+      {items.map((item, idx) => {
+        if (hasExpandedStage && item.id === expandedItemId) {
+          return null;
+        }
+        if (isMeasured) {
+          const pos = posById.get(item.id);
+          if (!pos) return null;
+          return (
             <div
-              key={pos.item.id}
-              ref={getItemRef(pos.item.id)}
-              data-masonry-item-id={pos.item.id}
+              key={item.id}
+              ref={getItemRef(item.id)}
+              data-masonry-item-id={item.id}
               style={{
                 position: "absolute",
                 top: 0,
@@ -488,11 +509,22 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
                 willChange: "transform",
               }}
             >
-              {renderItem(pos.item)}
+              {renderItem(pos.item, idx)}
             </div>
-          ))}
-        </>
-      )}
+          );
+        }
+
+        return (
+          <div
+            key={item.id}
+            ref={getItemRef(item.id)}
+            data-masonry-item-id={item.id}
+            className="break-inside-avoid mb-1.5 sm:mb-2.5 lg:mb-3.5"
+          >
+            {renderItem(item, idx)}
+          </div>
+        );
+      })}
     </div>
   );
 }

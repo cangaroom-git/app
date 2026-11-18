@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
     ? { distDir: process.env.NEXT_BUILD_DIR }
     : {}),
   images: {
-    unoptimized: true,
+    deviceSizes: [360, 480, 640, 750, 828, 1080, 1200, 1920],
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
@@ -14,6 +15,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
     ],
   },

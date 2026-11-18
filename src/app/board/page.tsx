@@ -27,6 +27,7 @@ import {
 } from "@/components/media/PureMediaViewer";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
+  clearLastClickedPinOrigin,
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
@@ -303,6 +304,7 @@ export default function SavedBoardPage() {
   const handleNavigateBoardPin = useCallback(
     (direction: "prev" | "next") => {
       if (!activeBoardPin) return;
+      clearLastClickedPinOrigin();
       if (direction === "prev" && pinHistoryStack.length > 0) {
         handleStepBackBoardPin();
         return;
@@ -651,11 +653,11 @@ export default function SavedBoardPage() {
 
       {/* Masonry Grid Below Close-Up Stage */}
       {isLoading && !activeBoardPin ? (
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-3.5">
           {Array.from({ length: 8 }).map((_, idx) => (
             <div
               key={idx}
-              className="w-[calc(50%-8px)] sm:w-[236px] aspect-[3/4] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+              className="w-[calc(50%-8px)] sm:w-[200px] aspect-[3/4] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
             />
           ))}
         </div>
@@ -695,14 +697,16 @@ export default function SavedBoardPage() {
                 aspectClass: e.pin.aspectRatio,
                 boardEntry: e,
               }))}
-              columnWidth={236}
-              gutter={16}
+              columnWidth={184}
+              maxColumnWidth={235}
+              gutter={14}
               fitContainer={true}
-              renderItem={(item) => (
+              renderItem={(item, cardIdx) => (
                 <div className="space-y-1">
                   <PinterestPinCard
                     pin={item}
                     language={language}
+                    priority={cardIdx < 8}
                     isSaved={true}
                     onSelectPin={handleSelectBoardPin}
                     onToggleSave={(pinId) =>

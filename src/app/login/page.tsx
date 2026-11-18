@@ -30,14 +30,81 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCompletingOAuth, setIsCompletingOAuth] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const cb = new URLSearchParams(window.location.search).get("callbackUrl");
-    if (cb && cb.startsWith("/")) setCallbackUrl(cb);
-  }, []);
+    const params = new URLSearchParams(window.location.search);
+    const cb = params.get("callbackUrl");
+    const safeCb = cb && cb.startsWith("/") ? cb : null;
+    if (safeCb) setCallbackUrl(safeCb);
+
+    const oauthError = params.get("error") || params.get("error_description");
+    if (oauthError) {
+      setErrorMessage(
+        oauthError === "access_denied"
+          ? lang === "th"
+            ? "ยกเลิกการเข้าสู่ระบบด้วย Google"
+            : "Google sign-in was cancelled"
+          : lang === "th"
+            ? `เข้าสู่ระบบด้วย Google ไม่สำเร็จ (${oauthError})`
+            : `Google sign-in failed (${oauthError})`
+      );
+      return;
+    }
+
+    const verifier = params.get("neon_auth_session_verifier");
+    if (!verifier) return;
+
+    let cancelled = false;
+    setIsCompletingOAuth(true);
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    void (async () => {
+      try {
+        await authClient.getSession().catch(() => null);
+        await refreshMe().catch(() => null);
+        const meRes = await fetch("/api/me", { cache: "no-store" });
+        if (!cancelled && meRes.ok) {
+          const meData = (await meRes.json()) as {
+            user?: { role?: Parameters<typeof resolveDestinationByRole>[0] } | null;
+          };
+          if (meData.user) {
+            const dest = safeCb || resolveDestinationByRole(meData.user.role);
+            router.replace(dest);
+            return;
+          }
+        }
+        if (!cancelled) {
+          setErrorMessage(
+            lang === "th"
+              ? "ไม่สามารถยืนยันเซสชันจาก Google ได้ (หากทดสอบบน http://localhost ด้วย Safari กรุณาลองใช้ Chrome หรือ HTTPS)"
+              : "Could not establish Google sign-in session (Safari blocks secure cookies on plain http://localhost; try Chrome or HTTPS)."
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setErrorMessage(
+            lang === "th"
+              ? "เกิดข้อผิดพลาดในการยืนยันเซสชัน Google"
+              : "Failed to verify Google login session"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCompletingOAuth(false);
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lang, refreshMe, router]);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -45,10 +112,22 @@ export default function LoginPage() {
     try {
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
-      await authClient.signIn.social({
+      const returnPath = callbackUrl
+        ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+        : "/login";
+      const res = await authClient.signIn.social({
         provider: "google",
-        callbackURL: callbackUrl ? `${origin}${callbackUrl}` : `${origin}/login`,
+        callbackURL: `${origin}${returnPath}`,
       });
+      if (res && "error" in res && res.error) {
+        setErrorMessage(
+          res.error.message ||
+            (lang === "th"
+              ? "เกิดข้อผิดพลาดในการเชื่อมต่อ Google"
+              : "Failed to connect Google sign-in")
+        );
+        setIsLoading(false);
+      }
     } catch {
       setErrorMessage(
         lang === "th"
@@ -265,6 +344,14 @@ export default function LoginPage() {
                 </span>
                 <div className="h-px flex-1 bg-[var(--color-border)]" />
               </div>
+
+              {isCompletingOAuth && (
+                <p className="w-full rounded-[10px] bg-[var(--color-background-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-text-primary)] text-center">
+                  {lang === "th"
+                    ? "กำลังยืนยันการเข้าสู่ระบบด้วย Google..."
+                    : "Completing Google sign-in..."}
+                </p>
+              )}
 
               {errorMessage && (
                 <p className="w-full rounded-[10px] bg-[var(--color-error-muted)] px-3.5 py-2.5 ty-caption font-semibold text-[var(--color-error)] text-center">

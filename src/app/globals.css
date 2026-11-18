@@ -182,17 +182,13 @@ select {
 }
 
 html {
-  background-color: var(--color-background-body);
-  min-height: 100%;
-  max-width: 100%;
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background-color: var(--color-background-body);
   color: var(--color-text-primary);
-  min-height: 100dvh;
-  max-width: 100%;
-  overflow-x: clip;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
   line-height: 1.45;
