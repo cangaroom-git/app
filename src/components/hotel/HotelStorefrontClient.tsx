@@ -40,8 +40,14 @@ import {
 } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import { getFacilityIconMeta } from "@/lib/facilityIcons";
+import {
+  getOptimizedPinImageSrcSet,
+  getOptimizedPinImageUrl,
+  PIN_IMAGE_SIZES,
+} from "@/lib/mediaUtils";
 import { trackTelemetryEvent } from "@/lib/telemetry/clientTelemetry";
 import { useHotelApp } from "@/components/HotelAppShell";
+import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
   clearLastClickedPinOrigin,
@@ -135,6 +141,8 @@ export function HotelStorefrontClient({
   const [roomSearchQuery, setRoomSearchQuery] = useState("");
   const [calendarRoomFilterId, setCalendarRoomFilterId] = useState<string>("ALL");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [isAnchorBarVisible, setIsAnchorBarVisible] = useState(false);
+  const heroHeaderRef = useRef<HTMLElement | null>(null);
   const calendarSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
@@ -326,6 +334,30 @@ export function HotelStorefrontClient({
     return () => observer.disconnect();
   }, [storefront.posts.length]);
 
+  // Show Top Anchor Jump Bar cleanly once scrolled past the 5-square Hero Mosaic
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const heroEl = heroHeaderRef.current;
+    if (!heroEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) {
+          setIsAnchorBarVisible(!entry.isIntersecting);
+        }
+      },
+      {
+        rootMargin: "-64px 0px 0px 0px",
+        threshold: 0,
+      }
+    );
+    observer.observe(heroEl);
+    return () => observer.disconnect();
+  }, []);
+
   // Refresh availability immediately whenever user taps calendar dates or changes login
   useEffect(() => {
     if (!didMountFetchRef.current) {
@@ -408,6 +440,7 @@ export function HotelStorefrontClient({
     if (resolvedCoupon) {
       qs.set("coupon", resolvedCoupon);
     }
+    startRouteProgress();
     router.push(`/${encodeURIComponent(storefront.hotel.slug)}/book?${qs.toString()}`);
   };
 
@@ -830,10 +863,14 @@ export function HotelStorefrontClient({
   return (
     <div className="cgr-page-standard">
       {/* =====================================================================
-          ZONE 1 (TOP): AIRBNB TITLE BAR + 5-PHOTO BENTO MOSAIC GRID
+          ZONE 1 (TOP): AIRBNB TITLE BAR + 1:1 SQUARE BENTO PHOTO MOSAIC
       ====================================================================== */}
-      <header id="section-photos" className="scroll-mt-24 space-y-4 pb-6">
-        {/* Mobile Full-Bleed Hero Banner (< sm) */}
+      <header
+        ref={heroHeaderRef}
+        id="section-photos"
+        className="scroll-mt-24 space-y-5 pb-4"
+      >
+        {/* Mobile 1:1 Square Hero Banner (< sm) */}
         <div
           role="button"
           tabIndex={0}
@@ -854,24 +891,29 @@ export function HotelStorefrontClient({
           aria-label={
             language === "th" ? "เปิดดูรูปภาพที่พัก" : "View property photos"
           }
-          className="sm:hidden relative -mx-4 -mt-5 h-[250px] overflow-hidden bg-[var(--color-background-muted)] border-b border-[var(--color-border)] cursor-pointer"
+          className="sm:hidden relative -mx-4 -mt-5 aspect-square overflow-hidden bg-[var(--color-background-muted)] border-b border-[var(--color-border)] cursor-pointer"
         >
           <img
-            src={coverBannerUrl}
+            src={getOptimizedPinImageUrl(coverBannerUrl, "hero")}
+            srcSet={getOptimizedPinImageSrcSet(coverBannerUrl, "hero")}
+            sizes="(max-width: 639px) 100vw, 640px"
             alt={hotel.nameTh}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="h-full w-full object-cover"
           />
           {allCoverSlides.length > 1 && (
-            <span className="absolute bottom-3 right-3 h-8 px-3 rounded-[9px] bg-white/95 text-[#222222] border border-[#222222]/20 text-[12px] font-semibold inline-flex items-center gap-1.5">
+            <span className="absolute bottom-3 right-3 h-8 px-3 rounded-[8px] bg-white/95 text-[#222222] border border-[#222222]/20 text-[12px] font-medium inline-flex items-center gap-1.5">
               <Images className="w-3.5 h-3.5" />
               <span>1 / {allCoverSlides.length}</span>
             </span>
           )}
         </div>
 
-        {/* Airbnb Title + Share / Contact Row */}
+        {/* Airbnb Title + Minimal Ghost Actions Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1 sm:pt-0">
-          <h1 className="text-[23px] sm:text-[26px] font-semibold leading-tight tracking-tight text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
+          <h1 className="text-[23px] sm:text-[26px] font-semibold leading-tight tracking-[-0.016em] text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
             <span className="truncate">
               {language === "th" ? hotel.nameTh : hotel.nameEn}
             </span>
@@ -883,11 +925,11 @@ export function HotelStorefrontClient({
             )}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={handleShareProperty}
-              className="h-9 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors underline"
+              className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
             >
               <Share2 className="w-4 h-4" />
               <span>{language === "th" ? "แชร์" : "Share"}</span>
@@ -896,7 +938,7 @@ export function HotelStorefrontClient({
             <button
               type="button"
               onClick={handlePrimaryContactClick}
-              className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
             >
               <MessageCircle className="w-4 h-4" />
               <span>
@@ -914,7 +956,7 @@ export function HotelStorefrontClient({
               <button
                 type="button"
                 onClick={() => handleContactClick("PHONE")}
-                className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
               >
                 <Phone className="w-4 h-4" />
                 <span>{hotel.contactPhone}</span>
@@ -923,19 +965,24 @@ export function HotelStorefrontClient({
           </div>
         </div>
 
-        {/* Tablet / Desktop Airbnb 5-Photo Bento Mosaic Grid (sm:+) */}
+        {/* Tablet / Desktop Airbnb Exact 1:1 Squares 5-Photo Grid (aspect-[2/1] · 4 cols x 2 rows) */}
         {allCoverSlides.length >= 5 ? (
-          <div className="hidden sm:grid sm:grid-cols-4 sm:grid-rows-2 gap-2 h-[320px] lg:h-[420px] rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
+          <div className="hidden sm:grid sm:grid-cols-4 sm:grid-rows-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
             <button
               type="button"
               onClick={() =>
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 })
               }
-              className="col-span-2 row-span-2 relative overflow-hidden cursor-pointer hover:brightness-95 transition"
+              className="col-span-2 row-span-2 relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
             >
               <img
-                src={allCoverSlides[0].url}
+                src={getOptimizedPinImageUrl(allCoverSlides[0].url, "hero")}
+                srcSet={getOptimizedPinImageSrcSet(allCoverSlides[0].url, "hero")}
+                sizes={PIN_IMAGE_SIZES.hero}
                 alt={hotel.nameTh}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </button>
@@ -947,11 +994,15 @@ export function HotelStorefrontClient({
                 onClick={() =>
                   setFullscreenMedia({ slides: allCoverSlides, index: idx + 1 })
                 }
-                className="col-span-1 row-span-1 relative overflow-hidden cursor-pointer hover:brightness-95 transition"
+                className="col-span-1 row-span-1 relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
               >
                 <img
-                  src={slide.url}
+                  src={getOptimizedPinImageUrl(slide.url, "gallery")}
+                  srcSet={getOptimizedPinImageSrcSet(slide.url, "gallery")}
+                  sizes={PIN_IMAGE_SIZES.gallery}
                   alt={`${hotel.nameTh} ${idx + 2}`}
+                  loading="eager"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               </button>
@@ -962,7 +1013,46 @@ export function HotelStorefrontClient({
               onClick={() =>
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 })
               }
-              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white hover:bg-[#f7f7f7] text-[#222222] border border-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[8px] bg-white/95 hover:bg-white text-[#222222] border border-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <Images className="w-4 h-4" />
+              <span>
+                {language === "th"
+                  ? `แสดงรูปภาพทั้งหมด (${allCoverSlides.length})`
+                  : `Show all photos (${allCoverSlides.length})`}
+              </span>
+            </button>
+          </div>
+        ) : allCoverSlides.length >= 2 ? (
+          <div className="hidden sm:grid sm:grid-cols-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
+            {allCoverSlides.slice(0, 2).map((slide, idx) => (
+              <button
+                key={`${slide.url}-${idx}`}
+                type="button"
+                onClick={() =>
+                  setFullscreenMedia({ slides: allCoverSlides, index: idx })
+                }
+                className="relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
+              >
+                <img
+                  src={getOptimizedPinImageUrl(slide.url, "hero")}
+                  srcSet={getOptimizedPinImageSrcSet(slide.url, "hero")}
+                  sizes={PIN_IMAGE_SIZES.hero}
+                  alt={`${hotel.nameTh} ${idx + 1}`}
+                  loading="eager"
+                  fetchPriority={idx === 0 ? "high" : "auto"}
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setFullscreenMedia({ slides: allCoverSlides, index: 0 })
+              }
+              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[8px] bg-white/95 hover:bg-white text-[#222222] border border-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Images className="w-4 h-4" />
               <span>
@@ -990,82 +1080,85 @@ export function HotelStorefrontClient({
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 });
               }
             }}
-            className="hidden sm:block relative w-full h-[320px] lg:h-[400px] rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] border border-[var(--color-border)] cursor-pointer"
+            className="hidden sm:block relative w-full aspect-[2/1] rounded-[12px] lg:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] border border-[var(--color-border)] cursor-pointer"
           >
             <img
-              src={coverBannerUrl}
+              src={getOptimizedPinImageUrl(coverBannerUrl, "hero")}
+              srcSet={getOptimizedPinImageSrcSet(coverBannerUrl, "hero")}
+              sizes={PIN_IMAGE_SIZES.hero}
               alt={hotel.nameTh}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="h-full w-full object-cover"
             />
-            {allCoverSlides.length > 1 && (
-              <span className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white hover:bg-[#f7f7f7] text-[#222222] border border-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5">
-                <Images className="w-4 h-4" />
-                <span>
-                  {language === "th"
-                    ? `แสดงรูปภาพทั้งหมด (${allCoverSlides.length})`
-                    : `Show all photos (${allCoverSlides.length})`}
-                </span>
-              </span>
-            )}
           </div>
         )}
       </header>
 
       {/* =====================================================================
-          ZONE 2 (NAV_DEFAULT): STICKY ANCHOR JUMP BAR + COMPACT RESERVE CTA
+          ZONE 2 (NAV_DEFAULT): AIRBNB SCROLL-REVEAL ANCHOR BAR
+          Hidden at scroll top so the Hero Mosaic flows seamlessly into Overview!
       ====================================================================== */}
       <nav
         aria-label="Property section navigation"
-        className="sticky top-[var(--cgr-sticky-header-offset,4rem)] z-30 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] flex items-center justify-between gap-4 transition-[top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        aria-hidden={!isAnchorBarVisible}
+        className={`fixed top-[var(--cgr-sticky-header-offset,4rem)] inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-all duration-200 ${
+          isAnchorBarVisible
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 -translate-y-2 pointer-events-none"
+        }`}
       >
-        <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
-          {anchorNavItems.map((item) => {
-            const isActive = activeAnchor === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => scrollToAnchor(item.id)}
-                className={`py-3.5 -mb-px border-b-2 text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
-                  isActive
-                    ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] font-semibold"
-                    : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {minRoomPrice > 0 && (
-          <div className="hidden md:flex items-center gap-3 shrink-0 py-2">
-            <div className="text-right">
-              <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-                ฿{minRoomPrice.toLocaleString()}
-              </span>
-              <span className="text-[12px] text-[var(--color-text-secondary)]">
-                {" "}
-                / {language === "th" ? "คืน" : "night"} · ★{" "}
-                {hotel.ratingAvg.toFixed(1)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => scrollToAnchor("rooms")}
-              className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
-            >
-              {language === "th" ? "ดูห้องว่าง" : "Check rooms"}
-            </button>
+        <div className="cgr-page-standard flex items-center justify-between gap-4">
+          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
+            {anchorNavItems.map((item) => {
+              const isActive = activeAnchor === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => scrollToAnchor(item.id)}
+                  className={`py-3.5 -mb-px border-b-2 text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
+                    isActive
+                      ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] font-semibold"
+                      : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
-        )}
+
+          {minRoomPrice > 0 && (
+            <div className="hidden md:flex items-center gap-3 shrink-0 py-2">
+              <div className="text-right">
+                <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                  ฿{minRoomPrice.toLocaleString()}
+                </span>
+                <span className="text-[12px] text-[var(--color-text-secondary)]">
+                  {" "}
+                  / {language === "th" ? "คืน" : "night"} · ★{" "}
+                  {hotel.ratingAvg.toFixed(1)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => scrollToAnchor("rooms")}
+                className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
+              >
+                {language === "th" ? "ดูห้องว่าง" : "Check rooms"}
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* =====================================================================
           ZONE 3 (ALONG_SIDEBAR + SIDEBAR): AIRBNB 7 + 1 + 4 ASYMMETRIC GRID
              7 Cols Main Content | 1 Empty Col (~93px Breathing Air) | 4 Cols Sticky Card
       ====================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 items-start pt-8 pb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-12 items-start pt-2 lg:pt-6 pb-12">
         {/* LEFT MAIN COLUMN (7 OF 12 COLS = 58.33%) */}
         <div className="lg:col-span-7 divide-y divide-[var(--color-border)] min-w-0">
           {/* 3A. Overview + Airbnb Guest-Favorite Style Trust Box */}
@@ -1205,9 +1298,9 @@ export function HotelStorefrontClient({
           {/* 3C. Airbnb Key Highlights Stack */}
           <section className="py-8 space-y-5">
             <div className="flex items-start gap-4">
-              <Clock className="w-6 h-6 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+              <Clock className="w-6 h-6 text-[var(--color-text-primary)] shrink-0 mt-0.5" strokeWidth={1.75} />
               <div>
-                <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                <p className="text-[15.5px] font-medium text-[var(--color-text-primary)]">
                   {language === "th"
                     ? `เช็กอิน ${hotel.checkInTime} น. · เช็กเอาต์ ${hotel.checkOutTime} น.`
                     : `Check-in ${hotel.checkInTime} · Check-out ${hotel.checkOutTime}`}
@@ -1231,9 +1324,9 @@ export function HotelStorefrontClient({
               const HlIcon = meta.Icon;
               return (
                 <div key={idx} className="flex items-start gap-4">
-                  <HlIcon className="w-6 h-6 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+                  <HlIcon className="w-6 h-6 text-[var(--color-text-primary)] shrink-0 mt-0.5" strokeWidth={1.75} />
                   <div>
-                    <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-[15.5px] font-medium text-[var(--color-text-primary)]">
                       {hl.titleTh}
                     </p>
                     <p className="ty-caption text-[var(--color-text-secondary)]">
@@ -1482,7 +1575,7 @@ export function HotelStorefrontClient({
                           ? "hidden"
                           : `rounded-[16px] bg-[var(--color-background-card)] border p-4 flex flex-col sm:flex-row gap-4 transition-colors cursor-pointer ${
                               isSelectedForBooking
-                                ? "border-[#222222] dark:border-[#f5f5f5] ring-1 ring-[#222222] dark:ring-[#f5f5f5]"
+                                ? "border-[#222222] dark:border-[#f5f5f5]"
                                 : "border-[var(--color-border)] hover:border-[var(--color-border-emphasized)]"
                             } ${!matchesInstantFilter ? "opacity-80" : ""}`
                       }
@@ -1494,11 +1587,15 @@ export function HotelStorefrontClient({
                           setSelectedRoomId(room.id);
                           openRoomDetailsDrawer(room);
                         }}
-                        className="relative w-full sm:w-[208px] h-[184px] sm:h-[164px] rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 cursor-pointer text-left"
+                        className="relative w-full sm:w-[164px] h-[200px] sm:h-[164px] rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 cursor-pointer text-left"
                       >
                         <img
-                          src={roomCover}
+                          src={getOptimizedPinImageUrl(roomCover, "gallery")}
+                          srcSet={getOptimizedPinImageSrcSet(roomCover, "gallery")}
+                          sizes="(max-width: 639px) 100vw, 180px"
                           alt={language === "th" ? room.nameTh : room.nameEn}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                         <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-[#222222]/85 backdrop-blur-md !text-white text-[11px] font-semibold">
@@ -1708,9 +1805,9 @@ export function HotelStorefrontClient({
         </div>
 
         {/* RIGHT STICKY SIDEBAR (4 OF 12 COLS = 33.33%, WITH COL 8 AS 8.33% BREATHING AIR!) */}
-        <aside className="lg:col-start-9 lg:col-span-4 lg:sticky lg:top-[132px] mt-10 lg:mt-0">
+        <aside className="lg:col-start-9 lg:col-span-4 lg:sticky lg:top-[128px] mt-10 lg:mt-0">
           {activeBookingRoom && stickyPricing && (
-            <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-6 space-y-4">
+            <div className="rounded-[16px] border border-[#dddddd] dark:border-[var(--color-border)] bg-[var(--color-background-card)] p-6 space-y-4">
               {/* Price Header */}
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-1.5">
@@ -1744,8 +1841,8 @@ export function HotelStorefrontClient({
               </div>
 
               {/* Airbnb Unified Bordered Input Box (Date-First: Dates -> Guests -> Room Type) */}
-              <div className="rounded-[12px] border border-[var(--color-border-emphasized)] overflow-hidden divide-y divide-[var(--color-border-emphasized)] bg-[var(--color-background-card)]">
-                <div className="grid grid-cols-2 divide-x divide-[var(--color-border-emphasized)]">
+              <div className="rounded-[12px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] overflow-hidden divide-y divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)] bg-[var(--color-background-card)]">
+                <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
                   <button
                     type="button"
                     onClick={scrollToCalendarSection}
@@ -2150,7 +2247,7 @@ export function HotelStorefrontClient({
                   )}
                 </div>
 
-                <p className="text-[15px] leading-[1.6] text-[var(--color-text-primary)]">
+                <p className="text-[15.5px] leading-[1.65] text-[var(--color-text-primary)]">
                   {rv.commentTh}
                 </p>
 
@@ -2159,8 +2256,12 @@ export function HotelStorefrontClient({
                     {rv.photoUrls.map((u, idx) => (
                       <img
                         key={idx}
-                        src={u}
+                        src={getOptimizedPinImageUrl(u, "thumb")}
+                        srcSet={getOptimizedPinImageSrcSet(u, "thumb")}
+                        sizes="112px"
                         alt="Guest photo"
+                        loading="lazy"
+                        decoding="async"
                         onClick={() =>
                           setFullscreenMedia({
                             slides: rv.photoUrls.map((url) => ({
@@ -2279,8 +2380,15 @@ export function HotelStorefrontClient({
                     className="block relative h-44 bg-[var(--color-background-muted)] overflow-hidden"
                   >
                     <img
-                      src={post.coverImageUrl}
+                      src={getOptimizedPinImageUrl(post.coverImageUrl, "gallery")}
+                      srcSet={getOptimizedPinImageSrcSet(
+                        post.coverImageUrl,
+                        "gallery"
+                      )}
+                      sizes={PIN_IMAGE_SIZES.gallery}
                       alt={post.titleTh}
+                      loading="lazy"
+                      decoding="async"
                       className="h-full w-full object-cover"
                     />
                     <span className="absolute top-3 left-3 px-2.5 py-1 rounded-[8px] bg-[#222222]/80 backdrop-blur-md text-white text-[11px] font-semibold">

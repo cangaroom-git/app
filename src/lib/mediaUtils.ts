@@ -126,7 +126,7 @@ export function parseVideoSource(
       originalUrl: cleanUrl,
       youtubeId: videoId,
       embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`,
-      autoPosterUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      autoPosterUrl: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
       isVerticalHint: isShortsUrl,
     };
   }
@@ -219,6 +219,8 @@ export async function compressImageToWebP(
         return;
       }
 
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
       canvas.toBlob(
         (blob) => {
@@ -260,7 +262,7 @@ export interface UploadedImageResult {
 export async function uploadOptimizedImage(
   rawFile: File,
   folder: UploadMediaFolder,
-  maxDimension: number = 1440
+  maxDimension: number = folder === "hero" || folder === "rooms" ? 1920 : 1440
 ): Promise<UploadedImageResult> {
   if (!rawFile.type.startsWith("image/")) {
     throw new Error("รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WebP, GIF, AVIF)");
@@ -272,7 +274,7 @@ export async function uploadOptimizedImage(
   const webpFile = await compressImageToWebP(rawFile, {
     maxWidth: maxDimension,
     maxHeight: maxDimension,
-    quality: 0.82,
+    quality: folder === "hero" || folder === "rooms" ? 0.86 : 0.82,
   });
 
   const formData = new FormData();
@@ -307,30 +309,72 @@ export function formatKilobytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export type PinImageVariant = "thumb" | "card" | "hero";
+export type PinImageVariant = "thumb" | "card" | "gallery" | "hero" | "full";
 
-const VARIANT_CONFIG: Record<
-  PinImageVariant,
-  { width: number; quality: number }
-> = {
-  thumb: { width: 160, quality: 72 },
-  card: { width: 480, quality: 75 },
-  hero: { width: 1080, quality: 82 },
+interface VariantSpec {
+  width: number;
+  quality: number;
+  cloudinaryQuality: "q_auto:good" | "q_auto:best";
+  srcSetWidths: readonly number[];
+  sizes: string;
+}
+
+const VARIANT_CONFIG: Record<PinImageVariant, VariantSpec> = {
+  thumb: {
+    width: 200,
+    quality: 82,
+    cloudinaryQuality: "q_auto:good",
+    srcSetWidths: [160, 280],
+    sizes: "64px",
+  },
+  card: {
+    width: 600,
+    quality: 82,
+    cloudinaryQuality: "q_auto:good",
+    srcSetWidths: [400, 640, 840],
+    sizes: "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 240px",
+  },
+  gallery: {
+    width: 800,
+    quality: 85,
+    cloudinaryQuality: "q_auto:good",
+    srcSetWidths: [480, 800, 1120],
+    sizes: "(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 320px",
+  },
+  hero: {
+    width: 1280,
+    quality: 86,
+    cloudinaryQuality: "q_auto:best",
+    srcSetWidths: [800, 1280, 1680],
+    sizes: "(max-width: 1023px) 100vw, 560px",
+  },
+  full: {
+    width: 1800,
+    quality: 88,
+    cloudinaryQuality: "q_auto:best",
+    srcSetWidths: [1200, 1800, 2200],
+    sizes: "95vw",
+  },
 };
 
-/**
- * Rewrites Unsplash / Cloudinary CDN URLs to an exact width/quality preset
- * while strictly preserving the original aspect ratio (prevents downloading
- * 1080px+ images on 175px mobile cards or 58px thumbnails!).
- */
-export function getOptimizedPinImageUrl(
-  rawUrl: string,
-  variant: PinImageVariant
-): string {
-  const trimmed = (rawUrl || "").trim();
-  if (!trimmed) return rawUrl;
+export const PIN_IMAGE_SIZES: Record<PinImageVariant, string> = {
+  thumb: VARIANT_CONFIG.thumb.sizes,
+  card: VARIANT_CONFIG.card.sizes,
+  gallery: VARIANT_CONFIG.gallery.sizes,
+  hero: VARIANT_CONFIG.hero.sizes,
+  full: VARIANT_CONFIG.full.sizes,
+};
 
-  const { width: targetW, quality } = VARIANT_CONFIG[variant];
+function rewriteImageUrlForWidth(
+  rawUrl: string,
+  targetW: number,
+  quality: number,
+  cloudinaryQuality: "q_auto:good" | "q_auto:best"
+): { url: string; supportsResponsiveWidth: boolean } {
+  const trimmed = (rawUrl || "").trim();
+  if (!trimmed) {
+    return { url: rawUrl, supportsResponsiveWidth: false };
+  }
 
   try {
     const parsed = new URL(trimmed);
@@ -339,6 +383,7 @@ export function getOptimizedPinImageUrl(
       const origW = Number(parsed.searchParams.get("w")) || 0;
       const origH = Number(parsed.searchParams.get("h")) || 0;
       parsed.searchParams.set("auto", "format");
+      parsed.searchParams.set("fit", parsed.searchParams.get("fit") || "crop");
       parsed.searchParams.set("w", String(targetW));
       if (origW > 0 && origH > 0) {
         parsed.searchParams.set(
@@ -347,7 +392,7 @@ export function getOptimizedPinImageUrl(
         );
       }
       parsed.searchParams.set("q", String(quality));
-      return parsed.toString();
+      return { url: parsed.toString(), supportsResponsiveWidth: true };
     }
 
     if (parsed.hostname === "res.cloudinary.com") {
@@ -360,14 +405,24 @@ export function getOptimizedPinImageUrl(
         if (slashIdx > 0) {
           const firstSeg = rest.slice(0, slashIdx);
           if (/^v\d+$/.test(firstSeg)) {
-            parsed.pathname = `${prefix}f_auto,q_auto,w_${targetW}/${rest}`;
-            return parsed.toString();
+            parsed.pathname = `${prefix}f_auto,${cloudinaryQuality},w_${targetW}/${rest}`;
+            return { url: parsed.toString(), supportsResponsiveWidth: true };
           }
           const wMatch = firstSeg.match(/w_(\d+)/);
           const hMatch = firstSeg.match(/h_(\d+)/);
           const origW = wMatch ? Number(wMatch[1]) : 0;
           const origH = hMatch ? Number(hMatch[1]) : 0;
           let updatedSeg = firstSeg;
+          if (/f_[^,]+/.test(updatedSeg)) {
+            updatedSeg = updatedSeg.replace(/f_[^,]+/, "f_auto");
+          } else {
+            updatedSeg = `${updatedSeg},f_auto`;
+          }
+          if (/q_[^,]+/.test(updatedSeg)) {
+            updatedSeg = updatedSeg.replace(/q_[^,]+/, cloudinaryQuality);
+          } else {
+            updatedSeg = `${updatedSeg},${cloudinaryQuality}`;
+          }
           if (wMatch) {
             updatedSeg = updatedSeg.replace(/w_\d+/, `w_${targetW}`);
           } else {
@@ -378,7 +433,96 @@ export function getOptimizedPinImageUrl(
             updatedSeg = updatedSeg.replace(/h_\d+/, `h_${nextH}`);
           }
           parsed.pathname = `${prefix}${updatedSeg}${rest.slice(slashIdx)}`;
-          return parsed.toString();
+          return { url: parsed.toString(), supportsResponsiveWidth: true };
+        }
+      }
+    }
+  } catch {
+    return { url: rawUrl, supportsResponsiveWidth: false };
+  }
+
+  return { url: rawUrl, supportsResponsiveWidth: false };
+}
+
+/**
+ * Rewrites Unsplash / Cloudinary CDN URLs to an exact width/quality preset
+ * while strictly preserving the original aspect ratio (prevents downloading
+ * 1680px images on 175px mobile cards or 58px thumbnails!).
+ */
+export function getOptimizedPinImageUrl(
+  rawUrl: string,
+  variant: PinImageVariant
+): string {
+  const spec = VARIANT_CONFIG[variant];
+  return rewriteImageUrlForWidth(
+    rawUrl,
+    spec.width,
+    spec.quality,
+    spec.cloudinaryQuality
+  ).url;
+}
+
+/**
+ * Builds a responsive `srcSet` string (`400w, 640w, ...`) for Unsplash and
+ * Cloudinary URLs so 2x/3x Retina displays select sharp AVIF/WebP candidates.
+ */
+export function getOptimizedPinImageSrcSet(
+  rawUrl: string,
+  variant: PinImageVariant
+): string | undefined {
+  const spec = VARIANT_CONFIG[variant];
+  const probe = rewriteImageUrlForWidth(
+    rawUrl,
+    spec.width,
+    spec.quality,
+    spec.cloudinaryQuality
+  );
+  if (!probe.supportsResponsiveWidth) {
+    return undefined;
+  }
+  return spec.srcSetWidths
+    .map((w) => {
+      const entry = rewriteImageUrlForWidth(
+        rawUrl,
+        w,
+        spec.quality,
+        spec.cloudinaryQuality
+      );
+      return `${entry.url} ${w}w`;
+    })
+    .join(", ");
+}
+
+/**
+ * Optimizes Cloudinary video URLs with automatic codec (`vc_auto`), format
+ * (`f_auto`), perceptual quality (`q_auto:good` / `q_auto:best`), and width cap.
+ */
+export function getOptimizedVideoUrl(
+  rawUrl: string,
+  variant: "card" | "hero"
+): string {
+  const trimmed = (rawUrl || "").trim();
+  if (!trimmed) return rawUrl;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.hostname === "res.cloudinary.com") {
+      const marker = "/video/upload/";
+      const markerIdx = parsed.pathname.indexOf(marker);
+      if (markerIdx !== -1) {
+        const prefix = parsed.pathname.slice(0, markerIdx + marker.length);
+        const rest = parsed.pathname.slice(markerIdx + marker.length);
+        const slashIdx = rest.indexOf("/");
+        if (slashIdx > 0) {
+          const firstSeg = rest.slice(0, slashIdx);
+          if (/^v\d+$/.test(firstSeg)) {
+            const transform =
+              variant === "hero"
+                ? "f_auto,vc_auto,q_auto:best,w_1280,c_limit"
+                : "f_auto,vc_auto,q_auto:good,w_640,c_limit";
+            parsed.pathname = `${prefix}${transform}/${rest}`;
+            return parsed.toString();
+          }
         }
       }
     }
@@ -411,7 +555,7 @@ export function resolveAspectRatioCss(aspectClass?: string | null): string {
 const preloadedHeroUrls = new Set<string>();
 
 /**
- * Warms both card (480w) and hero (1080w) image variants in the browser cache
+ * Warms Retina-appropriate hero image variants in the browser cache
  * before a user taps or swipes into an adjacent Pin detail page.
  */
 export function preloadPinHeroImages(
@@ -422,19 +566,22 @@ export function preloadPinHeroImages(
 ): void {
   if (typeof window === "undefined" || !pin?.coverImageUrl) return;
   const cover = pin.mediaUrls?.[0] || pin.coverImageUrl;
-  const urls = [
-    getOptimizedPinImageUrl(cover, "card"),
-    getOptimizedPinImageUrl(cover, "hero"),
-  ];
-  for (const url of urls) {
-    if (!url || preloadedHeroUrls.has(url)) continue;
-    if (preloadedHeroUrls.size >= 120) {
-      preloadedHeroUrls.clear();
-    }
-    preloadedHeroUrls.add(url);
-    const img = new window.Image();
-    img.decoding = "async";
-    img.src = url;
+  const heroUrl = getOptimizedPinImageUrl(cover, "hero");
+  const heroSrcSet = getOptimizedPinImageSrcSet(cover, "hero");
+  const cacheKey = `${heroUrl}|${heroSrcSet || ""}`;
+
+  if (preloadedHeroUrls.has(cacheKey)) return;
+  if (preloadedHeroUrls.size >= 120) {
+    preloadedHeroUrls.clear();
   }
+  preloadedHeroUrls.add(cacheKey);
+
+  const img = new window.Image();
+  img.decoding = "async";
+  img.sizes = PIN_IMAGE_SIZES.hero;
+  if (heroSrcSet) {
+    img.srcset = heroSrcSet;
+  }
+  img.src = heroUrl;
 }
 

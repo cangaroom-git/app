@@ -18,6 +18,7 @@ import {
   type PlatformNavTabId,
 } from "@/components/navigation/NavigationIcons";
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
+import { RouteProgressBar } from "@/components/navigation/RouteProgressBar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
 import { CookieConsentBanner } from "@/components/privacy/CookieConsentBanner";
 
@@ -318,6 +319,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <PlatformAppContext.Provider value={contextValue}>
+      <RouteProgressBar />
       {isAuthFullScreenPage ? (
         <main className="flex min-h-screen flex-col">
           {children}

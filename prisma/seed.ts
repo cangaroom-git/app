@@ -1415,7 +1415,7 @@ async function main() {
           "Silently drifting valley mist right outside your private mountain balcony.",
         coverImageUrl: CLOUDINARY_SAPAN_HERO,
         mediaUrls: [CLOUDINARY_SAPAN_HERO],
-        videoUrl: "https://assets.mixkit.co/videos/4716/4716-720.mp4",
+        videoUrl: "https://assets.mixkit.co/videos/28342/28342-720.mp4",
         aspectRatio: "aspect-[3/4]",
         provinceId: "nan",
         stayStyles: ["mountain", "bathtub"],

@@ -35,6 +35,7 @@ import {
   SmartSearchDropdown,
   type SmartSearchSelectQueryPayload,
 } from "@/components/navigation/SmartSearchDropdown";
+import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type { AuthenticatedMeDto } from "@/types/cangaroom";
 import {
@@ -327,6 +328,7 @@ export function PrimaryNavigation({
       setIsFloatingSearchOpen(false);
       desktopSearchInputRef.current?.blur();
       floatingSearchInputRef.current?.blur();
+      startRouteProgress();
       router.push(`/${hotel.slug}`);
     },
     [language, router]
@@ -338,6 +340,7 @@ export function PrimaryNavigation({
       setIsFloatingSearchOpen(false);
       desktopSearchInputRef.current?.blur();
       floatingSearchInputRef.current?.blur();
+      startRouteProgress();
       router.push(`/?stay=${encodeURIComponent(pin.id)}`);
     },
     [router]

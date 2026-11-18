@@ -61,6 +61,25 @@ export function mapPinToDto(
       ? Math.min(...pin.hotel.rooms.map((r) => r.weekdayPriceThb))
       : null;
 
+  const seenMediaKeys = new Set<string>();
+  const cleanedMediaUrls: string[] = [];
+  for (const raw of pin.mediaUrls) {
+    const clean = (raw || "").trim();
+    if (!clean || clean.includes("res.cloudinary.com/dxxb2gvyw/")) continue;
+    let key = clean;
+    try {
+      const u = new URL(clean);
+      if (u.hostname === "images.unsplash.com") {
+        key = `${u.origin}${u.pathname}`;
+      }
+    } catch {
+      // keep literal URL as dedupe key
+    }
+    if (seenMediaKeys.has(key)) continue;
+    seenMediaKeys.add(key);
+    cleanedMediaUrls.push(clean);
+  }
+
   return {
     id: pin.id,
     hotelId: pin.hotelId,
@@ -84,7 +103,7 @@ export function mapPinToDto(
     descriptionEn: pin.descriptionEn || pin.descriptionTh,
     coverImageUrl: pin.coverImageUrl,
     mediaUrls:
-      pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl],
+      cleanedMediaUrls.length > 0 ? cleanedMediaUrls : [pin.coverImageUrl],
     videoUrl: pin.videoUrl,
     aspectRatio: pin.aspectRatio || "aspect-[3/4]",
     provinceId: pin.provinceId,

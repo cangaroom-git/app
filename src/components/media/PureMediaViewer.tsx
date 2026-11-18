@@ -2,6 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  getOptimizedPinImageSrcSet,
+  getOptimizedPinImageUrl,
+  getOptimizedVideoUrl,
+  PIN_IMAGE_SIZES,
+} from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { UniversalVideoPlayer } from "@/components/media/UniversalVideoPlayer";
 
@@ -134,8 +140,18 @@ export function PureMediaViewer({
               }
             >
               <UniversalVideoPlayer
-                videoUrl={activeSlide.url}
-                posterUrl={activeSlide.posterUrl}
+                videoUrl={getOptimizedVideoUrl(activeSlide.url, "hero")}
+                posterUrl={
+                  activeSlide.posterUrl
+                    ? getOptimizedPinImageUrl(activeSlide.posterUrl, "full")
+                    : undefined
+                }
+                posterSrcSet={
+                  activeSlide.posterUrl
+                    ? getOptimizedPinImageSrcSet(activeSlide.posterUrl, "full")
+                    : undefined
+                }
+                posterSizes={PIN_IMAGE_SIZES.full}
                 title={activeSlide.caption || "Video"}
                 aspectRatio={activeSlide.aspectRatio || "9/16"}
                 autoPlay={true}
@@ -145,8 +161,11 @@ export function PureMediaViewer({
           ) : (
             <img
               key={activeSlide.url}
-              src={activeSlide.url}
+              src={getOptimizedPinImageUrl(activeSlide.url, "full")}
+              srcSet={getOptimizedPinImageSrcSet(activeSlide.url, "full")}
+              sizes={PIN_IMAGE_SIZES.full}
               alt={activeSlide.caption || "Photo"}
+              decoding="async"
               draggable={false}
               className="max-h-[80dvh] max-w-[92vw] sm:max-w-[84vw] object-contain rounded-[8px]"
             />

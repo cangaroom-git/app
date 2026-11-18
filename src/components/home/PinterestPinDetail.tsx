@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -21,6 +22,7 @@ import {
   Flag,
   Heart,
   Link2,
+  Loader2,
   Maximize2,
   MessageCircle,
   MoreHorizontal,
@@ -32,11 +34,15 @@ import {
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import {
+  getOptimizedPinImageSrcSet,
   getOptimizedPinImageUrl,
+  getOptimizedVideoUrl,
   parseVideoSource,
+  PIN_IMAGE_SIZES,
   preloadPinHeroImages,
   resolveAspectRatioCss,
 } from "@/lib/mediaUtils";
+import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { trackPinInteraction } from "@/lib/telemetry/clientTelemetry";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type {
@@ -392,6 +398,7 @@ export function PinterestPinCard({
 }: PinterestPinCardProps) {
   const title = language === "th" ? pin.titleTh : pin.titleEn;
   const cardImageUrl = getOptimizedPinImageUrl(pin.coverImageUrl, "card");
+  const cardImageSrcSet = getOptimizedPinImageSrcSet(pin.coverImageUrl, "card");
 
   const parsedVideo = pin.videoUrl
     ? parseVideoSource(pin.videoUrl, {
@@ -401,10 +408,19 @@ export function PinterestPinCard({
       })
     : null;
   const isInlineMp4Video = parsedVideo?.provider === "mp4";
+  const optimizedCardVideoUrl =
+    isInlineMp4Video && parsedVideo
+      ? getOptimizedVideoUrl(parsedVideo.embedUrl, "card")
+      : null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   useEffect(() => {
-    if (!isInlineMp4Video) return;
+    setIsVideoPlaying(false);
+  }, [optimizedCardVideoUrl]);
+
+  useEffect(() => {
+    if (!isInlineMp4Video || !optimizedCardVideoUrl) return;
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
@@ -412,6 +428,7 @@ export function PinterestPinCard({
     videoEl.defaultMuted = true;
 
     if (typeof IntersectionObserver === "undefined") {
+      videoEl.preload = "metadata";
       videoEl.play().catch(() => {});
       return;
     }
@@ -420,18 +437,21 @@ export function PinterestPinCard({
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
+            if (videoEl.preload === "none") {
+              videoEl.preload = "metadata";
+            }
             videoEl.play().catch(() => {});
           } else {
             videoEl.pause();
           }
         }
       },
-      { threshold: 0.2 }
+      { rootMargin: "180px 0px", threshold: 0.15 }
     );
 
     observer.observe(videoEl);
     return () => observer.disconnect();
-  }, [isInlineMp4Video, parsedVideo?.embedUrl]);
+  }, [isInlineMp4Video, optimizedCardVideoUrl]);
 
   const mediaBoxRef = useRef<HTMLDivElement | null>(null);
   const impressionLoggedRef = useRef(false);
@@ -504,21 +524,40 @@ export function PinterestPinCard({
         onTouchStart={() => preloadPinHeroImages(pin)}
         className={`group relative w-full ${pin.aspectRatio} rounded-[14px] sm:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
       >
-        {isInlineMp4Video && parsedVideo ? (
-          <video
-            ref={videoRef}
-            src={parsedVideo.embedUrl}
-            poster={cardImageUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="h-full w-full object-cover object-center pointer-events-none"
-          />
+        {isInlineMp4Video && optimizedCardVideoUrl ? (
+          <>
+            <img
+              src={cardImageUrl}
+              srcSet={cardImageSrcSet}
+              sizes={PIN_IMAGE_SIZES.card}
+              alt={title}
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
+              decoding="async"
+              draggable={false}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+            <video
+              ref={videoRef}
+              src={optimizedCardVideoUrl}
+              poster={cardImageUrl}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="none"
+              onPlaying={() => setIsVideoPlaying(true)}
+              onError={() => setIsVideoPlaying(false)}
+              className={`relative z-[1] h-full w-full object-cover object-center pointer-events-none transition-opacity duration-200 ${
+                isVideoPlaying ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          </>
         ) : (
           <img
             src={cardImageUrl}
+            srcSet={cardImageSrcSet}
+            sizes={PIN_IMAGE_SIZES.card}
             alt={title}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
@@ -665,6 +704,8 @@ function MobileAdjacentPinPreview({
         />
         <img
           src={getOptimizedPinImageUrl(coverSource, "hero")}
+          srcSet={getOptimizedPinImageSrcSet(coverSource, "hero")}
+          sizes={PIN_IMAGE_SIZES.hero}
           alt={title}
           loading="eager"
           decoding="sync"
@@ -673,36 +714,43 @@ function MobileAdjacentPinPreview({
         />
       </div>
 
-      <div className="px-4 py-3 flex items-center justify-between gap-2 bg-[var(--color-background-card)]">
-        <div className="flex items-center gap-1">
-          <span className="h-10 px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
+      <div className="px-3.5 sm:px-4 py-3 flex items-center justify-between gap-1.5 bg-[var(--color-background-card)]">
+        <div className="flex items-center gap-0.5 sm:gap-1">
+          <span className="h-10 px-2 sm:px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
             <Heart className="w-[21px] h-[21px]" strokeWidth={2.1} />
             {pin.likesCount > 0 && <span>{pin.likesCount}</span>}
           </span>
-          <span className="h-10 px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
+          <span className="h-10 px-2 sm:px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
             <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
             {pin.commentsCount > 0 && <span>{pin.commentsCount}</span>}
           </span>
-          <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+          <span className="h-10 w-9 sm:w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
             <Share className="w-[20px] h-[20px]" strokeWidth={2.1} />
           </span>
         </div>
 
-        <span
-          className={`h-10 px-4 rounded-[14px] ty-body font-bold inline-flex items-center justify-center ${
-            isSaved
-              ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
-              : "bg-[var(--color-promo)] !text-white"
-          }`}
-        >
-          {isSaved
-            ? language === "th"
-              ? "บันทึกแล้ว"
-              : "Saved"
-            : language === "th"
-            ? "บันทึก"
-            : "Save"}
-        </span>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <span className="h-10 px-3 sm:px-3.5 rounded-[14px] bg-[var(--color-background-muted)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center gap-1 whitespace-nowrap">
+            <span>{language === "th" ? "เข้าชมที่พัก" : "Visit stay"}</span>
+            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+          </span>
+
+          <span
+            className={`h-10 px-3.5 sm:px-4 rounded-[14px] ty-body font-bold inline-flex items-center justify-center whitespace-nowrap ${
+              isSaved
+                ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
+                : "bg-[var(--color-promo)] !text-white"
+            }`}
+          >
+            {isSaved
+              ? language === "th"
+                ? "บันทึกแล้ว"
+                : "Saved"
+              : language === "th"
+              ? "บันทึก"
+              : "Save"}
+          </span>
+        </div>
       </div>
 
       <div className="px-4 pt-2 pb-6 space-y-3 bg-[var(--color-background-card)]">
@@ -732,15 +780,6 @@ function MobileAdjacentPinPreview({
                 : ""}
             </p>
           </div>
-        </div>
-
-        <div className="w-full h-11 rounded-[14px] bg-[var(--color-background-muted)] text-[14px] font-bold text-[var(--color-text-primary)] flex items-center justify-center gap-1.5">
-          <span>
-            {language === "th"
-              ? "เยี่ยมชมที่พัก · ดูห้องว่าง"
-              : "Visit stay & check rooms"}
-          </span>
-          <ArrowUpRight className="w-4 h-4" />
         </div>
 
         <h2 className="text-[16.5px] font-bold text-[var(--color-text-primary)] leading-snug">
@@ -799,6 +838,8 @@ export function PinterestPinDetail({
   onAddComment,
   onDeleteComment,
 }: PinterestPinDetailProps) {
+  const router = useRouter();
+  const pathname = usePathname() || "/";
   const [slideIndex, setSlideIndex] = useState(0);
   const [isCarouselAnimated, setIsCarouselAnimated] = useState(false);
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
@@ -815,6 +856,13 @@ export function PinterestPinDetail({
   const [isDesktopCommentsOpen, setIsDesktopCommentsOpen] = useState(true);
   const [pullDownOffset, setPullDownOffset] = useState(0);
   const [isPullingDown, setIsPullingDown] = useState(false);
+  const [isNavigatingToHotel, setIsNavigatingToHotel] = useState(false);
+  const [failedMediaUrls, setFailedMediaUrls] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [loadedHeroUrls, setLoadedHeroUrls] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const commentInputRef = useRef<HTMLInputElement | null>(null);
   const desktopCommentInputRef = useRef<HTMLInputElement | null>(null);
@@ -879,6 +927,9 @@ export function PinterestPinDetail({
     setReplyingTo(null);
     setPullDownOffset(0);
     setIsPullingDown(false);
+    setIsNavigatingToHotel(false);
+    setFailedMediaUrls(new Set());
+    setLoadedHeroUrls(new Set());
 
     if (carouselTrackRef.current) {
       carouselTrackRef.current.style.transition = "none";
@@ -918,11 +969,21 @@ export function PinterestPinDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin.id]);
 
-  // Preload adjacent card hero images so horizontal card-to-card swipes never flash
+  // Preload adjacent card hero images + prefetch hotel storefront route for instant 1-tap transition
   useEffect(() => {
     preloadPinHeroImages(prevPinPreview);
     preloadPinHeroImages(nextPinPreview);
   }, [prevPinPreview, nextPinPreview]);
+
+  useEffect(() => {
+    if (pin.hotelSlug) {
+      router.prefetch(`/${pin.hotelSlug}`);
+    }
+  }, [pin.hotelSlug, router]);
+
+  useEffect(() => {
+    setIsNavigatingToHotel(false);
+  }, [pathname]);
 
   // Close Comments Sheet on Escape
   useEffect(() => {
@@ -1026,8 +1087,83 @@ export function PinterestPinDetail({
     };
   }, [pin.id]);
 
-  const images =
-    pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl];
+  const baseImages = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    const rawList =
+      pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl];
+    for (const raw of rawList) {
+      const clean = (raw || "").trim();
+      if (!clean || clean.includes("res.cloudinary.com/dxxb2gvyw/")) continue;
+      let key = clean;
+      try {
+        const u = new URL(clean);
+        if (u.hostname === "images.unsplash.com") {
+          key = `${u.origin}${u.pathname}`;
+        }
+      } catch {
+        // use raw string as dedupe key
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push(clean);
+    }
+    return list.length > 0 ? list : [pin.coverImageUrl];
+  }, [pin.mediaUrls, pin.coverImageUrl]);
+
+  const images = useMemo(() => {
+    const filtered = baseImages.filter((url) => !failedMediaUrls.has(url));
+    return filtered.length > 0 ? filtered : baseImages.slice(0, 1);
+  }, [baseImages, failedMediaUrls]);
+
+  useEffect(() => {
+    if (slideIndex >= images.length) {
+      setSlideIndex(Math.max(0, images.length - 1));
+    }
+  }, [slideIndex, images.length]);
+
+  const handleMarkMediaError = (brokenUrl: string) => {
+    setFailedMediaUrls((prev) => {
+      if (prev.has(brokenUrl)) return prev;
+      const next = new Set(prev);
+      next.add(brokenUrl);
+      return next;
+    });
+  };
+
+  const handleMarkHeroLoaded = (loadedUrl: string) => {
+    setLoadedHeroUrls((prev) => {
+      if (prev.has(loadedUrl)) return prev;
+      const next = new Set(prev);
+      next.add(loadedUrl);
+      return next;
+    });
+  };
+
+  const handleVisitHotelClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
+    const targetPath = `/${pin.hotelSlug}`;
+    if (pathname === targetPath) {
+      e.preventDefault();
+      onClose();
+      window.setTimeout(() => {
+        document
+          .getElementById("section-rooms")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 40);
+      return;
+    }
+    if (
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      e.button === 0
+    ) {
+      setIsNavigatingToHotel(true);
+      startRouteProgress();
+    }
+  };
 
   const navigateCarouselSlide = (
     nextIdxOrFn: number | ((prev: number) => number)
@@ -1260,7 +1396,11 @@ export function PinterestPinDetail({
         Boolean(mediaStageRef.current?.contains(target));
       const ignore =
         insideMultiPhotoHero ||
-        Boolean(target?.closest("input, textarea, [data-swipe-ignore='true']"));
+        Boolean(
+          target?.closest(
+            "a, button, input, textarea, select, [role='button'], [data-swipe-ignore='true']"
+          )
+        );
 
       const now = performance.now();
       state = {
@@ -1297,8 +1437,8 @@ export function PinterestPinDetail({
         state.lastTime = now;
       }
 
-      if (state.locked === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-        if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+      if (state.locked === null && (Math.abs(dx) > 14 || Math.abs(dy) > 12)) {
+        if (Math.abs(dx) > Math.abs(dy) * 1.35) {
           state.locked = "horizontal";
           const scrollOff = getScrollOffset();
           if (leftPeekPanelRef.current) {
@@ -1680,11 +1820,16 @@ export function PinterestPinDetail({
           {pin.videoUrl ? (
             <div className="w-full h-full bg-[var(--color-background-body)] flex items-center justify-center">
               <UniversalVideoPlayer
-                videoUrl={pin.videoUrl}
-                posterUrl={getOptimizedPinImageUrl(pin.coverImageUrl, "card")}
+                videoUrl={getOptimizedVideoUrl(pin.videoUrl, "hero")}
+                posterUrl={getOptimizedPinImageUrl(pin.coverImageUrl, "hero")}
+                posterSrcSet={getOptimizedPinImageSrcSet(
+                  pin.coverImageUrl,
+                  "hero"
+                )}
+                posterSizes={PIN_IMAGE_SIZES.hero}
                 title={title}
                 aspectRatio={videoAspect}
-                fitMode="cover"
+                fitMode={videoAspect === "16/9" ? "contain" : "cover"}
                 autoPlay={true}
                 initialMuted={false}
               />
@@ -1701,31 +1846,40 @@ export function PinterestPinDetail({
                     : "none",
                 }}
               >
-                {images.map((imgUrl, idx) => (
-                  <div
-                    key={`${imgUrl}-${idx}`}
-                    className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
-                  >
-                    <img
-                      src={getOptimizedPinImageUrl(imgUrl, "card")}
-                      alt=""
-                      aria-hidden="true"
-                      loading={idx === 0 ? "eager" : "lazy"}
-                      decoding="sync"
-                      draggable={false}
-                      className="absolute inset-0 w-full h-full object-cover select-none"
-                    />
-                    <img
-                      src={getOptimizedPinImageUrl(imgUrl, "hero")}
-                      alt={idx === 0 ? title : `${title} (${idx + 1})`}
-                      loading={idx === 0 ? "eager" : "lazy"}
-                      fetchPriority={idx === 0 ? "high" : "auto"}
-                      decoding={idx === 0 ? "sync" : "async"}
-                      draggable={false}
-                      className="absolute inset-0 z-10 w-full h-full object-cover select-none"
-                    />
-                  </div>
-                ))}
+                {images.map((imgUrl, idx) => {
+                  const isHeroLoaded = loadedHeroUrls.has(imgUrl);
+                  return (
+                    <div
+                      key={`${imgUrl}-${idx}`}
+                      className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                    >
+                      {!isHeroLoaded && (
+                        <img
+                          src={getOptimizedPinImageUrl(imgUrl, "card")}
+                          alt=""
+                          aria-hidden="true"
+                          loading={idx === 0 ? "eager" : "lazy"}
+                          decoding="sync"
+                          draggable={false}
+                          className="absolute inset-0 w-full h-full object-cover select-none"
+                        />
+                      )}
+                      <img
+                        src={getOptimizedPinImageUrl(imgUrl, "hero")}
+                        srcSet={getOptimizedPinImageSrcSet(imgUrl, "hero")}
+                        sizes={PIN_IMAGE_SIZES.hero}
+                        alt={idx === 0 ? title : `${title} (${idx + 1})`}
+                        loading={idx <= 1 ? "eager" : "lazy"}
+                        fetchPriority={idx === 0 ? "high" : "auto"}
+                        decoding={idx === 0 ? "sync" : "async"}
+                        draggable={false}
+                        onLoad={() => handleMarkHeroLoaded(imgUrl)}
+                        onError={() => handleMarkMediaError(imgUrl)}
+                        className="relative z-10 w-full h-full object-cover select-none"
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
               {images.length > 1 && (
@@ -1769,13 +1923,13 @@ export function PinterestPinDetail({
           ref={detailsPanelRef}
           className="lg:col-span-6 min-h-0 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-card)] lg:border-l border-[var(--color-border)]"
         >
-          {/* 1. Clean Top Action Bar (♡ | 💬 | 📤 | •••  ...  [บันทึก] [✕]) */}
-          <div className="px-4 sm:px-5 py-3 flex items-center justify-between gap-2 shrink-0 lg:border-b border-[var(--color-border)]">
-            <div className="flex items-center gap-1">
+          {/* 1. Clean Top Action Bar (♡ | 💬 | 📤 | •••  ...  [เข้าชมที่พัก ↗] [บันทึก] [✕]) */}
+          <div className="px-3.5 sm:px-5 py-3 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 lg:border-b border-[var(--color-border)]">
+            <div className="flex items-center gap-0.5 sm:gap-1 min-w-0">
               <button
                 type="button"
                 onClick={() => onToggleLike(pin.id)}
-                className="h-10 px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-10 px-2 sm:px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1 sm:gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 <Heart
                   className={`w-[21px] h-[21px] ${
@@ -1794,7 +1948,7 @@ export function PinterestPinDetail({
                 aria-label={
                   language === "th" ? "เปิดดูความคิดเห็น" : "Open comments"
                 }
-                className="h-10 px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-10 px-2 sm:px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1 sm:gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
               >
                 <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
                 {totalCommentsCount > 0 && <span>{totalCommentsCount}</span>}
@@ -1804,7 +1958,7 @@ export function PinterestPinDetail({
                 type="button"
                 onClick={handleShareWithFeedback}
                 aria-label="Share"
-                className="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                className="h-10 w-9 sm:w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer shrink-0"
               >
                 {justCopied ? (
                   <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
@@ -1829,11 +1983,36 @@ export function PinterestPinDetail({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div
+              data-swipe-ignore="true"
+              className="flex items-center gap-1.5 sm:gap-2 shrink-0"
+            >
+              <Link
+                href={`/${pin.hotelSlug}`}
+                prefetch={true}
+                onClick={handleVisitHotelClick}
+                aria-busy={isNavigatingToHotel}
+                className={`h-10 px-3 sm:px-3.5 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] sm:text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
+                  isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
+                }`}
+              >
+                <span>
+                  {language === "th" ? "เข้าชมที่พัก" : "Visit stay"}
+                </span>
+                {isNavigatingToHotel ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                ) : (
+                  <ArrowUpRight
+                    className="w-3.5 h-3.5 shrink-0"
+                    strokeWidth={2.2}
+                  />
+                )}
+              </Link>
+
               <button
                 type="button"
                 onClick={() => onToggleSave(pin.id)}
-                className={`h-10 px-4 rounded-[14px] ty-body font-bold transition cursor-pointer ${
+                className={`h-10 px-3.5 sm:px-4 rounded-[14px] ty-body font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
                   isSaved
                     ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
                     : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
@@ -1855,21 +2034,21 @@ export function PinterestPinDetail({
                   language === "th" ? "ปิดกลับหน้าแรก" : "Close to Home feed"
                 }
                 aria-label={language === "th" ? "ปิด" : "Close"}
-                className="hidden lg:inline-flex h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="hidden lg:inline-flex h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors shrink-0"
               >
                 <X className="w-4 h-4" strokeWidth={2.2} />
               </button>
             </div>
           </div>
 
-          {/* 2. Clean Minimal Info Body (Author + Multi-Photo Thumbnail Strip + Full-Width CTA + Title/Desc!) */}
+          {/* 2. Clean Minimal Info Body (Author + Multi-Photo Thumbnail Strip + Title/Desc!) */}
           <div className="px-4 sm:px-5 pt-2 pb-4 lg:py-4 flex-1 min-h-0 lg:overflow-y-auto space-y-3.5">
-            {/* PINTEREST RED-BOX ZONE: Author + Multi-Photo Squircle Thumbnail Strip + Full-Width Visit Button */}
             <div className="space-y-3">
               {/* Row 1: Property Identity */}
               <Link
                 href={`/${pin.hotelSlug}`}
-                onClick={() => trackPinInteraction("HOTEL_PROFILE_VIEW", pin)}
+                prefetch={true}
+                onClick={handleVisitHotelClick}
                 className="inline-flex items-center gap-2.5 min-w-0 group/author"
               >
                 {pin.hotelLogoUrl ? (
@@ -1899,7 +2078,7 @@ export function PinterestPinDetail({
                 </div>
               </Link>
 
-              {/* Row 2: Pinterest Multi-Photo Squircle Thumbnail Strip + '>' Next Arrow (Replaces Left/Right Overlay Buttons!) */}
+              {/* Row 2: Pinterest Multi-Photo Squircle Thumbnail Strip + '>' Next Arrow */}
               {images.length > 1 && !pin.videoUrl && (
                 <div
                   data-swipe-ignore="true"
@@ -1922,7 +2101,7 @@ export function PinterestPinDetail({
                               ? `ดูภาพที่ ${idx + 1}`
                               : `View photo ${idx + 1}`
                           }
-                          className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[13px] overflow-hidden shrink-0 cursor-pointer transition-all ${
+                          className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[13px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${
                             isCurrent
                               ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-card)] opacity-100"
                               : "border border-[var(--color-border)] opacity-75 hover:opacity-100"
@@ -1930,10 +2109,13 @@ export function PinterestPinDetail({
                         >
                           <img
                             src={getOptimizedPinImageUrl(imgUrl, "thumb")}
+                            srcSet={getOptimizedPinImageSrcSet(imgUrl, "thumb")}
+                            sizes={PIN_IMAGE_SIZES.thumb}
                             alt={`${title} ${idx + 1}`}
                             loading="eager"
                             decoding="async"
                             draggable={false}
+                            onError={() => handleMarkMediaError(imgUrl)}
                             className="w-full h-full object-cover"
                           />
                         </button>
@@ -1953,20 +2135,6 @@ export function PinterestPinDetail({
                   </button>
                 </div>
               )}
-
-              {/* Row 3: Full-Width Secondary Visit Stay Button (Matches Pinterest "เยี่ยมชมเว็บไซต์"!) */}
-              <Link
-                href={`/${pin.hotelSlug}`}
-                onClick={() => trackPinInteraction("HOTEL_PROFILE_VIEW", pin)}
-                className="w-full h-11 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-bold text-[var(--color-text-primary)] flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <span>
-                  {language === "th"
-                    ? "เยี่ยมชมที่พัก · ดูห้องว่าง"
-                    : "Visit stay & check rooms"}
-                </span>
-                <ArrowUpRight className="w-4 h-4" />
-              </Link>
             </div>
 
             {/* Pin Title + Expandable Chevron (Matches Pinterest App Image 1!) */}

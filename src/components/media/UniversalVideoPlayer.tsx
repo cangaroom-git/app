@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { parseVideoSource } from "@/lib/mediaUtils";
 
 export interface UniversalVideoPlayerProps {
   videoUrl: string;
   posterUrl?: string;
+  posterSrcSet?: string;
+  posterSizes?: string;
   title?: string;
   aspectRatio?: "9/16" | "16/9";
   fitMode?: "cover" | "contain";
@@ -17,11 +19,14 @@ export interface UniversalVideoPlayerProps {
 
 /**
  * Renders YouTube, YouTube Shorts, Facebook Reels/Video, or direct MP4 URLs.
- * Supports `fitMode="contain"` for true uncropped aspect ratio inside Pin Close-Up.
+ * Supports `fitMode="contain"` for true uncropped aspect ratio inside Pin Close-Up
+ * and sharp Retina poster crossfade while buffering.
  */
 export function UniversalVideoPlayer({
   videoUrl,
   posterUrl,
+  posterSrcSet,
+  posterSizes,
   title = "Video player",
   aspectRatio = "9/16",
   fitMode = "cover",
@@ -32,12 +37,18 @@ export function UniversalVideoPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlayingMp4, setIsPlayingMp4] = useState(autoPlay);
   const [isMutedMp4, setIsMutedMp4] = useState(initialMuted);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   const parsed = parseVideoSource(videoUrl, {
     autoplay: autoPlay,
     muted: initialMuted,
     forceVertical: aspectRatio === "9/16",
   });
+
+  useEffect(() => {
+    setIsVideoReady(false);
+    setIsPlayingMp4(autoPlay);
+  }, [parsed.embedUrl, autoPlay]);
 
   const aspectClass =
     fitMode === "contain"
@@ -97,6 +108,9 @@ export function UniversalVideoPlayer({
     }
   };
 
+  const mediaFitClass =
+    fitMode === "contain" ? "object-contain" : "object-cover";
+
   return (
     <div
       className={`group relative w-full ${aspectClass} ${
@@ -105,6 +119,19 @@ export function UniversalVideoPlayer({
           : "bg-black"
       } overflow-hidden flex items-center justify-center ${className}`}
     >
+      {posterUrl && (
+        <img
+          src={posterUrl}
+          srcSet={posterSrcSet}
+          sizes={posterSizes}
+          alt={title}
+          decoding="sync"
+          className={`absolute inset-0 w-full h-full ${mediaFitClass} pointer-events-none transition-opacity duration-200 ${
+            isVideoReady ? "opacity-0" : "opacity-100"
+          }`}
+        />
+      )}
+
       <video
         ref={videoRef}
         key={parsed.embedUrl}
@@ -114,10 +141,17 @@ export function UniversalVideoPlayer({
         playsInline
         loop
         muted={isMutedMp4}
+        preload={autoPlay ? "auto" : "metadata"}
+        onLoadedData={() => setIsVideoReady(true)}
+        onPlaying={() => {
+          setIsPlayingMp4(true);
+          setIsVideoReady(true);
+        }}
+        onPause={() => setIsPlayingMp4(false)}
         onClick={handleTogglePlay}
-        className={`w-full h-full ${
-          fitMode === "contain" ? "object-contain" : "object-cover"
-        } cursor-pointer`}
+        className={`relative z-[1] w-full h-full ${mediaFitClass} cursor-pointer transition-opacity duration-200 ${
+          isVideoReady || !posterUrl ? "opacity-100" : "opacity-0"
+        }`}
       />
 
       {!isPlayingMp4 && (
@@ -125,7 +159,7 @@ export function UniversalVideoPlayer({
           type="button"
           onClick={handleTogglePlay}
           aria-label="Play video"
-          className="absolute inset-0 m-auto h-14 w-14 rounded-[18px] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer"
+          className="absolute inset-0 z-10 m-auto h-14 w-14 rounded-[18px] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md transition cursor-pointer"
         >
           <Play className="w-6 h-6 fill-white ml-0.5" />
         </button>
