@@ -2,153 +2,161 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================================
-   CANGAROOM · PINTEREST GESTALT & INSTAGRAM MINIMAL DESIGN SYSTEM
-   1. Pure White Canvas (#FFFFFF) + Soft Gray Pills (#F1F1F1 / #EFEFEF)
-   2. Dark Mode: Sleek Charcoal (#121212) + Elevated Surfaces (#1E1E1E)
-   3. Save / Promo Red (#E60023) + Booking Accent (#0866FF)
-   4. Native Thai + English System Font Stack (SF Pro / ThonburiUI / Segoe UI)
+   CANGAROOM · AIRBNB WARM MINIMAL & PINTEREST GESTALT DESIGN SYSTEM
+   1. Pure White Canvas (#FFFFFF) + Soft Cloud Surface (#F7F7F7 / #EBEBEB)
+   2. Warm Charcoal Primary Ink (#222222, hover #3F3F3F) + Foggy Secondary (#6A6A6A)
+   3. 2-Tier Hairlines: Structural (#DDDDDD), Subtle (#EBEBEB), Input (#B0B0B0)
+   4. Reserved 5% Pin Save Red (#E60023) + Earthy Semantic Dots
    ============================================================================ */
 :root {
-  /* Strict 95/5 Monochrome Core Tokens (Light Mode) */
-  --color-accent: #111111;
-  --color-accent-hover: #262626;
-  --color-accent-muted: #f1f1f1;
+  /* Airbnb DLS Warm Monochrome Core Tokens (Light Mode) */
+  --color-accent: #222222;
+  --color-accent-hover: #3f3f3f;
+  --color-accent-muted: #f7f7f7;
   --color-on-accent: #ffffff;
-  --color-tiktok-accent: #111111;
-  --color-tiktok-accent-hover: #262626;
+  --color-tiktok-accent: #222222;
+  --color-tiktok-accent-hover: #3f3f3f;
   --color-tiktok-on-accent: #ffffff;
-  --color-tiktok-gray: #efefef;
-  --color-tiktok-gray-hover: #e4e4e4;
-  --color-fastwork: #111111;
+  --color-tiktok-gray: #f7f7f7;
+  --color-tiktok-gray-hover: #ebebeb;
+  --color-fastwork: #222222;
   --color-on-fastwork: #ffffff;
-  --color-neutral: rgba(0, 0, 0, 0.05);
+  --color-neutral: rgba(0, 0, 0, 0.04);
 
   /* Reserved 5% Red — Pin Save Button & Nav Notification Dots ONLY (#e60023) */
   --color-promo: #e60023;
   --color-promo-hover: #ad081b;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #f1f1f1;
-  --color-promo-border: #d4d4d4;
-  --color-promo-text: #111111;
+  --color-promo-muted: #f7f7f7;
+  --color-promo-border: #dddddd;
+  --color-promo-text: #222222;
 
-  /* Pure White Surface Hierarchy (Light Mode) */
+  /* Pure White + Airbnb Soft Cloud (#F7F7F7) Surface Hierarchy (Light Mode) */
   --color-background-body: #ffffff;
   --color-background-surface: #ffffff;
   --color-background-card: #ffffff;
   --color-background-popover: #ffffff;
-  --color-background-muted: #f1f1f1;     /* Search bar, secondary button & input fill */
-  --color-background-subtle: #e4e4e4;    /* Secondary surface hover */
+  --color-background-muted: #f7f7f7;     /* Airbnb --palette-faint (#F7F7F7) */
+  --color-background-subtle: #ebebeb;    /* Airbnb --palette-bebe (#EBEBEB) */
   --color-sidebar-bg: #ffffff;
 
   /* Zero Card Shadow Rule (Popover shadow allowed strictly on floating menus) */
   --shadow-card: none;
-  --shadow-popover: 0 8px 28px 0 rgba(0, 0, 0, 0.12);
+  --shadow-popover: 0 6px 20px 0 rgba(0, 0, 0, 0.14);
 
-  /* Monochrome Ink Tokens (Light Mode) */
-  --color-text-primary: #111111;
-  --color-text-secondary: #737373;
-  --color-text-disabled: #cdcdcd;
-  --color-text-accent: #111111;
+  /* Warm Charcoal Ink Tokens (Airbnb --palette-hof & --palette-foggy) */
+  --color-text-primary: #222222;
+  --color-text-secondary: #6a6a6a;
+  --color-text-tertiary: #8c8c8c;
+  --color-text-disabled: #c1c1c1;
+  --color-text-accent: #222222;
 
-  /* Crisp 1px Hairline Dividers (Light Mode) */
-  --color-border: #ebebeb;
-  --color-border-emphasized: #d4d4d4;
-  --color-overlay-hover: rgba(0, 0, 0, 0.05);
-  --color-overlay-pressed: rgba(0, 0, 0, 0.10);
+  /* Crisp 1px Hairline Dividers (Airbnb --palette-deco #DDDDDD & --palette-bobo #B0B0B0) */
+  --color-border-subtle: #ebebeb;
+  --color-border: #dddddd;
+  --color-border-emphasized: #b0b0b0;
+  --color-overlay-hover: rgba(0, 0, 0, 0.04);
+  --color-overlay-pressed: rgba(0, 0, 0, 0.08);
 
   /* Custom Scrollbar Tokens */
-  --color-scrollbar-thumb: rgba(0, 0, 0, 0.22);
-  --color-scrollbar-thumb-hover: rgba(0, 0, 0, 0.38);
-  --color-scrollbar-thumb-active: rgba(0, 0, 0, 0.55);
+  --color-scrollbar-thumb: rgba(34, 34, 34, 0.22);
+  --color-scrollbar-thumb-hover: rgba(34, 34, 34, 0.38);
+  --color-scrollbar-thumb-active: rgba(34, 34, 34, 0.55);
 
-  /* Semantic Text/Dot Tokens (Muted backgrounds stay neutral #f1f1f1) */
-  --color-success: #15803d;
-  --color-success-muted: #f1f1f1;
+  /* Airbnb Earthy Semantic Tokens (Spruce #008A05, Arches #C13515, Ondo #E07912) */
+  --color-success: #008a05;
+  --color-success-muted: #f7f7f7;
   --color-on-success: #ffffff;
 
-  --color-error: #dc2626;
-  --color-error-muted: #f1f1f1;
+  --color-error: #c13515;
+  --color-error-muted: #f7f7f7;
   --color-on-error: #ffffff;
 
-  --color-warning: #b45309;
-  --color-warning-muted: #f1f1f1;
-  --color-on-warning: #111111;
+  --color-warning: #e07912;
+  --color-warning-muted: #f7f7f7;
+  --color-on-warning: #222222;
 
   /* Standardized Layout & Right Drawer Dimensions */
   --feed-max-width: 1120px;
-  --right-drawer-tablet-width: 460px;
-  --right-drawer-desktop-width: 520px;
+  --right-drawer-tablet-width: 480px;
+  --right-drawer-desktop-width: 540px;
+  --cgr-sticky-header-offset: 4rem;
 
-  /* Clean Architectural Squircle Radii (Unified with Mobile Bottom Menu) */
+  /* Clean Architectural Squircle Radii (Airbnb DLS 8 / 12 / 16 / 20) */
   --radius-inner: 10px;
-  --radius-button: 14px;
-  --radius-element: 14px;
+  --radius-button: 12px;
+  --radius-element: 12px;
   --radius-container: 16px;
   --radius-page: 20px;
   --radius-full: 9999px;
 
   /* ==========================================================================
-     FACEBOOK COMET 5-TIER TYPOGRAPHY SCALE (THAI + ENGLISH)
-     1. Display (Page / Resort Title): 24px (1.5rem)
-     2. Title (Section Heading): 20px (1.25rem)
+     AIRBNB DLS 5-TIER WARM SEMIBOLD TYPOGRAPHY SCALE (THAI + ENGLISH)
+     1. Display (Page / Resort Title): 26px (1.625rem)
+     2. Title (Section Heading): 22px (1.375rem)
      3. Subtitle (Card / Author / Room Title): 17px (1.0625rem)
      4. Body (Posts / Buttons / Inputs): 15px (0.9375rem)
-     5. Caption (Timestamps / Secondary Meta): 13px (0.8125rem)
+     5. Caption (Timestamps / Secondary Meta): 13.5px (0.84375rem)
      ========================================================================== */
-  --font-size-display: 1.5rem;      /* 24px */
-  --font-size-title: 1.25rem;       /* 20px */
+  --font-size-display: 1.625rem;    /* 26px */
+  --font-size-title: 1.375rem;      /* 22px */
   --font-size-subtitle: 1.0625rem;  /* 17px */
   --font-size-body: 0.9375rem;      /* 15px */
-  --font-size-caption: 0.8125rem;   /* 13px */
+  --font-size-caption: 0.84375rem;  /* 13.5px */
 
-  /* Exact Facebook Comet System Font Stack:
-     - macOS / iOS: SF Pro + ThonburiUI (Native Apple Thai UI Font)
-     - Windows: Segoe UI + Leelawadee UI / Tahoma (Native Microsoft Thai UI Font) */
-  --font-family-body: system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-family-heading: system-ui, -apple-system, BlinkMacSystemFont, ".SFNSText-Regular", "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-family-body: system-ui, -apple-system, BlinkMacSystemFont, "Circular", ".SFNSText-Regular", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-heading: system-ui, -apple-system, BlinkMacSystemFont, "Circular", ".SFNSText-Regular", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (max-width: 1023.98px) {
+  html[data-mobile-nav-hidden="true"] {
+    --cgr-sticky-header-offset: 0px;
+  }
 }
 
 /* ============================================================================
-   FACEBOOK COMET DARK MODE TOKENS (html.dark)
+   WARM CHARCOAL DARK MODE TOKENS (html.dark)
    ============================================================================ */
 html.dark {
   --color-accent: #f5f5f5;
   --color-accent-hover: #e5e5e5;
-  --color-accent-muted: #262626;
-  --color-on-accent: #111111;
+  --color-accent-muted: #2a2a2a;
+  --color-on-accent: #222222;
   --color-tiktok-accent: #f5f5f5;
   --color-tiktok-accent-hover: #e5e5e5;
-  --color-tiktok-on-accent: #111111;
-  --color-tiktok-gray: #262626;
-  --color-tiktok-gray-hover: #333333;
+  --color-tiktok-on-accent: #222222;
+  --color-tiktok-gray: #2a2a2a;
+  --color-tiktok-gray-hover: #363636;
   --color-fastwork: #f5f5f5;
   --color-neutral: rgba(255, 255, 255, 0.08);
 
   --color-promo: #e60023;
   --color-promo-hover: #ff1f40;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #262626;
-  --color-promo-border: #404040;
+  --color-promo-muted: #2a2a2a;
+  --color-promo-border: #444444;
   --color-promo-text: #f5f5f5;
 
-  --color-background-body: #121212;
-  --color-background-surface: #1e1e1e;
-  --color-background-card: #1e1e1e;
-  --color-background-popover: #242424;
-  --color-background-muted: #262626;
-  --color-background-subtle: #333333;
-  --color-sidebar-bg: #121212;
+  --color-background-body: #161616;
+  --color-background-surface: #222222;
+  --color-background-card: #222222;
+  --color-background-popover: #262626;
+  --color-background-muted: #2c2c2c;
+  --color-background-subtle: #383838;
+  --color-sidebar-bg: #161616;
 
   --shadow-card: none;
   --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.55);
 
   --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-disabled: #555555;
+  --color-text-secondary: #a8a8a8;
+  --color-text-tertiary: #7a7a7a;
+  --color-text-disabled: #5c5c5c;
   --color-text-accent: #f5f5f5;
 
-  --color-border: #2b2b2b;
-  --color-border-emphasized: #404040;
+  --color-border-subtle: #2c2c2c;
+  --color-border: #333333;
+  --color-border-emphasized: #4d4d4d;
   --color-overlay-hover: rgba(255, 255, 255, 0.08);
   --color-overlay-pressed: rgba(255, 255, 255, 0.14);
 
@@ -157,12 +165,12 @@ html.dark {
   --color-scrollbar-thumb-active: rgba(255, 255, 255, 0.6);
 
   --color-success: #4ade80;
-  --color-success-muted: #262626;
+  --color-success-muted: #2a2a2a;
   --color-on-success: #052e16;
   --color-error: #f87171;
-  --color-error-muted: #262626;
+  --color-error-muted: #2a2a2a;
   --color-warning: #fbbf24;
-  --color-warning-muted: #262626;
+  --color-warning-muted: #2a2a2a;
 }
 
 @theme inline {
@@ -192,7 +200,7 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
-  line-height: 1.45;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: normal;
@@ -201,54 +209,54 @@ body {
 
 h1, h2, h3, h4, .font-serif {
   font-family: var(--font-family-heading);
-  letter-spacing: normal;
+  letter-spacing: -0.01em;
 }
 
 /* ============================================================================
-   5-TIER FACEBOOK COMET TYPOGRAPHY CLASSES
+   5-TIER AIRBNB DLS TYPOGRAPHY CLASSES (SEMIBOLD 600 HARMONY)
    ============================================================================ */
 @layer components {
   .ty-display {
     font-size: 1.375rem; /* 22px mobile */
-    line-height: 1.24;
-    font-weight: 700;
+    line-height: 1.22;
+    font-weight: 600;
     color: var(--color-text-primary);
   }
   @media (min-width: 640px) {
     .ty-display {
-      font-size: var(--font-size-display); /* 24px desktop */
+      font-size: var(--font-size-display); /* 26px desktop */
     }
   }
 
   .ty-title {
-    font-size: var(--font-size-title); /* 20px */
-    line-height: 1.28;
-    font-weight: 700;
+    font-size: var(--font-size-title); /* 22px */
+    line-height: 1.25;
+    font-weight: 600;
     color: var(--color-text-primary);
   }
 
   .ty-subtitle {
     font-size: var(--font-size-subtitle); /* 17px */
-    line-height: 1.32;
+    line-height: 1.35;
     font-weight: 600;
     color: var(--color-text-primary);
   }
 
   .ty-body {
     font-size: var(--font-size-body); /* 15px */
-    line-height: 1.45;
+    line-height: 1.5;
     color: var(--color-text-primary);
   }
 
   .ty-body-muted {
     font-size: var(--font-size-body); /* 15px */
-    line-height: 1.45;
+    line-height: 1.5;
     color: var(--color-text-secondary);
   }
 
   .ty-caption {
-    font-size: var(--font-size-caption); /* 13px */
-    line-height: 1.35;
+    font-size: var(--font-size-caption); /* 13.5px */
+    line-height: 1.4;
     color: var(--color-text-secondary);
   }
 }
@@ -388,8 +396,21 @@ h1, h2, h3, h4, .font-serif {
 }
 
 /* ============================================================================
-   DARK MODE AUTOMATIC ADAPTATION
+   WARM CHARCOAL (#222222) LIGHT-MODE HARMONIZATION & DARK MODE ADAPTATION
    ============================================================================ */
+html:not(.dark) .bg-\[\#111111\] {
+  background-color: #222222;
+}
+html:not(.dark) .bg-\[\#111111\]:hover:not(:disabled) {
+  background-color: #3f3f3f;
+}
+html:not(.dark) .text-\[\#111111\] {
+  color: #222222;
+}
+html:not(.dark) .border-\[\#111111\] {
+  border-color: #222222;
+}
+
 html.dark .bg-white {
   background-color: var(--color-background-card) !important;
 }

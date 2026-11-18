@@ -62,7 +62,7 @@ export function RoomSpecificationView({
       : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-3">
       {/* 1. Hero Gallery + Tap-to-Zoom Fullscreen + Squircle Thumbnail Strip */}
       <div className="space-y-2.5">
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)]">

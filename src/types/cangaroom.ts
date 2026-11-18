@@ -249,6 +249,7 @@ export interface HotelStorefrontDto {
   hotel: HotelProfileDto;
   rooms: RoomAvailabilityDto[];
   dateOverrides: RoomDateOverrideDto[];
+  bookedUnitsByRoomDate?: Record<string, number>;
   addons: HotelAddonDto[];
   coupons: CouponDealDto[];
   pins: PinFeedItemDto[];

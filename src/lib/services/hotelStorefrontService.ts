@@ -80,56 +80,107 @@ export async function getHotelStorefrontBySlug(
   const checkOut = options?.checkOutDate || addDaysToDate(checkIn, 1);
   const roomIds = hotel.rooms.map((r) => r.id);
 
+  const now = new Date();
   const rangeStart = new Date(`${todayStr}T00:00:00.000Z`);
-  const rangeEnd = new Date(`${addDaysToDate(todayStr, 90)}T00:00:00.000Z`);
+  const rangeEndStr = addDaysToDate(todayStr, 180);
+  const rangeEnd = new Date(`${rangeEndStr}T00:00:00.000Z`);
 
-  const [availabilityMap, dateOverrides, totalSavesAgg, userLikes, userSaves, userWallet] =
-    await Promise.all([
-      getRoomsAvailabilityForRange({
-        roomIds,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-      }),
-      roomIds.length > 0
-        ? prisma.roomDateOverride.findMany({
-            where: {
-              roomId: { in: roomIds },
-              date: { gte: rangeStart, lte: rangeEnd },
-            },
-          })
-        : Promise.resolve([]),
-      prisma.pin.aggregate({
-        where: { hotelId: hotel.id, publishStatus: "PUBLISHED" },
-        _sum: { savesCount: true },
-      }),
-      options?.userId
-        ? prisma.pinLike.findMany({
-            where: {
-              userId: options.userId,
-              pinId: { in: hotel.pins.map((p) => p.id) },
-            },
-            select: { pinId: true },
-          })
-        : Promise.resolve([]),
-      options?.userId
-        ? prisma.savedBoardPin.findMany({
-            where: {
-              userId: options.userId,
-              pinId: { in: hotel.pins.map((p) => p.id) },
-            },
-            select: { pinId: true },
-          })
-        : Promise.resolve([]),
-      options?.userId
-        ? prisma.userCouponWallet.findMany({
-            where: {
-              userId: options.userId,
-              couponId: { in: hotel.coupons.map((c) => c.id) },
-            },
-            select: { couponId: true, usedAt: true },
-          })
-        : Promise.resolve([]),
-    ]);
+  const [
+    availabilityMap,
+    dateOverrides,
+    activeBookingsInRange,
+    totalSavesAgg,
+    userLikes,
+    userSaves,
+    userWallet,
+  ] = await Promise.all([
+    getRoomsAvailabilityForRange({
+      roomIds,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+    }),
+    roomIds.length > 0
+      ? prisma.roomDateOverride.findMany({
+          where: {
+            roomId: { in: roomIds },
+            date: { gte: rangeStart, lte: rangeEnd },
+          },
+        })
+      : Promise.resolve([]),
+    roomIds.length > 0
+      ? prisma.booking.findMany({
+          where: {
+            roomId: { in: roomIds },
+            checkInDate: { lt: rangeEnd },
+            checkOutDate: { gt: rangeStart },
+            OR: [
+              {
+                status: {
+                  in: ["CONFIRMED", "PENDING_VERIFICATION", "COMPLETED"],
+                },
+              },
+              {
+                status: "HOLD_PENDING_PAYMENT",
+                holdExpiresAt: { gt: now },
+              },
+            ],
+          },
+          select: {
+            roomId: true,
+            checkInDate: true,
+            checkOutDate: true,
+            unitsBooked: true,
+          },
+        })
+      : Promise.resolve([]),
+    prisma.pin.aggregate({
+      where: { hotelId: hotel.id, publishStatus: "PUBLISHED" },
+      _sum: { savesCount: true },
+    }),
+    options?.userId
+      ? prisma.pinLike.findMany({
+          where: {
+            userId: options.userId,
+            pinId: { in: hotel.pins.map((p) => p.id) },
+          },
+          select: { pinId: true },
+        })
+      : Promise.resolve([]),
+    options?.userId
+      ? prisma.savedBoardPin.findMany({
+          where: {
+            userId: options.userId,
+            pinId: { in: hotel.pins.map((p) => p.id) },
+          },
+          select: { pinId: true },
+        })
+      : Promise.resolve([]),
+    options?.userId
+      ? prisma.userCouponWallet.findMany({
+          where: {
+            userId: options.userId,
+            couponId: { in: hotel.coupons.map((c) => c.id) },
+          },
+          select: { couponId: true, usedAt: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const bookedUnitsByRoomDate: Record<string, number> = {};
+  for (const booking of activeBookingsInRange) {
+    const rawStart = formatDateStr(booking.checkInDate);
+    const rawEnd = formatDateStr(booking.checkOutDate);
+    let cursor = rawStart < todayStr ? todayStr : rawStart;
+    const endBound = rawEnd > rangeEndStr ? rangeEndStr : rawEnd;
+    let guard = 0;
+    while (cursor < endBound && guard < 185) {
+      const key = `${booking.roomId}:${cursor}`;
+      bookedUnitsByRoomDate[key] =
+        (bookedUnitsByRoomDate[key] ?? 0) + booking.unitsBooked;
+      cursor = addDaysToDate(cursor, 1);
+      guard += 1;
+    }
+  }
 
   const likedSet = new Set(userLikes.map((l) => l.pinId));
   const savedSet = new Set(userSaves.map((s) => s.pinId));
@@ -281,6 +332,7 @@ export async function getHotelStorefrontBySlug(
   return {
     hotel: hotelProfile,
     rooms: roomsDto,
+    bookedUnitsByRoomDate,
     dateOverrides: dateOverrides.map((o) => ({
       id: o.id,
       roomId: o.roomId,

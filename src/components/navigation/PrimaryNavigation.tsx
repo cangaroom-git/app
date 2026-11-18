@@ -112,6 +112,15 @@ export function PrimaryNavigation({
     }
   }, [shouldHideMobileBottomNav]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.mobileNavHidden =
+      shouldHideMobileBottomNav ? "true" : "false";
+    return () => {
+      document.documentElement.dataset.mobileNavHidden = "false";
+    };
+  }, [shouldHideMobileBottomNav]);
+
   const moreWrapperRef = useRef<HTMLDivElement | null>(null);
   const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);

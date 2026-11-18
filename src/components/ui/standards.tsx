@@ -108,13 +108,13 @@ export function StandardButton({
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
+      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
     promo:
-      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
+      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
     secondary:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
+      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
   };
@@ -153,11 +153,11 @@ export function StandardIconButton({
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
+      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
     primary:
-      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
+      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
     promo:
-      "bg-[#111111] !text-white hover:opacity-90 dark:bg-[#f5f5f5] dark:!text-[#111111]",
+      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
     ghost:
       "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]",
   };
