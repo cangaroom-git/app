@@ -97,6 +97,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
   const resizeTimerRef = useRef<number | null>(null);
   const resizeAnimEndTimerRef = useRef<number | null>(null);
   const hasInitialWidthRef = useRef<boolean>(false);
+  const wasHiddenRef = useRef<boolean>(false);
   const prevExpandedIdRef = useRef<string | null>(expandedItemId);
   const isFirstMountRef = useRef<boolean>(true);
 
@@ -126,11 +127,29 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
       const entry = entries[0];
       if (!entry) return;
       const nextW = Math.round(entry.contentRect.width);
-      if (nextW <= 0) return;
+      if (nextW <= 0) {
+        wasHiddenRef.current = true;
+        if (resizeTimerRef.current !== null) {
+          window.clearTimeout(resizeTimerRef.current);
+          resizeTimerRef.current = null;
+        }
+        return;
+      }
 
       if (!hasInitialWidthRef.current) {
         hasInitialWidthRef.current = true;
+        wasHiddenRef.current = false;
         setContainerWidth(nextW);
+        return;
+      }
+
+      if (wasHiddenRef.current) {
+        wasHiddenRef.current = false;
+        if (resizeTimerRef.current !== null) {
+          window.clearTimeout(resizeTimerRef.current);
+          resizeTimerRef.current = null;
+        }
+        setContainerWidth((prev) => (Math.abs(prev - nextW) > 1 ? nextW : prev));
         return;
       }
 
@@ -211,6 +230,7 @@ export function MasonryGrid<T extends MasonryItemWithRatio>({
           const existing = prev[id];
           if (
             h > 0 &&
+            w > 0 &&
             (!existing ||
               Math.abs(existing.height - h) > 1 ||
               Math.abs(existing.width - w) > 2)

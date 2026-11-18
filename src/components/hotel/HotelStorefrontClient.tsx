@@ -148,7 +148,16 @@ export function HotelStorefrontClient({
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedPinSnapshot, setSelectedPinSnapshot] =
     useState<PinFeedItemDto | null>(null);
-  const [pinHistoryStack, setPinHistoryStack] = useState<PinFeedItemDto[]>([]);
+  const [pinHistoryStack, setPinHistoryStack] = useState<
+    Array<{ pin: PinFeedItemDto; scrollY: number }>
+  >([]);
+  const [detailRestoreScrollY, setDetailRestoreScrollY] = useState<
+    number | null
+  >(null);
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(false);
+  const postsMasonrySectionRef = useRef<HTMLElement | null>(null);
+  const openedHotelPinIdRef = useRef<string | null>(null);
+  const lastOpenHotelPinIdRef = useRef<string | null>(null);
   const [pinDetail, setPinDetail] = useState<{
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
@@ -444,6 +453,15 @@ export function HotelStorefrontClient({
     router.push(`/${encodeURIComponent(storefront.hotel.slug)}/book?${qs.toString()}`);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsDesktopViewport(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktopViewport(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const gridHotelPins = useMemo(
     () =>
       activePin
@@ -452,29 +470,85 @@ export function HotelStorefrontClient({
     [storefront.pins, activePin]
   );
 
+  // On mobile/tablet (< 1024px), keep masonry items unfiltered so cards behind mobileOverlayMode never shift on open/close!
+  const masonrySectionPins = useMemo(
+    () => (activePin && isDesktopViewport ? gridHotelPins : storefront.pins),
+    [activePin, isDesktopViewport, gridHotelPins, storefront.pins]
+  );
+
   const visibleGridPins = useMemo(
-    () => (showAllPins ? gridHotelPins : gridHotelPins.slice(0, 10)),
-    [gridHotelPins, showAllPins]
+    () =>
+      showAllPins ? masonrySectionPins : masonrySectionPins.slice(0, 10),
+    [masonrySectionPins, showAllPins]
   );
 
   const handleCloseHotelPin = useCallback(() => {
+    const closingPinId = lastOpenHotelPinIdRef.current;
+    const openedOriginId = openedHotelPinIdRef.current;
     latestPinReqRef.current = null;
+    setDetailRestoreScrollY(null);
     setPinHistoryStack([]);
     setSelectedPinId(null);
     setSelectedPinSnapshot(null);
     setPinDetail(null);
+    openedHotelPinIdRef.current = null;
+    lastOpenHotelPinIdRef.current = null;
+
+    if (
+      typeof window !== "undefined" &&
+      closingPinId &&
+      openedOriginId &&
+      closingPinId !== openedOriginId
+    ) {
+      window.requestAnimationFrame(() => {
+        const cardEl = postsMasonrySectionRef.current?.querySelector<HTMLElement>(
+          `[data-masonry-item-id="${closingPinId}"]`
+        );
+        if (cardEl) {
+          const rect = cardEl.getBoundingClientRect();
+          if (rect.height > 0) {
+            const targetY = Math.max(
+              0,
+              Math.round(
+                rect.top +
+                  window.scrollY -
+                  Math.max(88, (window.innerHeight - rect.height) * 0.32)
+              )
+            );
+            window.scrollTo({
+              top: targetY,
+              behavior: "instant" as ScrollBehavior,
+            });
+          }
+        }
+      });
+    }
   }, []);
 
   const handleSelectPinFromMasonry = useCallback(
     (pin: PinFeedItemDto, pushStack = true) => {
+      setDetailRestoreScrollY(null);
+      if (!activePin) {
+        openedHotelPinIdRef.current = pin.id;
+      }
       if (pushStack && activePin && activePin.id !== pin.id) {
+        const currentOverlayScrollY =
+          typeof document !== "undefined"
+            ? document.querySelector<HTMLElement>(
+                '[data-mobile-scroll-container="true"]'
+              )?.scrollTop ?? 0
+            : 0;
         setPinHistoryStack((prev) =>
           [
-            ...prev.filter((p) => p.id !== activePin.id && p.id !== pin.id),
-            activePin,
+            ...prev.filter(
+              (entry) =>
+                entry.pin.id !== activePin.id && entry.pin.id !== pin.id
+            ),
+            { pin: activePin, scrollY: currentOverlayScrollY },
           ].slice(-16)
         );
       }
+      lastOpenHotelPinIdRef.current = pin.id;
       setSelectedPinSnapshot(pin);
       setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
       setSelectedPinId(pin.id);
@@ -492,17 +566,19 @@ export function HotelStorefrontClient({
       handleCloseHotelPin();
       return;
     }
-    const prevPin = pinHistoryStack[pinHistoryStack.length - 1];
+    const prevEntry = pinHistoryStack[pinHistoryStack.length - 1];
     setPinHistoryStack((prev) => prev.slice(0, -1));
-    setSelectedPinSnapshot(prevPin);
+    setDetailRestoreScrollY(prevEntry.scrollY);
+    lastOpenHotelPinIdRef.current = prevEntry.pin.id;
+    setSelectedPinSnapshot(prevEntry.pin);
     setPinDetail(null);
-    setSelectedPinId(prevPin.id);
+    setSelectedPinId(prevEntry.pin.id);
   }, [pinHistoryStack, handleCloseHotelPin]);
 
   const prevHotelPinPreview = useMemo<PinFeedItemDto | null>(() => {
     if (!activePin) return null;
     if (pinHistoryStack.length > 0) {
-      return pinHistoryStack[pinHistoryStack.length - 1] ?? null;
+      return pinHistoryStack[pinHistoryStack.length - 1]?.pin ?? null;
     }
     if (storefront.pins.length <= 1) return null;
     const idx = storefront.pins.findIndex((p) => p.id === activePin.id);
@@ -2054,8 +2130,9 @@ export function HotelStorefrontClient({
 
       {/* 4A. PROPERTY POSTS & ATMOSPHERE MASONRY (#section-posts) */}
       <section
+        ref={postsMasonrySectionRef}
         id="section-posts"
-        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
+        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [overflow-anchor:none]"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
@@ -2084,6 +2161,7 @@ export function HotelStorefrontClient({
             nextPinPreview={nextHotelPinPreview}
             mobileOverlayMode={true}
             canStepBack={pinHistoryStack.length > 0}
+            restoreScrollY={detailRestoreScrollY}
             onBack={handleStepBackHotelPin}
             onClose={handleCloseHotelPin}
             onSelectPin={(next) => handleSelectPinFromMasonry(next, true)}
@@ -2179,7 +2257,7 @@ export function HotelStorefrontClient({
                 )}
               />
 
-              {gridHotelPins.length > 10 && (
+              {masonrySectionPins.length > 10 && (
                 <div>
                   <button
                     type="button"
@@ -2191,8 +2269,8 @@ export function HotelStorefrontClient({
                         ? "ย่อรายการโพสต์"
                         : "Show fewer posts"
                       : language === "th"
-                      ? `ดูโพสต์และวิดีโอทั้งหมด (${gridHotelPins.length})`
-                      : `Show all ${gridHotelPins.length} posts`}
+                      ? `ดูโพสต์และวิดีโอทั้งหมด (${masonrySectionPins.length})`
+                      : `Show all ${masonrySectionPins.length} posts`}
                   </button>
                 </div>
               )}

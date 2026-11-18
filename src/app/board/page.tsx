@@ -59,13 +59,23 @@ export default function SavedBoardPage() {
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedPinSnapshot, setSelectedPinSnapshot] =
     useState<PinFeedItemDto | null>(null);
-  const [pinHistoryStack, setPinHistoryStack] = useState<PinFeedItemDto[]>([]);
+  const [pinHistoryStack, setPinHistoryStack] = useState<
+    Array<{ pin: PinFeedItemDto; scrollY: number }>
+  >([]);
+  const [detailRestoreScrollY, setDetailRestoreScrollY] = useState<
+    number | null
+  >(null);
   const [pinDetail, setPinDetail] = useState<{
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
     relatedPins: PinFeedItemDto[];
   } | null>(null);
   const latestPinReqRef = useRef<string | null>(null);
+  const boardGridSectionRef = useRef<HTMLElement | null>(null);
+  const openedFromBoardRef = useRef<{ pinId: string; scrollY: number } | null>(
+    null
+  );
+  const lastOpenBoardPinIdRef = useRef<string | null>(null);
   const [fullscreenMedia, setFullscreenMedia] = useState<{
     slides: PureMediaSlide[];
     index: number;
@@ -215,6 +225,7 @@ export default function SavedBoardPage() {
 
   const handleCloseBoardPin = useCallback(() => {
     latestPinReqRef.current = null;
+    setDetailRestoreScrollY(null);
     setPinHistoryStack([]);
     setSelectedPinId(null);
     setSelectedPinSnapshot(null);
@@ -226,35 +237,117 @@ export default function SavedBoardPage() {
   const useIsomorphicLayoutEffect =
     typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+  useEffect(() => {
+    if (activeBoardPin) {
+      lastOpenBoardPinIdRef.current = activeBoardPin.id;
+    }
+  }, [activeBoardPin]);
+
   useIsomorphicLayoutEffect(() => {
     const isNowOpen = Boolean(activeBoardPin);
     if (
       wasBoardPinOpenRef.current &&
       !isNowOpen &&
-      typeof window !== "undefined" &&
-      window.innerWidth < 1024
+      typeof window !== "undefined"
     ) {
+      const openedOrigin = openedFromBoardRef.current;
+      const targetPinId =
+        lastOpenBoardPinIdRef.current || openedOrigin?.pinId || null;
+
+      const computeBoardScrollY = (): number => {
+        const cardEl = targetPinId
+          ? boardGridSectionRef.current?.querySelector<HTMLElement>(
+              `[data-masonry-item-id="${targetPinId}"]`
+            )
+          : null;
+
+        if (openedOrigin && openedOrigin.pinId === targetPinId) {
+          if (cardEl) {
+            const rect = cardEl.getBoundingClientRect();
+            const cardDocTop = rect.top + window.scrollY;
+            const cardDocBottom = rect.bottom + window.scrollY;
+            if (
+              rect.height > 0 &&
+              (cardDocBottom < openedOrigin.scrollY + 56 ||
+                cardDocTop > openedOrigin.scrollY + window.innerHeight - 64)
+            ) {
+              return Math.max(
+                0,
+                Math.round(
+                  cardDocTop -
+                    Math.max(88, (window.innerHeight - rect.height) * 0.32)
+                )
+              );
+            }
+          }
+          return openedOrigin.scrollY;
+        }
+
+        if (cardEl) {
+          const rect = cardEl.getBoundingClientRect();
+          if (rect.height > 0) {
+            const cardDocTop = rect.top + window.scrollY;
+            return Math.max(
+              0,
+              Math.round(
+                cardDocTop -
+                  Math.max(88, (window.innerHeight - rect.height) * 0.32)
+              )
+            );
+          }
+        }
+
+        return openedOrigin?.scrollY ?? savedBoardScrollYRef.current;
+      };
+
+      const initialY = computeBoardScrollY();
       window.scrollTo({
-        top: savedBoardScrollYRef.current,
+        top: initialY,
         behavior: "instant" as ScrollBehavior,
       });
+
+      window.requestAnimationFrame(() => {
+        const settledY = computeBoardScrollY();
+        if (Math.abs(window.scrollY - settledY) > 6) {
+          window.scrollTo({
+            top: settledY,
+            behavior: "instant" as ScrollBehavior,
+          });
+        }
+        openedFromBoardRef.current = null;
+        lastOpenBoardPinIdRef.current = null;
+        setDetailRestoreScrollY(null);
+      });
+    } else if (isNowOpen && activeBoardPin) {
+      lastOpenBoardPinIdRef.current = activeBoardPin.id;
     }
     wasBoardPinOpenRef.current = isNowOpen;
   }, [activeBoardPin]);
 
   const handleSelectBoardPin = useCallback(
     (pin: PinFeedItemDto, pushStack = true) => {
+      setDetailRestoreScrollY(null);
       if (typeof window !== "undefined" && !activeBoardPin) {
+        openedFromBoardRef.current = {
+          pinId: pin.id,
+          scrollY: window.scrollY,
+        };
         savedBoardScrollYRef.current = window.scrollY;
       }
       if (pushStack && activeBoardPin && activeBoardPin.id !== pin.id) {
+        const currentDetailScrollY =
+          typeof window !== "undefined" ? window.scrollY : 0;
         setPinHistoryStack((prev) =>
           [
-            ...prev.filter((p) => p.id !== activeBoardPin.id && p.id !== pin.id),
-            activeBoardPin,
+            ...prev.filter(
+              (entry) =>
+                entry.pin.id !== activeBoardPin.id && entry.pin.id !== pin.id
+            ),
+            { pin: activeBoardPin, scrollY: currentDetailScrollY },
           ].slice(-16)
         );
       }
+      lastOpenBoardPinIdRef.current = pin.id;
       setSelectedPinSnapshot(pin);
       setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
       setSelectedPinId(pin.id);
@@ -271,18 +364,26 @@ export default function SavedBoardPage() {
       handleCloseBoardPin();
       return;
     }
-    const prevPin = pinHistoryStack[pinHistoryStack.length - 1];
+    const prevEntry = pinHistoryStack[pinHistoryStack.length - 1];
     setPinHistoryStack((prev) => prev.slice(0, -1));
-    setSelectedPinSnapshot(prevPin);
+    setDetailRestoreScrollY(prevEntry.scrollY);
+    lastOpenBoardPinIdRef.current = prevEntry.pin.id;
+    setSelectedPinSnapshot(prevEntry.pin);
     setPinDetail(null);
-    setSelectedPinId(prevPin.id);
-    void loadPinDetail(prevPin.id);
+    setSelectedPinId(prevEntry.pin.id);
+    void loadPinDetail(prevEntry.pin.id);
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      window.scrollTo({
+        top: Math.max(0, prevEntry.scrollY),
+        behavior: "instant" as ScrollBehavior,
+      });
+    }
   }, [pinHistoryStack, handleCloseBoardPin, loadPinDetail]);
 
   const prevBoardPinPreview = useMemo<PinFeedItemDto | null>(() => {
     if (!activeBoardPin) return null;
     if (pinHistoryStack.length > 0) {
-      return pinHistoryStack[pinHistoryStack.length - 1] ?? null;
+      return pinHistoryStack[pinHistoryStack.length - 1]?.pin ?? null;
     }
     if (allSavedEntries.length <= 1) return null;
     const idx = allSavedEntries.findIndex((e) => e.pin.id === activeBoardPin.id);
@@ -412,14 +513,16 @@ export default function SavedBoardPage() {
   };
 
   return (
-    <div
-      onTouchStart={handleFeedTouchStart}
-      onTouchEnd={handleFeedTouchEnd}
-      className="cgr-page-fluid space-y-5"
-    >
-      {/* Header & Board Controls (Hidden when Pin Close-Up Stage is Open) */}
-      {!activeBoardPin && (
-        <>
+      <div
+        onTouchStart={handleFeedTouchStart}
+        onTouchEnd={handleFeedTouchEnd}
+        className="cgr-page-fluid space-y-5 [overflow-anchor:none]"
+      >
+        {/* Header & Board Controls (Persisted without layout shift when activeBoardPin is open!) */}
+        <div
+          aria-hidden={Boolean(activeBoardPin)}
+          className={activeBoardPin ? "hidden" : "space-y-5"}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="ty-display">
@@ -587,8 +690,7 @@ export default function SavedBoardPage() {
           );
         })}
       </div>
-        </>
-      )}
+      </div>
 
       {/* Top Pin Close-Up Stage (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
       {activeBoardPin && (
@@ -602,6 +704,7 @@ export default function SavedBoardPage() {
           prevPinPreview={prevBoardPinPreview}
           nextPinPreview={nextBoardPinPreview}
           canStepBack={pinHistoryStack.length > 0}
+          restoreScrollY={detailRestoreScrollY}
           onBack={handleStepBackBoardPin}
           onClose={handleCloseBoardPin}
           onSelectPin={(next) => handleSelectBoardPin(next, true)}
@@ -651,7 +754,61 @@ export default function SavedBoardPage() {
         </div>
       )}
 
-      {/* Masonry Grid Below Close-Up Stage */}
+      {/* Desktop Close-Up Related Grid */}
+      {activeBoardPin && gridBoardEntries.length > 0 && (
+        <section className="hidden lg:block space-y-3">
+          <h2 className="ty-subtitle font-bold pt-2">
+            {language === "th"
+              ? "ที่พักอื่นในบอร์ดของคุณ"
+              : "More in this board"}
+          </h2>
+          <MasonryGrid
+            key={`board-related-${activeBoardPin.id}`}
+            items={gridBoardEntries.map((e) => ({
+              ...e.pin,
+              aspectClass: e.pin.aspectRatio,
+              boardEntry: e,
+            }))}
+            columnWidth={184}
+            maxColumnWidth={235}
+            gutter={14}
+            fitContainer={true}
+            renderItem={(item, cardIdx) => (
+              <div className="space-y-1">
+                <PinterestPinCard
+                  pin={item}
+                  language={language}
+                  priority={cardIdx < 8}
+                  isSaved={true}
+                  onSelectPin={handleSelectBoardPin}
+                  onToggleSave={(pinId) =>
+                    handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
+                  }
+                  onSharePin={() => {}}
+                />
+                {(item.boardEntry.priceDropThb > 0 ||
+                  item.boardEntry.hasActivePromo) && (
+                  <div className="px-1 flex flex-wrap gap-1">
+                    {item.boardEntry.priceDropThb > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        ลด ฿{item.boardEntry.priceDropThb.toLocaleString()}
+                      </span>
+                    )}
+                    {item.boardEntry.hasActivePromo && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
+                        มีคูปองใหม่
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          />
+        </section>
+      )}
+
+      {/* Persistent Main Board Masonry Grid (Never Unmounted on Pin Open = Zero Reflow & Exact Scroll Restore!) */}
       {isLoading && !activeBoardPin ? (
         <div className="flex flex-wrap justify-center gap-3.5">
           {Array.from({ length: 8 }).map((_, idx) => (
@@ -662,7 +819,13 @@ export default function SavedBoardPage() {
           ))}
         </div>
       ) : allSavedEntries.length === 0 ? (
-        <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+        <div
+          className={
+            activeBoardPin
+              ? "hidden"
+              : "rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3"
+          }
+        >
           <h2 className="ty-title">
             {language === "th"
               ? "ยังไม่มีที่พักที่บันทึกไว้ในบอร์ดนี้"
@@ -678,63 +841,54 @@ export default function SavedBoardPage() {
           </Link>
         </div>
       ) : (
-        gridBoardEntries.length > 0 && (
-          <section
-            className={
-              activeBoardPin ? "hidden lg:block space-y-3" : "space-y-3"
-            }
-          >
-            {activeBoardPin && (
-              <h2 className="hidden lg:block ty-subtitle font-bold pt-2">
-                {language === "th"
-                  ? "ที่พักอื่นในบอร์ดของคุณ"
-                  : "More in this board"}
-              </h2>
+        <section
+          ref={boardGridSectionRef}
+          aria-hidden={Boolean(activeBoardPin)}
+          className={activeBoardPin ? "hidden" : "space-y-3"}
+        >
+          <MasonryGrid
+            items={allSavedEntries.map((e) => ({
+              ...e.pin,
+              aspectClass: e.pin.aspectRatio,
+              boardEntry: e,
+            }))}
+            columnWidth={184}
+            maxColumnWidth={235}
+            gutter={14}
+            fitContainer={true}
+            renderItem={(item, cardIdx) => (
+              <div className="space-y-1">
+                <PinterestPinCard
+                  pin={item}
+                  language={language}
+                  priority={cardIdx < 8}
+                  isSaved={true}
+                  onSelectPin={handleSelectBoardPin}
+                  onToggleSave={(pinId) =>
+                    handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
+                  }
+                  onSharePin={() => {}}
+                />
+                {(item.boardEntry.priceDropThb > 0 ||
+                  item.boardEntry.hasActivePromo) && (
+                  <div className="px-1 flex flex-wrap gap-1">
+                    {item.boardEntry.priceDropThb > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        ลด ฿{item.boardEntry.priceDropThb.toLocaleString()}
+                      </span>
+                    )}
+                    {item.boardEntry.hasActivePromo && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
+                        มีคูปองใหม่
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-            <MasonryGrid
-              items={gridBoardEntries.map((e) => ({
-                ...e.pin,
-                aspectClass: e.pin.aspectRatio,
-                boardEntry: e,
-              }))}
-              columnWidth={184}
-              maxColumnWidth={235}
-              gutter={14}
-              fitContainer={true}
-              renderItem={(item, cardIdx) => (
-                <div className="space-y-1">
-                  <PinterestPinCard
-                    pin={item}
-                    language={language}
-                    priority={cardIdx < 8}
-                    isSaved={true}
-                    onSelectPin={handleSelectBoardPin}
-                    onToggleSave={(pinId) =>
-                      handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
-                    }
-                    onSharePin={() => {}}
-                  />
-                  {(item.boardEntry.priceDropThb > 0 ||
-                    item.boardEntry.hasActivePromo) && (
-                    <div className="px-1 flex flex-wrap gap-1">
-                      {item.boardEntry.priceDropThb > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          ลด ฿{item.boardEntry.priceDropThb.toLocaleString()}
-                        </span>
-                      )}
-                      {item.boardEntry.hasActivePromo && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                          มีคูปองใหม่
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            />
-          </section>
-        )
+          />
+        </section>
       )}
 
       <PureMediaViewer

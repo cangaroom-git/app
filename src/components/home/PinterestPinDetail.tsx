@@ -801,6 +801,7 @@ export interface PinterestPinDetailProps {
   nextPinPreview?: PinFeedItemDto | null;
   mobileOverlayMode?: boolean;
   canStepBack?: boolean;
+  restoreScrollY?: number | null;
   onBack?: () => void;
   onClose: () => void;
   onSelectPin?: (pin: PinFeedItemDto) => void;
@@ -826,6 +827,7 @@ export function PinterestPinDetail({
   nextPinPreview = null,
   mobileOverlayMode = false,
   canStepBack = false,
+  restoreScrollY = null,
   onBack,
   onClose,
   onSelectPin,
@@ -903,16 +905,17 @@ export function PinterestPinDetail({
       (isCommentsSheetOpen && isMobileViewport)
   );
 
-  useEffect(() => {
+  const useIsomorphicLayoutEffect =
+    typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+  // Toggle mobile/tablet edge-to-edge layout synchronously BEFORE paint so parent feed gutters never jump on dismiss
+  useIsomorphicLayoutEffect(() => {
     if (typeof document === "undefined" || mobileOverlayMode) return;
     document.documentElement.dataset.mobilePinOpen = "true";
     return () => {
       delete document.documentElement.dataset.mobilePinOpen;
     };
   }, [mobileOverlayMode]);
-
-  const useIsomorphicLayoutEffect =
-    typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
   // Synchronously reset swipe & carousel tracks BEFORE browser paint whenever `pin.id` changes (Zero Flash!)
   useIsomorphicLayoutEffect(() => {
@@ -946,10 +949,18 @@ export function PinterestPinDetail({
       rightPeekPanelRef.current.style.top = "0px";
     }
 
+    const targetScrollTop =
+      typeof restoreScrollY === "number" && restoreScrollY > 0
+        ? restoreScrollY
+        : 0;
+
     if (mobileOverlayMode) {
-      if (overlayRef.current) overlayRef.current.scrollTop = 0;
+      if (overlayRef.current) overlayRef.current.scrollTop = targetScrollTop;
     } else if (typeof window !== "undefined" && window.innerWidth < 1024) {
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      window.scrollTo({
+        top: targetScrollTop,
+        behavior: "instant" as ScrollBehavior,
+      });
     }
   }, [pin.id, mobileOverlayMode]);
 
@@ -1184,11 +1195,18 @@ export function PinterestPinDetail({
           const activeThumb = strip?.querySelector<HTMLElement>(
             `[data-thumb-idx="${clamped}"]`
           );
-          activeThumb?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-            inline: "center",
-          });
+          if (strip && activeThumb && strip.scrollWidth > strip.clientWidth) {
+            const targetLeft = Math.max(
+              0,
+              Math.min(
+                strip.scrollWidth - strip.clientWidth,
+                activeThumb.offsetLeft +
+                  activeThumb.offsetWidth / 2 -
+                  strip.clientWidth / 2
+              )
+            );
+            strip.scrollTo({ left: targetLeft, behavior: "smooth" });
+          }
         });
       }
       return clamped;
@@ -1265,10 +1283,20 @@ export function PinterestPinDetail({
       const { imagesCount, hasVideo } = gestureCallbacksRef.current;
       const isMultiPhoto = imagesCount > 1 && !hasVideo;
 
-      if (state.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      // Prevent diagonal thumb arcs from scrolling the outer page vertically before horizontal lock commits
+      if (
+        state.locked === null &&
+        isMultiPhoto &&
+        Math.abs(dx) > 2 &&
+        Math.abs(dx) >= Math.abs(dy) * 0.8
+      ) {
+        if (e.cancelable) e.preventDefault();
+      }
+
+      if (state.locked === null && (Math.abs(dx) > 5 || Math.abs(dy) > 6)) {
         if (dy > 0 && state.atTop && Math.abs(dy) > Math.abs(dx) * 1.15) {
           state.locked = "pull-down";
-        } else if (isMultiPhoto && Math.abs(dx) > Math.abs(dy) * 1.12) {
+        } else if (isMultiPhoto && Math.abs(dx) >= Math.abs(dy) * 0.85) {
           state.locked = "carousel";
         } else {
           state.locked = "vertical";
@@ -1305,11 +1333,13 @@ export function PinterestPinDetail({
       if (st.locked === "pull-down") {
         const t = e.changedTouches[0];
         const dy = t ? t.clientY - st.startY : 0;
+        if (dy >= 64) {
+          setIsPullingDown(false);
+          gestureCallbacksRef.current.handleStepBack();
+          return;
+        }
         setIsPullingDown(false);
         setPullDownOffset(0);
-        if (dy >= 64) {
-          gestureCallbacksRef.current.handleStepBack();
-        }
         return;
       }
 
@@ -1808,7 +1838,10 @@ export function PinterestPinDetail({
             onPointerCancel={handleMediaPointerUp}
             style={
               !pin.videoUrl
-                ? ({ "--pin-aspect": heroAspectCss } as React.CSSProperties)
+                ? ({
+                    "--pin-aspect": heroAspectCss,
+                    touchAction: images.length > 1 ? "pan-y" : undefined,
+                  } as React.CSSProperties)
                 : undefined
             }
             className={`relative w-full min-h-0 ${
