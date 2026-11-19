@@ -3,23 +3,20 @@
 import React, {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import Link from "next/link";
 import {
+  ArrowLeft,
   Bookmark,
   FolderPlus,
   LogIn,
-  Plus,
   Sparkles,
   Tag,
-  Trash2,
   X,
 } from "lucide-react";
-import { STAY_STYLE_TABS } from "@/data/thailandProvinces";
 import { useHotelApp } from "@/components/HotelAppShell";
 import {
   PureMediaViewer,
@@ -31,6 +28,10 @@ import {
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
+import {
+  BoardFolderThumb,
+  DeleteBoardConfirmModal,
+} from "@/components/board/BoardActionModals";
 import type {
   PinCommentDto,
   PinFeedItemDto,
@@ -41,20 +42,24 @@ export default function SavedBoardPage() {
   const {
     lang: language,
     user: currentUser,
-    refreshMe,
+    isCheckingSession,
     globalSearchQuery,
     selectedProvinceId,
+    openAuthModal,
+    savedBoards,
+    savedPinIds,
+    isLoadingBoards,
+    refreshSavedBoards,
+    openCreateBoardModal,
+    deleteSavedBoard,
+    togglePinLikeInstant,
   } = useHotelApp();
 
-  const [authenticated, setAuthenticated] = useState<boolean>(true);
-  const [boards, setBoards] = useState<SavedBoardDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isTh = language === "th";
 
-  const [activeBoardId, setActiveBoardId] = useState<string>("all");
-  const [activeStyleTab, setActiveStyleTab] = useState<string>("all");
-  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
-  const [newBoardName, setNewBoardName] = useState("");
+  const [openBoardId, setOpenBoardId] = useState<string | null>(null);
+  const [boardToDelete, setBoardToDelete] = useState<SavedBoardDto | null>(null);
+  const [isDeletingBoard, setIsDeletingBoard] = useState(false);
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedPinSnapshot, setSelectedPinSnapshot] =
@@ -71,120 +76,55 @@ export default function SavedBoardPage() {
     relatedPins: PinFeedItemDto[];
   } | null>(null);
   const latestPinReqRef = useRef<string | null>(null);
-  const boardGridSectionRef = useRef<HTMLElement | null>(null);
-  const openedFromBoardRef = useRef<{ pinId: string; scrollY: number } | null>(
-    null
-  );
-  const lastOpenBoardPinIdRef = useRef<string | null>(null);
+
   const [fullscreenMedia, setFullscreenMedia] = useState<{
     slides: PureMediaSlide[];
     index: number;
   } | null>(null);
-  const feedSwipeRef = useRef<{
-    startX: number;
-    startY: number;
-    ignore: boolean;
-  } | null>(null);
-
-  const loadBoards = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMsg(null);
-    try {
-      const res = await fetch("/api/boards", { cache: "no-store" });
-      const data = (await res.json()) as {
-        authenticated?: boolean;
-        boards?: SavedBoardDto[];
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error || "ไม่สามารถโหลดบอร์ดได้");
-      setAuthenticated(Boolean(data.authenticated));
-      setBoards(data.boards || []);
-    } catch (err) {
-      setErrorMsg(
-        err instanceof Error ? err.message : "โหลดบอร์ดที่บันทึกไม่สำเร็จ"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    loadBoards();
-  }, [currentUser?.id, loadBoards]);
-
-  const handleCreateBoard = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBoardName.trim()) return;
-    const res = await fetch("/api/boards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newBoardName.trim() }),
-    });
-    if (res.ok) {
-      setNewBoardName("");
-      setIsCreatingBoard(false);
-      await loadBoards();
+    if (currentUser?.id) {
+      void refreshSavedBoards();
     }
-  };
+  }, [currentUser?.id, refreshSavedBoards]);
 
-  const handleDeleteBoard = async (boardId: string) => {
-    await fetch(`/api/boards/${encodeURIComponent(boardId)}`, {
-      method: "DELETE",
-    });
-    if (activeBoardId === boardId) setActiveBoardId("all");
-    await Promise.all([loadBoards(), refreshMe()]);
-  };
-
-  const handleRemovePinFromBoard = async (pinId: string, boardId?: string) => {
-    await fetch("/api/boards/toggle-pin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pinId, boardId }),
-    });
-    if (selectedPinId === pinId) {
+  // If the currently opened folder was deleted, return to folder grid
+  useEffect(() => {
+    if (openBoardId && !savedBoards.some((b) => b.id === openBoardId)) {
+      setOpenBoardId(null);
       setSelectedPinId(null);
+      setSelectedPinSnapshot(null);
       setPinDetail(null);
     }
-    await Promise.all([loadBoards(), refreshMe()]);
-  };
+  }, [openBoardId, savedBoards]);
 
-  const allSavedEntries = useMemo(() => {
-    const raw =
-      activeBoardId === "all"
-        ? boards.flatMap((b) => b.items)
-        : boards.find((b) => b.id === activeBoardId)?.items ?? [];
+  const activeBoard = useMemo(
+    () => savedBoards.find((b) => b.id === openBoardId) ?? null,
+    [openBoardId, savedBoards]
+  );
 
-    const filteredByStyle =
-      activeStyleTab === "all"
-        ? raw
-        : raw.filter((entry) => entry.pin.stayStyles.includes(activeStyleTab));
-
+  const visibleFolderEntries = useMemo(() => {
+    if (!activeBoard) return [];
     const q = globalSearchQuery.trim().toLowerCase();
-    if (!q) return filteredByStyle;
-
-    return [...filteredByStyle].sort((a, b) => {
-      const scoreEntry = (entry: (typeof raw)[number]) => {
-        let sc = 0;
-        if (entry.pin.hotelNameTh.toLowerCase().includes(q)) sc += 500;
-        if (entry.pin.provinceNameTh.toLowerCase().includes(q)) sc += 400;
-        if (entry.pin.titleTh.toLowerCase().includes(q)) sc += 300;
-        return sc;
-      };
-      return scoreEntry(b) - scoreEntry(a);
+    return activeBoard.items.filter((entry) => {
+      if (selectedProvinceId && entry.pin.provinceId !== selectedProvinceId) {
+        return false;
+      }
+      if (q) {
+        const hay =
+          `${entry.pin.titleTh} ${entry.pin.titleEn} ${entry.pin.hotelNameTh} ${entry.pin.provinceNameTh}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
     });
-  }, [boards, activeBoardId, activeStyleTab, globalSearchQuery]);
+  }, [activeBoard, globalSearchQuery, selectedProvinceId]);
 
   const alertItems = useMemo(
     () =>
-      allSavedEntries.filter(
+      visibleFolderEntries.filter(
         (entry) => entry.priceDropThb > 0 || entry.hasActivePromo
       ),
-    [allSavedEntries]
-  );
-
-  const savedPinIdSet = useMemo(
-    () => new Set(allSavedEntries.map((e) => e.pin.id)),
-    [allSavedEntries]
+    [visibleFolderEntries]
   );
 
   const loadPinDetail = useCallback(async (pinId: string) => {
@@ -192,704 +132,577 @@ export default function SavedBoardPage() {
     const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
       cache: "no-store",
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (latestPinReqRef.current === pinId) {
-        setPinDetail(data);
-      }
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      pin: PinFeedItemDto;
+      comments: PinCommentDto[];
+      relatedPins: PinFeedItemDto[];
+    };
+    if (latestPinReqRef.current === pinId) {
+      setPinDetail(data);
     }
   }, []);
+
+  useEffect(() => {
+    if (selectedPinId) {
+      void loadPinDetail(selectedPinId);
+    }
+  }, [selectedPinId, loadPinDetail]);
 
   const activeBoardPin = useMemo(() => {
     if (!selectedPinId) return null;
     if (pinDetail?.pin.id === selectedPinId) return pinDetail.pin;
     if (selectedPinSnapshot?.id === selectedPinId) return selectedPinSnapshot;
-    return allSavedEntries.find((e) => e.pin.id === selectedPinId)?.pin ?? null;
-  }, [pinDetail, selectedPinId, selectedPinSnapshot, allSavedEntries]);
+    return (
+      visibleFolderEntries.find((e) => e.pin.id === selectedPinId)?.pin ?? null
+    );
+  }, [pinDetail, selectedPinId, selectedPinSnapshot, visibleFolderEntries]);
 
   const activeBoardComments = useMemo(
-    () =>
-      activeBoardPin && pinDetail?.pin.id === activeBoardPin.id
-        ? pinDetail.comments
-        : [],
-    [activeBoardPin, pinDetail]
+    () => (pinDetail?.pin.id === selectedPinId ? pinDetail.comments : []),
+    [pinDetail, selectedPinId]
   );
 
-  const gridBoardEntries = useMemo(
-    () =>
-      activeBoardPin
-        ? allSavedEntries.filter((e) => e.pin.id !== activeBoardPin.id)
-        : allSavedEntries,
-    [allSavedEntries, activeBoardPin]
-  );
+  const gridBoardEntries = useMemo(() => {
+    if (!activeBoardPin) return visibleFolderEntries;
+    return visibleFolderEntries.filter((e) => e.pin.id !== activeBoardPin.id);
+  }, [activeBoardPin, visibleFolderEntries]);
 
-  const handleCloseBoardPin = useCallback(() => {
-    latestPinReqRef.current = null;
+  const activePinIdxInFolder = useMemo(() => {
+    if (!activeBoardPin) return -1;
+    return visibleFolderEntries.findIndex(
+      (e) => e.pin.id === activeBoardPin.id
+    );
+  }, [activeBoardPin, visibleFolderEntries]);
+
+  const prevBoardPinPreview =
+    activePinIdxInFolder > 0
+      ? visibleFolderEntries[activePinIdxInFolder - 1]?.pin ?? null
+      : null;
+  const nextBoardPinPreview =
+    activePinIdxInFolder >= 0 &&
+    activePinIdxInFolder < visibleFolderEntries.length - 1
+      ? visibleFolderEntries[activePinIdxInFolder + 1]?.pin ?? null
+      : null;
+
+  const handleSelectBoardPin = (pin: PinFeedItemDto, pushHistory = false) => {
+    if (pushHistory && activeBoardPin && activeBoardPin.id !== pin.id) {
+      setPinHistoryStack((prev) => [
+        ...prev,
+        {
+          pin: activeBoardPin,
+          scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+        },
+      ]);
+    } else if (!pushHistory) {
+      setPinHistoryStack([]);
+    }
     setDetailRestoreScrollY(null);
+    setSelectedPinSnapshot(pin);
+    setSelectedPinId(pin.id);
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+  };
+
+  const handleCloseBoardPin = () => {
+    clearLastClickedPinOrigin();
     setPinHistoryStack([]);
+    setDetailRestoreScrollY(null);
     setSelectedPinId(null);
     setSelectedPinSnapshot(null);
     setPinDetail(null);
-  }, []);
+  };
 
-  const savedBoardScrollYRef = useRef<number>(0);
-  const wasBoardPinOpenRef = useRef<boolean>(false);
-  const useIsomorphicLayoutEffect =
-    typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
-  useEffect(() => {
-    if (activeBoardPin) {
-      lastOpenBoardPinIdRef.current = activeBoardPin.id;
-    }
-  }, [activeBoardPin]);
-
-  useIsomorphicLayoutEffect(() => {
-    const isNowOpen = Boolean(activeBoardPin);
-    if (
-      wasBoardPinOpenRef.current &&
-      !isNowOpen &&
-      typeof window !== "undefined"
-    ) {
-      const openedOrigin = openedFromBoardRef.current;
-      const targetPinId =
-        lastOpenBoardPinIdRef.current || openedOrigin?.pinId || null;
-
-      const computeBoardScrollY = (): number => {
-        const cardEl = targetPinId
-          ? boardGridSectionRef.current?.querySelector<HTMLElement>(
-              `[data-masonry-item-id="${targetPinId}"]`
-            )
-          : null;
-
-        if (openedOrigin && openedOrigin.pinId === targetPinId) {
-          if (cardEl) {
-            const rect = cardEl.getBoundingClientRect();
-            const cardDocTop = rect.top + window.scrollY;
-            const cardDocBottom = rect.bottom + window.scrollY;
-            if (
-              rect.height > 0 &&
-              (cardDocBottom < openedOrigin.scrollY + 56 ||
-                cardDocTop > openedOrigin.scrollY + window.innerHeight - 64)
-            ) {
-              return Math.max(
-                0,
-                Math.round(
-                  cardDocTop -
-                    Math.max(88, (window.innerHeight - rect.height) * 0.32)
-                )
-              );
-            }
-          }
-          return openedOrigin.scrollY;
-        }
-
-        if (cardEl) {
-          const rect = cardEl.getBoundingClientRect();
-          if (rect.height > 0) {
-            const cardDocTop = rect.top + window.scrollY;
-            return Math.max(
-              0,
-              Math.round(
-                cardDocTop -
-                  Math.max(88, (window.innerHeight - rect.height) * 0.32)
-              )
-            );
-          }
-        }
-
-        return openedOrigin?.scrollY ?? savedBoardScrollYRef.current;
-      };
-
-      const initialY = computeBoardScrollY();
-      window.scrollTo({
-        top: initialY,
-        behavior: "instant" as ScrollBehavior,
-      });
-
-      window.requestAnimationFrame(() => {
-        const settledY = computeBoardScrollY();
-        if (Math.abs(window.scrollY - settledY) > 6) {
-          window.scrollTo({
-            top: settledY,
-            behavior: "instant" as ScrollBehavior,
-          });
-        }
-        openedFromBoardRef.current = null;
-        lastOpenBoardPinIdRef.current = null;
-        setDetailRestoreScrollY(null);
-      });
-    } else if (isNowOpen && activeBoardPin) {
-      lastOpenBoardPinIdRef.current = activeBoardPin.id;
-    }
-    wasBoardPinOpenRef.current = isNowOpen;
-  }, [activeBoardPin]);
-
-  const handleSelectBoardPin = useCallback(
-    (pin: PinFeedItemDto, pushStack = true) => {
-      setDetailRestoreScrollY(null);
-      if (typeof window !== "undefined" && !activeBoardPin) {
-        openedFromBoardRef.current = {
-          pinId: pin.id,
-          scrollY: window.scrollY,
-        };
-        savedBoardScrollYRef.current = window.scrollY;
-      }
-      if (pushStack && activeBoardPin && activeBoardPin.id !== pin.id) {
-        const currentDetailScrollY =
-          typeof window !== "undefined" ? window.scrollY : 0;
-        setPinHistoryStack((prev) =>
-          [
-            ...prev.filter(
-              (entry) =>
-                entry.pin.id !== activeBoardPin.id && entry.pin.id !== pin.id
-            ),
-            { pin: activeBoardPin, scrollY: currentDetailScrollY },
-          ].slice(-16)
-        );
-      }
-      lastOpenBoardPinIdRef.current = pin.id;
-      setSelectedPinSnapshot(pin);
-      setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
-      setSelectedPinId(pin.id);
-      void loadPinDetail(pin.id);
-      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-      }
-    },
-    [activeBoardPin, loadPinDetail]
-  );
-
-  const handleStepBackBoardPin = useCallback(() => {
+  const handleStepBackBoardPin = () => {
     if (pinHistoryStack.length === 0) {
       handleCloseBoardPin();
       return;
     }
-    const prevEntry = pinHistoryStack[pinHistoryStack.length - 1];
-    setPinHistoryStack((prev) => prev.slice(0, -1));
-    setDetailRestoreScrollY(prevEntry.scrollY);
-    lastOpenBoardPinIdRef.current = prevEntry.pin.id;
-    setSelectedPinSnapshot(prevEntry.pin);
-    setPinDetail(null);
-    setSelectedPinId(prevEntry.pin.id);
-    void loadPinDetail(prevEntry.pin.id);
-    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-      window.scrollTo({
-        top: Math.max(0, prevEntry.scrollY),
-        behavior: "instant" as ScrollBehavior,
-      });
+    const prev = pinHistoryStack[pinHistoryStack.length - 1];
+    setPinHistoryStack((s) => s.slice(0, -1));
+    setDetailRestoreScrollY(prev.scrollY);
+    setSelectedPinSnapshot(prev.pin);
+    setSelectedPinId(prev.pin.id);
+  };
+
+  const handleNavigateBoardPin = (direction: "prev" | "next") => {
+    const target =
+      direction === "next" ? nextBoardPinPreview : prevBoardPinPreview;
+    if (!target) return;
+    setPinHistoryStack([]);
+    setDetailRestoreScrollY(null);
+    setSelectedPinSnapshot(target);
+    setSelectedPinId(target.id);
+  };
+
+  const handleRemovePinFromCurrentBoard = async (
+    pinId: string,
+    boardId?: string
+  ) => {
+    await fetch("/api/boards/toggle-pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pinId,
+        boardId: boardId ?? openBoardId ?? null,
+        action: "unsave",
+      }),
+    });
+    if (selectedPinId === pinId) {
+      handleCloseBoardPin();
     }
-  }, [pinHistoryStack, handleCloseBoardPin, loadPinDetail]);
+    await refreshSavedBoards();
+  };
 
-  const prevBoardPinPreview = useMemo<PinFeedItemDto | null>(() => {
-    if (!activeBoardPin) return null;
-    if (pinHistoryStack.length > 0) {
-      return pinHistoryStack[pinHistoryStack.length - 1]?.pin ?? null;
+  const handleToggleLikeOnBoard = (pinId: string) => {
+    const target =
+      (activeBoardPin?.id === pinId ? activeBoardPin : null) ??
+      visibleFolderEntries.find((e) => e.pin.id === pinId)?.pin ??
+      savedBoards
+        .flatMap((b) => b.items)
+        .find((item) => item.pin.id === pinId)?.pin;
+    if (!target) return;
+    togglePinLikeInstant({
+      id: target.id,
+      isLikedByMe: target.isLikedByMe,
+      likesCount: target.likesCount,
+    });
+  };
+
+  const handleConfirmDeleteBoard = async () => {
+    if (!boardToDelete || isDeletingBoard) return;
+    setIsDeletingBoard(true);
+    try {
+      await deleteSavedBoard(boardToDelete.id);
+      if (openBoardId === boardToDelete.id) {
+        setOpenBoardId(null);
+      }
+      setBoardToDelete(null);
+    } finally {
+      setIsDeletingBoard(false);
     }
-    if (allSavedEntries.length <= 1) return null;
-    const idx = allSavedEntries.findIndex((e) => e.pin.id === activeBoardPin.id);
-    if (idx === -1) return allSavedEntries[0]?.pin ?? null;
+  };
+
+  // =========================================================================
+  // LOGGED-OUT VIEW: Open In-Place Auth Modal instead of jumping to /login
+  // =========================================================================
+  if (!isCheckingSession && !currentUser) {
     return (
-      allSavedEntries[
-        (idx - 1 + allSavedEntries.length) % allSavedEntries.length
-      ]?.pin ?? null
-    );
-  }, [activeBoardPin, pinHistoryStack, allSavedEntries]);
-
-  const nextBoardPinPreview = useMemo<PinFeedItemDto | null>(() => {
-    if (!activeBoardPin || allSavedEntries.length <= 1) return null;
-    const idx = allSavedEntries.findIndex((e) => e.pin.id === activeBoardPin.id);
-    if (idx === -1) return allSavedEntries[0]?.pin ?? null;
-    return allSavedEntries[(idx + 1) % allSavedEntries.length]?.pin ?? null;
-  }, [activeBoardPin, allSavedEntries]);
-
-  const handleNavigateBoardPin = useCallback(
-    (direction: "prev" | "next") => {
-      if (!activeBoardPin) return;
-      clearLastClickedPinOrigin();
-      if (direction === "prev" && pinHistoryStack.length > 0) {
-        handleStepBackBoardPin();
-        return;
-      }
-      if (allSavedEntries.length <= 1) return;
-      const idx = allSavedEntries.findIndex(
-        (e) => e.pin.id === activeBoardPin.id
-      );
-      if (idx === -1) return;
-      const nextIdx =
-        direction === "next"
-          ? (idx + 1) % allSavedEntries.length
-          : (idx - 1 + allSavedEntries.length) % allSavedEntries.length;
-      const nextEntry = allSavedEntries[nextIdx];
-      if (nextEntry) {
-        handleSelectBoardPin(nextEntry.pin);
-      }
-    },
-    [
-      activeBoardPin,
-      pinHistoryStack.length,
-      allSavedEntries,
-      handleStepBackBoardPin,
-      handleSelectBoardPin,
-    ]
-  );
-
-  if (!isLoading && !authenticated) {
-    return (
-      <div className="cgr-page-form py-8">
-        <div className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-8 text-center space-y-4">
-          <div className="h-12 w-12 rounded-[14px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center mx-auto">
-            <Bookmark className="w-6 h-6" />
+      <div className="cgr-page-standard py-10">
+        <div className="max-w-[460px] mx-auto rounded-[20px] bg-[var(--color-background-muted)] p-8 text-center space-y-4">
+          <span className="h-12 w-12 rounded-[14px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] inline-flex items-center justify-center mx-auto">
+            <Bookmark className="w-5 h-5" />
+          </span>
+          <div className="space-y-1.5">
+            <h1 className="text-[21px] font-semibold text-[var(--color-text-primary)]">
+              {isTh ? "บอร์ดที่พักของฉัน" : "Boards"}
+            </h1>
+            <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
+              {isTh
+                ? "เข้าสู่ระบบเพื่อปักหมุดที่พักสวยๆ จัดแยกเป็นโฟลเดอร์ทริป และติดตามคูปองส่วนลด"
+                : "Log in to pin favorite stays into trip folders and track price drops & deals."}
+            </p>
           </div>
-          <h1 className="ty-display">
-            {language === "th"
-              ? "บอร์ดที่พักที่บันทึกไว้ & ติดตามราคา"
-              : "Saved Stay Boards & Price Watch"}
-          </h1>
-          <p className="ty-body text-[var(--color-text-secondary)]">
-            {language === "th"
-              ? "เข้าสู่ระบบเพื่อบันทึกที่พักที่ชอบแยกตามทริป และให้ระบบช่วยแจ้งเตือนทันทีเมื่อที่พักลดราคาหรือปล่อยคูปองส่วนลดใหม่"
-              : "Sign in to organize your favorite Thailand stays into boards and track price drops & new hotel coupons across devices."}
-          </p>
-          <Link
-            href="/login?callbackUrl=/board"
-            className="btn-round-solid inline-flex"
+          <button
+            type="button"
+            onClick={() =>
+              openAuthModal({
+                reasonTh: "เข้าสู่ระบบเพื่อดูและจัดการบอร์ดที่พักของคุณ",
+                reasonEn: "Log in to view and manage your saved boards",
+              })
+            }
+            className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
             <LogIn className="w-4 h-4" />
-            <span>
-              {language === "th" ? "เข้าสู่ระบบด้วย Google" : "Sign in"}
-            </span>
-          </Link>
+            <span>{isTh ? "เข้าสู่ระบบ" : "Log in"}</span>
+          </button>
         </div>
       </div>
     );
   }
 
-  const handleFeedTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (
-      activeBoardPin ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      return;
-    }
-    const t = e.touches[0];
-    if (!t) return;
-    const target = e.target as HTMLElement | null;
-    const ignore = Boolean(
-      target?.closest(
-        "[data-style-tabs-bar='true'], input, textarea, [data-swipe-ignore='true']"
-      )
-    );
-    feedSwipeRef.current = { startX: t.clientX, startY: t.clientY, ignore };
-  };
-
-  const handleFeedTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    const st = feedSwipeRef.current;
-    feedSwipeRef.current = null;
-    if (
-      !st ||
-      st.ignore ||
-      activeBoardPin ||
-      typeof window === "undefined" ||
-      window.innerWidth >= 1024
-    ) {
-      return;
-    }
-    const t = e.changedTouches[0];
-    if (!t) return;
-    const dx = t.clientX - st.startX;
-    const dy = t.clientY - st.startY;
-    if (Math.abs(dx) >= 56 && Math.abs(dx) > Math.abs(dy) * 1.35) {
-      const currentIdx = STAY_STYLE_TABS.findIndex(
-        (tab) => tab.id === activeStyleTab
-      );
-      if (currentIdx === -1) return;
-      if (dx < 0 && currentIdx < STAY_STYLE_TABS.length - 1) {
-        setActiveStyleTab(STAY_STYLE_TABS[currentIdx + 1].id);
-      } else if (dx > 0 && currentIdx > 0) {
-        setActiveStyleTab(STAY_STYLE_TABS[currentIdx - 1].id);
-      }
-    }
-  };
-
   return (
-      <div
-        onTouchStart={handleFeedTouchStart}
-        onTouchEnd={handleFeedTouchEnd}
-        className="cgr-page-fluid space-y-5 [overflow-anchor:none]"
-      >
-        {/* Header & Board Controls (Persisted without layout shift when activeBoardPin is open!) */}
-        <div
-          aria-hidden={Boolean(activeBoardPin)}
-          className={activeBoardPin ? "hidden" : "space-y-5"}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="ty-display">
-            {language === "th"
-              ? "บอร์ดที่พักที่บันทึกไว้"
-              : "My Saved Boards"}
-          </h1>
-          <p className="ty-caption mt-0.5">
-            {language === "th"
-              ? "ระบบติดตามราคาที่ลดลงและคูปองส่วนลดใหม่ของที่พักที่คุณปักหมุดไว้โดยอัตโนมัติ"
-              : "Live price-drop & new coupon tracker for all your saved stays."}
-          </p>
-        </div>
+    <div className="cgr-page-standard pb-14 space-y-6 sm:space-y-8">
+      {/* =====================================================================
+          VIEW 1: AIRBNB-STYLE FOLDER GRID (Default Top-Level /board View)
+      ====================================================================== */}
+      {!activeBoard && (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-[26px] sm:text-[30px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+              {isTh ? "บอร์ดของฉัน" : "Boards"}
+            </h1>
 
-        <button
-          type="button"
-          onClick={() => setIsCreatingBoard((v) => !v)}
-          className="h-10 px-4 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-body font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
-        >
-          <FolderPlus className="w-4 h-4 text-[var(--color-text-primary)]" />
-          <span>{language === "th" ? "สร้างบอร์ดใหม่" : "New Board"}</span>
-        </button>
-      </div>
-
-      {isCreatingBoard && (
-        <form
-          onSubmit={handleCreateBoard}
-          className="rounded-[14px] bg-[var(--color-background-muted)] p-3 flex items-center gap-2 max-w-md"
-        >
-          <input
-            type="text"
-            value={newBoardName}
-            onChange={(e) => setNewBoardName(e.target.value)}
-            placeholder="เช่น ทริปน่านหน้าหนาว, พูลวิลล่าปีใหม่..."
-            className="flex-1 h-10 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] px-3.5 ty-body focus:outline-none"
-          />
-          <button type="submit" className="btn-round-solid">
-            <Plus className="w-4 h-4" />
-            <span>สร้าง</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsCreatingBoard(false)}
-            className="btn-icon"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </form>
-      )}
-
-      {/* Board Collection Pills */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveBoardId("all")}
-          className={`h-9 px-4 rounded-[10px] ty-caption font-semibold cursor-pointer transition-colors ${
-            activeBoardId === "all"
-              ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-              : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
-          }`}
-        >
-          ทั้งหมด ({boards.reduce((sum, b) => sum + b.pinCount, 0)})
-        </button>
-
-        {boards.map((board) => {
-          const isSel = activeBoardId === board.id;
-          return (
-            <div
-              key={board.id}
-              className={`h-9 pl-3.5 pr-1.5 rounded-[10px] inline-flex items-center gap-2 ty-caption font-semibold transition-colors ${
-                isSel
-                  ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
-                  : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveBoardId(board.id)}
-                className="cursor-pointer"
-              >
-                {board.name} ({board.pinCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteBoard(board.id)}
-                aria-label="Delete board"
-                className="h-6 w-6 rounded-[6px] hover:bg-black/15 dark:hover:bg-white/15 inline-flex items-center justify-center cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Price Drop & New Coupon Watch Strip */}
-      {alertItems.length > 0 && (
-        <section className="rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 space-y-3">
-          <div className="flex items-center gap-2 ty-body font-bold text-[var(--color-text-primary)]">
-            <Sparkles className="w-4 h-4 text-[var(--color-text-secondary)]" />
-            <span>
-              {language === "th"
-                ? `อัปเดตราคา & โปรโมชั่นของที่พักในบอร์ดคุณ (${alertItems.length} รายการ)`
-                : `Live Price & Promo Alerts (${alertItems.length})`}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {alertItems.map((entry) => (
-              <Link
-                key={entry.boardPinId}
-                href={`/${entry.pin.hotelSlug}`}
-                className="rounded-[12px] bg-[var(--color-background-muted)]/60 border border-[var(--color-border)] p-3 flex items-center gap-3 hover:bg-[var(--color-background-muted)] transition-colors"
-              >
-                <img
-                  src={entry.pin.coverImageUrl}
-                  alt={entry.pin.hotelNameTh}
-                  className="h-12 w-12 rounded-[10px] object-cover shrink-0"
-                />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="ty-body font-bold truncate">
-                    {entry.pin.hotelNameTh}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {entry.priceDropThb > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] px-2 py-0.5 text-[11px] font-semibold">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        ลดราคาลง ฿{entry.priceDropThb.toLocaleString()}
-                      </span>
-                    )}
-                    {entry.hasActivePromo && entry.activePromoLabel && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] px-2 py-0.5 text-[11px] font-semibold">
-                        <Tag className="w-3 h-3 text-[var(--color-text-secondary)]" />
-                        {entry.activePromoLabel}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Style Tabs */}
-      <div
-        data-style-tabs-bar="true"
-        className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar border-b border-[var(--color-border)]"
-      >
-        {STAY_STYLE_TABS.map((tab) => {
-          const isActive = activeStyleTab === tab.id;
-          return (
             <button
-              key={tab.id}
               type="button"
-              onClick={() => setActiveStyleTab(tab.id)}
-              className={`relative shrink-0 py-3 -mb-px border-b-2 ty-body cursor-pointer whitespace-nowrap transition-colors ${
-                isActive
-                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
-                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              }`}
+              onClick={openCreateBoardModal}
+              className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
             >
-              <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+              <FolderPlus className="w-4 h-4" />
+              <span>{isTh ? "สร้างบอร์ดใหม่" : "Create board"}</span>
             </button>
-          );
-        })}
-      </div>
-      </div>
+          </div>
 
-      {/* Top Pin Close-Up Stage (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
-      {activeBoardPin && (
-        <PinterestPinDetail
-          pin={activeBoardPin}
-          language={language}
-          currentUser={currentUser}
-          comments={activeBoardComments}
-          savedPinIds={savedPinIdSet}
-          relatedPins={gridBoardEntries.map((e) => e.pin)}
-          prevPinPreview={prevBoardPinPreview}
-          nextPinPreview={nextBoardPinPreview}
-          canStepBack={pinHistoryStack.length > 0}
-          restoreScrollY={detailRestoreScrollY}
-          onBack={handleStepBackBoardPin}
-          onClose={handleCloseBoardPin}
-          onSelectPin={(next) => handleSelectBoardPin(next, true)}
-          onNavigatePin={handleNavigateBoardPin}
-          onToggleLike={async (pinId) => {
-            await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
-              method: "POST",
-            });
-            await loadPinDetail(pinId);
-          }}
-          onToggleSave={(pinId) =>
-            handleRemovePinFromBoard(
-              pinId,
-              activeBoardId === "all" ? undefined : activeBoardId
-            )
-          }
-          onSharePin={() => {}}
-          onExpandMedia={(urls, idx) =>
-            setFullscreenMedia({
-              slides: urls.map((u) => ({ type: "image", url: u })),
-              index: idx,
-            })
-          }
-          onAddComment={async (text, parentId) => {
-            await fetch(
-              `/api/pins/${encodeURIComponent(activeBoardPin.id)}/comments`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ body: text, parentId }),
+          {isLoadingBoards && savedBoards.length === 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-7">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-2.5">
+                  <div className="w-full aspect-square rounded-[20px] bg-[var(--color-background-muted)] animate-pulse" />
+                  <div className="h-4 w-28 rounded-[6px] bg-[var(--color-background-muted)] animate-pulse" />
+                  <div className="h-3.5 w-16 rounded-[6px] bg-[var(--color-background-muted)] animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : savedBoards.length === 0 ? (
+            <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 sm:p-12 text-center space-y-4">
+              <div className="space-y-1.5">
+                <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
+                  {isTh ? "ยังไม่มีบอร์ดที่พัก" : "Create your first board"}
+                </h2>
+                <p className="text-[14.5px] text-[var(--color-text-secondary)] max-w-md mx-auto">
+                  {isTh
+                    ? "กดไอคอนปักหมุดบนการ์ดที่พักที่ถูกใจ เพื่อเก็บแยกตามทริปหรือจังหวัดที่อยากไป"
+                    : "Tap the pin icon on any stay card while browsing to collect stays into trip folders."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={openCreateBoardModal}
+                  className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>{isTh ? "สร้างบอร์ดใหม่" : "Create board"}</span>
+                </button>
+                <Link
+                  href="/"
+                  className="h-11 px-5 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
+                >
+                  {isTh ? "สำรวจที่พักทั่วไทย" : "Explore stays"}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 sm:gap-7">
+              {savedBoards.map((board) => {
+                const covers = board.items
+                  .slice(0, 4)
+                  .map((entry) => entry.pin.coverImageUrl);
+                const promoAlertCount = board.items.filter(
+                  (e) => e.priceDropThb > 0 || e.hasActivePromo
+                ).length;
+
+                return (
+                  <div
+                    key={board.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenBoardId(board.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpenBoardId(board.id);
+                      }
+                    }}
+                    className="group relative text-left cursor-pointer focus:outline-none"
+                  >
+                    {/* Folder Square Cover (1 full image OR Airbnb 2x2 Collage) */}
+                    <div className="relative w-full aspect-square rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] group-hover:brightness-95 transition">
+                      <BoardFolderThumb
+                        coverUrls={covers}
+                        sizeClass="w-full h-full"
+                      />
+
+                      {/* Hover Delete (X) Button — Top-Left just like Airbnb Image 2! */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBoardToDelete(board);
+                        }}
+                        aria-label={
+                          isTh ? `ลบบอร์ด ${board.name}` : `Delete ${board.name}`
+                        }
+                        title={isTh ? "ลบบอร์ดนี้" : "Delete board"}
+                        className="absolute top-3 left-3 z-10 h-8 w-8 rounded-[10px] bg-white/92 dark:bg-[#222222]/92 hover:bg-white dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Clean 2-Line Folder Meta Below Cover */}
+                    <div className="pt-2.5 px-0.5 space-y-0.5">
+                      <h2 className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                        {board.name}
+                      </h2>
+                      <p className="text-[13.5px] text-[var(--color-text-secondary)] flex items-center gap-1.5 truncate">
+                        <span>
+                          {isTh
+                            ? `บันทึกแล้ว ${board.pinCount} แห่ง`
+                            : `${board.pinCount} saved`}
+                        </span>
+                        {promoAlertCount > 0 && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-[var(--color-text-primary)] font-medium">
+                              {isTh
+                                ? `${promoAlertCount} โปรโมชั่น`
+                                : `${promoAlertCount} deals`}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* =====================================================================
+          VIEW 2: INSIDE AN OPENED BOARD FOLDER
+      ====================================================================== */}
+      {activeBoard && (
+        <div className="space-y-6">
+          {/* Folder Header (Hidden when Pin Close-Up is open on mobile) */}
+          <div
+            className={
+              activeBoardPin
+                ? "hidden lg:flex items-center justify-between gap-4"
+                : "flex items-center justify-between gap-4"
+            }
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleCloseBoardPin();
+                  setOpenBoardId(null);
+                }}
+                aria-label={isTh ? "กลับไปหน้ารวมบอร์ด" : "Back to boards"}
+                className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.016em] text-[var(--color-text-primary)] truncate">
+                  {activeBoard.name}
+                </h1>
+                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                  {isTh
+                    ? `บันทึกแล้ว ${visibleFolderEntries.length} แห่ง`
+                    : `${visibleFolderEntries.length} saved`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setBoardToDelete(activeBoard)}
+              className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors shrink-0"
+            >
+              {isTh ? "ลบบอร์ด" : "Delete"}
+            </button>
+          </div>
+
+          {/* Price Drop & New Coupon Watch Strip (Minimal Borderless Surface) */}
+          {!activeBoardPin && alertItems.length > 0 && (
+            <section className="rounded-[16px] bg-[var(--color-background-muted)] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-[14px] font-semibold text-[var(--color-text-primary)]">
+                <Sparkles className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                <span>
+                  {isTh
+                    ? `อัปเดตราคา & คูปองใหม่ในบอร์ดนี้ (${alertItems.length})`
+                    : `Live price drops & deals (${alertItems.length})`}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {alertItems.map((entry) => (
+                  <Link
+                    key={entry.boardPinId}
+                    href={`/${entry.pin.hotelSlug}`}
+                    className="rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)]/50 p-3 flex items-center gap-3 transition-colors"
+                  >
+                    <img
+                      src={entry.pin.coverImageUrl}
+                      alt={entry.pin.hotelNameTh}
+                      className="h-11 w-11 rounded-[10px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+                    />
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                        {isTh ? entry.pin.hotelNameTh : entry.pin.hotelNameEn}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-[var(--color-text-secondary)]">
+                        {entry.priceDropThb > 0 && (
+                          <span className="inline-flex items-center gap-1 font-semibold text-[var(--color-text-primary)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />
+                            {isTh
+                              ? `ลด ฿${entry.priceDropThb.toLocaleString()}`
+                              : `-฿${entry.priceDropThb.toLocaleString()}`}
+                          </span>
+                        )}
+                        {entry.hasActivePromo && entry.activePromoLabel && (
+                          <span className="inline-flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            <span>{entry.activePromoLabel}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Pin Close-Up Stage */}
+          {activeBoardPin && (
+            <PinterestPinDetail
+              pin={activeBoardPin}
+              language={language}
+              currentUser={currentUser}
+              comments={activeBoardComments}
+              savedPinIds={savedPinIds}
+              relatedPins={gridBoardEntries.map((e) => e.pin)}
+              prevPinPreview={prevBoardPinPreview}
+              nextPinPreview={nextBoardPinPreview}
+              canStepBack={pinHistoryStack.length > 0}
+              restoreScrollY={detailRestoreScrollY}
+              onBack={handleStepBackBoardPin}
+              onClose={handleCloseBoardPin}
+              onSelectPin={(next) => handleSelectBoardPin(next, true)}
+              onNavigatePin={handleNavigateBoardPin}
+              onToggleLike={handleToggleLikeOnBoard}
+              onToggleSave={(pinId) =>
+                handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
               }
-            );
-            await loadPinDetail(activeBoardPin.id);
-          }}
-          onDeleteComment={async (commentId) => {
-            await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
-              method: "DELETE",
-            });
-            await loadPinDetail(activeBoardPin.id);
-          }}
-        />
-      )}
-
-      {errorMsg && (
-        <div className="rounded-[16px] bg-[var(--color-error-muted)] p-4 ty-body text-[var(--color-error)]">
-          {errorMsg}
-        </div>
-      )}
-
-      {/* Desktop Close-Up Related Grid */}
-      {activeBoardPin && gridBoardEntries.length > 0 && (
-        <section className="hidden lg:block space-y-3">
-          <h2 className="ty-subtitle font-bold pt-2">
-            {language === "th"
-              ? "ที่พักอื่นในบอร์ดของคุณ"
-              : "More in this board"}
-          </h2>
-          <MasonryGrid
-            key={`board-related-${activeBoardPin.id}`}
-            items={gridBoardEntries.map((e) => ({
-              ...e.pin,
-              aspectClass: e.pin.aspectRatio,
-              boardEntry: e,
-            }))}
-            columnWidth={184}
-            maxColumnWidth={235}
-            gutter={14}
-            fitContainer={true}
-            renderItem={(item, cardIdx) => (
-              <div className="space-y-1">
-                <PinterestPinCard
-                  pin={item}
-                  language={language}
-                  priority={cardIdx < 8}
-                  isSaved={true}
-                  onSelectPin={handleSelectBoardPin}
-                  onToggleSave={(pinId) =>
-                    handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
+              onSharePin={() => {}}
+              onExpandMedia={(urls, idx) =>
+                setFullscreenMedia({
+                  slides: urls.map((u) => ({ type: "image", url: u })),
+                  index: idx,
+                })
+              }
+              onAddComment={async (text, parentId) => {
+                await fetch(
+                  `/api/pins/${encodeURIComponent(activeBoardPin.id)}/comments`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body: text, parentId }),
                   }
-                  onSharePin={() => {}}
-                />
-                {(item.boardEntry.priceDropThb > 0 ||
-                  item.boardEntry.hasActivePromo) && (
-                  <div className="px-1 flex flex-wrap gap-1">
-                    {item.boardEntry.priceDropThb > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        ลด ฿{item.boardEntry.priceDropThb.toLocaleString()}
-                      </span>
-                    )}
-                    {item.boardEntry.hasActivePromo && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                        มีคูปองใหม่
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          />
-        </section>
-      )}
-
-      {/* Persistent Main Board Masonry Grid (Never Unmounted on Pin Open = Zero Reflow & Exact Scroll Restore!) */}
-      {isLoading && !activeBoardPin ? (
-        <div className="flex flex-wrap justify-center gap-3.5">
-          {Array.from({ length: 8 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="w-[calc(50%-8px)] sm:w-[200px] aspect-[3/4] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+                );
+                await loadPinDetail(activeBoardPin.id);
+              }}
+              onDeleteComment={async (commentId) => {
+                await fetch(
+                  `/api/comments/${encodeURIComponent(commentId)}`,
+                  { method: "DELETE" }
+                );
+                await loadPinDetail(activeBoardPin.id);
+              }}
             />
-          ))}
-        </div>
-      ) : allSavedEntries.length === 0 ? (
-        <div
-          className={
-            activeBoardPin
-              ? "hidden"
-              : "rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3"
-          }
-        >
-          <h2 className="ty-title">
-            {language === "th"
-              ? "ยังไม่มีที่พักที่บันทึกไว้ในบอร์ดนี้"
-              : "No stays saved in this board yet"}
-          </h2>
-          <p className="ty-body text-[var(--color-text-secondary)]">
-            {language === "th"
-              ? "ลองเลือกดูที่พักสวยๆ จากหน้าแรกแล้วกดปุ่ม บันทึก เพื่อเก็บเข้าบอร์ดและติดตามโปรโมชั่น"
-              : "Browse the Home feed and click Save on any Pin to collect stays here."}
-          </p>
-          <Link href="/" className="btn-round-solid inline-flex">
-            {language === "th" ? "สำรวจที่พักทั่วไทย" : "Explore Thailand Stays"}
-          </Link>
-        </div>
-      ) : (
-        <section
-          ref={boardGridSectionRef}
-          aria-hidden={Boolean(activeBoardPin)}
-          className={activeBoardPin ? "hidden" : "space-y-3"}
-        >
-          <MasonryGrid
-            items={allSavedEntries.map((e) => ({
-              ...e.pin,
-              aspectClass: e.pin.aspectRatio,
-              boardEntry: e,
-            }))}
-            columnWidth={184}
-            maxColumnWidth={235}
-            gutter={14}
-            fitContainer={true}
-            renderItem={(item, cardIdx) => (
-              <div className="space-y-1">
-                <PinterestPinCard
-                  pin={item}
-                  language={language}
-                  priority={cardIdx < 8}
-                  isSaved={true}
-                  onSelectPin={handleSelectBoardPin}
-                  onToggleSave={(pinId) =>
-                    handleRemovePinFromBoard(pinId, item.boardEntry.boardId)
-                  }
-                  onSharePin={() => {}}
-                />
-                {(item.boardEntry.priceDropThb > 0 ||
-                  item.boardEntry.hasActivePromo) && (
-                  <div className="px-1 flex flex-wrap gap-1">
-                    {item.boardEntry.priceDropThb > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        ลด ฿{item.boardEntry.priceDropThb.toLocaleString()}
-                      </span>
-                    )}
-                    {item.boardEntry.hasActivePromo && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10px] font-semibold">
-                        มีคูปองใหม่
-                      </span>
-                    )}
-                  </div>
+          )}
+
+          {/* Desktop Related Stays in This Board */}
+          {activeBoardPin && gridBoardEntries.length > 0 && (
+            <section className="hidden lg:block pt-8 lg:pt-10 border-t border-[var(--color-border)] space-y-4">
+              <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                {isTh ? "ที่พักอื่นในบอร์ดนี้" : "More in this board"}
+              </h2>
+              <MasonryGrid
+                key={`board-related-${activeBoardPin.id}`}
+                items={gridBoardEntries.map((e) => ({
+                  ...e.pin,
+                  aspectClass: e.pin.aspectRatio,
+                  boardEntry: e,
+                }))}
+                columnWidth={184}
+                maxColumnWidth={235}
+                gutter={14}
+                fitContainer={true}
+                renderItem={(item, cardIdx) => (
+                  <PinterestPinCard
+                    pin={item}
+                    language={language}
+                    priority={cardIdx < 6}
+                    isSaved={true}
+                    onSelectPin={(p) => handleSelectBoardPin(p, true)}
+                    onToggleSave={(pinId) =>
+                      handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
+                    }
+                    onToggleLike={handleToggleLikeOnBoard}
+                    onSharePin={() => {}}
+                  />
                 )}
+              />
+            </section>
+          )}
+
+          {/* Folder Masonry Grid */}
+          {!activeBoardPin &&
+            (visibleFolderEntries.length === 0 ? (
+              <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+                <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                  {isTh
+                    ? "ยังไม่มีที่พักในบอร์ดนี้"
+                    : "No stays saved in this board yet"}
+                </p>
+                <p className="text-[14px] text-[var(--color-text-secondary)]">
+                  {isTh
+                    ? "กลับไปหน้าสำรวจแล้วกดปักหมุดบนการ์ดที่พักที่ชอบได้เลย"
+                    : "Head back to explore and tap the pin button on stays you like."}
+                </p>
+                <Link
+                  href="/"
+                  className="h-10 px-5 rounded-[12px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center justify-center"
+                >
+                  {isTh ? "สำรวจที่พักทั่วไทย" : "Explore stays"}
+                </Link>
               </div>
-            )}
-          />
-        </section>
+            ) : (
+              <MasonryGrid
+                key={`folder-grid-${activeBoard.id}`}
+                items={visibleFolderEntries.map((e) => ({
+                  ...e.pin,
+                  aspectClass: e.pin.aspectRatio,
+                  boardEntry: e,
+                }))}
+                columnWidth={184}
+                maxColumnWidth={235}
+                gutter={14}
+                fitContainer={true}
+                renderItem={(item, cardIdx) => (
+                  <PinterestPinCard
+                    pin={item}
+                    language={language}
+                    priority={cardIdx < 8}
+                    isSaved={true}
+                    onSelectPin={(p) => handleSelectBoardPin(p, false)}
+                    onToggleSave={(pinId) =>
+                      handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
+                    }
+                    onToggleLike={handleToggleLikeOnBoard}
+                    onSharePin={() => {}}
+                  />
+                )}
+              />
+            ))}
+        </div>
       )}
+
+      {/* Airbnb-Style Delete Board Confirmation Modal */}
+      <DeleteBoardConfirmModal
+        board={boardToDelete}
+        language={language}
+        isDeleting={isDeletingBoard}
+        onClose={() => setBoardToDelete(null)}
+        onConfirmDelete={handleConfirmDeleteBoard}
+      />
 
       <PureMediaViewer
         slides={fullscreenMedia?.slides ?? null}

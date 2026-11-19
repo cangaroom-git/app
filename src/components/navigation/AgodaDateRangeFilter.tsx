@@ -256,7 +256,7 @@ export function AgodaDateRangeFilter({
         </div>
 
         {/* Days Grid */}
-        <div className="grid grid-cols-7 gap-y-1.5">
+        <div className="grid grid-cols-7 gap-0.5">
           {cells.map((cell, idx) => {
             if (!cell) {
               return <div key={`empty-${idx}`} className="h-10" />;

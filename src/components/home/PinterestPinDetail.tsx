@@ -7,14 +7,15 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
   BadgeCheck,
+  Bookmark,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CornerDownRight,
@@ -23,12 +24,13 @@ import {
   Heart,
   Link2,
   Loader2,
-  Maximize2,
   MessageCircle,
   MoreHorizontal,
   Send,
   Share,
   Smile,
+  Star,
+  TicketPercent,
   Trash2,
   X,
 } from "lucide-react";
@@ -47,11 +49,144 @@ import { trackPinInteraction } from "@/lib/telemetry/clientTelemetry";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type {
   AuthenticatedMeDto,
+  CouponDealDto,
+  PinActiveCouponDto,
   PinCommentDto,
   PinFeedItemDto,
 } from "@/types/cangaroom";
 import { UniversalVideoPlayer } from "@/components/media/UniversalVideoPlayer";
 import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
+import { HotelCouponTicketCard } from "@/components/deals/HotelCouponTicketCard";
+import { ShareStayModal } from "@/components/shared/ShareStayModal";
+import { InstagramEmojiPicker } from "@/components/shared/InstagramEmojiPicker";
+import { useHotelApp } from "@/components/HotelAppShell";
+
+function mapPinCouponToDealDto(
+  c: PinActiveCouponDto,
+  pin: PinFeedItemDto,
+  isClaimed: boolean
+): CouponDealDto {
+  return {
+    id: c.id,
+    hotelId: pin.hotelId,
+    hotelSlug: pin.hotelSlug,
+    hotelNameTh: pin.hotelNameTh,
+    hotelNameEn: pin.hotelNameEn,
+    hotelLogoUrl: pin.hotelLogoUrl,
+    hotelVerificationStatus: pin.hotelVerificationStatus,
+    provinceId: pin.provinceId,
+    provinceNameTh: pin.provinceNameTh,
+    provinceNameEn: pin.provinceNameEn,
+    stayStyles: pin.stayStyles,
+    code: c.code,
+    titleTh: c.titleTh,
+    titleEn: c.titleEn,
+    descriptionTh: c.descriptionTh,
+    descriptionEn: c.descriptionEn,
+    coverImageUrl: c.coverImageUrl || pin.coverImageUrl,
+    discountType: c.discountType,
+    discountValue: c.discountValue,
+    minSpendThb: c.minSpendThb,
+    maxDiscountThb: c.maxDiscountThb,
+    totalQuota: c.totalQuota,
+    claimedCount: c.claimedCount,
+    usedCount: 0,
+    startsAt: c.startsAt,
+    expiresAt: c.expiresAt,
+    isFeaturedDeal: true,
+    isActive: true,
+    isClaimedByMe: isClaimed,
+    usedAt: null,
+  };
+}
+
+function SparklingCouponIconButton({
+  hasUnclaimed,
+  sizeClass,
+  activeSurfaceClass,
+  claimedSurfaceClass,
+  ariaLabel,
+  title,
+  onClick,
+  onPointerDown,
+  onTouchStart,
+}: {
+  hasUnclaimed: boolean;
+  sizeClass: string;
+  activeSurfaceClass: string;
+  claimedSurfaceClass: string;
+  ariaLabel: string;
+  title?: string;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onPointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onTouchStart?: (e: React.TouchEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      onTouchStart={onTouchStart}
+      aria-label={ariaLabel}
+      title={title ?? ariaLabel}
+      className={`relative ${sizeClass} inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+        hasUnclaimed ? activeSurfaceClass : claimedSurfaceClass
+      }`}
+    >
+      {hasUnclaimed && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+        >
+          <span className="animate-coupon-sheen-loop absolute -inset-y-3 left-0 w-1/2 bg-white/40" />
+        </span>
+      )}
+
+      {hasUnclaimed ? (
+        <svg
+          viewBox="0 0 24 24"
+          className="relative z-[1] w-[20px] h-[20px]"
+          fill="none"
+          aria-hidden="true"
+        >
+          {/* Notched ticket silhouette with periodic wiggle */}
+          <g className="animate-ticket-attention">
+            <path
+              d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v2.1a2.1 2.1 0 0 0 0 4.2v2.7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5v-2.7a2.1 2.1 0 0 0 0-4.2V7.5Z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M9.5 14.2 14.5 9.8"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+            />
+            <circle cx="9.6" cy="9.9" r="0.95" fill="currentColor" />
+            <circle cx="14.4" cy="14.1" r="0.95" fill="currentColor" />
+          </g>
+          {/* Twinkling 4-point sparkles */}
+          <path
+            d="M19.2 1.8l.45 1.35 1.35.45-1.35.45-.45 1.35-.45-1.35-1.35-.45 1.35-.45.45-1.35Z"
+            fill="currentColor"
+            className="animate-sparkle-1"
+          />
+          <path
+            d="M3.6 17.8l.35 1.05 1.05.35-1.05.35-.35 1.05-.35-1.05-1.05-.35 1.05-.35.35-1.05Z"
+            fill="currentColor"
+            className="animate-sparkle-2"
+          />
+        </svg>
+      ) : (
+        <TicketPercent
+          className="relative z-[1] w-[19px] h-[19px]"
+          strokeWidth={1.95}
+        />
+      )}
+    </button>
+  );
+}
 
 interface ClickedPinOrigin {
   pinId: string;
@@ -190,17 +325,22 @@ function PinMoreOptionsControl({
           setIsMobileSheet(mobile);
           setIsOpen((v) => !v);
         }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
         aria-label={language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
         className={triggerClassName}
       >
         <MoreHorizontal className={iconClassName} />
       </button>
 
-      {feedbackToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[95] rounded-[12px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-4 py-2 text-[13px] font-semibold shadow-[var(--shadow-popover)] pointer-events-none">
-          {feedbackToast}
-        </div>
-      )}
+      {feedbackToast &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[96] rounded-[12px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-4 py-2 text-[13px] font-semibold shadow-[var(--shadow-popover)] pointer-events-none">
+            {feedbackToast}
+          </div>,
+          document.body
+        )}
 
       {/* DESKTOP STANDARD DROPDOWN (>= lg) */}
       {isOpen && !isMobileSheet && (
@@ -285,94 +425,175 @@ function PinMoreOptionsControl({
         </div>
       )}
 
-      {/* MOBILE / TABLET SLIDE-UP BOTTOM SHEET (< lg — Matches Pinterest Mobile App) */}
-      {isOpen && isMobileSheet && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="More options"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(false);
-          }}
-          className="fixed inset-0 z-[85] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
-        >
+      {/* MOBILE / TABLET SLIDE-UP BOTTOM SHEET (< lg — Portaled to document.body to escape overflow-hidden & will-change-transform!) */}
+      {isOpen &&
+        isMobileSheet &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full rounded-t-[24px] bg-[var(--color-background-popover)] border-t border-[var(--color-border)] px-5 pt-4 pb-[max(20px,env(safe-area-inset-bottom))] space-y-3 animate-slide-up-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
+            data-swipe-ignore="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
+            className="fixed inset-0 z-[95] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
           >
-            <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full rounded-t-[24px] bg-[var(--color-background-popover)] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] px-5 pt-4 pb-[max(20px,env(safe-area-inset-bottom))] space-y-3 animate-slide-up-sheet"
+            >
+              <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
 
-            <p className="text-[13px] font-medium text-[var(--color-text-secondary)] pt-1">
-              {language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
-            </p>
+              <p className="text-[13px] font-medium text-[var(--color-text-secondary)] pt-1">
+                {language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
+              </p>
 
-            <div className="space-y-0.5">
-              <button
-                type="button"
-                onClick={handleSendShare}
-                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
-              >
-                {language === "th" ? "ส่งต่อ / แชร์" : "Send"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
-              >
-                {language === "th" ? "คัดลอกลิงก์" : "Copy link"}
-              </button>
-
-              <Link
-                href={`/${pin.hotelSlug}`}
-                onClick={() => {
-                  trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
-                  setIsOpen(false);
-                }}
-                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[16px] font-bold text-[var(--color-text-primary)]"
-              >
-                <span className="truncate">
-                  {language === "th"
-                    ? `ไปที่เพจ ${hotelName}`
-                    : `Visit ${hotelName}`}
-                </span>
-                <ArrowUpRight className="w-4 h-4 shrink-0" />
-              </Link>
-
-              <button
-                type="button"
-                onClick={handleReport}
-                className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
-              >
-                {language === "th" ? "รายงานโพสต์" : "Report Pin"}
-              </button>
-
-              {onHidePin && (
+              <div className="space-y-0.5">
                 <button
                   type="button"
-                  onClick={handleHide}
+                  onClick={() => {
+                    onToggleSave(pin.id);
+                    setIsOpen(false);
+                  }}
+                  className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  <span>
+                    {isSaved
+                      ? language === "th"
+                        ? "นำออกจากบอร์ด"
+                        : "Remove from board"
+                      : language === "th"
+                      ? "บันทึกเข้าบอร์ด"
+                      : "Save to board"}
+                  </span>
+                  <Bookmark
+                    className={`w-4 h-4 shrink-0 ${isSaved ? "fill-[var(--color-promo)] text-[var(--color-promo)]" : ""}`}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSendShare}
                   className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
                 >
-                  {language === "th" ? "ซ่อนโพสต์นี้" : "Hide"}
+                  {language === "th" ? "ส่งต่อ / แชร์" : "Send"}
                 </button>
-              )}
-            </div>
 
-            <div className="pt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="h-11 px-6 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-bold text-[var(--color-text-primary)] cursor-pointer transition-colors"
-              >
-                {language === "th" ? "ปิด" : "Close"}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  {language === "th" ? "คัดลอกลิงก์" : "Copy link"}
+                </button>
+
+                <Link
+                  href={`/${pin.hotelSlug}`}
+                  onClick={() => {
+                    trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
+                    setIsOpen(false);
+                  }}
+                  className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[16px] font-bold text-[var(--color-text-primary)]"
+                >
+                  <span className="truncate">
+                    {language === "th"
+                      ? `ไปที่เพจ ${hotelName}`
+                      : `Visit ${hotelName}`}
+                  </span>
+                  <ArrowUpRight className="w-4 h-4 shrink-0" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleReport}
+                  className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  {language === "th" ? "รายงานโพสต์" : "Report Pin"}
+                </button>
+
+                {onHidePin && (
+                  <button
+                    type="button"
+                    onClick={handleHide}
+                    className="w-full h-12 rounded-[12px] px-1 hover:bg-[var(--color-background-muted)] flex items-center text-[16px] font-bold text-[var(--color-text-primary)] cursor-pointer"
+                  >
+                    {language === "th" ? "ซ่อนโพสต์นี้" : "Hide"}
+                  </button>
+                )}
+              </div>
+
+              <div className="pt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="h-11 px-6 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-bold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                >
+                  {language === "th" ? "ปิด" : "Close"}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
+}
+
+export function formatAirbnbCardHeadline(
+  pin: PinFeedItemDto,
+  language: LanguageCode
+): string {
+  const isTh = language === "th";
+  const corpus = [
+    pin.roomNameTh,
+    pin.roomNameEn,
+    pin.titleTh,
+    pin.titleEn,
+    ...pin.stayStyles,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  let typeTh = "ที่พัก";
+  let typeEn = "Stay";
+
+  if (/พูลวิลล่า|pool\s*villa/i.test(corpus)) {
+    typeTh = "พูลวิลล่า";
+    typeEn = "Pool villa";
+  } else if (/แกลมปิ้ง|เต็นท์|โดม|glamping|tent|dome/i.test(corpus)) {
+    typeTh = "แกลมปิ้ง";
+    typeEn = "Glamping";
+  } else if (/วิลล่า|villa|a-frame|เอเฟรม/i.test(corpus)) {
+    typeTh = "วิลล่า";
+    typeEn = "Villa";
+  } else if (/ออนเซ็น|onsen/i.test(corpus)) {
+    typeTh = "ที่พักออนเซ็น";
+    typeEn = "Onsen stay";
+  } else if (/บังกะโล|bungalow|cottage|เคบิน|cabin/i.test(corpus)) {
+    typeTh = "บังกะโล";
+    typeEn = "Cabin";
+  } else if (/สวีท|suite/i.test(corpus)) {
+    typeTh = "ห้องสวีท";
+    typeEn = "Suite";
+  } else if (/รีสอร์ท|resort/i.test(corpus)) {
+    typeTh = "รีสอร์ท";
+    typeEn = "Resort";
+  } else if (pin.stayStyles.includes("beach")) {
+    typeTh = "ที่พักริมทะเล";
+    typeEn = "Beach stay";
+  } else if (pin.stayStyles.includes("mountain")) {
+    typeTh = "ที่พักภูเขา";
+    typeEn = "Mountain stay";
+  }
+
+  const province = isTh ? pin.provinceNameTh : pin.provinceNameEn;
+  if (!province) return isTh ? typeTh : typeEn;
+  return isTh ? `${typeTh}ใน${province}` : `${typeEn} in ${province}`;
 }
 
 export interface PinterestPinCardProps {
@@ -382,6 +603,7 @@ export interface PinterestPinCardProps {
   priority?: boolean;
   onSelectPin: (pin: PinFeedItemDto) => void;
   onToggleSave: (pinId: string) => void;
+  onToggleLike?: (pinId: string) => void;
   onSharePin: (pin: PinFeedItemDto) => void;
   onHidePin?: (pinId: string) => void;
 }
@@ -393,10 +615,10 @@ export function PinterestPinCard({
   priority = false,
   onSelectPin,
   onToggleSave,
-  onSharePin,
-  onHidePin,
 }: PinterestPinCardProps) {
-  const title = language === "th" ? pin.titleTh : pin.titleEn;
+  const isTh = language === "th";
+  const title = isTh ? pin.titleTh : pin.titleEn;
+  const headline = formatAirbnbCardHeadline(pin, language);
   const cardImageUrl = getOptimizedPinImageUrl(pin.coverImageUrl, "card");
   const cardImageSrcSet = getOptimizedPinImageSrcSet(pin.coverImageUrl, "card");
 
@@ -456,6 +678,167 @@ export function PinterestPinCard({
   const mediaBoxRef = useRef<HTMLDivElement | null>(null);
   const impressionLoggedRef = useRef(false);
 
+  // Deduplicated photo set for in-card swipe carousel
+  const cardImages = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    const rawList =
+      pin.mediaUrls.length > 0 ? pin.mediaUrls : [pin.coverImageUrl];
+    for (const raw of rawList) {
+      const clean = (raw || "").trim();
+      if (!clean || clean.includes("res.cloudinary.com/dxxb2gvyw/")) continue;
+      let key = clean;
+      try {
+        const u = new URL(clean);
+        if (u.hostname === "images.unsplash.com") {
+          key = `${u.origin}${u.pathname}`;
+        }
+      } catch {
+        // fallback to raw URL string
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push(clean);
+    }
+    return list.length > 0 ? list : [pin.coverImageUrl];
+  }, [pin.mediaUrls, pin.coverImageUrl]);
+
+  const hasCarousel = !isInlineMp4Video && cardImages.length > 1;
+  const [cardSlideIndex, setCardSlideIndex] = useState(0);
+  const [isCardCarouselAnimated, setIsCardCarouselAnimated] = useState(false);
+  const cardTrackRef = useRef<HTMLDivElement | null>(null);
+  const cardSlideIdxRef = useRef(0);
+  cardSlideIdxRef.current = cardSlideIndex;
+  const suppressClickUntilRef = useRef(0);
+
+  useEffect(() => {
+    setIsCardCarouselAnimated(false);
+    setCardSlideIndex(0);
+  }, [pin.id]);
+
+  const goToCardSlide = (nextIdx: number) => {
+    const clamped = Math.max(0, Math.min(cardImages.length - 1, nextIdx));
+    setIsCardCarouselAnimated(true);
+    setCardSlideIndex((prev) => {
+      if (clamped !== prev) {
+        trackPinInteraction("CAROUSEL_SWIPE", pin, {
+          carouselDepth: clamped + 1,
+        });
+      }
+      return clamped;
+    });
+  };
+
+  // 120fps Horizontal In-Card Photo-Set Swipe (Mobile/Touch — lets users browse multi-photo cards directly in feed!)
+  useEffect(() => {
+    const el = mediaBoxRef.current;
+    if (!el || !hasCarousel || typeof window === "undefined") return;
+
+    let state: {
+      startX: number;
+      startY: number;
+      lastX: number;
+      lastTime: number;
+      velocityX: number;
+      locked: "horizontal" | "vertical" | null;
+    } | null = null;
+
+    const count = cardImages.length;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("button, a")) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const now = performance.now();
+      state = {
+        startX: t.clientX,
+        startY: t.clientY,
+        lastX: t.clientX,
+        lastTime: now,
+        velocityX: 0,
+        locked: null,
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!state) return;
+      const t = e.touches[0];
+      if (!t) return;
+
+      const dx = t.clientX - state.startX;
+      const dy = t.clientY - state.startY;
+      const now = performance.now();
+      const dt = now - state.lastTime;
+      if (dt > 0) {
+        state.velocityX = (t.clientX - state.lastX) / dt;
+        state.lastX = t.clientX;
+        state.lastTime = now;
+      }
+
+      if (state.locked === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        if (Math.abs(dx) > Math.abs(dy) * 1.15) {
+          state.locked = "horizontal";
+        } else {
+          state.locked = "vertical";
+        }
+      }
+
+      if (state.locked === "horizontal") {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        const track = cardTrackRef.current;
+        if (!track) return;
+        const curr = cardSlideIdxRef.current;
+        const atEdge = (curr === 0 && dx > 0) || (curr === count - 1 && dx < 0);
+        const effectiveDx = atEdge ? dx * 0.26 : dx;
+        track.style.transition = "none";
+        track.style.transform = `translate3d(calc(${-curr * 100}% + ${effectiveDx}px), 0, 0)`;
+      }
+    };
+
+    const finishSwipe = (e: TouchEvent) => {
+      if (!state) return;
+      const st = state;
+      state = null;
+      if (st.locked !== "horizontal") return;
+
+      suppressClickUntilRef.current = Date.now() + 300;
+      const track = cardTrackRef.current;
+      const boxW = el.clientWidth || 180;
+      const t = e.changedTouches[0];
+      const dx = t ? t.clientX - st.startX : 0;
+      const vx = st.velocityX;
+      const curr = cardSlideIdxRef.current;
+
+      let targetIdx = curr;
+      if ((dx < -boxW * 0.22 || vx < -0.3) && curr < count - 1) {
+        targetIdx = curr + 1;
+      } else if ((dx > boxW * 0.22 || vx > 0.3) && curr > 0) {
+        targetIdx = curr - 1;
+      }
+
+      if (track) {
+        track.style.transition =
+          "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+        track.style.transform = `translate3d(${-targetIdx * 100}%, 0, 0)`;
+      }
+      goToCardSlide(targetIdx);
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", finishSwipe, { passive: true });
+    el.addEventListener("touchcancel", finishSwipe, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", finishSwipe);
+      el.removeEventListener("touchcancel", finishSwipe);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin.id, hasCarousel, cardImages.length]);
+
   // Track PIN_IMPRESSION after card is >=55% visible for >=1000ms
   useEffect(() => {
     const el = mediaBoxRef.current;
@@ -497,6 +880,7 @@ export function PinterestPinCard({
   }, [pin]);
 
   const handleCardClick = () => {
+    if (Date.now() < suppressClickUntilRef.current) return;
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       const rect = mediaBoxRef.current?.getBoundingClientRect();
       if (rect && rect.width > 0 && rect.height > 0) {
@@ -515,6 +899,19 @@ export function PinterestPinCard({
     onSelectPin(pin);
   };
 
+  const maxDots = 5;
+  const dotStart =
+    cardImages.length <= maxDots
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            cardImages.length - maxDots,
+            cardSlideIndex - Math.floor(maxDots / 2)
+          )
+        );
+  const dotEnd = Math.min(cardImages.length, dotStart + maxDots);
+
   return (
     <article className="w-full select-none">
       <div
@@ -522,6 +919,7 @@ export function PinterestPinCard({
         onClick={handleCardClick}
         onMouseEnter={() => preloadPinHeroImages(pin)}
         onTouchStart={() => preloadPinHeroImages(pin)}
+        style={hasCarousel ? { touchAction: "pan-y" } : undefined}
         className={`group relative w-full ${pin.aspectRatio} rounded-[14px] sm:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
       >
         {isInlineMp4Video && optimizedCardVideoUrl ? (
@@ -553,6 +951,87 @@ export function PinterestPinCard({
               }`}
             />
           </>
+        ) : hasCarousel ? (
+          <>
+            <div
+              ref={cardTrackRef}
+              className="flex h-full w-full will-change-transform"
+              style={{
+                transform: `translate3d(${-cardSlideIndex * 100}%, 0, 0)`,
+                transition: isCardCarouselAnimated
+                  ? "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)"
+                  : "none",
+              }}
+            >
+              {cardImages.map((imgUrl, idx) => (
+                <div
+                  key={`${pin.id}-slide-${idx}`}
+                  className="relative h-full w-full shrink-0 overflow-hidden"
+                >
+                  <img
+                    src={getOptimizedPinImageUrl(imgUrl, "card")}
+                    srcSet={getOptimizedPinImageSrcSet(imgUrl, "card")}
+                    sizes={PIN_IMAGE_SIZES.card}
+                    alt={idx === 0 ? title : `${title} (${idx + 1})`}
+                    loading={
+                      (idx === 0 && priority) || idx <= cardSlideIndex + 1
+                        ? "eager"
+                        : "lazy"
+                    }
+                    fetchPriority={idx === 0 && priority ? "high" : "auto"}
+                    decoding={idx === 0 && priority ? "sync" : "async"}
+                    draggable={false}
+                    className="h-full w-full object-cover object-center select-none"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {cardSlideIndex > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToCardSlide(cardSlideIndex - 1);
+                }}
+                aria-label={isTh ? "ภาพก่อนหน้า" : "Previous photo"}
+                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-[9px] bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" strokeWidth={2.2} />
+              </button>
+            )}
+
+            {cardSlideIndex < cardImages.length - 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToCardSlide(cardSlideIndex + 1);
+                }}
+                aria-label={isTh ? "ภาพถัดไป" : "Next photo"}
+                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-[9px] bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" strokeWidth={2.2} />
+              </button>
+            )}
+
+            <div className="pointer-events-none absolute bottom-2.5 inset-x-0 z-10 flex items-center justify-center gap-1">
+              {cardImages.slice(dotStart, dotEnd).map((_, relIdx) => {
+                const realIdx = dotStart + relIdx;
+                const isActive = realIdx === cardSlideIndex;
+                return (
+                  <span
+                    key={`dot-${realIdx}`}
+                    className={`rounded-full transition-colors ${
+                      isActive
+                        ? "h-1.5 w-1.5 bg-white"
+                        : "h-[5px] w-[5px] bg-white/55"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          </>
         ) : (
           <img
             src={cardImageUrl}
@@ -566,105 +1045,72 @@ export function PinterestPinCard({
             className="h-full w-full object-cover object-center"
           />
         )}
-
-        {/* Hover Dim Overlay — Strictly Zero Hover Scale & Squircle Buttons */}
-        <div className="pointer-events-none absolute inset-0 bg-black/28 opacity-0 group-hover:opacity-100 transition-opacity duration-150 hidden lg:flex flex-col justify-between p-2.5">
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSave(pin.id);
-              }}
-              className={`pointer-events-auto h-9 px-3.5 rounded-[12px] text-[13px] font-bold transition-colors cursor-pointer ${
-                isSaved
-                  ? "bg-[#111111] !text-white"
-                  : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
-              }`}
-            >
-              {isSaved
-                ? language === "th"
-                  ? "บันทึกแล้ว"
-                  : "Saved"
-                : language === "th"
-                ? "บันทึก"
-                : "Save"}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-2">
-            <Link
-              href={`/${pin.hotelSlug}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                trackPinInteraction("HOTEL_PROFILE_VIEW", pin);
-              }}
-              className="pointer-events-auto max-w-[75%] h-8 px-3 rounded-[10px] bg-white/92 hover:bg-white text-[#111111] text-[12px] font-semibold inline-flex items-center gap-1 truncate"
-            >
-              <span className="truncate">
-                {language === "th" ? pin.hotelNameTh : pin.hotelNameEn}
-              </span>
-              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-            </Link>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSharePin(pin);
-              }}
-              aria-label={language === "th" ? "แชร์โพสต์" : "Share"}
-              className="pointer-events-auto h-8 w-8 rounded-[10px] bg-white/92 hover:bg-white text-[#111111] inline-flex items-center justify-center shrink-0 cursor-pointer"
-            >
-              <Share className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Compact 2-Line Title + Like/Comment Counts + '...' Menu Underneath */}
-      <div className="pt-1.5 pb-0.5 px-0.5 space-y-1 relative">
-        <p
+      {/* Clean Airbnb 2-Line Caption Left + Bookmark Save Button Right */}
+      <div className="pt-2 pb-0.5 px-0.5 flex items-start justify-between gap-2">
+        <div
           onClick={handleCardClick}
-          className="text-[12.5px] sm:text-[13px] leading-[1.35] font-semibold text-[var(--color-text-primary)] line-clamp-2 cursor-pointer"
+          className="min-w-0 flex-1 space-y-0.5 cursor-pointer"
         >
-          {title}
-        </p>
+          <p className="text-[13.5px] leading-snug font-semibold text-[var(--color-text-primary)] truncate">
+            {headline}
+          </p>
 
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handleCardClick}
-            className="flex items-center gap-2.5 text-[11.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
-          >
-            <span className="inline-flex items-center gap-1 tabular-nums">
-              <Heart
-                className={`w-3 h-3 ${
-                  pin.isLikedByMe
-                    ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
-                    : ""
-                }`}
-                strokeWidth={2}
-              />
-              <span>{pin.likesCount}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 tabular-nums">
-              <MessageCircle className="w-3 h-3" strokeWidth={2} />
-              <span>{pin.commentsCount}</span>
-            </span>
-          </button>
-
-          <PinMoreOptionsControl
-            pin={pin}
-            language={language}
-            isSaved={isSaved}
-            onToggleSave={onToggleSave}
-            onSharePin={onSharePin}
-            onHidePin={onHidePin}
-            iconClassName="w-3.5 h-3.5"
-            triggerClassName="h-6 w-6 rounded-[8px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors shrink-0"
-          />
+          <p className="text-[12.5px] leading-snug text-[var(--color-text-secondary)] flex items-center gap-1 truncate tabular-nums">
+            {pin.nightlyPriceThb ? (
+              <span>
+                ฿{pin.nightlyPriceThb.toLocaleString()} /{" "}
+                {isTh ? "คืน" : "night"}
+              </span>
+            ) : null}
+            {pin.nightlyPriceThb && pin.hotelRatingAvg > 0 && (
+              <span aria-hidden="true">·</span>
+            )}
+            {pin.hotelRatingAvg > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[var(--color-text-secondary)]">
+                <Star className="w-3 h-3 fill-current shrink-0" />
+                <span>{pin.hotelRatingAvg.toFixed(1)}</span>
+              </span>
+            )}
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSave(pin.id);
+          }}
+          aria-label={
+            isSaved
+              ? isTh
+                ? "นำออกจากบอร์ด"
+                : "Remove from board"
+              : isTh
+              ? "บันทึกเข้าบอร์ด"
+              : "Save to board"
+          }
+          title={
+            isSaved
+              ? isTh
+                ? "บันทึกแล้ว"
+                : "Saved"
+              : isTh
+              ? "บันทึก"
+              : "Save"
+          }
+          className={`h-8 w-8 -mr-1 -mt-0.5 rounded-[9px] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-[var(--color-background-muted)] ${
+            isSaved
+              ? "text-[var(--color-promo)]"
+              : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          }`}
+        >
+          <Bookmark
+            className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
+            strokeWidth={1.9}
+          />
+        </button>
       </div>
     </article>
   );
@@ -679,19 +1125,21 @@ function MobileAdjacentPinPreview({
   language: LanguageCode;
   isSaved: boolean;
 }) {
-  const title = language === "th" ? pin.titleTh : pin.titleEn;
-  const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
-  const provinceLabel =
-    language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
+  const isTh = language === "th";
+  const title = isTh ? pin.titleTh : pin.titleEn;
+  const description = isTh ? pin.descriptionTh : pin.descriptionEn;
+  const captionText = (description || title || "").trim();
+  const hotelName = isTh ? pin.hotelNameTh : pin.hotelNameEn;
+  const provinceLabel = isTh ? pin.provinceNameTh : pin.provinceNameEn;
   const heroAspectCss = resolveAspectRatioCss(pin.aspectRatio);
   const coverSource =
     pin.mediaUrls.length > 0 ? pin.mediaUrls[0] : pin.coverImageUrl;
 
   return (
-    <div className="w-full px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 bg-[var(--color-background-card)] select-none pointer-events-none">
+    <div className="w-full px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 bg-[var(--color-background-body)] select-none pointer-events-none">
       <div
         style={{ aspectRatio: heroAspectCss }}
-        className="relative w-full max-h-[78svh] mx-auto rounded-[24px] sm:rounded-[26px] bg-[var(--color-background-muted)] overflow-hidden"
+        className="relative w-full max-h-[76svh] mx-auto rounded-[24px] sm:rounded-[26px] bg-[var(--color-background-muted)] overflow-hidden"
       >
         <img
           src={getOptimizedPinImageUrl(coverSource, "card")}
@@ -706,85 +1154,98 @@ function MobileAdjacentPinPreview({
           src={getOptimizedPinImageUrl(coverSource, "hero")}
           srcSet={getOptimizedPinImageSrcSet(coverSource, "hero")}
           sizes={PIN_IMAGE_SIZES.hero}
-          alt={title}
+          alt={title || hotelName}
           loading="eager"
           decoding="sync"
           draggable={false}
           className="relative z-10 w-full h-full object-cover select-none"
         />
-      </div>
 
-      <div className="px-3.5 sm:px-4 py-3 flex items-center justify-between gap-1.5 bg-[var(--color-background-card)]">
-        <div className="flex items-center gap-0.5 sm:gap-1">
-          <span className="h-10 px-2 sm:px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
-            <Heart className="w-[21px] h-[21px]" strokeWidth={2.1} />
-            {pin.likesCount > 0 && <span>{pin.likesCount}</span>}
-          </span>
-          <span className="h-10 px-2 sm:px-2.5 rounded-[12px] inline-flex items-center gap-1.5 ty-body font-semibold text-[var(--color-text-primary)]">
-            <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
-            {pin.commentsCount > 0 && <span>{pin.commentsCount}</span>}
-          </span>
-          <span className="h-10 w-9 sm:w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
-            <Share className="w-[20px] h-[20px]" strokeWidth={2.1} />
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <span className="h-10 px-3 sm:px-3.5 rounded-[14px] bg-[var(--color-background-muted)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center gap-1 whitespace-nowrap">
-            <span>{language === "th" ? "เข้าชมที่พัก" : "Visit stay"}</span>
-            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-          </span>
-
+        {/* Grouped Bottom-Right Coupon + Save + More Preview Badges */}
+        <div
+          className={`absolute ${
+            pin.videoUrl ? "bottom-14" : "bottom-3"
+          } right-3 z-20 flex items-center gap-2`}
+        >
+          {pin.activeCoupons.length > 0 && (
+            <span className="h-10 w-10 rounded-[12px] bg-[var(--color-promo)] !text-white inline-flex items-center justify-center">
+              <TicketPercent className="w-[19px] h-[19px]" strokeWidth={2} />
+            </span>
+          )}
           <span
-            className={`h-10 px-3.5 sm:px-4 rounded-[14px] ty-body font-bold inline-flex items-center justify-center whitespace-nowrap ${
+            className={`h-10 w-10 rounded-[12px] inline-flex items-center justify-center ${
               isSaved
-                ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
-                : "bg-[var(--color-promo)] !text-white"
+                ? "bg-[var(--color-promo)] !text-white"
+                : "bg-black/50 text-white backdrop-blur-md"
             }`}
           >
-            {isSaved
-              ? language === "th"
-                ? "บันทึกแล้ว"
-                : "Saved"
-              : language === "th"
-              ? "บันทึก"
-              : "Save"}
+            <Bookmark
+              className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
+              strokeWidth={2.1}
+            />
+          </span>
+          <span className="h-10 w-10 rounded-[12px] bg-black/50 text-white backdrop-blur-md inline-flex items-center justify-center">
+            <MoreHorizontal className="w-5 h-5" />
           </span>
         </div>
       </div>
 
-      <div className="px-4 pt-2 pb-6 space-y-3 bg-[var(--color-background-card)]">
-        <div className="inline-flex items-center gap-2.5 min-w-0">
+      <div className="px-3.5 sm:px-5 pt-3 pb-4 space-y-2.5 bg-[var(--color-background-body)]">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-0.5 -ml-1.5">
+            <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+              <Heart className="w-[22px] h-[22px]" strokeWidth={2} />
+            </span>
+            <span className="h-10 px-2 rounded-[12px] inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+              <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2} />
+              {pin.commentsCount > 0 && <span>{pin.commentsCount}</span>}
+            </span>
+            <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+              <Share className="w-[20px] h-[20px]" strokeWidth={2} />
+            </span>
+          </div>
+
+          <span className="h-9 px-4 rounded-[10px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap shrink-0">
+            <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
+            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+          </span>
+        </div>
+
+        <div className="inline-flex items-center gap-2.5 min-w-0 pt-0.5">
           {pin.hotelLogoUrl ? (
             <img
               src={pin.hotelLogoUrl}
               alt={hotelName}
-              className="h-7 w-7 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
+              className="h-7 w-7 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
             />
           ) : (
-            <span className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0">
+            <span className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-semibold shrink-0">
               {hotelName[0] || "C"}
             </span>
           )}
           <div className="min-w-0">
-            <p className="text-[13.5px] font-bold text-[var(--color-text-primary)] truncate flex items-center gap-1">
+            <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate flex items-center gap-1">
               <span className="truncate">{hotelName}</span>
               {pin.hotelVerificationStatus === "VERIFIED" && (
-                <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
+                <BadgeCheck className="w-3.5 h-3.5 text-[var(--color-text-primary)] shrink-0" />
               )}
             </p>
-            <p className="text-[11.5px] text-[var(--color-text-secondary)] truncate">
+            <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
               {provinceLabel}
               {pin.nightlyPriceThb
-                ? ` · เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
+                ? ` · ฿${pin.nightlyPriceThb.toLocaleString()}/${
+                    isTh ? "คืน" : "night"
+                  }`
                 : ""}
             </p>
           </div>
         </div>
 
-        <h2 className="text-[16.5px] font-bold text-[var(--color-text-primary)] leading-snug">
-          {title}
-        </h2>
+        {captionText && (
+          <p className="text-[14px] leading-relaxed text-[var(--color-text-primary)]">
+            {captionText}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -844,8 +1305,10 @@ export function PinterestPinDetail({
   const pathname = usePathname() || "/";
   const [slideIndex, setSlideIndex] = useState(0);
   const [isCarouselAnimated, setIsCarouselAnimated] = useState(false);
-  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [isCommentsSheetOpen, setIsCommentsSheetOpen] = useState(false);
+  const [isCouponPopoverOpen, setIsCouponPopoverOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [claimingCouponId, setClaimingCouponId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [replyingTo, setReplyingTo] = useState<{
     id: string;
@@ -855,7 +1318,6 @@ export function PinterestPinDetail({
   const [justCopied, setJustCopied] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
-  const [isDesktopCommentsOpen, setIsDesktopCommentsOpen] = useState(true);
   const [pullDownOffset, setPullDownOffset] = useState(0);
   const [isPullingDown, setIsPullingDown] = useState(false);
   const [isNavigatingToHotel, setIsNavigatingToHotel] = useState(false);
@@ -898,11 +1360,12 @@ export function PinterestPinDetail({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Only lock body scroll when using legacy overlay mode (`/{hotelSlug}`) or when mobile comments modal is open!
-  // On `/` and `/board`, native `window` scroll stays active so iOS Safari's bottom bar is 100% translucent!
+  // Lock body scroll on legacy overlay mode or when a modal/sheet is open!
   useBodyScrollLock(
     (mobileOverlayMode && isMobileViewport) ||
-      (isCommentsSheetOpen && isMobileViewport)
+      (isCommentsSheetOpen && isMobileViewport) ||
+      isCouponPopoverOpen ||
+      isShareModalOpen
   );
 
   const useIsomorphicLayoutEffect =
@@ -925,8 +1388,9 @@ export function PinterestPinDetail({
     }
     setIsCarouselAnimated(false);
     setSlideIndex(0);
-    setIsDescriptionOpen(false);
     setIsCommentsSheetOpen(false);
+    setIsCouponPopoverOpen(false);
+    setClaimingCouponId(null);
     setReplyingTo(null);
     setPullDownOffset(0);
     setIsPullingDown(false);
@@ -996,15 +1460,18 @@ export function PinterestPinDetail({
     setIsNavigatingToHotel(false);
   }, [pathname]);
 
-  // Close Comments Sheet on Escape
+  // Close Comments Sheet / Stay Coupons Modal on Escape
   useEffect(() => {
-    if (!isCommentsSheetOpen) return;
+    if (!isCommentsSheetOpen && !isCouponPopoverOpen) return;
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsCommentsSheetOpen(false);
+      if (e.key === "Escape") {
+        setIsCommentsSheetOpen(false);
+        setIsCouponPopoverOpen(false);
+      }
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [isCommentsSheetOpen]);
+  }, [isCommentsSheetOpen, isCouponPopoverOpen]);
 
   // Pinterest-style FLIP expansion animation from the clicked card box -> full hero stage
   useIsomorphicLayoutEffect(() => {
@@ -1251,6 +1718,13 @@ export function PinterestPinDetail({
 
     const onTouchStart = (e: TouchEvent) => {
       if (window.innerWidth >= 1024 || isCommentsSheetOpen) return;
+      if (
+        (e.target as HTMLElement | null)?.closest(
+          "button, a, [data-swipe-ignore='true']"
+        )
+      ) {
+        return;
+      }
       const t = e.touches[0];
       if (!t) return;
       const now = performance.now();
@@ -1596,12 +2070,67 @@ export function PinterestPinDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin.id, images.length, pin.videoUrl, isCommentsSheetOpen]);
 
-  const title = language === "th" ? pin.titleTh : pin.titleEn;
-  const description = language === "th" ? pin.descriptionTh : pin.descriptionEn;
-  const hotelName = language === "th" ? pin.hotelNameTh : pin.hotelNameEn;
-  const provinceLabel =
-    language === "th" ? pin.provinceNameTh : pin.provinceNameEn;
-  const isSaved = pin.isSavedByMe || savedPinIds.has(pin.id);
+  const {
+    pinLikeOverrides,
+    togglePinLikeInstant,
+    claimedCouponIds,
+    claimCouponToWallet,
+    openAuthModal,
+  } = useHotelApp();
+  const isTh = language === "th";
+  const title = isTh ? pin.titleTh : pin.titleEn;
+  const description = isTh ? pin.descriptionTh : pin.descriptionEn;
+  const captionText = (description || title || "").trim();
+  const hotelName = isTh ? pin.hotelNameTh : pin.hotelNameEn;
+  const provinceLabel = isTh ? pin.provinceNameTh : pin.provinceNameEn;
+  const isSaved = savedPinIds.has(pin.id);
+
+  const activeCoupons = pin.activeCoupons ?? [];
+  const hasUnclaimedCoupons = activeCoupons.some(
+    (c) => !claimedCouponIds.has(c.id)
+  );
+
+  const commitCouponClaimInModal = async (
+    deal: CouponDealDto
+  ): Promise<boolean> => {
+    setClaimingCouponId(deal.id);
+    const res = await claimCouponToWallet({ couponId: deal.id });
+    setClaimingCouponId(null);
+    return res.success;
+  };
+
+  const handleClaimCouponInModal = async (
+    deal: CouponDealDto
+  ): Promise<boolean> => {
+    if (!currentUser) {
+      openAuthModal({
+        reasonTh: "เข้าสู่ระบบเพื่อเก็บคูปองส่วนลดเข้ากระเป๋า",
+        reasonEn: "Log in to save this coupon to your wallet",
+        onSuccess: async () => {
+          await commitCouponClaimInModal(deal);
+        },
+      });
+      return false;
+    }
+    return commitCouponClaimInModal(deal);
+  };
+
+  const likeOverride = pinLikeOverrides[pin.id];
+  const effectiveIsLiked = likeOverride ? likeOverride.isLiked : pin.isLikedByMe;
+  const effectiveLikesCount = likeOverride
+    ? likeOverride.likesCount
+    : pin.likesCount;
+
+  const handleInstantLike = () => {
+    togglePinLikeInstant({
+      id: pin.id,
+      isLikedByMe: pin.isLikedByMe,
+      likesCount: pin.likesCount,
+    });
+    if (currentUser && !effectiveIsLiked) {
+      trackPinInteraction("PIN_LIKE", pin);
+    }
+  };
 
   const totalCommentsCount = useMemo(() => {
     const loadedCount = comments.reduce(
@@ -1652,14 +2181,11 @@ export function PinterestPinDetail({
   };
 
   const handleShareWithFeedback = () => {
-    onSharePin(pin);
-    setJustCopied(true);
-    window.setTimeout(() => setJustCopied(false), 1800);
+    setIsShareModalOpen(true);
   };
 
   const handleOpenCommentsSheet = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-      setIsDesktopCommentsOpen(true);
       window.setTimeout(() => {
         desktopCommentsSectionRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -1739,39 +2265,6 @@ export function PinterestPinDetail({
           : "relative w-full overflow-x-clip lg:overflow-visible lg:pb-2 select-none bg-[var(--color-background-body)] lg:bg-transparent"
       }
     >
-      {/* GLOBAL STICKY / FIXED BACK BUTTON (Left) & MOBILE MORE BUTTON (Right — 100% Symmetrical Level & Size!) */}
-      <button
-        type="button"
-        onClick={handleStepBack}
-        title={
-          canStepBack
-            ? language === "th"
-              ? "ย้อนกลับไปการ์ดก่อนหน้า"
-              : "Back to previous Pin"
-            : language === "th"
-            ? "กลับหน้าฟีด"
-            : "Back to feed"
-        }
-        aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-        className="fixed top-[max(18px,env(safe-area-inset-top))] left-4 sm:left-6 lg:top-[96px] lg:left-[104px] z-[68] h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-muted)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
-      >
-        <ChevronLeft className="w-6 h-6 lg:hidden" strokeWidth={2.4} />
-        <ArrowLeft className="hidden lg:block w-6 h-6" strokeWidth={2.4} />
-      </button>
-
-      <div className="lg:hidden fixed top-[max(18px,env(safe-area-inset-top))] right-4 sm:right-6 z-[68]">
-        <PinMoreOptionsControl
-          pin={pin}
-          language={language}
-          isSaved={isSaved}
-          onToggleSave={onToggleSave}
-          onSharePin={onSharePin}
-          onHidePin={onHidePin}
-          iconClassName="w-6 h-6"
-          triggerClassName="h-12 w-12 rounded-[16px] bg-black/55 hover:bg-black/70 text-white shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
-        />
-      </div>
-
       {/* WHOLE-PAGE INTERACTIVE CARD-TO-CARD SLIDE TRACK (With Live -100% / +100% Adjacent Card Previews!) */}
       <div ref={pageSwipeTrackRef} className="relative w-full will-change-transform">
         {prevPinPreview && (
@@ -1783,9 +2276,7 @@ export function PinterestPinDetail({
             <MobileAdjacentPinPreview
               pin={prevPinPreview}
               language={language}
-              isSaved={
-                savedPinIds.has(prevPinPreview.id) || prevPinPreview.isSavedByMe
-              }
+              isSaved={savedPinIds.has(prevPinPreview.id)}
             />
           </div>
         )}
@@ -1799,14 +2290,12 @@ export function PinterestPinDetail({
             <MobileAdjacentPinPreview
               pin={nextPinPreview}
               language={language}
-              isSaved={
-                savedPinIds.has(nextPinPreview.id) || nextPinPreview.isSavedByMe
-              }
+              isSaved={savedPinIds.has(nextPinPreview.id)}
             />
           </div>
         )}
 
-      {/* TALL SPLIT PIN CLOSE-UP CARD (Zero Inline Comment Clutter | Squircle Buttons) */}
+      {/* OPEN EDITORIAL SPLIT CLOSE-UP (Instagram-Clean Photo-First Layout) */}
       <div
         style={
           isMobileViewport && pullDownOffset > 0
@@ -1824,12 +2313,32 @@ export function PinterestPinDetail({
               }
             : undefined
         }
-        className="max-w-[1120px] mx-auto rounded-none lg:rounded-[24px] lg:border lg:border-[var(--color-border)] bg-[var(--color-background-card)] grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:h-[min(85vh,780px)] lg:min-h-[560px] lg:overflow-hidden"
+        className="max-w-[1120px] mx-auto lg:pt-2 lg:pb-4 lg:flex lg:items-start lg:gap-6 xl:gap-8"
       >
+        {/* Dedicated Desktop Left Gutter Back Button — Flat Borderless Squircle, Never Overlaps Hero Photo */}
+        <button
+          type="button"
+          onClick={handleStepBack}
+          title={
+            canStepBack
+              ? isTh
+                ? "ย้อนกลับไปการ์ดก่อนหน้า"
+                : "Back to previous Pin"
+              : isTh
+              ? "กลับหน้าฟีด"
+              : "Back to feed"
+          }
+          aria-label={isTh ? "ย้อนกลับ" : "Back"}
+          className="hidden lg:inline-flex h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] items-center justify-center transition-colors cursor-pointer shrink-0"
+        >
+          <ArrowLeft className="w-5 h-5" strokeWidth={2.1} />
+        </button>
+
+        <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:gap-10 lg:h-[min(82vh,740px)] lg:min-h-[540px]">
         {/* =================================================================
-            LEFT / HERO STAGE: TRUE VERTICAL MEDIA + 1:1 SLIDING CAROUSEL TRACK
+            LEFT / HERO STAGE: PHOTO-FIRST + MOBILE BACK & MORE ATTACHED TO IMAGE
         ================================================================== */}
-        <div className="lg:col-span-6 min-h-0 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-3 bg-[var(--color-background-card)] flex items-center justify-center lg:h-full">
+        <div className="lg:col-span-6 min-h-0 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-0 flex flex-col gap-2.5 sm:gap-3 lg:h-full">
           <div
             ref={mediaStageRef}
             onPointerDown={handleMediaPointerDown}
@@ -1846,10 +2355,91 @@ export function PinterestPinDetail({
             }
             className={`relative w-full min-h-0 ${
               !pin.videoUrl
-                ? "max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[78svh] lg:max-h-none"
+                ? "max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[76svh] lg:max-h-none"
                 : "min-h-[280px]"
-            } lg:h-full rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-muted)] flex items-center justify-center overflow-hidden`}
+            } lg:flex-1 rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-muted)] flex items-center justify-center overflow-hidden`}
           >
+            {/* Mobile Back (<) Top-Left & Grouped Save + More (...) Bottom-Right Attached Directly to Image */}
+            <button
+              type="button"
+              data-swipe-ignore="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStepBack();
+              }}
+              aria-label={isTh ? "ย้อนกลับ" : "Back"}
+              className="lg:hidden absolute top-3 left-3 z-20 h-10 w-10 rounded-[12px] bg-black/50 hover:bg-black/70 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5" strokeWidth={2.4} />
+            </button>
+
+            <div
+              data-swipe-ignore="true"
+              className={`lg:hidden absolute ${
+                pin.videoUrl ? "bottom-14" : "bottom-3"
+              } right-3 z-20 flex items-center gap-2`}
+            >
+              {activeCoupons.length > 0 && (
+                <SparklingCouponIconButton
+                  hasUnclaimed={hasUnclaimedCoupons}
+                  sizeClass="h-10 w-10 rounded-[12px]"
+                  activeSurfaceClass="bg-[var(--color-promo)] hover:bg-[#d5001f] !text-white"
+                  claimedSurfaceClass="bg-black/50 hover:bg-black/70 text-white backdrop-blur-md"
+                  ariaLabel={
+                    isTh
+                      ? `ดูคูปองส่วนลดของ ${hotelName}`
+                      : `View coupons from ${hotelName}`
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCouponPopoverOpen(true);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleSave(pin.id);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                aria-label={
+                  isSaved
+                    ? isTh
+                      ? "นำออกจากบอร์ด"
+                      : "Remove from board"
+                    : isTh
+                    ? "บันทึกเข้าบอร์ด"
+                    : "Save to board"
+                }
+                className={`h-10 w-10 rounded-[12px] inline-flex items-center justify-center transition-colors cursor-pointer ${
+                  isSaved
+                    ? "bg-[var(--color-promo)] !text-white"
+                    : "bg-black/50 hover:bg-black/70 text-white backdrop-blur-md"
+                }`}
+              >
+                <Bookmark
+                  className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
+                  strokeWidth={2.1}
+                />
+              </button>
+
+              <PinMoreOptionsControl
+                pin={pin}
+                language={language}
+                isSaved={isSaved}
+                onToggleSave={onToggleSave}
+                onSharePin={handleShareWithFeedback}
+                onHidePin={onHidePin}
+                iconClassName="w-5 h-5"
+                triggerClassName="h-10 w-10 rounded-[12px] bg-black/50 hover:bg-black/70 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+              />
+            </div>
+
           {pin.videoUrl ? (
             <div className="w-full h-full bg-[var(--color-background-body)] flex items-center justify-center">
               <UniversalVideoPlayer
@@ -1860,7 +2450,7 @@ export function PinterestPinDetail({
                   "hero"
                 )}
                 posterSizes={PIN_IMAGE_SIZES.hero}
-                title={title}
+                title={title || hotelName}
                 aspectRatio={videoAspect}
                 fitMode={videoAspect === "16/9" ? "contain" : "cover"}
                 autoPlay={true}
@@ -1868,533 +2458,591 @@ export function PinterestPinDetail({
               />
             </div>
           ) : (
-            <>
+            <div
+              ref={carouselTrackRef}
+              className="flex w-full h-full will-change-transform"
+              style={{
+                transform: `translate3d(${-slideIndex * 100}%, 0, 0)`,
+                transition: isCarouselAnimated
+                  ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+                  : "none",
+              }}
+            >
+              {images.map((imgUrl, idx) => {
+                const isHeroLoaded = loadedHeroUrls.has(imgUrl);
+                return (
+                  <div
+                    key={`${imgUrl}-${idx}`}
+                    className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                  >
+                    {!isHeroLoaded && (
+                      <img
+                        src={getOptimizedPinImageUrl(imgUrl, "card")}
+                        alt=""
+                        aria-hidden="true"
+                        loading={idx === 0 ? "eager" : "lazy"}
+                        decoding="sync"
+                        draggable={false}
+                        className="absolute inset-0 w-full h-full object-cover select-none"
+                      />
+                    )}
+                    <img
+                      src={getOptimizedPinImageUrl(imgUrl, "hero")}
+                      srcSet={getOptimizedPinImageSrcSet(imgUrl, "hero")}
+                      sizes={PIN_IMAGE_SIZES.hero}
+                      alt={
+                        idx === 0
+                          ? title || hotelName
+                          : `${title || hotelName} (${idx + 1})`
+                      }
+                      loading={idx <= 1 ? "eager" : "lazy"}
+                      fetchPriority={idx === 0 ? "high" : "auto"}
+                      decoding={idx === 0 ? "sync" : "async"}
+                      draggable={false}
+                      onLoad={() => handleMarkHeroLoaded(imgUrl)}
+                      onError={() => handleMarkMediaError(imgUrl)}
+                      className="relative z-10 w-full h-full object-cover select-none"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          </div>
+
+          {/* Multi-Photo Set Squircle Thumbnail Strip Underneath Hero Image */}
+          {images.length > 1 && !pin.videoUrl && (
+            <div
+              data-swipe-ignore="true"
+              className="shrink-0 flex items-center gap-2 px-1.5 sm:px-0.5 lg:px-0"
+            >
               <div
-                ref={carouselTrackRef}
-                className="flex w-full h-full will-change-transform"
-                style={{
-                  transform: `translate3d(${-slideIndex * 100}%, 0, 0)`,
-                  transition: isCarouselAnimated
-                    ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
-                    : "none",
-                }}
+                ref={thumbnailStripRef}
+                className="flex-1 flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-1.5 -mx-1.5"
               >
                 {images.map((imgUrl, idx) => {
-                  const isHeroLoaded = loadedHeroUrls.has(imgUrl);
+                  const isCurrent = idx === slideIndex;
                   return (
-                    <div
+                    <button
                       key={`${imgUrl}-${idx}`}
-                      className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                      type="button"
+                      data-thumb-idx={idx}
+                      onClick={() => navigateCarouselSlide(idx)}
+                      aria-label={
+                        isTh ? `ดูภาพที่ ${idx + 1}` : `View photo ${idx + 1}`
+                      }
+                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${
+                        isCurrent
+                          ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-body)] opacity-100"
+                          : "opacity-65 hover:opacity-100"
+                      }`}
                     >
-                      {!isHeroLoaded && (
-                        <img
-                          src={getOptimizedPinImageUrl(imgUrl, "card")}
-                          alt=""
-                          aria-hidden="true"
-                          loading={idx === 0 ? "eager" : "lazy"}
-                          decoding="sync"
-                          draggable={false}
-                          className="absolute inset-0 w-full h-full object-cover select-none"
-                        />
-                      )}
                       <img
-                        src={getOptimizedPinImageUrl(imgUrl, "hero")}
-                        srcSet={getOptimizedPinImageSrcSet(imgUrl, "hero")}
-                        sizes={PIN_IMAGE_SIZES.hero}
-                        alt={idx === 0 ? title : `${title} (${idx + 1})`}
-                        loading={idx <= 1 ? "eager" : "lazy"}
-                        fetchPriority={idx === 0 ? "high" : "auto"}
-                        decoding={idx === 0 ? "sync" : "async"}
+                        src={getOptimizedPinImageUrl(imgUrl, "thumb")}
+                        srcSet={getOptimizedPinImageSrcSet(imgUrl, "thumb")}
+                        sizes={PIN_IMAGE_SIZES.thumb}
+                        alt={`${title || hotelName} ${idx + 1}`}
+                        loading="eager"
+                        decoding="async"
                         draggable={false}
-                        onLoad={() => handleMarkHeroLoaded(imgUrl)}
                         onError={() => handleMarkMediaError(imgUrl)}
-                        className="relative z-10 w-full h-full object-cover select-none"
+                        className="w-full h-full object-cover"
                       />
-                    </div>
+                    </button>
                   );
                 })}
               </div>
 
-              {images.length > 1 && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-[10px] bg-black/50 backdrop-blur-xs px-3 py-1.5">
-                  {images.map((_, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => navigateCarouselSlide(idx)}
-                      aria-label={`Photo ${idx + 1}`}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                        idx === slideIndex
-                          ? "w-2 bg-white"
-                          : "w-1.5 bg-white/55 hover:bg-white/80"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-
               <button
                 type="button"
-                onClick={() => {
-                  trackPinInteraction("MEDIA_EXPAND", pin);
-                  onExpandMedia(images, slideIndex);
-                }}
-                aria-label="Expand image"
-                className="absolute bottom-4 right-4 z-20 h-12 w-12 rounded-[16px] bg-black/55 lg:bg-[var(--color-background-card)]/95 hover:bg-black/70 lg:hover:bg-[var(--color-background-card)] text-white lg:text-[var(--color-text-primary)] lg:border lg:border-[var(--color-border)] shadow-[var(--shadow-popover)] backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+                onClick={() =>
+                  navigateCarouselSlide((prev) => (prev + 1) % images.length)
+                }
+                aria-label={isTh ? "ภาพถัดไป" : "Next photo"}
+                className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
               >
-                <Maximize2 className="w-5 h-5" strokeWidth={2.3} />
+                <ChevronRight className="w-4 h-4" strokeWidth={2.1} />
               </button>
-            </>
+            </div>
           )}
-          </div>
         </div>
 
         {/* =================================================================
-            RIGHT / INFO PANEL: ULTRA-CLEAN PINTEREST ANATOMY (Zero Comment Clutter!)
+            RIGHT / INSTAGRAM-CLEAN PANEL
+            Desktop: Header (Host + Visit Stay + ...) -> Airy Caption & Comments -> Bottom Like/Comment/Share/Pin + Composer
+            Mobile: Action Bar (Like/Comment/Share | Visit Stay + Pin) -> Likes -> Host + Optional Short Caption
         ================================================================== */}
         <div
           ref={detailsPanelRef}
-          className="lg:col-span-6 min-h-0 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-card)] lg:border-l border-[var(--color-border)]"
+          className="lg:col-span-6 min-h-0 flex flex-col justify-between lg:h-full lg:max-h-full bg-[var(--color-background-body)]"
         >
-          {/* 1. Clean Top Action Bar (♡ | 💬 | 📤 | •••  ...  [เข้าชมที่พัก ↗] [บันทึก] [✕]) */}
-          <div className="px-3.5 sm:px-5 py-3 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 lg:border-b border-[var(--color-border)]">
-            <div className="flex items-center gap-0.5 sm:gap-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => onToggleLike(pin.id)}
-                className="h-10 px-2 sm:px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1 sm:gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
-              >
-                <Heart
-                  className={`w-[21px] h-[21px] ${
-                    pin.isLikedByMe
-                      ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
-                      : ""
-                  }`}
-                  strokeWidth={2.1}
-                />
-                {pin.likesCount > 0 && <span>{pin.likesCount}</span>}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleOpenCommentsSheet}
-                aria-label={
-                  language === "th" ? "เปิดดูความคิดเห็น" : "Open comments"
-                }
-                className="h-10 px-2 sm:px-2.5 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1 sm:gap-1.5 ty-body font-semibold text-[var(--color-text-primary)] transition cursor-pointer"
-              >
-                <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2.1} />
-                {totalCommentsCount > 0 && <span>{totalCommentsCount}</span>}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleShareWithFeedback}
-                aria-label="Share"
-                className="h-10 w-9 sm:w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer shrink-0"
-              >
-                {justCopied ? (
-                  <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
-                ) : (
-                  <Share className="w-[20px] h-[20px]" strokeWidth={2.1} />
-                )}
-              </button>
-
-              {/* Desktop '...' More Options Dropdown */}
-              <div className="hidden lg:inline-flex">
-                <PinMoreOptionsControl
-                  pin={pin}
-                  language={language}
-                  isSaved={isSaved}
-                  onToggleSave={onToggleSave}
-                  onSharePin={onSharePin}
-                  onHidePin={onHidePin}
-                  dropdownAlign="left"
-                  iconClassName="w-[20px] h-[20px]"
-                  triggerClassName="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div
-              data-swipe-ignore="true"
-              className="flex items-center gap-1.5 sm:gap-2 shrink-0"
+          {/* 1A. DESKTOP TOP HEADER (Instagram Image 5: Avatar + Hotel Name + Prominent Visit Stay + '...') */}
+          <div className="hidden lg:flex items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)] shrink-0">
+            <Link
+              href={`/${pin.hotelSlug}`}
+              prefetch={true}
+              onClick={handleVisitHotelClick}
+              className="inline-flex items-center gap-3 min-w-0 group/author"
             >
+              {pin.hotelLogoUrl ? (
+                <img
+                  src={pin.hotelLogoUrl}
+                  alt={hotelName}
+                  className="h-9 w-9 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                />
+              ) : (
+                <span className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[13px] font-semibold shrink-0">
+                  {hotelName[0] || "C"}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] group-hover/author:underline truncate flex items-center gap-1">
+                  <span className="truncate">{hotelName}</span>
+                  {pin.hotelVerificationStatus === "VERIFIED" && (
+                    <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
+                  )}
+                </p>
+                <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                  {provinceLabel}
+                  {pin.nightlyPriceThb
+                    ? ` · ${
+                        isTh
+                          ? `เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
+                          : `from ฿${pin.nightlyPriceThb.toLocaleString()}/night`
+                      }`
+                    : ""}
+                </p>
+              </div>
+            </Link>
+
+            <div className="flex items-center gap-1.5 shrink-0">
               <Link
                 href={`/${pin.hotelSlug}`}
                 prefetch={true}
                 onClick={handleVisitHotelClick}
                 aria-busy={isNavigatingToHotel}
-                className={`h-10 px-3 sm:px-3.5 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] sm:text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
+                className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 ${
                   isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
                 }`}
               >
-                <span>
-                  {language === "th" ? "เข้าชมที่พัก" : "Visit stay"}
-                </span>
+                <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
                 {isNavigatingToHotel ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                 ) : (
-                  <ArrowUpRight
-                    className="w-3.5 h-3.5 shrink-0"
-                    strokeWidth={2.2}
-                  />
+                  <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
                 )}
               </Link>
 
-              <button
-                type="button"
-                onClick={() => onToggleSave(pin.id)}
-                className={`h-10 px-3.5 sm:px-4 rounded-[14px] ty-body font-bold whitespace-nowrap transition cursor-pointer shrink-0 ${
-                  isSaved
-                    ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111]"
-                    : "bg-[var(--color-promo)] hover:bg-[var(--color-promo-hover)] !text-white"
-                }`}
-              >
-                {isSaved
-                  ? language === "th"
-                    ? "บันทึกแล้ว"
-                    : "Saved"
-                  : language === "th"
-                  ? "บันทึก"
-                  : "Save"}
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                title={
-                  language === "th" ? "ปิดกลับหน้าแรก" : "Close to Home feed"
-                }
-                aria-label={language === "th" ? "ปิด" : "Close"}
-                className="hidden lg:inline-flex h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors shrink-0"
-              >
-                <X className="w-4 h-4" strokeWidth={2.2} />
-              </button>
+              <PinMoreOptionsControl
+                pin={pin}
+                language={language}
+                isSaved={isSaved}
+                onToggleSave={onToggleSave}
+                onSharePin={handleShareWithFeedback}
+                onHidePin={onHidePin}
+                dropdownAlign="right"
+                iconClassName="w-[19px] h-[19px]"
+                triggerClassName="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+              />
             </div>
           </div>
 
-          {/* 2. Clean Minimal Info Body (Author + Multi-Photo Thumbnail Strip + Title/Desc!) */}
-          <div className="px-4 sm:px-5 pt-2 pb-4 lg:py-4 flex-1 min-h-0 lg:overflow-y-auto space-y-3.5">
-            <div className="space-y-3">
-              {/* Row 1: Property Identity */}
-              <Link
-                href={`/${pin.hotelSlug}`}
-                prefetch={true}
-                onClick={handleVisitHotelClick}
-                className="inline-flex items-center gap-2.5 min-w-0 group/author"
-              >
+          {/* 1B. MOBILE ACTION ROW & CLEAN CAPTION (< lg ONLY) */}
+          <div className="lg:hidden px-3.5 sm:px-5 pt-3 pb-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-0.5 -ml-1.5">
+                <button
+                  type="button"
+                  onClick={handleInstantLike}
+                  aria-label={isTh ? "ถูกใจ" : "Like"}
+                  className="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                >
+                  <Heart
+                    className={`w-[22px] h-[22px] ${
+                      effectiveIsLiked
+                        ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
+                        : ""
+                    }`}
+                    strokeWidth={2}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenCommentsSheet}
+                  aria-label={isTh ? "ความคิดเห็น" : "Comments"}
+                  className="h-10 px-2 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--color-text-primary)] transition cursor-pointer tabular-nums"
+                >
+                  <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2} />
+                  {totalCommentsCount > 0 && <span>{totalCommentsCount}</span>}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareWithFeedback}
+                  aria-label={isTh ? "แชร์" : "Share"}
+                  className="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                >
+                  {justCopied ? (
+                    <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
+                  ) : (
+                    <Share className="w-[20px] h-[20px]" strokeWidth={2} />
+                  )}
+                </button>
+              </div>
+
+              <div data-swipe-ignore="true" className="shrink-0">
+                <Link
+                  href={`/${pin.hotelSlug}`}
+                  prefetch={true}
+                  onClick={handleVisitHotelClick}
+                  aria-busy={isNavigatingToHotel}
+                  className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
+                    isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
+                  }`}
+                >
+                  <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
+                  {isNavigatingToHotel ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                  )}
+                </Link>
+              </div>
+            </div>
+
+            {effectiveLikesCount > 0 && (
+              <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                {isTh
+                  ? `ถูกใจ ${effectiveLikesCount.toLocaleString()} คน`
+                  : `${effectiveLikesCount.toLocaleString()} ${
+                      effectiveLikesCount === 1 ? "like" : "likes"
+                    }`}
+              </p>
+            )}
+
+            <Link
+              href={`/${pin.hotelSlug}`}
+              prefetch={true}
+              onClick={handleVisitHotelClick}
+              className="inline-flex items-center gap-2.5 min-w-0 pt-0.5"
+            >
+              {pin.hotelLogoUrl ? (
+                <img
+                  src={pin.hotelLogoUrl}
+                  alt={hotelName}
+                  className="h-7 w-7 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                />
+              ) : (
+                <span className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-semibold shrink-0">
+                  {hotelName[0] || "C"}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate flex items-center gap-1">
+                  <span className="truncate">{hotelName}</span>
+                  {pin.hotelVerificationStatus === "VERIFIED" && (
+                    <BadgeCheck className="w-3.5 h-3.5 text-[var(--color-text-primary)] shrink-0" />
+                  )}
+                </p>
+                <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                  {provinceLabel}
+                  {pin.nightlyPriceThb
+                    ? ` · ฿${pin.nightlyPriceThb.toLocaleString()}/${
+                        isTh ? "คืน" : "night"
+                      }`
+                    : ""}
+                </p>
+              </div>
+            </Link>
+
+            {captionText && (
+              <p className="text-[14px] leading-relaxed text-[var(--color-text-primary)]">
+                {captionText}
+              </p>
+            )}
+          </div>
+
+          {/* 2. DESKTOP MIDDLE SCROLLABLE AREA (Airy Instagram Caption + Comments, NO Heavy Header!) */}
+          <div
+            ref={desktopCommentsSectionRef}
+            className="hidden lg:flex flex-col flex-1 min-h-0 overflow-y-auto py-5 pr-1 space-y-5"
+          >
+            {/* Optional Instagram-Style Short Caption (No big title header, no hashtag clutter) */}
+            {captionText && (
+              <div className="flex items-start gap-3 select-text">
                 {pin.hotelLogoUrl ? (
                   <img
                     src={pin.hotelLogoUrl}
                     alt={hotelName}
-                    className="h-7 w-7 lg:h-8 lg:w-8 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
+                    className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)] ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
                   />
                 ) : (
-                  <span className="h-7 w-7 lg:h-8 lg:w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0">
+                  <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-semibold shrink-0 mt-0.5">
                     {hotelName[0] || "C"}
                   </span>
                 )}
-                <div className="min-w-0">
-                  <p className="text-[13.5px] lg:text-[14px] font-bold text-[var(--color-text-primary)] group-hover/author:underline truncate flex items-center gap-1">
-                    <span className="truncate">{hotelName}</span>
-                    {pin.hotelVerificationStatus === "VERIFIED" && (
-                      <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
-                    )}
-                  </p>
-                  <p className="text-[11.5px] text-[var(--color-text-secondary)] truncate">
-                    {provinceLabel}
-                    {pin.nightlyPriceThb
-                      ? ` · เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
-                      : ""}
-                  </p>
+                <div className="flex-1 min-w-0 text-[14px] leading-relaxed text-[var(--color-text-primary)]">
+                  <Link
+                    href={`/${pin.hotelSlug}`}
+                    prefetch={true}
+                    onClick={handleVisitHotelClick}
+                    className="font-semibold hover:underline mr-1.5"
+                  >
+                    {hotelName}
+                  </Link>
+                  <span>{captionText}</span>
                 </div>
-              </Link>
-
-              {/* Row 2: Pinterest Multi-Photo Squircle Thumbnail Strip + '>' Next Arrow */}
-              {images.length > 1 && !pin.videoUrl && (
-                <div
-                  data-swipe-ignore="true"
-                  className="flex items-center gap-1.5"
-                >
-                  <div
-                    ref={thumbnailStripRef}
-                    className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar pl-1 py-1 px-0.5"
-                  >
-                    {images.map((imgUrl, idx) => {
-                      const isCurrent = idx === slideIndex;
-                      return (
-                        <button
-                          key={`${imgUrl}-${idx}`}
-                          type="button"
-                          data-thumb-idx={idx}
-                          onClick={() => navigateCarouselSlide(idx)}
-                          aria-label={
-                            language === "th"
-                              ? `ดูภาพที่ ${idx + 1}`
-                              : `View photo ${idx + 1}`
-                          }
-                          className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[13px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${
-                            isCurrent
-                              ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-card)] opacity-100"
-                              : "border border-[var(--color-border)] opacity-75 hover:opacity-100"
-                          }`}
-                        >
-                          <img
-                            src={getOptimizedPinImageUrl(imgUrl, "thumb")}
-                            srcSet={getOptimizedPinImageSrcSet(imgUrl, "thumb")}
-                            sizes={PIN_IMAGE_SIZES.thumb}
-                            alt={`${title} ${idx + 1}`}
-                            loading="eager"
-                            decoding="async"
-                            draggable={false}
-                            onError={() => handleMarkMediaError(imgUrl)}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigateCarouselSlide((prev) => (prev + 1) % images.length)
-                    }
-                    aria-label={language === "th" ? "ภาพถัดไป" : "Next photo"}
-                    className="h-9 w-9 rounded-[11px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" strokeWidth={2.2} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Pin Title + Expandable Chevron (Matches Pinterest App Image 1!) */}
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2.5">
-                <h1 className="text-[16.5px] lg:text-[19px] font-bold text-[var(--color-text-primary)] leading-snug">
-                  {title}
-                </h1>
-
-                {description && description !== title && (
-                  <button
-                    type="button"
-                    onClick={() => setIsDescriptionOpen((v) => !v)}
-                    aria-label={
-                      isDescriptionOpen
-                        ? "ซ่อนรายละเอียด"
-                        : "อ่านรายละเอียดเพิ่มเติม"
-                    }
-                    className="lg:hidden shrink-0 h-7 w-7 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer transition-colors mt-0.5"
-                  >
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        isDescriptionOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                )}
               </div>
+            )}
 
-              {description && description !== title && (
-                <p
-                  className={`text-[14px] leading-relaxed text-[var(--color-text-secondary)] lg:text-[var(--color-text-primary)] ${
-                    isDescriptionOpen ? "block" : "hidden lg:block"
-                  }`}
-                >
-                  {description}
+            {/* Airy Comments List OR Instagram Centered Empty State */}
+            {comments.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-10 space-y-1">
+                <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                  {isTh ? "ยังไม่มีความคิดเห็น" : "No comments yet."}
                 </p>
-              )}
+                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                  {isTh
+                    ? "เริ่มพูดคุยหรือสอบถามที่พักได้เลย"
+                    : "Start the conversation."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {comments.map((cm) => {
+                  const canRemove =
+                    isOwnerOfPin || currentUser?.id === cm.userId;
 
-              {pin.semanticTags.length > 0 && (
-                <div
-                  className={`flex-wrap items-center gap-1.5 pt-1 ${
-                    isDescriptionOpen ? "flex" : "hidden lg:flex"
-                  }`}
-                >
-                  {pin.semanticTags.slice(0, 5).map((tag) => (
-                    <span
-                      key={tag}
-                      className="h-7 px-2.5 rounded-[9px] bg-[var(--color-background-muted)] text-[12px] font-medium text-[var(--color-text-secondary)] inline-flex items-center"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+                  return (
+                    <div key={`desk-${cm.id}`} className="space-y-2.5 select-text">
+                      <div className="flex items-start gap-3">
+                        {cm.authorAvatar ? (
+                          <img
+                            src={cm.authorAvatar}
+                            alt={cm.authorName}
+                            referrerPolicy="no-referrer"
+                            className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)]"
+                          />
+                        ) : (
+                          <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-semibold shrink-0 mt-0.5">
+                            {(cm.authorName[0] || "G").toUpperCase()}
+                          </span>
+                        )}
 
-            {/* DESKTOP INLINE COMMENTS SECTION (>= lg ONLY — Never Uses Mobile Bottom Sheet!) */}
-            <div
-              ref={desktopCommentsSectionRef}
-              className="hidden lg:block pt-4 border-t border-[var(--color-border)] space-y-3.5"
-            >
-              <button
-                type="button"
-                onClick={() => setIsDesktopCommentsOpen((v) => !v)}
-                className="w-full flex items-center justify-between text-left cursor-pointer group/cmhead"
-              >
-                <span className="text-[15px] font-bold text-[var(--color-text-primary)]">
-                  {totalCommentsCount > 0
-                    ? language === "th"
-                      ? `${totalCommentsCount} ความคิดเห็น`
-                      : `${totalCommentsCount} ${
-                          totalCommentsCount === 1 ? "comment" : "comments"
-                        }`
-                    : language === "th"
-                    ? "ความคิดเห็น"
-                    : "Comments"}
-                </span>
-                <ChevronDown
-                  className={`w-4 h-4 text-[var(--color-text-secondary)] group-hover/cmhead:text-[var(--color-text-primary)] transition-transform duration-200 ${
-                    isDesktopCommentsOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {isDesktopCommentsOpen && (
-                <div className="space-y-3.5">
-                  {comments.length === 0 ? (
-                    <p className="text-[13.5px] text-[var(--color-text-secondary)] py-2">
-                      {language === "th"
-                        ? "ยังไม่มีความคิดเห็น · สอบถามรายละเอียดห้องพักหรือพูดคุยเป็นคนแรกได้เลย"
-                        : "No comments yet — ask a question about this stay below."}
-                    </p>
-                  ) : (
-                    comments.map((cm) => {
-                      const canRemove =
-                        isOwnerOfPin || currentUser?.id === cm.userId;
-
-                      return (
-                        <div key={`desk-${cm.id}`} className="space-y-2.5 select-text">
-                          <div className="flex items-start gap-2.5">
-                            {cm.authorAvatar ? (
-                              <img
-                                src={cm.authorAvatar}
-                                alt={cm.authorName}
-                                referrerPolicy="no-referrer"
-                                className="h-8 w-8 rounded-full object-cover shrink-0 mt-0.5 bg-[var(--color-background-muted)]"
-                              />
-                            ) : (
-                              <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-bold shrink-0 mt-0.5">
-                                {(cm.authorName[0] || "G").toUpperCase()}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[14px] leading-relaxed break-words text-[var(--color-text-primary)]">
+                            <strong className="font-semibold mr-1.5">
+                              {cm.authorName}
+                            </strong>
+                            {cm.isHotelOwnerReply && (
+                              <span className="inline-flex items-center rounded-[6px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-1.5 py-0.5 text-[10.5px] font-semibold mr-1.5 align-middle">
+                                เจ้าของที่พัก
                               </span>
                             )}
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <strong className="text-[13.5px] font-bold text-[var(--color-text-primary)]">
-                                  {cm.authorName}
-                                </strong>
-                                {cm.isHotelOwnerReply && (
-                                  <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
-                                    เจ้าของที่พัก
-                                  </span>
-                                )}
-                                <span className="text-[11.5px] text-[var(--color-text-secondary)]">
-                                  {formatRelativeCommentDate(
-                                    cm.createdAt,
-                                    language
-                                  )}
-                                </span>
-                              </div>
-
-                              <p className="text-[14px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
-                                {cm.body}
-                              </p>
-
-                              <div className="mt-1 flex items-center gap-3.5 text-[12px] text-[var(--color-text-secondary)]">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReplyingTo({
-                                      id: cm.id,
-                                      authorName: cm.authorName,
-                                    });
-                                    desktopCommentInputRef.current?.focus();
-                                  }}
-                                  className="font-semibold hover:text-[var(--color-text-primary)] cursor-pointer"
-                                >
-                                  {language === "th" ? "ตอบกลับ" : "Reply"}
-                                </button>
-
-                                {canRemove && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onDeleteComment(cm.id)}
-                                    className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    <span>
-                                      {language === "th" ? "ลบ" : "Delete"}
-                                    </span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+                            <span>{cm.body}</span>
                           </div>
 
-                          {cm.replies.length > 0 && (
-                            <div className="pl-9 space-y-2">
-                              {cm.replies.map((rp) => {
-                                const canRemoveReply =
-                                  isOwnerOfPin || currentUser?.id === rp.userId;
-                                return (
-                                  <div
-                                    key={`desk-rp-${rp.id}`}
-                                    className="flex items-start gap-2"
-                                  >
-                                    <CornerDownRight className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0 mt-1" />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        <strong className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                                          {rp.authorName}
-                                        </strong>
-                                        {rp.isHotelOwnerReply && (
-                                          <span className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2 py-0.5 text-[10.5px] font-semibold">
-                                            เจ้าของที่พัก
-                                          </span>
-                                        )}
-                                        <span className="text-[11px] text-[var(--color-text-secondary)]">
-                                          {formatRelativeCommentDate(
-                                            rp.createdAt,
-                                            language
-                                          )}
-                                        </span>
-                                      </div>
-                                      <p className="text-[13.5px] leading-snug break-words text-[var(--color-text-primary)] mt-0.5">
-                                        {rp.body}
-                                      </p>
-                                      {canRemoveReply && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onDeleteComment(rp.id)}
-                                          className="mt-1 text-[11.5px] text-[var(--color-text-secondary)] hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                          <span>
-                                            {language === "th" ? "ลบ" : "Delete"}
-                                          </span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                          <div className="mt-1 flex items-center gap-3.5 text-[12px] text-[var(--color-text-secondary)]">
+                            <span>
+                              {formatRelativeCommentDate(
+                                cm.createdAt,
+                                language
+                              )}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyingTo({
+                                  id: cm.id,
+                                  authorName: cm.authorName,
+                                });
+                                desktopCommentInputRef.current?.focus();
+                              }}
+                              className="font-semibold hover:text-[var(--color-text-primary)] cursor-pointer"
+                            >
+                              {isTh ? "ตอบกลับ" : "Reply"}
+                            </button>
+
+                            {canRemove && (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteComment(cm.id)}
+                                className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>{isTh ? "ลบ" : "Delete"}</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </div>
+                      </div>
+
+                      {cm.replies.length > 0 && (
+                        <div className="pl-11 space-y-2.5">
+                          {cm.replies.map((rp) => {
+                            const canRemoveReply =
+                              isOwnerOfPin || currentUser?.id === rp.userId;
+                            return (
+                              <div
+                                key={`desk-rp-${rp.id}`}
+                                className="flex items-start gap-2"
+                              >
+                                <CornerDownRight className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0 mt-1" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[13.5px] leading-relaxed break-words text-[var(--color-text-primary)]">
+                                    <strong className="font-semibold mr-1.5">
+                                      {rp.authorName}
+                                    </strong>
+                                    {rp.isHotelOwnerReply && (
+                                      <span className="inline-flex items-center rounded-[6px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-1.5 py-0.5 text-[10.5px] font-semibold mr-1.5 align-middle">
+                                        เจ้าของที่พัก
+                                      </span>
+                                    )}
+                                    <span>{rp.body}</span>
+                                  </div>
+                                  <div className="mt-0.5 flex items-center gap-3 text-[11.5px] text-[var(--color-text-secondary)]">
+                                    <span>
+                                      {formatRelativeCommentDate(
+                                        rp.createdAt,
+                                        language
+                                      )}
+                                    </span>
+                                    {canRemoveReply && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteComment(rp.id)}
+                                        className="hover:text-[var(--color-error)] inline-flex items-center gap-0.5 cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>{isTh ? "ลบ" : "Delete"}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* DESKTOP STICKY INLINE COMMENT COMPOSER (>= lg ONLY) */}
-          <div className="hidden lg:block shrink-0 px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-background-card)] space-y-2">
+          {/* 3. DESKTOP BOTTOM INSTAGRAM ENGAGEMENT BAR + COMPOSER (>= lg ONLY — Image 5!) */}
+          <div className="hidden lg:block shrink-0 pt-3.5 border-t border-[var(--color-border)] bg-[var(--color-background-body)] space-y-2.5">
+            {/* Action Icons: Left (Like · Comment · Share) | Right (Pin Icon) */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 -ml-1.5">
+                <button
+                  type="button"
+                  onClick={handleInstantLike}
+                  aria-label={isTh ? "ถูกใจ" : "Like"}
+                  className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                >
+                  <Heart
+                    className={`w-[22px] h-[22px] ${
+                      effectiveIsLiked
+                        ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
+                        : ""
+                    }`}
+                    strokeWidth={1.9}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => desktopCommentInputRef.current?.focus()}
+                  aria-label={isTh ? "แสดงความคิดเห็น" : "Comment"}
+                  className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                >
+                  <MessageCircle className="w-[21px] h-[21px]" strokeWidth={1.9} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareWithFeedback}
+                  aria-label={isTh ? "แชร์" : "Share"}
+                  className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)] transition cursor-pointer"
+                >
+                  {justCopied ? (
+                    <Check className="w-[20px] h-[20px] text-[var(--color-success)]" />
+                  ) : (
+                    <Share className="w-[20px] h-[20px]" strokeWidth={1.9} />
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeCoupons.length > 0 && (
+                  <SparklingCouponIconButton
+                    hasUnclaimed={hasUnclaimedCoupons}
+                    sizeClass="h-9 w-9 rounded-[10px]"
+                    activeSurfaceClass="bg-[var(--color-promo)] hover:bg-[#d5001f] !text-white"
+                    claimedSurfaceClass="bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                    ariaLabel={
+                      isTh
+                        ? `ดูคูปองส่วนลดของ ${hotelName}`
+                        : `View coupons from ${hotelName}`
+                    }
+                    onClick={() => setIsCouponPopoverOpen(true)}
+                  />
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onToggleSave(pin.id)}
+                  aria-label={
+                    isSaved
+                      ? isTh
+                        ? "นำออกจากบอร์ด"
+                        : "Remove from board"
+                      : isTh
+                      ? "บันทึกเข้าบอร์ด"
+                      : "Save to board"
+                  }
+                  title={
+                    isSaved
+                      ? isTh
+                        ? "บันทึกแล้ว"
+                        : "Saved"
+                      : isTh
+                      ? "บันทึก"
+                      : "Save"
+                  }
+                  className={`h-9 w-9 rounded-[10px] inline-flex items-center justify-center transition-colors cursor-pointer ${
+                    isSaved
+                      ? "bg-[var(--color-promo)] !text-white"
+                      : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <Bookmark
+                    className={`w-[20px] h-[20px] ${
+                      isSaved ? "fill-current" : ""
+                    }`}
+                    strokeWidth={1.95}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Likes Count & Relative Timestamp */}
+            <div className="space-y-0.5">
+              <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                {isTh
+                  ? `ถูกใจ ${effectiveLikesCount.toLocaleString()} คน`
+                  : `${effectiveLikesCount.toLocaleString()} ${
+                      effectiveLikesCount === 1 ? "like" : "likes"
+                    }`}
+              </p>
+              <p className="text-[11.5px] text-[var(--color-text-secondary)]">
+                {formatRelativeCommentDate(pin.createdAt, language)}
+              </p>
+            </div>
+
             {replyingTo && (
               <div className="flex items-center justify-between px-3 py-1.5 rounded-[10px] bg-[var(--color-background-muted)] text-[12px]">
                 <span>
@@ -2410,42 +3058,41 @@ export function PinterestPinDetail({
               </div>
             )}
 
-            {showEmojiBar && (
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                {QUICK_EMOJIS.map((em) => (
-                  <button
-                    key={`desk-em-${em}`}
-                    type="button"
-                    onClick={() => {
-                      setCommentText((prev) => `${prev}${em}`);
-                      desktopCommentInputRef.current?.focus();
-                    }}
-                    className="h-8 w-8 rounded-[9px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[15px] cursor-pointer shrink-0"
-                  >
-                    {em}
-                  </button>
-                ))}
-              </div>
-            )}
-
             <form
               onSubmit={handleSubmitComment}
-              className="flex items-center gap-2"
+              className="relative flex items-center gap-2 pt-0.5"
             >
-              <button
-                type="button"
-                onClick={() => setShowEmojiBar((v) => !v)}
-                aria-label="Toggle emoji bar"
-                className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer shrink-0 transition-colors"
-              >
-                <Smile className="w-[18px] h-[18px]" />
-              </button>
+              <InstagramEmojiPicker
+                isOpen={showEmojiBar}
+                onClose={() => setShowEmojiBar(false)}
+                language={language}
+                placement="popover-above"
+                onSelect={(em) => {
+                  setCommentText((prev) => `${prev}${em}`);
+                  desktopCommentInputRef.current?.focus();
+                }}
+              />
 
               {currentUser && (
                 <UserAvatarCircle user={currentUser} sizeClass="h-8 w-8" />
               )}
 
-              <div className="flex-1 h-10 rounded-[12px] bg-[var(--color-background-muted)]/65 border border-[var(--color-border)] focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-border-emphasized)] pl-3.5 pr-1.5 flex items-center gap-1.5 transition-colors">
+              <div className="flex-1 h-10 rounded-[12px] bg-[var(--color-background-muted)] border border-transparent focus-within:bg-[var(--color-background-body)] focus-within:border-[var(--color-text-primary)] pl-1.5 pr-1.5 flex items-center gap-1.5 transition-colors">
+                <button
+                  type="button"
+                  data-emoji-trigger="true"
+                  onClick={() => setShowEmojiBar((v) => !v)}
+                  aria-label={isTh ? "เลือกอิโมจิ" : "Choose emoji"}
+                  aria-expanded={showEmojiBar}
+                  className={`h-7 w-7 rounded-[8px] inline-flex items-center justify-center cursor-pointer shrink-0 transition-colors ${
+                    showEmojiBar
+                      ? "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                      : "hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <Smile className="w-[18px] h-[18px]" strokeWidth={1.9} />
+                </button>
+
                 <input
                   ref={desktopCommentInputRef}
                   type="text"
@@ -2453,10 +3100,10 @@ export function PinterestPinDetail({
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder={
                     currentUser
-                      ? language === "th"
+                      ? isTh
                         ? "เพิ่มความคิดเห็น..."
                         : "Add a comment..."
-                      : language === "th"
+                      : isTh
                       ? "เข้าสู่ระบบเพื่อแสดงความคิดเห็น..."
                       : "Sign in to comment..."
                   }
@@ -2468,24 +3115,23 @@ export function PinterestPinDetail({
                     type="submit"
                     disabled={isSubmittingComment}
                     aria-label="Send comment"
-                    className="h-7 w-7 rounded-[9px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] hover:opacity-90 inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
+                    className="h-7 px-2.5 rounded-[8px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] hover:opacity-90 text-[12px] font-semibold inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
                   >
-                    <Send className="w-3.5 h-3.5" />
+                    {isTh ? "โพสต์" : "Post"}
                   </button>
                 )}
               </div>
             </form>
           </div>
         </div>
+        </div>
       </div>
 
-      {/* MOBILE / TABLET "YOU MAY ALSO LIKE" 2-COLUMN TIGHT MASONRY RIGHT UNDER TITLE */}
+      {/* MOBILE / TABLET "MORE TO EXPLORE" 2-COLUMN MASONRY (Clean 1px Section Divider) */}
       {relatedPins.length > 0 && (
-        <div className="lg:hidden px-1.5 pt-3 pb-[calc(88px+env(safe-area-inset-bottom))] space-y-2.5 bg-[var(--color-background-body)]">
-          <h2 className="px-1 text-[15px] font-bold text-[var(--color-text-primary)]">
-            {language === "th"
-              ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
-              : "More to explore"}
+        <div className="lg:hidden px-1.5 pt-5 mt-2 border-t border-[var(--color-border)] pb-[calc(96px+env(safe-area-inset-bottom))] space-y-3 bg-[var(--color-background-body)]">
+          <h2 className="px-1 text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+            {isTh ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ" : "More to explore"}
           </h2>
           <div className="flex gap-1.5 items-start">
             {[0, 1].map((colIdx) => (
@@ -2499,11 +3145,10 @@ export function PinterestPinDetail({
                       pin={relPin}
                       language={language}
                       priority={itemIdx < 2}
-                      isSaved={
-                        savedPinIds.has(relPin.id) || relPin.isSavedByMe
-                      }
+                      isSaved={savedPinIds.has(relPin.id)}
                       onSelectPin={(next) => onSelectPin?.(next)}
                       onToggleSave={onToggleSave}
+                      onToggleLike={onToggleLike}
                       onSharePin={onSharePin}
                       onHidePin={onHidePin}
                     />
@@ -2518,19 +3163,24 @@ export function PinterestPinDetail({
       {/* =====================================================================
           MOBILE / TABLET SLIDE-UP COMMENTS BOTTOM SHEET MODAL (< lg ONLY!)
       ====================================================================== */}
-      {isCommentsSheetOpen && isMobileViewport && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={language === "th" ? "ความคิดเห็น" : "Comments"}
-          data-swipe-ignore="true"
-          onClick={() => setIsCommentsSheetOpen(false)}
-          className="lg:hidden fixed inset-0 z-[85] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
-        >
+      {isCommentsSheetOpen &&
+        isMobileViewport &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full sm:w-[calc(100%-32px)] md:w-[calc(100%-48px)] sm:max-w-[760px] md:max-w-[860px] h-[78dvh] sm:h-[76dvh] rounded-t-[24px] bg-[var(--color-background-popover)] border-t sm:border-x border-[var(--color-border)] flex flex-col justify-between overflow-hidden animate-slide-up-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "th" ? "ความคิดเห็น" : "Comments"}
+            data-swipe-ignore="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={() => setIsCommentsSheetOpen(false)}
+            className="lg:hidden fixed inset-0 z-[95] flex items-end justify-center bg-black/55 animate-fade-in-backdrop"
           >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:w-[calc(100%-32px)] md:w-[calc(100%-48px)] sm:max-w-[760px] md:max-w-[860px] h-[78dvh] sm:h-[76dvh] rounded-t-[24px] bg-[var(--color-background-popover)] border-t sm:border-x border-[var(--color-border)] flex flex-col justify-between overflow-hidden animate-slide-up-sheet"
+            >
             {/* Top Handle + Header (✕ | N comments | 📤) */}
             <div className="shrink-0 pt-2.5 pb-2.5 px-4 sm:px-6 border-b border-[var(--color-border)] space-y-2">
               <div className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto" />
@@ -2733,42 +3383,41 @@ export function PinterestPinDetail({
                 </div>
               )}
 
-              {showEmojiBar && (
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                  {QUICK_EMOJIS.map((em) => (
-                    <button
-                      key={em}
-                      type="button"
-                      onClick={() => {
-                        setCommentText((prev) => `${prev}${em}`);
-                        commentInputRef.current?.focus();
-                      }}
-                      className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[16px] cursor-pointer shrink-0"
-                    >
-                      {em}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <InstagramEmojiPicker
+                isOpen={showEmojiBar}
+                onClose={() => setShowEmojiBar(false)}
+                language={language}
+                placement="inline"
+                onSelect={(em) => {
+                  setCommentText((prev) => `${prev}${em}`);
+                  commentInputRef.current?.focus();
+                }}
+              />
 
               <form
                 onSubmit={handleSubmitComment}
                 className="flex items-center gap-2"
               >
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiBar((v) => !v)}
-                  aria-label="Toggle emoji bar"
-                  className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] cursor-pointer shrink-0 transition-colors"
-                >
-                  <Smile className="w-[18px] h-[18px]" />
-                </button>
-
                 {currentUser && (
                   <UserAvatarCircle user={currentUser} sizeClass="h-8 w-8" />
                 )}
 
-                <div className="flex-1 h-11 rounded-[14px] bg-[var(--color-background-muted)]/65 border border-[var(--color-border)] focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-border-emphasized)] pl-3.5 pr-1.5 flex items-center gap-1.5 transition-colors">
+                <div className="flex-1 h-11 rounded-[14px] bg-[var(--color-background-muted)] border border-transparent focus-within:bg-[var(--color-background-card)] focus-within:border-[var(--color-text-primary)] pl-2 pr-1.5 flex items-center gap-1.5 transition-colors">
+                  <button
+                    type="button"
+                    data-emoji-trigger="true"
+                    onClick={() => setShowEmojiBar((v) => !v)}
+                    aria-label={language === "th" ? "เลือกอิโมจิ" : "Choose emoji"}
+                    aria-expanded={showEmojiBar}
+                    className={`h-8 w-8 rounded-[9px] inline-flex items-center justify-center cursor-pointer shrink-0 transition-colors ${
+                      showEmojiBar
+                        ? "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                        : "hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <Smile className="w-[19px] h-[19px]" strokeWidth={1.9} />
+                  </button>
+
                   <input
                     ref={commentInputRef}
                     type="text"
@@ -2800,8 +3449,114 @@ export function PinterestPinDetail({
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
+
+      {/* STAY COUPONS MODAL (Desktop Centered Dialog + Mobile Slide-Up Bottom Sheet — Multi-Coupon List!) */}
+      {activeCoupons.length > 0 &&
+        isCouponPopoverOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={isTh ? "คูปองส่วนลดที่พัก" : "Stay Coupons"}
+            data-swipe-ignore="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={() => setIsCouponPopoverOpen(false)}
+            className="fixed inset-0 z-[95] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 animate-fade-in-backdrop"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-[460px] max-h-[82dvh] rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet sm:animate-none"
+            >
+              <div className="sm:hidden pt-3 pb-1 flex justify-center shrink-0">
+                <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
+              </div>
+
+              <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between gap-3 shrink-0">
+                <div className="min-w-0">
+                  <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)] truncate">
+                    {isTh ? "คูปองส่วนลดที่พัก" : "Stay Coupons"}
+                  </h2>
+                  <p className="text-[12.5px] text-[var(--color-text-secondary)] truncate">
+                    {hotelName} ·{" "}
+                    {isTh
+                      ? `${activeCoupons.length} รายการ (0% GP)`
+                      : `${activeCoupons.length} available (0% GP)`}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCouponPopoverOpen(false)}
+                  aria-label={isTh ? "ปิด" : "Close"}
+                  className="h-8 w-8 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5 space-y-3">
+                {activeCoupons.map((coupon) => {
+                  const isClaimed = claimedCouponIds.has(coupon.id);
+                  const dealDto = mapPinCouponToDealDto(
+                    coupon,
+                    pin,
+                    isClaimed
+                  );
+                  return (
+                    <HotelCouponTicketCard
+                      key={coupon.id}
+                      deal={dealDto}
+                      language={language}
+                      variant="compact"
+                      notchBgClass="bg-[var(--color-background-popover)]"
+                      isClaimed={isClaimed}
+                      isClaiming={claimingCouponId === coupon.id}
+                      onClaim={(d) => handleClaimCouponInModal(d)}
+                      onNavigateHotel={() => setIsCouponPopoverOpen(false)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ===================================================================
+          AIRBNB-STYLE SHARE MODAL (Desktop Centered / Mobile Slide-Up Sheet)
+      ==================================================================== */}
+      <ShareStayModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        language={language}
+        shareUrl={
+          typeof window !== "undefined"
+            ? `${window.location.origin}/?stay=${encodeURIComponent(pin.id)}`
+            : `/?stay=${encodeURIComponent(pin.id)}`
+        }
+        title={hotelName}
+        subtitle={[
+          provinceLabel,
+          pin.hotelRatingAvg > 0 ? `★ ${pin.hotelRatingAvg.toFixed(1)}` : null,
+          pin.nightlyPriceThb && pin.nightlyPriceThb > 0
+            ? isTh
+              ? `เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
+              : `from ฿${pin.nightlyPriceThb.toLocaleString()}/night`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        imageUrl={getOptimizedPinImageUrl(pin.coverImageUrl, "card")}
+        onCopied={() => {
+          setJustCopied(true);
+          window.setTimeout(() => setJustCopied(false), 1800);
+        }}
+      />
     </div>
   );
 }

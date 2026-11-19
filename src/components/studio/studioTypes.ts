@@ -1,11 +1,31 @@
+import type { SeasonalRuleRecord } from "@/lib/seasonalPricing";
 import type {
   BookingSummaryDto,
+  GuestReviewDto,
   HotelAddonDto,
+  HotelDiscountRuleDto,
   HotelPostDetailDto,
   PinFeedItemDto,
+  PropertyTypeDto,
   RoomDateOverrideDto,
+  RoomPhotoMetaDto,
   VerificationStatusDto,
 } from "@/types/cangaroom";
+
+export interface StudioHotelHighlight {
+  titleTh: string;
+  descTh: string;
+}
+
+export interface StudioNearbySpot {
+  nameTh: string;
+  distTh: string;
+}
+
+export interface StudioFaqItem {
+  qTh: string;
+  aTh: string;
+}
 
 export interface StudioHotelRecord {
   id: string;
@@ -13,7 +33,9 @@ export interface StudioHotelRecord {
   nameTh: string;
   nameEn: string;
   taglineTh: string;
+  taglineEn: string;
   descriptionTh: string;
+  descriptionEn: string;
   logoUrl: string | null;
   coverImageUrl: string | null;
   provinceId: string;
@@ -27,12 +49,22 @@ export interface StudioHotelRecord {
   checkOutTime: string;
   petsAllowed: boolean;
   petPolicyTh: string;
+  highlightsJson: StudioHotelHighlight[] | null;
+  nearbySpotsJson: StudioNearbySpot[] | null;
+  faqJson: StudioFaqItem[] | null;
+  seasonalRulesJson?: SeasonalRuleRecord[] | null;
   contactPhone: string;
   contactLine: string;
   facebookPageUrl: string;
   instagramUrl: string;
   promptPayId: string;
   promptPayAccountName: string;
+  bankName: string;
+  bankAccountNo: string;
+  propertyType: PropertyTypeDto;
+  isPublished: boolean;
+  ratingAvg: number;
+  reviewCount: number;
   verificationStatus: VerificationStatusDto;
 }
 
@@ -42,7 +74,10 @@ export interface StudioRoomRecord {
   slug: string;
   nameTh: string;
   nameEn: string;
+  categoryTh: string;
+  categoryEn: string;
   shortDescTh: string;
+  shortDescEn: string;
   totalUnits: number;
   weekdayPriceThb: number;
   weekendPriceThb: number;
@@ -50,10 +85,15 @@ export interface StudioRoomRecord {
   sizeSqm: number;
   standardGuests: number;
   maxGuests: number;
+  bedrooms: number;
+  beds: number;
+  bathrooms: number;
   petsAllowed: boolean;
   amenities: string[];
   galleryUrls: string[];
+  galleryMetaJson?: RoomPhotoMetaDto[] | null;
   isActive: boolean;
+  sortOrder: number;
 }
 
 export interface StudioCouponRecord {
@@ -68,6 +108,7 @@ export interface StudioCouponRecord {
   totalQuota: number | null;
   claimedCount: number;
   usedCount: number;
+  startsAt: string;
   expiresAt: string;
   isFeaturedDeal: boolean;
   isActive: boolean;
@@ -100,11 +141,13 @@ export interface StudioPayload {
   };
   rooms: StudioRoomRecord[];
   dateOverrides: RoomDateOverrideDto[];
+  bookedUnitsByRoomDate: Record<string, number>;
   addons: HotelAddonDto[];
   coupons: StudioCouponRecord[];
+  discountRules: HotelDiscountRuleDto[];
   pins: PinFeedItemDto[];
   bookings: BookingSummaryDto[];
+  reviews: GuestReviewDto[];
   socialConnections: StudioSocialConnectionRecord[];
   posts: HotelPostDetailDto[];
 }
-

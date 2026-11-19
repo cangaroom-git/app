@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   getOptimizedPinImageSrcSet,
@@ -17,6 +17,8 @@ export interface PureMediaSlide {
   posterUrl?: string;
   aspectRatio?: "16/9" | "9/16";
   caption?: string;
+  spaceId?: string;
+  spaceLabel?: string;
 }
 
 export interface PureMediaViewerProps {
@@ -31,18 +33,40 @@ export function PureMediaViewer({
   onClose,
 }: PureMediaViewerProps) {
   const isOpen = Boolean(slides && slides.length > 0);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>("all");
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   useBodyScrollLock(isOpen);
 
   useEffect(() => {
+    setSelectedSpaceId("all");
     if (slides && slides.length > 0) {
       const safeIdx = Math.min(Math.max(0, initialIndex), slides.length - 1);
       setCurrentIndex(safeIdx);
     }
   }, [slides, initialIndex]);
 
-  const total = slides?.length ?? 0;
+  const spaceTabs = useMemo(() => {
+    if (!slides || slides.length === 0) return [];
+    const map = new Map<string, { id: string; label: string; count: number }>();
+    for (const s of slides) {
+      if (!s.spaceId || !s.spaceLabel) continue;
+      const existing = map.get(s.spaceId);
+      if (existing) existing.count += 1;
+      else map.set(s.spaceId, { id: s.spaceId, label: s.spaceLabel, count: 1 });
+    }
+    const items = Array.from(map.values());
+    return items.length >= 2 ? items : [];
+  }, [slides]);
+
+  const filteredSlides = useMemo(() => {
+    if (!slides) return [];
+    if (selectedSpaceId === "all") return slides;
+    const subset = slides.filter((s) => s.spaceId === selectedSpaceId);
+    return subset.length > 0 ? subset : slides;
+  }, [slides, selectedSpaceId]);
+
+  const total = filteredSlides.length;
 
   const goPrev = useCallback(() => {
     if (total <= 1) return;
@@ -75,7 +99,8 @@ export function PureMediaViewer({
     return null;
   }
 
-  const activeSlide = slides[currentIndex] || slides[0];
+  const safeCurrentIndex = Math.min(currentIndex, Math.max(0, total - 1));
+  const activeSlide = filteredSlides[safeCurrentIndex] || filteredSlides[0];
 
   return (
     <div
@@ -87,18 +112,54 @@ export function PureMediaViewer({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="h-14 px-4 flex items-center justify-between text-white shrink-0"
+        className="px-4 py-3 flex items-center justify-between gap-3 text-white shrink-0"
       >
-        <div className="min-w-0 flex items-center gap-2.5">
+        <div className="min-w-0 flex items-center gap-2.5 overflow-x-auto no-scrollbar">
           {total > 1 && (
-            <span className="rounded-[10px] bg-white/15 px-3 py-1 ty-caption !text-white font-semibold tabular-nums">
-              {currentIndex + 1} / {total}
+            <span className="rounded-[10px] bg-white/15 px-3 py-1 ty-caption !text-white font-semibold tabular-nums shrink-0">
+              {safeCurrentIndex + 1} / {total}
             </span>
           )}
-          {activeSlide.caption && (
-            <span className="ty-body !text-white/90 truncate max-w-[65vw]">
-              {activeSlide.caption}
-            </span>
+          {spaceTabs.length > 0 ? (
+            <div className="flex items-center gap-1.5 min-w-max">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSpaceId("all");
+                  setCurrentIndex(0);
+                }}
+                className={`h-8 px-3 rounded-[10px] text-[12.5px] font-medium transition-colors cursor-pointer ${
+                  selectedSpaceId === "all"
+                    ? "bg-white text-[#222222] font-semibold"
+                    : "bg-white/12 text-white/85 hover:bg-white/20"
+                }`}
+              >
+                ทั้งหมด ({slides.length})
+              </button>
+              {spaceTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSpaceId(tab.id);
+                    setCurrentIndex(0);
+                  }}
+                  className={`h-8 px-3 rounded-[10px] text-[12.5px] font-medium transition-colors cursor-pointer ${
+                    selectedSpaceId === tab.id
+                      ? "bg-white text-[#222222] font-semibold"
+                      : "bg-white/12 text-white/85 hover:bg-white/20"
+                  }`}
+                >
+                  {tab.label} ({tab.count})
+                </button>
+              ))}
+            </div>
+          ) : (
+            activeSlide.spaceLabel && (
+              <span className="rounded-[9px] bg-white/12 px-2.5 py-1 text-[12px] font-medium text-white/85 shrink-0">
+                {activeSlide.spaceLabel}
+              </span>
+            )
           )}
         </div>
 
@@ -189,21 +250,34 @@ export function PureMediaViewer({
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="h-8 flex items-center justify-center gap-1.5 pb-3 shrink-0"
+        className="px-4 pb-4 pt-1 flex flex-col items-center justify-center gap-2 shrink-0"
       >
-        {total > 1 &&
-          total <= 12 &&
-          slides.map((_, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => setCurrentIndex(idx)}
-              aria-label={`Slide ${idx + 1}`}
-              className={`h-2 rounded-full transition-all cursor-pointer ${
-                idx === currentIndex ? "w-5 bg-white" : "w-2 bg-white/40"
-              }`}
-            />
-          ))}
+        {activeSlide.caption && (
+          <p className="text-[13.5px] sm:text-[14px] text-white/90 text-center max-w-2xl leading-relaxed line-clamp-2">
+            {activeSlide.spaceLabel ? (
+              <span className="font-semibold text-white">
+                {activeSlide.spaceLabel} ·{" "}
+              </span>
+            ) : null}
+            {activeSlide.caption}
+          </p>
+        )}
+
+        {total > 1 && total <= 12 && (
+          <div className="flex items-center justify-center gap-1.5">
+            {filteredSlides.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentIndex(idx)}
+                aria-label={`Slide ${idx + 1}`}
+                className={`h-2 rounded-full transition-all cursor-pointer ${
+                  idx === safeCurrentIndex ? "w-5 bg-white" : "w-2 bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

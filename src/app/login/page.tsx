@@ -18,7 +18,12 @@ import {
 } from "@/lib/auth/client";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
-import { StandardButton, StatusPill } from "@/components/ui/standards";
+import {
+  StandardButton,
+  StandardFieldGroup,
+  StandardInput,
+  StatusPill,
+} from "@/components/ui/standards";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -359,39 +364,41 @@ export default function LoginPage() {
                 </p>
               )}
 
-              <form onSubmit={handleEmailAuth} className="space-y-3">
-                {mode === "signup" && (
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={lang === "th" ? "ชื่อผู้ใช้งาน" : "Your name"}
-                    className="fw-input w-full"
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                <StandardFieldGroup>
+                  {mode === "signup" && (
+                    <StandardInput
+                      grouped
+                      label={lang === "th" ? "ชื่อผู้ใช้งาน" : "Your name"}
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={lang === "th" ? "เช่น คุณกานต์" : "Your name"}
+                    />
+                  )}
+
+                  <StandardInput
+                    grouped
+                    label={lang === "th" ? "อีเมล" : "Email address"}
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
                   />
-                )}
 
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={lang === "th" ? "อีเมล" : "Email address"}
-                  className="fw-input w-full"
-                />
-
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={
-                    lang === "th"
-                      ? "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)"
-                      : "Password"
-                  }
-                  className="fw-input w-full"
-                />
+                  <StandardInput
+                    grouped
+                    label={lang === "th" ? "รหัสผ่าน" : "Password"}
+                    optionalText={lang === "th" ? "อย่างน้อย 8 ตัวอักษร" : "Min 8 chars"}
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </StandardFieldGroup>
 
                 <StandardButton
                   type="submit"

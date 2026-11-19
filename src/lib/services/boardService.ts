@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { mapPinToDto } from "@/lib/services/pinMapper";
+import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
 import type { SavedBoardDto } from "@/types/cangaroom";
 
 export async function getUserSavedBoards(
@@ -31,13 +31,12 @@ export async function getUserSavedBoards(
                       isActive: true,
                       expiresAt: { gt: new Date() },
                     },
-                    orderBy: { discountValue: "desc" },
-                    take: 1,
-                    select: {
-                      code: true,
-                      discountType: true,
-                      discountValue: true,
-                    },
+                    orderBy: [
+                      { isFeaturedDeal: "desc" },
+                      { discountValue: "desc" },
+                    ],
+                    take: 6,
+                    select: PIN_COUPON_SELECT,
                   },
                 },
               },
@@ -49,7 +48,7 @@ export async function getUserSavedBoards(
                   weekdayPriceThb: true,
                 },
               },
-              coupon: { select: { code: true } },
+              coupon: { select: PIN_COUPON_SELECT },
             },
           },
         },

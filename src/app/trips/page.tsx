@@ -17,7 +17,12 @@ import {
   BookingDigitalVoucherCard,
   PromptPayPaymentCard,
 } from "@/components/booking/PromptPayPaymentCard";
-import { StandardButton, StandardInput, StatusPill } from "@/components/ui/standards";
+import {
+  StandardButton,
+  StandardFieldGroup,
+  StandardInput,
+  StatusPill,
+} from "@/components/ui/standards";
 import type { BookingSummaryDto } from "@/types/cangaroom";
 
 type TripsTab = "bookings" | "wallet" | "account";
@@ -219,32 +224,44 @@ export default function TripsAndAccountPage() {
       {/* TAB 1: BOOKINGS */}
       {activeTab === "bookings" && (
         <div className="space-y-5">
-          {/* Guest Booking Lookup Bar */}
+          {/* Guest Booking Lookup Bar (Unified Airbnb Grouped Inputs) */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               loadBookings(lookupCode, lookupPhone);
             }}
-            className="rounded-[16px] bg-[var(--color-background-muted)] p-4 flex flex-col sm:flex-row gap-2.5"
+            className="flex flex-col sm:flex-row items-stretch gap-3"
           >
-            <input
-              type="text"
-              value={lookupCode}
-              onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
-              placeholder="รหัสใบจอง เช่น CGR-261117-1234"
-              className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-card)] px-4 ty-body font-mono uppercase focus:outline-none"
-            />
-            <input
-              type="tel"
-              value={lookupPhone}
-              onChange={(e) => setLookupPhone(e.target.value)}
-              placeholder="เบอร์โทรที่ใช้จอง"
-              className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-card)] px-4 ty-body focus:outline-none"
-            />
-            <StandardButton type="submit" variant="primary" size="md">
+            <div className="flex-1 min-w-0">
+              <StandardFieldGroup>
+                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                  <StandardInput
+                    grouped
+                    label="รหัสใบจอง"
+                    type="text"
+                    value={lookupCode}
+                    onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+                    placeholder="CGR-261117-1234"
+                    className="font-mono uppercase"
+                  />
+                  <StandardInput
+                    grouped
+                    label="เบอร์โทรศัพท์ที่ใช้จอง"
+                    type="tel"
+                    value={lookupPhone}
+                    onChange={(e) => setLookupPhone(e.target.value)}
+                    placeholder="08X-XXX-XXXX"
+                  />
+                </div>
+              </StandardFieldGroup>
+            </div>
+            <button
+              type="submit"
+              className="min-h-[56px] px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+            >
               <Search className="w-4 h-4" />
               <span>ค้นหาใบจอง</span>
-            </StandardButton>
+            </button>
           </form>
 
           {lookupError && (

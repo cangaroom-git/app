@@ -57,9 +57,13 @@ export function HomeFeedClient({
   const {
     lang: language,
     user: currentUser,
-    refreshMe,
     globalSearchQuery,
     setGlobalSearchQuery,
+    openAuthModal,
+    savedPinIds: globalSavedPinIds,
+    hasLoadedBoardsOnce,
+    triggerPinToBoard,
+    togglePinLikeInstant,
   } = useHotelApp();
 
   const resolvedInitialStyle = VALID_STYLE_TAGS.has(initialStyleTab)
@@ -68,20 +72,7 @@ export function HomeFeedClient({
 
   const [activeStyleTab, setActiveStyleTab] =
     useState<string>(resolvedInitialStyle);
-  const [visualStyleTab, setVisualStyleTab] =
-    useState<string>(resolvedInitialStyle);
-  const [mountedTabIds, setMountedTabIds] = useState<Set<string>>(() => {
-    const idx = Math.max(
-      0,
-      STAY_STYLE_TABS.findIndex((t) => t.id === resolvedInitialStyle)
-    );
-    const initialSet = new Set<string>([STAY_STYLE_TABS[idx]?.id || "all"]);
-    if (idx > 0) initialSet.add(STAY_STYLE_TABS[idx - 1].id);
-    if (idx < STAY_STYLE_TABS.length - 1) {
-      initialSet.add(STAY_STYLE_TABS[idx + 1].id);
-    }
-    return initialSet;
-  });
+  const [isTabsPinned, setIsTabsPinned] = useState<boolean>(false);
 
   const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>(initialPins);
   const [searchPins, setSearchPins] = useState<PinFeedItemDto[] | null>(null);
@@ -118,18 +109,14 @@ export function HomeFeedClient({
     index: number;
   } | null>(null);
 
+  const inlineTabsSentinelRef = useRef<HTMLDivElement | null>(null);
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
-  const tabUnderlineRef = useRef<HTMLSpanElement | null>(null);
-  const hasMountedUnderlineRef = useRef<boolean>(false);
-  const prevPinOpenForTabsRef = useRef<boolean>(Boolean(initialStayId));
+  const stickyTabsScrollRef = useRef<HTMLDivElement | null>(null);
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const tabPanelRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const homeRootRef = useRef<HTMLDivElement | null>(null);
-  const feedSwipeViewportRef = useRef<HTMLElement | null>(null);
-  const feedSwipeTrackRef = useRef<HTMLDivElement | null>(null);
-  const tabSwipeTimerRef = useRef<number | null>(null);
-  const swipedWhileScrolledRef = useRef<boolean>(false);
-  const justDraggedFeedUntilRef = useRef<number>(0);
+  const stickyTabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
+    {}
+  );
+  const feedGridContainerRef = useRef<HTMLElement | null>(null);
   const savedFeedScrollYRef = useRef<number>(0);
   const openedFromFeedRef = useRef<{ pinId: string; scrollY: number } | null>(
     null
@@ -158,7 +145,6 @@ export function HomeFeedClient({
       const styleParam = params.get("style");
       if (styleParam && VALID_STYLE_TAGS.has(styleParam)) {
         setActiveStyleTab(styleParam);
-        setVisualStyleTab(styleParam);
       }
     };
     syncFromUrl();
@@ -208,32 +194,6 @@ export function HomeFeedClient({
       void loadMasterPins(false);
     }
   }, [initialPins.length, loadMasterPins]);
-
-  // Keep adjacent tabs pre-mounted so swipes never allocate/unmount Masonry grids mid-gesture
-  useEffect(() => {
-    const idx = Math.max(
-      0,
-      STAY_STYLE_TABS.findIndex((t) => t.id === activeStyleTab)
-    );
-    setMountedTabIds((prev) => {
-      const currId = STAY_STYLE_TABS[idx]?.id || "all";
-      const prevId = idx > 0 ? STAY_STYLE_TABS[idx - 1].id : null;
-      const nextId =
-        idx < STAY_STYLE_TABS.length - 1 ? STAY_STYLE_TABS[idx + 1].id : null;
-      if (
-        prev.has(currId) &&
-        (!prevId || prev.has(prevId)) &&
-        (!nextId || prev.has(nextId))
-      ) {
-        return prev;
-      }
-      const next = new Set(prev);
-      next.add(currId);
-      if (prevId) next.add(prevId);
-      if (nextId) next.add(nextId);
-      return next;
-    });
-  }, [activeStyleTab]);
 
   // Debounced 3-Tier Zero-Dead-End Search when globalSearchQuery is active
   useEffect(() => {
@@ -386,8 +346,6 @@ export function HomeFeedClient({
 
   const handleSelectPin = useCallback(
     (pin: PinFeedItemDto, pushHistoryStack = true) => {
-      if (Date.now() < justDraggedFeedUntilRef.current) return;
-
       setDetailRestoreScrollY(null);
 
       if (typeof window !== "undefined" && !currentOpenPin) {
@@ -470,25 +428,24 @@ export function HomeFeedClient({
   );
 
   const handleToggleSave = async (pinId: string) => {
-    if (!currentUser) {
-      router.push(`/login?callbackUrl=${encodeURIComponent("/")}`);
-      return;
-    }
+    const targetPin =
+      (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
+      masterPins.find((p) => p.id === pinId) ??
+      pins.find((p) => p.id === pinId) ??
+      (selectedPinSnapshot?.id === pinId ? selectedPinSnapshot : null);
 
-    const res = await fetch("/api/boards/toggle-pin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pinId }),
+    if (!targetPin) return;
+
+    const result = await triggerPinToBoard({
+      id: targetPin.id,
+      coverImageUrl: targetPin.coverImageUrl,
+      isSavedByMe:
+        globalSavedPinIds.has(targetPin.id) || targetPin.isSavedByMe,
     });
-    if (!res.ok) return;
+    if (!result) return;
 
-    const result = (await res.json()) as { isSaved: boolean };
     if (result.isSaved) {
-      const targetPin =
-        (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
-        masterPins.find((p) => p.id === pinId) ??
-        pins.find((p) => p.id === pinId);
-      if (targetPin) trackPinInteraction("PIN_SAVE", targetPin);
+      trackPinInteraction("PIN_SAVE", targetPin);
     }
     setOptimisticSavedIds((prev) => {
       const next = new Set(prev);
@@ -510,56 +467,24 @@ export function HomeFeedClient({
         prev ? { ...prev, pin: { ...prev.pin, isSavedByMe: result.isSaved } } : prev
       );
     }
-    await refreshMe();
   };
 
-  const handleToggleLike = async (pinId: string) => {
-    if (!currentUser) {
-      router.push(
-        `/login?callbackUrl=${encodeURIComponent(`/?stay=${pinId}`)}`
-      );
-      return;
-    }
+  const effectiveSavedPinIds =
+    currentUser && !hasLoadedBoardsOnce ? optimisticSavedIds : globalSavedPinIds;
 
-    const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
-      method: "POST",
+  const handleToggleLike = (pinId: string) => {
+    const targetPin =
+      (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
+      masterPins.find((p) => p.id === pinId) ??
+      pins.find((p) => p.id === pinId);
+    if (!targetPin) return;
+    togglePinLikeInstant({
+      id: targetPin.id,
+      isLikedByMe: targetPin.isLikedByMe,
+      likesCount: targetPin.likesCount,
     });
-    if (!res.ok) return;
-    const data = (await res.json()) as { isLiked: boolean; likesCount: number };
-    if (data.isLiked) {
-      const targetPin =
-        (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
-        masterPins.find((p) => p.id === pinId) ??
-        pins.find((p) => p.id === pinId);
-      if (targetPin) trackPinInteraction("PIN_LIKE", targetPin);
-    }
-
-    const updatePinLike = (list: PinFeedItemDto[]) =>
-      list.map((p) =>
-        p.id === pinId
-          ? { ...p, isLikedByMe: data.isLiked, likesCount: data.likesCount }
-          : p
-      );
-    setMasterPins(updatePinLike);
-    setSearchPins((prev) => (prev ? updatePinLike(prev) : null));
-    setSelectedPinSnapshot((prev) =>
-      prev && prev.id === pinId
-        ? { ...prev, isLikedByMe: data.isLiked, likesCount: data.likesCount }
-        : prev
-    );
-    if (pinDetail?.pin.id === pinId) {
-      setPinDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              pin: {
-                ...prev.pin,
-                isLikedByMe: data.isLiked,
-                likesCount: data.likesCount,
-              },
-            }
-          : prev
-      );
+    if (currentUser && !targetPin.isLikedByMe) {
+      trackPinInteraction("PIN_LIKE", targetPin);
     }
   };
 
@@ -604,9 +529,23 @@ export function HomeFeedClient({
   ) => {
     if (!selectedPinId) return;
     if (!currentUser) {
-      router.push(
-        `/login?callbackUrl=${encodeURIComponent(`/?stay=${selectedPinId}`)}`
-      );
+      openAuthModal({
+        reasonTh: "เข้าสู่ระบบเพื่อแสดงความคิดเห็น",
+        reasonEn: "Log in to post a comment",
+        onSuccess: async () => {
+          const res = await fetch(
+            `/api/pins/${encodeURIComponent(selectedPinId)}/comments`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ body: text, parentId }),
+            }
+          );
+          if (res.ok) {
+            await loadPinDetail(selectedPinId);
+          }
+        },
+      });
       return;
     }
 
@@ -653,7 +592,7 @@ export function HomeFeedClient({
       const openedOrigin = openedFromFeedRef.current;
       const targetPinId =
         lastOpenPinIdRef.current || openedOrigin?.pinId || null;
-      const panelEl = tabPanelRefs.current[activeStyleTab];
+      const panelEl = feedGridContainerRef.current;
 
       const computeTargetScrollY = (): number => {
         const cardEl = targetPinId
@@ -834,338 +773,82 @@ export function HomeFeedClient({
     ]
   );
 
-  // Adjacent Stay Style Tabs
-  const currentTabIdx = useMemo(
-    () =>
-      Math.max(
-        0,
-        STAY_STYLE_TABS.findIndex((t) => t.id === activeStyleTab)
-      ),
-    [activeStyleTab]
-  );
-  const prevStyleTab =
-    currentTabIdx > 0 ? STAY_STYLE_TABS[currentTabIdx - 1] : null;
-  const nextStyleTab =
-    currentTabIdx < STAY_STYLE_TABS.length - 1
-      ? STAY_STYLE_TABS[currentTabIdx + 1]
-      : null;
-
-  // Real-Time 0ms Indicator & Tab Bar Horizontal Sync Helper
-  const syncTabIndicator = useCallback(
-    (fromIdx: number, toIdx: number, tProgress: number, animateMs: number) => {
-      const indicator = tabUnderlineRef.current;
-      const scroller = tabsScrollRef.current;
-      const fromTab = STAY_STYLE_TABS[fromIdx];
-      const toTab = STAY_STYLE_TABS[toIdx] ?? fromTab;
-      if (!indicator || !fromTab || !toTab) return;
-
-      const fromBtn = tabButtonRefs.current[fromTab.id];
-      const toBtn = tabButtonRefs.current[toTab.id] ?? fromBtn;
-      if (!fromBtn || !toBtn) return;
-
-      const x =
-        fromBtn.offsetLeft + (toBtn.offsetLeft - fromBtn.offsetLeft) * tProgress;
-      const w =
-        fromBtn.offsetWidth +
-        (toBtn.offsetWidth - fromBtn.offsetWidth) * tProgress;
-
-      indicator.style.transition =
-        animateMs > 0
-          ? `transform ${animateMs}ms cubic-bezier(0.22, 1, 0.36, 1), width ${animateMs}ms cubic-bezier(0.22, 1, 0.36, 1)`
-          : "none";
-      indicator.style.transform = `translate3d(${x}px, 0, 0)`;
-      indicator.style.width = `${w}px`;
-
-      if (scroller && scroller.scrollWidth > scroller.clientWidth) {
-        const targetScrollLeft = Math.max(
-          0,
-          Math.min(
-            scroller.scrollWidth - scroller.clientWidth,
-            x + w / 2 - scroller.clientWidth / 2
-          )
-        );
-        if (animateMs === 0) {
-          scroller.scrollLeft = targetScrollLeft;
-        } else {
-          scroller.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
-        }
-      }
-    },
-    []
-  );
-
-  // Sync underline indicator immediately on visualStyleTab changes (0ms lag on swipe release or tap!)
-  useIsomorphicLayoutEffect(() => {
+  // Show Sticky Tabs Bar cleanly once scrolled past inline tabs (mirrors HotelStorefrontClient anchor bar)
+  useEffect(() => {
     if (activePin) {
-      prevPinOpenForTabsRef.current = true;
+      setIsTabsPinned(false);
       return;
     }
-    const justClosedPin = prevPinOpenForTabsRef.current;
-    prevPinOpenForTabsRef.current = false;
-    const idx = Math.max(
-      0,
-      STAY_STYLE_TABS.findIndex((t) => t.id === visualStyleTab)
-    );
-    const animateMs =
-      hasMountedUnderlineRef.current && !justClosedPin ? 240 : 0;
-    hasMountedUnderlineRef.current = true;
-    syncTabIndicator(idx, idx, 0, animateMs);
-  }, [visualStyleTab, activePin, language, syncTabIndicator]);
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return;
+    }
+    const sentinelEl = inlineTabsSentinelRef.current;
+    if (!sentinelEl) return;
 
-  // Synchronously reset feed swipe track & scroll BEFORE browser paint when activeStyleTab commits (Zero Flash!)
-  useIsomorphicLayoutEffect(() => {
-    if (tabSwipeTimerRef.current !== null) {
-      window.clearTimeout(tabSwipeTimerRef.current);
-      tabSwipeTimerRef.current = null;
-    }
-    if (feedSwipeTrackRef.current) {
-      feedSwipeTrackRef.current.style.transition = "none";
-      feedSwipeTrackRef.current.style.transform = "translate3d(0px, 0, 0)";
-    }
-    for (const tab of STAY_STYLE_TABS) {
-      const panelEl = tabPanelRefs.current[tab.id];
-      if (panelEl) panelEl.style.top = "0px";
-    }
-    if (swipedWhileScrolledRef.current && typeof window !== "undefined") {
-      swipedWhileScrolledRef.current = false;
-      const rect = feedSwipeViewportRef.current?.getBoundingClientRect();
-      if (rect && rect.top < 0) {
-        window.scrollTo({
-          top: Math.max(0, Math.round(window.scrollY + rect.top)),
-          behavior: "instant" as ScrollBehavior,
-        });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) {
+          setIsTabsPinned(!entry.isIntersecting);
+        }
+      },
+      {
+        rootMargin: "-64px 0px 0px 0px",
+        threshold: 0,
       }
-    }
-  }, [activeStyleTab]);
-
-  // Precompute all cached Pin arrays by tab ID so persistent mounted panels never allocate mid-swipe
-  const tabPinsMap = useMemo(() => {
-    const map: Record<string, PinFeedItemDto[]> = {};
-    for (const tab of STAY_STYLE_TABS) {
-      map[tab.id] = getPinsForStyleTab(tab.id);
-    }
-    return map;
-  }, [getPinsForStyleTab]);
-
-  const selectStyleTabByTap = useCallback((tabId: string) => {
-    const idx = Math.max(
-      0,
-      STAY_STYLE_TABS.findIndex((t) => t.id === tabId)
     );
-    setMountedTabIds((prev) => {
-      const next = new Set(prev);
-      next.add(tabId);
-      if (idx > 0) next.add(STAY_STYLE_TABS[idx - 1].id);
-      if (idx < STAY_STYLE_TABS.length - 1) {
-        next.add(STAY_STYLE_TABS[idx + 1].id);
-      }
-      return next;
-    });
-    setVisualStyleTab(tabId);
-    setActiveStyleTab(tabId);
-  }, []);
+    observer.observe(sentinelEl);
+    return () => observer.disconnect();
+  }, [activePin]);
 
-  // =========================================================================
-  // ENGINE C: 120FPS INTERACTIVE HOME STAY-STYLE TAB SWIPE PAGER (< lg)
-  // =========================================================================
-  const tabSwipeStateRef = useRef({
-    isPinOpen: Boolean(activePin),
-    currentTabIdx,
-    prevStyleTab,
-    nextStyleTab,
-    syncTabIndicator,
-  });
-  tabSwipeStateRef.current = {
-    isPinOpen: Boolean(activePin),
-    currentTabIdx,
-    prevStyleTab,
-    nextStyleTab,
-    syncTabIndicator,
-  };
-
+  // Slide global Mobile Top Bar out smoothly when Home Sticky Tabs Bar is pinned at top-0
   useEffect(() => {
-    const rootEl = homeRootRef.current;
-    if (!rootEl || typeof window === "undefined") return;
+    if (typeof document === "undefined") return;
+    if (isTabsPinned && !activePin) {
+      document.documentElement.dataset.homeTabsPinned = "true";
+    } else {
+      delete document.documentElement.dataset.homeTabsPinned;
+    }
+    return () => {
+      delete document.documentElement.dataset.homeTabsPinned;
+    };
+  }, [isTabsPinned, activePin]);
 
-    let state: {
-      startX: number;
-      startY: number;
-      lastX: number;
-      lastTime: number;
-      velocityX: number;
-      scrolledOffset: number;
-      locked: "horizontal" | "vertical" | null;
-      ignore: boolean;
-    } | null = null;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (
-        tabSwipeStateRef.current.isPinOpen ||
-        window.innerWidth >= 1024 ||
-        tabSwipeTimerRef.current !== null
-      ) {
+  // Keep active tab centered inside both inline and sticky horizontal tab scrollers
+  useEffect(() => {
+    if (activePin) return;
+    const syncScroller = (
+      scroller: HTMLDivElement | null,
+      btn: HTMLButtonElement | null
+    ) => {
+      if (!scroller || !btn || scroller.scrollWidth <= scroller.clientWidth) {
         return;
       }
-      const t = e.touches[0];
-      if (!t) return;
-      const target = e.target as HTMLElement | null;
-      const ignore = Boolean(
-        target?.closest(
-          "[data-style-tabs-bar='true'], input, textarea, [data-swipe-ignore='true']"
+      const targetLeft = Math.max(
+        0,
+        Math.min(
+          scroller.scrollWidth - scroller.clientWidth,
+          btn.offsetLeft + btn.offsetWidth / 2 - scroller.clientWidth / 2
         )
       );
-      const now = performance.now();
-      state = {
-        startX: t.clientX,
-        startY: t.clientY,
-        lastX: t.clientX,
-        lastTime: now,
-        velocityX: 0,
-        scrolledOffset: 0,
-        locked: null,
-        ignore,
-      };
+      scroller.scrollTo({ left: targetLeft, behavior: "smooth" });
     };
+    syncScroller(tabsScrollRef.current, tabButtonRefs.current[activeStyleTab]);
+    syncScroller(
+      stickyTabsScrollRef.current,
+      stickyTabButtonRefs.current[activeStyleTab]
+    );
+  }, [activeStyleTab, activePin, language]);
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (
-        !state ||
-        state.ignore ||
-        tabSwipeStateRef.current.isPinOpen ||
-        window.innerWidth >= 1024 ||
-        tabSwipeTimerRef.current !== null
-      ) {
-        return;
+  const selectStyleTabByTap = useCallback(
+    (tabId: string) => {
+      setActiveStyleTab(tabId);
+      if (isTabsPinned && typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
-      const t = e.touches[0];
-      if (!t) return;
-
-      const dx = t.clientX - state.startX;
-      const dy = t.clientY - state.startY;
-      const now = performance.now();
-      const dt = now - state.lastTime;
-      if (dt > 0) {
-        state.velocityX = (t.clientX - state.lastX) / dt;
-        state.lastX = t.clientX;
-        state.lastTime = now;
-      }
-
-      if (state.locked === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-        if (Math.abs(dx) > Math.abs(dy) * 1.18) {
-          state.locked = "horizontal";
-          const rect = feedSwipeViewportRef.current?.getBoundingClientRect();
-          const topOff = rect && rect.top < 0 ? Math.round(-rect.top) : 0;
-          state.scrolledOffset = topOff;
-          const activeId =
-            STAY_STYLE_TABS[tabSwipeStateRef.current.currentTabIdx]?.id;
-          for (const tab of STAY_STYLE_TABS) {
-            if (tab.id === activeId) continue;
-            const panelEl = tabPanelRefs.current[tab.id];
-            if (panelEl) panelEl.style.top = `${topOff}px`;
-          }
-        } else {
-          state.locked = "vertical";
-        }
-      }
-
-      if (state.locked === "horizontal") {
-        if (e.cancelable) e.preventDefault();
-        const track = feedSwipeTrackRef.current;
-        if (!track) return;
-        const {
-          currentTabIdx: curIdx,
-          prevStyleTab: prevT,
-          nextStyleTab: nextT,
-          syncTabIndicator: syncFn,
-        } = tabSwipeStateRef.current;
-
-        const atEdge = (dx > 0 && !prevT) || (dx < 0 && !nextT);
-        const effectiveDx = atEdge ? dx * 0.24 : dx;
-        track.style.transition = "none";
-        track.style.transform = `translate3d(${effectiveDx}px, 0, 0)`;
-
-        // Live 1:1 underline & tab-bar scroll tracking during finger drag
-        const vw =
-          feedSwipeViewportRef.current?.clientWidth ||
-          window.innerWidth ||
-          375;
-        if (dx < 0 && nextT) {
-          syncFn(curIdx, curIdx + 1, Math.min(1, -dx / vw), 0);
-        } else if (dx > 0 && prevT) {
-          syncFn(curIdx, curIdx - 1, Math.min(1, dx / vw), 0);
-        } else {
-          syncFn(curIdx, curIdx, 0, 0);
-        }
-      }
-    };
-
-    const finishTabSwipe = (e: TouchEvent) => {
-      if (!state) return;
-      const st = state;
-      state = null;
-      if (st.ignore || st.locked !== "horizontal") return;
-
-      justDraggedFeedUntilRef.current = Date.now() + 260;
-
-      const track = feedSwipeTrackRef.current;
-      if (!track) return;
-
-      const vw =
-        feedSwipeViewportRef.current?.clientWidth || window.innerWidth || 375;
-      const t = e.changedTouches[0];
-      const dx = t ? t.clientX - st.startX : 0;
-      const vx = st.velocityX;
-      const {
-        currentTabIdx: curIdx,
-        prevStyleTab: prevT,
-        nextStyleTab: nextT,
-        syncTabIndicator: syncFn,
-      } = tabSwipeStateRef.current;
-
-      const commitNext = Boolean(nextT) && (dx < -vw * 0.18 || vx < -0.32);
-      const commitPrev = Boolean(prevT) && (dx > vw * 0.18 || vx > 0.32);
-
-      if (commitNext && nextT) {
-        swipedWhileScrolledRef.current = st.scrolledOffset > 0;
-        // Immediate 0ms tab highlight + tab bar scroll on finger release!
-        setVisualStyleTab(nextT.id);
-        track.style.transition =
-          "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
-        track.style.transform = "translate3d(calc(-100% - 12px), 0, 0)";
-        tabSwipeTimerRef.current = window.setTimeout(() => {
-          tabSwipeTimerRef.current = null;
-          setActiveStyleTab(nextT.id);
-        }, 260);
-      } else if (commitPrev && prevT) {
-        swipedWhileScrolledRef.current = st.scrolledOffset > 0;
-        setVisualStyleTab(prevT.id);
-        track.style.transition =
-          "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
-        track.style.transform = "translate3d(calc(100% + 12px), 0, 0)";
-        tabSwipeTimerRef.current = window.setTimeout(() => {
-          tabSwipeTimerRef.current = null;
-          setActiveStyleTab(prevT.id);
-        }, 260);
-      } else {
-        syncFn(curIdx, curIdx, 0, 220);
-        track.style.transition =
-          "transform 240ms cubic-bezier(0.22, 1, 0.36, 1)";
-        track.style.transform = "translate3d(0px, 0, 0)";
-      }
-    };
-
-    rootEl.addEventListener("touchstart", onTouchStart, { passive: true });
-    rootEl.addEventListener("touchmove", onTouchMove, { passive: false });
-    rootEl.addEventListener("touchend", finishTabSwipe, { passive: true });
-    rootEl.addEventListener("touchcancel", finishTabSwipe, { passive: true });
-
-    return () => {
-      rootEl.removeEventListener("touchstart", onTouchStart);
-      rootEl.removeEventListener("touchmove", onTouchMove);
-      rootEl.removeEventListener("touchend", finishTabSwipe);
-      rootEl.removeEventListener("touchcancel", finishTabSwipe);
-    };
-  }, []);
+    },
+    [isTabsPinned]
+  );
 
   const hasActiveFilter =
     activeStyleTab !== "all" || Boolean(globalSearchQuery.trim());
@@ -1176,71 +859,99 @@ export function HomeFeedClient({
   };
 
   return (
-    <div
-      ref={homeRootRef}
-      className="cgr-page-fluid space-y-4 sm:space-y-5 [overflow-anchor:none]"
-    >
-      {/* Strictly Locked 44px Horizontal Stay Style Tabs Bar (Persisted silently when activePin is open!) */}
+    <div className="cgr-page-fluid space-y-4 sm:space-y-5 [overflow-anchor:none]">
+      {/* Scroll-Reveal Sticky Stay Style Tabs Bar (Fixed Top Bar under 64px Header on Desktop / Top Edge on Mobile) */}
+      {!activePin && (
+        <nav
+          aria-label={language === "th" ? "หมวดหมู่สไตล์ที่พัก" : "Stay styles"}
+          aria-hidden={!isTabsPinned}
+          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-3 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
+            isTabsPinned
+              ? "opacity-100 translate-y-0 pointer-events-auto"
+              : "opacity-0 -translate-y-2 pointer-events-none"
+          }`}
+        >
+          <div
+            ref={stickyTabsScrollRef}
+            data-style-tabs-bar="true"
+            className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar select-none"
+          >
+            {STAY_STYLE_TABS.map((tab) => {
+              const isActive = activeStyleTab === tab.id;
+              return (
+                <button
+                  key={`sticky-${tab.id}`}
+                  ref={(el) => {
+                    stickyTabButtonRefs.current[tab.id] = el;
+                  }}
+                  type="button"
+                  onClick={() => selectStyleTabByTap(tab.id)}
+                  className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
+                    isActive
+                      ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                      : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
+      {/* Inline Stay Style Tabs Bar + Active Search Filter Banner (Persisted silently when activePin is open!) */}
       <div
         aria-hidden={Boolean(activePin)}
         className={activePin ? "hidden" : "space-y-2"}
       >
+        <div ref={inlineTabsSentinelRef}>
           <div
             ref={tabsScrollRef}
             data-style-tabs-bar="true"
-            style={{ touchAction: "pan-x" }}
-            className="relative h-11 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
+            className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
           >
-            <div className="relative flex items-center gap-5 sm:gap-6 h-full min-w-max">
-              {STAY_STYLE_TABS.map((tab) => {
-                const isVisualActive = visualStyleTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    ref={(el) => {
-                      tabButtonRefs.current[tab.id] = el;
-                    }}
-                    type="button"
-                    onClick={() => selectStyleTabByTap(tab.id)}
-                    className={`h-full inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
-                      isVisualActive
-                        ? "font-bold text-[var(--color-text-primary)]"
-                        : "font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    <span>
-                      {language === "th" ? tab.labelTh : tab.labelEn}
-                    </span>
-                  </button>
-                );
-              })}
-
-              <span
-                ref={tabUnderlineRef}
-                aria-hidden="true"
-                className="pointer-events-none absolute bottom-0 left-0 h-[2px] bg-[var(--color-text-primary)] will-change-transform"
-              />
-            </div>
+            {STAY_STYLE_TABS.map((tab) => {
+              const isActive = activeStyleTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  ref={(el) => {
+                    tabButtonRefs.current[tab.id] = el;
+                  }}
+                  type="button"
+                  onClick={() => selectStyleTabByTap(tab.id)}
+                  className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
+                    isActive
+                      ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                      : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+                </button>
+              );
+            })}
           </div>
-
-          {globalSearchQuery.trim() && (
-            <div className="flex items-center justify-between gap-2 px-1">
-              <p className="ty-caption truncate">
-                {language === "th"
-                  ? `ผลค้นหา: "${globalSearchQuery.trim()}"`
-                  : `Results for "${globalSearchQuery.trim()}"`}
-              </p>
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <span>{language === "th" ? "ล้างคำค้นหา" : "Clear search"}</span>
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
         </div>
+
+        {globalSearchQuery.trim() && (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <p className="ty-caption truncate">
+              {language === "th"
+                ? `ผลค้นหา: "${globalSearchQuery.trim()}"`
+                : `Results for "${globalSearchQuery.trim()}"`}
+            </p>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <span>{language === "th" ? "ล้างคำค้นหา" : "Clear search"}</span>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Stay Close-Up Stage at Very Top (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
       {activePin && (
@@ -1249,7 +960,7 @@ export function HomeFeedClient({
           language={language}
           currentUser={currentUser}
           comments={activePinComments}
-          savedPinIds={optimisticSavedIds}
+          savedPinIds={effectiveSavedPinIds}
           relatedPins={gridPins}
           prevPinPreview={prevPinPreview}
           nextPinPreview={nextPinPreview}
@@ -1290,10 +1001,10 @@ export function HomeFeedClient({
         </div>
       )}
 
-      {/* Desktop Close-Up Related Grid (Rendered cleanly without unmounting main Home feed!) */}
+      {/* Desktop Close-Up Related Grid (Equal Section Rhythm via Single 1px Hairline) */}
       {activePin && gridPins.length > 0 && (
-        <section className="hidden lg:block space-y-3">
-          <h2 className="ty-subtitle font-bold pt-2">
+        <section className="hidden lg:block pt-8 lg:pt-10 border-t border-[var(--color-border)] space-y-4">
+          <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
             {language === "th"
               ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
               : "You may also like"}
@@ -1313,9 +1024,10 @@ export function HomeFeedClient({
                 pin={pin}
                 language={language}
                 priority={cardIdx < 6}
-                isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
+                isSaved={effectiveSavedPinIds.has(pin.id)}
                 onSelectPin={(p) => handleSelectPin(p, true)}
                 onToggleSave={handleToggleSave}
+                onToggleLike={handleToggleLike}
                 onSharePin={handleSharePin}
                 onHidePin={handleHidePin}
               />
@@ -1324,7 +1036,7 @@ export function HomeFeedClient({
         </section>
       )}
 
-      {/* Interactive Persistent Multi-Tab Masonry Stage (Never Unmounts on Pin Open = Zero Reflow & Exact Scroll Restore!) */}
+      {/* Persistent Masonry Feed Stage (Never Unmounts on Pin Open = Exact Scroll Restore!) */}
       {isLoadingPins && masterPins.length === 0 && !activePin ? (
         <div className="flex flex-wrap justify-center gap-3.5">
           {Array.from({ length: 14 }).map((_, idx) => (
@@ -1342,101 +1054,58 @@ export function HomeFeedClient({
         </div>
       ) : (
         <section
-          ref={feedSwipeViewportRef}
+          ref={feedGridContainerRef}
           aria-hidden={Boolean(activePin)}
-          className={
-            activePin
-              ? "hidden"
-              : "relative overflow-x-clip space-y-3"
-          }
+          className={activePin ? "hidden" : "relative space-y-3"}
         >
-          <div
-            ref={feedSwipeTrackRef}
-            className="relative w-full will-change-transform"
-          >
-            {STAY_STYLE_TABS.map((tab, idx) => {
-              if (!mountedTabIds.has(tab.id)) return null;
-              const isCurrent = idx === currentTabIdx;
-              const offsetTabs = idx - currentTabIdx;
-              const tabPins = tabPinsMap[tab.id] || [];
-
-              return (
-                <div
-                  key={tab.id}
-                  ref={(el) => {
-                    tabPanelRefs.current[tab.id] = el;
-                  }}
-                  aria-hidden={!isCurrent}
-                  style={
-                    isCurrent
-                      ? undefined
-                      : {
-                          left: `calc(${offsetTabs * 100}% + ${
-                            offsetTabs * 12
-                          }px)`,
-                        }
-                  }
-                  className={
-                    isCurrent
-                      ? "relative w-full"
-                      : "lg:hidden absolute top-0 w-full pointer-events-none select-none"
-                  }
+          {pins.length === 0 ? (
+            <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+              <h2 className="ty-title">
+                {language === "th"
+                  ? "ไม่พบที่พักที่ตรงกับหมวดหมู่นี้"
+                  : "No stays match this category"}
+              </h2>
+              <p className="ty-body text-[var(--color-text-secondary)]">
+                {language === "th"
+                  ? "เลือกหมวดหมู่อื่นด้านบน หรือกดแสดงที่พักทั้งหมดในระบบ"
+                  : "Pick another category above, or view all stays."}
+              </p>
+              {hasActiveFilter && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn-round-solid inline-flex"
                 >
-                  {tabPins.length === 0 ? (
-                    <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
-                      <h2 className="ty-title">
-                        {language === "th"
-                          ? "ไม่พบที่พักที่ตรงกับหมวดหมู่นี้"
-                          : "No stays match this category"}
-                      </h2>
-                      <p className="ty-body text-[var(--color-text-secondary)]">
-                        {language === "th"
-                          ? "ปัดซ้าย-ขวาเพื่อดูหมวดหมู่อื่น หรือกดแสดงที่พักทั้งหมดในระบบ"
-                          : "Swipe left or right to browse other categories, or view all stays."}
-                      </p>
-                      {hasActiveFilter && isCurrent && (
-                        <button
-                          type="button"
-                          onClick={handleResetFilters}
-                          className="btn-round-solid inline-flex"
-                        >
-                          {language === "th"
-                            ? "แสดงที่พักทั้งหมด"
-                            : "Show All Stays"}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <MasonryGrid
-                      key={`tab-grid-${tab.id}`}
-                      items={tabPins.map((p) => ({
-                        ...p,
-                        aspectClass: p.aspectRatio,
-                      }))}
-                      columnWidth={184}
-                      maxColumnWidth={235}
-                      gutter={14}
-                      fitContainer={true}
-                      renderItem={(pin, cardIdx) => (
-                        <PinterestPinCard
-                          pin={pin}
-                          language={language}
-                          priority={isCurrent && cardIdx < 8}
-                          isSaved={
-                            pin.isSavedByMe || optimisticSavedIds.has(pin.id)
-                          }
-                          onSelectPin={(p) => handleSelectPin(p, true)}
-                          onToggleSave={handleToggleSave}
-                          onSharePin={handleSharePin}
-                          onHidePin={handleHidePin}
-                        />
-                      )}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  {language === "th" ? "แสดงที่พักทั้งหมด" : "Show All Stays"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <MasonryGrid
+              key={`tab-grid-${activeStyleTab}`}
+              items={pins.map((p) => ({
+                ...p,
+                aspectClass: p.aspectRatio,
+              }))}
+              columnWidth={184}
+              maxColumnWidth={235}
+              gutter={14}
+              fitContainer={true}
+              renderItem={(pin, cardIdx) => (
+                <PinterestPinCard
+                  pin={pin}
+                  language={language}
+                  priority={cardIdx < 8}
+                  isSaved={effectiveSavedPinIds.has(pin.id)}
+                  onSelectPin={(p) => handleSelectPin(p, true)}
+                  onToggleSave={handleToggleSave}
+                  onToggleLike={handleToggleLike}
+                  onSharePin={handleSharePin}
+                  onHidePin={handleHidePin}
+                />
+              )}
+            />
+          )}
         </section>
       )}
 

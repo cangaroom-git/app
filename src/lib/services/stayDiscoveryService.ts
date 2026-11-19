@@ -6,7 +6,7 @@ import {
   THAILAND_77_PROVINCES,
   type ThailandRegionId,
 } from "@/data/thailandProvinces";
-import { mapPinToDto } from "@/lib/services/pinMapper";
+import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
 import {
   loadMergedTasteContext,
   rankPersonalizedHomeFeed,
@@ -283,6 +283,12 @@ export async function searchDiscoveryPins(
               maxGuests: true,
             },
           },
+          coupons: {
+            where: { isActive: true, expiresAt: { gt: new Date() } },
+            orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+            take: 6,
+            select: PIN_COUPON_SELECT,
+          },
         },
       },
       room: {
@@ -296,7 +302,7 @@ export async function searchDiscoveryPins(
         },
       },
       coupon: {
-        select: { code: true },
+        select: PIN_COUPON_SELECT,
       },
     },
   });
@@ -393,6 +399,12 @@ export async function getPinDetailById(
             where: { isActive: true },
             select: { weekdayPriceThb: true },
           },
+          coupons: {
+            where: { isActive: true, expiresAt: { gt: new Date() } },
+            orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+            take: 6,
+            select: PIN_COUPON_SELECT,
+          },
         },
       },
       room: {
@@ -403,7 +415,7 @@ export async function getPinDetailById(
           weekdayPriceThb: true,
         },
       },
-      coupon: { select: { code: true } },
+      coupon: { select: PIN_COUPON_SELECT },
     },
   });
 
@@ -446,6 +458,12 @@ export async function getPinDetailById(
                 where: { isActive: true },
                 select: { weekdayPriceThb: true },
               },
+              coupons: {
+                where: { isActive: true, expiresAt: { gt: new Date() } },
+                orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+                take: 6,
+                select: PIN_COUPON_SELECT,
+              },
             },
           },
           room: {
@@ -456,7 +474,7 @@ export async function getPinDetailById(
               weekdayPriceThb: true,
             },
           },
-          coupon: { select: { code: true } },
+          coupon: { select: PIN_COUPON_SELECT },
         },
       }),
       prisma.savedBoardPin

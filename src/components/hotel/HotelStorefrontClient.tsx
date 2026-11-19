@@ -7,11 +7,13 @@ import React, {
   useRef,
   useState,
 } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BadgeCheck,
+  BedDouble,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -20,23 +22,20 @@ import {
   ExternalLink,
   Eye,
   Images,
-  MapPin,
   MessageCircle,
   Minus,
-  PawPrint,
   Phone,
   Plus,
-  Search,
   Share2,
   ShieldCheck,
   Star,
   Tag,
-  Users,
-  X,
 } from "lucide-react";
 import {
+  addDaysToDate,
   calculateStayPricing,
   computeNightsBetween,
+  getRequiredMinNightsForStay,
 } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import { getFacilityIconMeta } from "@/lib/facilityIcons";
@@ -54,15 +53,26 @@ import {
   PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
+import { getRoomPhotoSpaceDef } from "@/lib/roomPhotoSpaces";
 import {
   PureMediaViewer,
   type PureMediaSlide,
 } from "@/components/media/PureMediaViewer";
 import { AirbnbStayCalendar } from "@/components/booking/AirbnbStayCalendar";
+import { ChooseRoomBottomSheet } from "@/components/booking/ChooseRoomBottomSheet";
+import { DesktopDateRangePopover } from "@/components/booking/DesktopDateRangePopover";
+import { MobileDateRangeSheet } from "@/components/booking/MobileDateRangeSheet";
+import { HotelChooseRoomSection } from "@/components/hotel/HotelChooseRoomSection";
+import { HotelInfoBottomSheet } from "@/components/hotel/HotelInfoBottomSheet";
 import {
   RoomBookingDrawer,
   selectBestEligibleCoupon,
 } from "@/components/drawers/RoomBookingDrawer";
+import { HotelCouponTicketCard } from "@/components/deals/HotelCouponTicketCard";
+import { ShareStayModal } from "@/components/shared/ShareStayModal";
+import { formatCouponDiscountHeadline } from "@/lib/couponHelpers";
+import { launchCouponFlyAnimation } from "@/lib/couponClaimAnimation";
+import { computeCouponDiscount } from "@/lib/bookingMath";
 import type {
   CouponDealDto,
   HotelStorefrontDto,
@@ -70,6 +80,28 @@ import type {
   PinFeedItemDto,
   RoomAvailabilityDto,
 } from "@/types/cangaroom";
+
+const HotelLocationMap = dynamic(
+  () =>
+    import("@/components/hotel/HotelLocationMap").then(
+      (mod) => mod.HotelLocationMap
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full aspect-square sm:aspect-[16/9] lg:aspect-auto lg:h-[400px] rounded-[16px] bg-[var(--color-background-muted)]" />
+    ),
+  }
+);
+
+type HotelInfoSheetId =
+  | "description"
+  | "amenities"
+  | "reviews"
+  | "rules"
+  | "contact"
+  | "faqs"
+  | null;
 
 export type HotelProfileTabId =
   | "posts"
@@ -97,8 +129,6 @@ const ANCHOR_DOM_IDS: Record<AnchorNavId, string> = {
   more: "section-location",
 };
 
-const INITIAL_VISIBLE_ROOMS = 6;
-
 export function HotelStorefrontClient({
   initialStorefront,
   hotelSlug,
@@ -122,8 +152,16 @@ export function HotelStorefrontClient({
     setCheckOut,
     guests,
     setGuests,
+    isDateFilterActive,
+    setIsDateFilterActive,
+    walletCoupons,
     claimCouponToWallet,
     openCouponWallet,
+    openAuthModal,
+    savedPinIds: globalSavedPinIds,
+    hasLoadedBoardsOnce,
+    triggerPinToBoard,
+    togglePinLikeInstant,
   } = useHotelApp();
 
   const [storefront, setStorefront] =
@@ -133,17 +171,28 @@ export function HotelStorefrontClient({
   const [activeAnchor, setActiveAnchor] = useState<AnchorNavId>(() =>
     initialTab === "posts" ? "photos" : initialTab
   );
-  const [isBioExpanded, setIsBioExpanded] = useState(false);
-  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [activeInfoSheet, setActiveInfoSheet] =
+    useState<HotelInfoSheetId>(null);
+  const [mobileHeroIndex, setMobileHeroIndex] = useState(0);
   const [showAllPins, setShowAllPins] = useState(false);
-  const [onlyAvailableRooms, setOnlyAvailableRooms] = useState(false);
-  const [showAllRooms, setShowAllRooms] = useState(false);
-  const [roomSearchQuery, setRoomSearchQuery] = useState("");
   const [calendarRoomFilterId, setCalendarRoomFilterId] = useState<string>("ALL");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [hasConfirmedDates, setHasConfirmedDates] = useState<boolean>(
+    () => isDateFilterActive
+  );
+  const [isMobileDateSheetOpen, setIsMobileDateSheetOpen] = useState(false);
+  const [desktopDatePopoverPhase, setDesktopDatePopoverPhase] = useState<
+    "checkin" | "checkout" | null
+  >(null);
+  const [datePickerScopeRoomId, setDatePickerScopeRoomId] = useState<
+    string | null
+  >(null);
+  const [isChooseRoomSheetOpen, setIsChooseRoomSheetOpen] = useState(false);
   const [isAnchorBarVisible, setIsAnchorBarVisible] = useState(false);
   const heroHeaderRef = useRef<HTMLElement | null>(null);
   const calendarSectionRef = useRef<HTMLDivElement | null>(null);
+  const stickySidebarRef = useRef<HTMLElement | null>(null);
+  const stickyCardRef = useRef<HTMLDivElement | null>(null);
 
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [selectedPinSnapshot, setSelectedPinSnapshot] =
@@ -169,16 +218,23 @@ export function HotelStorefrontClient({
         initialStorefront.pins.filter((p) => p.isSavedByMe).map((p) => p.id)
       )
   );
+  const effectiveSavedPinIds =
+    currentUser && !hasLoadedBoardsOnce ? optimisticSavedIds : globalSavedPinIds;
   const [fullscreenMedia, setFullscreenMedia] = useState<{
     slides: PureMediaSlide[];
     index: number;
   } | null>(null);
 
   const [isBookingDrawerOpen, setIsBookingDrawerOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [drawerRoom, setDrawerRoom] = useState<RoomAvailabilityDto | null>(null);
   const [initialCouponCode, setInitialCouponCode] = useState<string | null>(
     null
   );
+  const [claimingCouponId, setClaimingCouponId] = useState<string | null>(null);
+  const [optimisticClaimedCouponIds, setOptimisticClaimedCouponIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [contactToast, setContactToast] = useState<string | null>(null);
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
   const didMountFetchRef = useRef(false);
@@ -238,8 +294,14 @@ export function HotelStorefrontClient({
     const sp = new URLSearchParams(window.location.search);
     const paramIn = sp.get("checkIn");
     const paramOut = sp.get("checkOut");
-    if (paramIn && /^\d{4}-\d{2}-\d{2}$/.test(paramIn)) setCheckIn(paramIn);
-    if (paramOut && /^\d{4}-\d{2}-\d{2}$/.test(paramOut)) setCheckOut(paramOut);
+    const hasValidParamIn = Boolean(paramIn && /^\d{4}-\d{2}-\d{2}$/.test(paramIn));
+    const hasValidParamOut = Boolean(paramOut && /^\d{4}-\d{2}-\d{2}$/.test(paramOut));
+    if (hasValidParamIn && paramIn) setCheckIn(paramIn);
+    if (hasValidParamOut && paramOut) setCheckOut(paramOut);
+    if (hasValidParamIn && hasValidParamOut) {
+      setHasConfirmedDates(true);
+      setIsDateFilterActive(true);
+    }
     const paramGuests = Number(sp.get("guests"));
     if (Number.isFinite(paramGuests) && paramGuests >= 1) {
       setGuests(Math.min(12, Math.floor(paramGuests)));
@@ -299,7 +361,13 @@ export function HotelStorefrontClient({
         });
       }
     }
-  }, [initialStorefront.rooms, setCheckIn, setCheckOut, setGuests]);
+  }, [
+    initialStorefront.rooms,
+    setCheckIn,
+    setCheckOut,
+    setGuests,
+    setIsDateFilterActive,
+  ]);
 
   // Scroll-spy observer so the Sticky Anchor Bar highlights the current section
   useEffect(() => {
@@ -366,6 +434,19 @@ export function HotelStorefrontClient({
     observer.observe(heroEl);
     return () => observer.disconnect();
   }, []);
+
+  // Lock global top bar out of the way on < lg whenever the Property Anchor Bar is visible
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isAnchorBarVisible) {
+      document.documentElement.dataset.hotelAnchorPinned = "true";
+    } else {
+      delete document.documentElement.dataset.hotelAnchorPinned;
+    }
+    return () => {
+      delete document.documentElement.dataset.hotelAnchorPinned;
+    };
+  }, [isAnchorBarVisible]);
 
   // Refresh availability immediately whenever user taps calendar dates or changes login
   useEffect(() => {
@@ -478,7 +559,7 @@ export function HotelStorefrontClient({
 
   const visibleGridPins = useMemo(
     () =>
-      showAllPins ? masonrySectionPins : masonrySectionPins.slice(0, 10),
+      showAllPins ? masonrySectionPins : masonrySectionPins.slice(0, 6),
     [masonrySectionPins, showAllPins]
   );
 
@@ -639,15 +720,7 @@ export function HotelStorefrontClient({
   };
 
   const handleShareProperty = () => {
-    if (typeof window === "undefined") return;
-    const shareUrl = `${window.location.origin}/${storefront.hotel.slug}`;
-    navigator.clipboard?.writeText(shareUrl).catch(() => {});
-    setContactToast(
-      language === "th"
-        ? "คัดลอกลิงก์หน้าเพจที่พักแล้ว"
-        : "Property link copied"
-    );
-    window.setTimeout(() => setContactToast(null), 2200);
+    setIsShareModalOpen(true);
   };
 
   const handleContactClick = async (
@@ -690,28 +763,83 @@ export function HotelStorefrontClient({
     window.setTimeout(() => setContactToast(null), 2800);
   };
 
-  const handleClaimHotelCoupon = async (coupon: CouponDealDto) => {
+  const handleClaimHotelCoupon = async (
+    coupon: CouponDealDto,
+    sourceEl: HTMLElement | null = null
+  ): Promise<boolean> => {
+    const executeClaim = async (): Promise<boolean> => {
+      setClaimingCouponId(coupon.id);
+      try {
+        const res = await claimCouponToWallet({ couponId: coupon.id });
+        if (res.success) {
+          setOptimisticClaimedCouponIds((prev) => {
+            const next = new Set(prev);
+            next.add(coupon.id);
+            return next;
+          });
+          void loadStorefront(true);
+          return true;
+        }
+        return false;
+      } finally {
+        setClaimingCouponId(null);
+      }
+    };
+
     if (!currentUser) {
-      router.push(
-        `/login?callbackUrl=${encodeURIComponent(`/${cleanSlug}`)}`
-      );
-      return;
+      openAuthModal({
+        reasonTh: "เข้าสู่ระบบเพื่อเก็บคูปองส่วนลดเข้ากระเป๋า",
+        reasonEn: "Log in to save this coupon to your wallet",
+        onSuccess: async () => {
+          const ok = await executeClaim();
+          if (ok) {
+            launchCouponFlyAnimation(
+              sourceEl,
+              formatCouponDiscountHeadline(coupon, language)
+            );
+          }
+        },
+      });
+      return false;
     }
-    const res = await claimCouponToWallet({ couponId: coupon.id });
-    setContactToast(res.message);
-    window.setTimeout(() => setContactToast(null), 2600);
-    await loadStorefront(true);
+
+    return executeClaim();
   };
 
   const {
     hotel,
     rooms,
     coupons,
+    discountRules = [],
     reviews,
     dateOverrides,
     bookedUnitsByRoomDate = {},
     posts,
   } = storefront;
+
+  // Auto-adjust storefront mode: 1 active room type -> Single-Unit Host Mode; 2+ active room types -> Multi-Room Hotel Mode
+  const storefrontMode: "SINGLE_UNIT" | "MULTI_ROOM" =
+    rooms.length <= 1 ? "SINGLE_UNIT" : "MULTI_ROOM";
+  const isMultiRoomHotel = storefrontMode === "MULTI_ROOM";
+  const singleUnitRoom = !isMultiRoomHotel ? rooms[0] ?? null : null;
+
+  const walletCouponIdSet = useMemo(
+    () => new Set(walletCoupons.map((c) => c.id)),
+    [walletCoupons]
+  );
+
+  const isHotelCouponClaimed = useCallback(
+    (coupon: CouponDealDto) =>
+      Boolean(coupon.isClaimedByMe) ||
+      walletCouponIdSet.has(coupon.id) ||
+      optimisticClaimedCouponIds.has(coupon.id),
+    [walletCouponIdSet, optimisticClaimedCouponIds]
+  );
+
+  const claimedHotelCoupons = useMemo(
+    () => coupons.filter((c) => isHotelCouponClaimed(c)),
+    [coupons, isHotelCouponClaimed]
+  );
   const stayNights = computeNightsBetween(checkIn, checkOut);
 
   const matchingAvailableRooms = useMemo(
@@ -719,46 +847,46 @@ export function HotelStorefrontClient({
     [rooms, guests]
   );
 
-  const sortedAndFilteredRooms = useMemo(() => {
-    const q = roomSearchQuery.trim().toLowerCase();
-    const searched = q
-      ? rooms.filter(
-          (r) =>
-            r.code.toLowerCase().includes(q) ||
-            r.nameTh.toLowerCase().includes(q) ||
-            r.nameEn.toLowerCase().includes(q) ||
-            r.categoryTh.toLowerCase().includes(q) ||
-            r.categoryEn.toLowerCase().includes(q)
-        )
-      : [...rooms];
+  // Enforce/surface Minimum Stay restriction immediately when guest selects dates
+  const stayMinNightsInfo = useMemo(() => {
+    if (!hasConfirmedDates) {
+      return { requiredMinNights: 1, isBlocked: false };
+    }
+    if (!isMultiRoomHotel) {
+      if (!singleUnitRoom) return { requiredMinNights: 1, isBlocked: false };
+      const req = getRequiredMinNightsForStay(
+        singleUnitRoom.id,
+        checkIn,
+        checkOut,
+        dateOverrides
+      );
+      return { requiredMinNights: req, isBlocked: stayNights < req };
+    }
+    if (matchingAvailableRooms.length === 0) {
+      return { requiredMinNights: 1, isBlocked: false };
+    }
+    const perRoomReqs = matchingAvailableRooms.map((r) =>
+      getRequiredMinNightsForStay(r.id, checkIn, checkOut, dateOverrides)
+    );
+    const lowestReq = Math.min(...perRoomReqs);
+    return {
+      requiredMinNights: lowestReq,
+      isBlocked: stayNights < lowestReq,
+    };
+  }, [
+    hasConfirmedDates,
+    isMultiRoomHotel,
+    singleUnitRoom,
+    matchingAvailableRooms,
+    checkIn,
+    checkOut,
+    dateOverrides,
+    stayNights,
+  ]);
 
-    const afterAvail = onlyAvailableRooms
-      ? searched.filter((r) => r.availableUnits > 0 && r.maxGuests >= guests)
-      : searched;
-
-    return [...afterAvail].sort((a, b) => {
-      const rank = (r: RoomAvailabilityDto) => {
-        if (r.availableUnits > 0 && r.maxGuests >= guests) return 0;
-        if (r.availableUnits > 0) return 1;
-        return 2;
-      };
-      const diff = rank(a) - rank(b);
-      if (diff !== 0) return diff;
-      return a.sortOrder - b.sortOrder;
-    });
-  }, [rooms, roomSearchQuery, onlyAvailableRooms, guests]);
-
-  const isRoomSearchActive = roomSearchQuery.trim().length > 0;
-  const displayedRooms = useMemo(
-    () =>
-      showAllRooms || isRoomSearchActive
-        ? sortedAndFilteredRooms
-        : sortedAndFilteredRooms.slice(0, INITIAL_VISIBLE_ROOMS),
-    [sortedAndFilteredRooms, showAllRooms, isRoomSearchActive]
-  );
-  const visibleRoomIdSet = useMemo(
-    () => new Set(displayedRooms.map((r) => r.id)),
-    [displayedRooms]
+  const maxHotelGuests = useMemo(
+    () => Math.max(2, ...rooms.map((r) => r.maxGuests)),
+    [rooms]
   );
 
   const minRoomPrice = rooms.reduce(
@@ -766,13 +894,70 @@ export function HotelStorefrontClient({
     rooms[0]?.weekdayPriceThb ?? 0
   );
 
+  const cheapestAvailableRoomPricing = useMemo(() => {
+    if (matchingAvailableRooms.length === 0) return null;
+    let best: {
+      room: RoomAvailabilityDto;
+      subtotalThb: number;
+      netTotalThb: number;
+      discountThb: number;
+      couponCode: string | null;
+    } | null = null;
+
+    for (const room of matchingAvailableRooms) {
+      const base = calculateStayPricing({
+        room,
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        guests,
+        overrides: dateOverrides,
+      });
+      const bestCoupon = selectBestEligibleCoupon(coupons, base.roomSubtotalThb);
+      const net = calculateStayPricing({
+        room,
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        guests,
+        overrides: dateOverrides,
+        coupon: bestCoupon?.coupon ?? null,
+        discountRules,
+      });
+      if (!best || net.netTotalThb < best.netTotalThb) {
+        best = {
+          room,
+          subtotalThb: net.roomSubtotalThb,
+          netTotalThb: net.netTotalThb,
+          discountThb: net.discountThb,
+          couponCode: net.appliedCouponCode,
+        };
+      }
+    }
+    return best;
+  }, [
+    matchingAvailableRooms,
+    checkIn,
+    checkOut,
+    guests,
+    dateOverrides,
+    coupons,
+    discountRules,
+  ]);
+
   const activeBookingRoom = useMemo(
     () =>
+      singleUnitRoom ||
       (selectedRoomId ? rooms.find((r) => r.id === selectedRoomId) : null) ||
+      cheapestAvailableRoomPricing?.room ||
       matchingAvailableRooms[0] ||
       rooms[0] ||
       null,
-    [rooms, selectedRoomId, matchingAvailableRooms]
+    [
+      singleUnitRoom,
+      rooms,
+      selectedRoomId,
+      cheapestAvailableRoomPricing,
+      matchingAvailableRooms,
+    ]
   );
 
   const allUniqueAmenities = useMemo(() => {
@@ -791,9 +976,8 @@ export function HotelStorefrontClient({
   }, [rooms]);
 
   const displayedAmenities = useMemo(
-    () =>
-      showAllAmenities ? allUniqueAmenities : allUniqueAmenities.slice(0, 8),
-    [allUniqueAmenities, showAllAmenities]
+    () => allUniqueAmenities.slice(0, 8),
+    [allUniqueAmenities]
   );
 
   const stickyBasePricing = useMemo(
@@ -810,13 +994,24 @@ export function HotelStorefrontClient({
     [activeBookingRoom, checkIn, checkOut, guests, dateOverrides]
   );
 
-  const stickyBestCoupon = useMemo(
-    () =>
-      stickyBasePricing
-        ? selectBestEligibleCoupon(coupons, stickyBasePricing.roomSubtotalThb)
-        : null,
-    [coupons, stickyBasePricing]
-  );
+  const stickyBestCoupon = useMemo(() => {
+    if (!stickyBasePricing) return null;
+    if (initialCouponCode) {
+      const requested = coupons.find(
+        (c) => c.code.toUpperCase() === initialCouponCode.toUpperCase()
+      );
+      if (requested) {
+        const res = computeCouponDiscount(
+          requested,
+          stickyBasePricing.roomSubtotalThb
+        );
+        if (!res.error && res.discountThb > 0) {
+          return { coupon: requested, discountThb: res.discountThb };
+        }
+      }
+    }
+    return selectBestEligibleCoupon(coupons, stickyBasePricing.roomSubtotalThb);
+  }, [coupons, stickyBasePricing, initialCouponCode]);
 
   const stickyPricing = useMemo(
     () =>
@@ -828,6 +1023,7 @@ export function HotelStorefrontClient({
             guests,
             overrides: dateOverrides,
             coupon: stickyBestCoupon?.coupon ?? null,
+            discountRules,
           })
         : null,
     [
@@ -837,6 +1033,7 @@ export function HotelStorefrontClient({
       guests,
       dateOverrides,
       stickyBestCoupon,
+      discountRules,
     ]
   );
 
@@ -845,6 +1042,92 @@ export function HotelStorefrontClient({
       behavior: "smooth",
       block: "start",
     });
+  };
+
+  const openDatePicker = useCallback(
+    (
+      preferredPhase: "checkin" | "checkout" = "checkin",
+      scopeRoomId: string | null = null
+    ) => {
+      setDatePickerScopeRoomId(scopeRoomId);
+      if (isDesktopViewport) {
+        // Ensure sticky booking card is visible in viewport when opening anchored desktop popover
+        const sidebarRect = stickySidebarRef.current?.getBoundingClientRect();
+        if (
+          sidebarRect &&
+          (sidebarRect.bottom < 120 || sidebarRect.top > window.innerHeight - 120)
+        ) {
+          document
+            .getElementById("section-rooms")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        setDesktopDatePopoverPhase(preferredPhase);
+      } else {
+        setIsMobileDateSheetOpen(true);
+      }
+    },
+    [isDesktopViewport]
+  );
+
+  const handleCommitStayDates = useCallback(
+    (nextIn: string, nextOut: string) => {
+      setCheckIn(nextIn);
+      setCheckOut(nextOut);
+      setHasConfirmedDates(true);
+      setIsDateFilterActive(true);
+      trackTelemetryEvent({
+        eventType: "ROOM_CALENDAR_SELECT",
+        hotelId: storefront.hotel.id,
+        provinceId: storefront.hotel.provinceId,
+        stayStyles: storefront.hotel.stayStyles.slice(0, 6),
+        priceThb:
+          activeBookingRoom?.weekdayPriceThb ??
+          rooms[0]?.weekdayPriceThb ??
+          undefined,
+        guests,
+      });
+    },
+    [
+      setCheckIn,
+      setCheckOut,
+      setIsDateFilterActive,
+      storefront.hotel.id,
+      storefront.hotel.provinceId,
+      storefront.hotel.stayStyles,
+      activeBookingRoom?.weekdayPriceThb,
+      rooms,
+      guests,
+    ]
+  );
+
+  const handleClearStayDates = useCallback(() => {
+    setHasConfirmedDates(false);
+    setIsDateFilterActive(false);
+  }, [setIsDateFilterActive]);
+
+  const handleRedeemHotelCoupon = (coupon: CouponDealDto) => {
+    setInitialCouponCode(coupon.code);
+    if (!hasConfirmedDates) {
+      openDatePicker("checkin");
+      return;
+    }
+    if (isMultiRoomHotel) {
+      if (matchingAvailableRooms.length > 0) {
+        setIsChooseRoomSheetOpen(true);
+      } else {
+        openDatePicker("checkin");
+      }
+      return;
+    }
+    if (
+      singleUnitRoom &&
+      singleUnitRoom.availableUnits > 0 &&
+      singleUnitRoom.maxGuests >= guests
+    ) {
+      navigateToCheckout(singleUnitRoom, coupon.code);
+    } else {
+      openDatePicker("checkin", singleUnitRoom?.id ?? null);
+    }
   };
 
   const coverBannerUrl =
@@ -861,16 +1144,69 @@ export function HotelStorefrontClient({
     coverBannerUrl;
 
   const allCoverSlides = useMemo<PureMediaSlide[]>(() => {
-    const urls = new Set<string>();
-    if (hotel.coverImageUrl) urls.add(hotel.coverImageUrl);
+    const seen = new Set<string>();
+    const slides: PureMediaSlide[] = [];
+
+    const pushSlide = (slide: PureMediaSlide) => {
+      if (!slide.url || seen.has(slide.url)) return;
+      seen.add(slide.url);
+      slides.push(slide);
+    };
+
+    if (hotel.coverImageUrl) {
+      pushSlide({
+        type: "image",
+        url: hotel.coverImageUrl,
+        caption: hotel.nameTh,
+        spaceId: "exterior",
+        spaceLabel: language === "th" ? "ภาพหลักที่พัก" : "Property",
+      });
+    }
+
     for (const r of rooms) {
-      for (const u of r.galleryUrls) urls.add(u);
+      const metaList =
+        r.galleryMeta && r.galleryMeta.length > 0
+          ? r.galleryMeta
+          : r.galleryUrls.map((url) => ({
+              url,
+              space: "additional" as const,
+              captionTh: undefined,
+            }));
+
+      for (const m of metaList) {
+        const spaceDef = getRoomPhotoSpaceDef(m.space);
+        pushSlide({
+          type: "image",
+          url: m.url,
+          caption: m.captionTh || (language === "th" ? r.nameTh : r.nameEn),
+          spaceId: m.space,
+          spaceLabel: language === "th" ? spaceDef.labelTh : spaceDef.labelEn,
+        });
+      }
     }
+
     for (const p of storefront.pins) {
-      if (p.coverImageUrl) urls.add(p.coverImageUrl);
+      if (p.coverImageUrl) {
+        pushSlide({
+          type: "image",
+          url: p.coverImageUrl,
+          caption: language === "th" ? p.titleTh : p.titleEn,
+          spaceId: "additional",
+          spaceLabel: language === "th" ? "บรรยากาศ" : "Moments",
+        });
+      }
     }
-    return Array.from(urls).map((url) => ({ type: "image", url }));
-  }, [hotel.coverImageUrl, rooms, storefront.pins]);
+
+    return slides;
+  }, [hotel.coverImageUrl, hotel.nameTh, rooms, storefront.pins, language]);
+
+  const mobileHeroSlides = useMemo<PureMediaSlide[]>(
+    () =>
+      allCoverSlides.length > 0
+        ? allCoverSlides
+        : [{ type: "image", url: coverBannerUrl }],
+    [allCoverSlides, coverBannerUrl]
+  );
 
   const fullBio =
     (language === "th" ? hotel.descriptionTh : hotel.descriptionEn) ||
@@ -896,10 +1232,13 @@ export function HotelStorefrontClient({
     },
     {
       id: "rooms",
-      label:
-        language === "th"
+      label: isMultiRoomHotel
+        ? language === "th"
           ? `ห้องพัก (${rooms.length})`
-          : `Rooms (${rooms.length})`,
+          : `Rooms (${rooms.length})`
+        : language === "th"
+        ? "ปฏิทินวันว่าง"
+        : "Availability",
     },
     {
       id: "amenities",
@@ -946,49 +1285,80 @@ export function HotelStorefrontClient({
         id="section-photos"
         className="scroll-mt-24 space-y-5 pb-4"
       >
-        {/* Mobile 1:1 Square Hero Banner (< sm) */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            if (allCoverSlides.length > 0) {
-              setFullscreenMedia({ slides: allCoverSlides, index: 0 });
-            }
-          }}
-          onKeyDown={(e) => {
-            if (
-              (e.key === "Enter" || e.key === " ") &&
-              allCoverSlides.length > 0
-            ) {
-              e.preventDefault();
-              setFullscreenMedia({ slides: allCoverSlides, index: 0 });
-            }
-          }}
-          aria-label={
-            language === "th" ? "เปิดดูรูปภาพที่พัก" : "View property photos"
-          }
-          className="sm:hidden relative -mx-4 -mt-5 aspect-square overflow-hidden bg-[var(--color-background-muted)] border-b border-[var(--color-border)] cursor-pointer"
-        >
-          <img
-            src={getOptimizedPinImageUrl(coverBannerUrl, "hero")}
-            srcSet={getOptimizedPinImageSrcSet(coverBannerUrl, "hero")}
-            sizes="(max-width: 639px) 100vw, 640px"
-            alt={hotel.nameTh}
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-          {allCoverSlides.length > 1 && (
-            <span className="absolute bottom-3 right-3 h-8 px-3 rounded-[8px] bg-white/95 text-[#222222] border border-[#222222]/20 text-[12px] font-medium inline-flex items-center gap-1.5">
-              <Images className="w-3.5 h-3.5" />
-              <span>1 / {allCoverSlides.length}</span>
+        {/* Mobile Swipeable 1:1 Square Hero Carousel (< sm) */}
+        <div className="sm:hidden relative -mx-4 -mt-5 aspect-square overflow-hidden bg-[var(--color-background-muted)]">
+          <div
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              const width = el.clientWidth;
+              if (width > 0) {
+                const idx = Math.round(el.scrollLeft / width);
+                setMobileHeroIndex(
+                  Math.max(0, Math.min(mobileHeroSlides.length - 1, idx))
+                );
+              }
+            }}
+            className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar"
+          >
+            {mobileHeroSlides.map((slide, idx) => (
+              <button
+                key={`${slide.url}-${idx}`}
+                type="button"
+                onClick={() =>
+                  setFullscreenMedia({ slides: mobileHeroSlides, index: idx })
+                }
+                aria-label={`${hotel.nameTh} ${idx + 1}`}
+                className="w-full h-full shrink-0 snap-center relative cursor-pointer"
+              >
+                <img
+                  src={getOptimizedPinImageUrl(slide.url, "hero")}
+                  srcSet={getOptimizedPinImageSrcSet(slide.url, "hero")}
+                  sizes="(max-width: 639px) 100vw, 640px"
+                  alt={slide.caption || `${hotel.nameTh} ${idx + 1}`}
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  fetchPriority={idx === 0 ? "high" : "auto"}
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                router.back();
+              } else {
+                router.push("/");
+              }
+            }}
+            aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
+            className="absolute top-3 left-3 h-9 w-9 rounded-[10px] bg-white/90 dark:bg-[#222222]/90 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleShareProperty}
+            aria-label={language === "th" ? "แชร์ที่พัก" : "Share property"}
+            className="absolute top-3 right-3 h-9 w-9 rounded-[10px] bg-white/90 dark:bg-[#222222]/90 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+
+          {mobileHeroSlides.length > 1 && (
+            <span className="pointer-events-none absolute bottom-3 right-3 h-7 px-2.5 rounded-[9px] bg-[#222222]/80 backdrop-blur-md !text-white text-[12px] font-medium inline-flex items-center gap-1.5">
+              <span>
+                {mobileHeroIndex + 1} / {mobileHeroSlides.length}
+              </span>
             </span>
           )}
         </div>
 
         {/* Airbnb Title + Minimal Ghost Actions Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 sm:pt-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 pt-1 sm:pt-0">
           <h1 className="text-[23px] sm:text-[26px] font-semibold leading-tight tracking-[-0.016em] text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
             <span className="truncate">
               {language === "th" ? hotel.nameTh : hotel.nameEn}
@@ -1005,7 +1375,7 @@ export function HotelStorefrontClient({
             <button
               type="button"
               onClick={handleShareProperty}
-              className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
+              className="hidden sm:inline-flex h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
             >
               <Share2 className="w-4 h-4" />
               <span>{language === "th" ? "แชร์" : "Share"}</span>
@@ -1055,7 +1425,7 @@ export function HotelStorefrontClient({
                 src={getOptimizedPinImageUrl(allCoverSlides[0].url, "hero")}
                 srcSet={getOptimizedPinImageSrcSet(allCoverSlides[0].url, "hero")}
                 sizes={PIN_IMAGE_SIZES.hero}
-                alt={hotel.nameTh}
+                alt={allCoverSlides[0].caption || hotel.nameTh}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
@@ -1076,7 +1446,7 @@ export function HotelStorefrontClient({
                   src={getOptimizedPinImageUrl(slide.url, "gallery")}
                   srcSet={getOptimizedPinImageSrcSet(slide.url, "gallery")}
                   sizes={PIN_IMAGE_SIZES.gallery}
-                  alt={`${hotel.nameTh} ${idx + 2}`}
+                  alt={slide.caption || `${hotel.nameTh} ${idx + 2}`}
                   loading="eager"
                   decoding="async"
                   className="h-full w-full object-cover"
@@ -1089,7 +1459,7 @@ export function HotelStorefrontClient({
               onClick={() =>
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 })
               }
-              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[8px] bg-white/95 hover:bg-white text-[#222222] border border-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white/95 hover:bg-white text-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Images className="w-4 h-4" />
               <span>
@@ -1114,7 +1484,7 @@ export function HotelStorefrontClient({
                   src={getOptimizedPinImageUrl(slide.url, "hero")}
                   srcSet={getOptimizedPinImageSrcSet(slide.url, "hero")}
                   sizes={PIN_IMAGE_SIZES.hero}
-                  alt={`${hotel.nameTh} ${idx + 1}`}
+                  alt={slide.caption || `${hotel.nameTh} ${idx + 1}`}
                   loading="eager"
                   fetchPriority={idx === 0 ? "high" : "auto"}
                   decoding="async"
@@ -1128,7 +1498,7 @@ export function HotelStorefrontClient({
               onClick={() =>
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 })
               }
-              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[8px] bg-white/95 hover:bg-white text-[#222222] border border-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white/95 hover:bg-white text-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Images className="w-4 h-4" />
               <span>
@@ -1156,7 +1526,7 @@ export function HotelStorefrontClient({
                 setFullscreenMedia({ slides: allCoverSlides, index: 0 });
               }
             }}
-            className="hidden sm:block relative w-full aspect-[2/1] rounded-[12px] lg:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] border border-[var(--color-border)] cursor-pointer"
+            className="hidden sm:block relative w-full aspect-[2/1] rounded-[12px] lg:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer"
           >
             <img
               src={getOptimizedPinImageUrl(coverBannerUrl, "hero")}
@@ -1179,14 +1549,14 @@ export function HotelStorefrontClient({
       <nav
         aria-label="Property section navigation"
         aria-hidden={!isAnchorBarVisible}
-        className={`fixed top-[var(--cgr-sticky-header-offset,4rem)] inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-all duration-200 ${
+        className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
           isAnchorBarVisible
             ? "opacity-100 translate-y-0 pointer-events-auto"
             : "opacity-0 -translate-y-2 pointer-events-none"
         }`}
       >
         <div className="cgr-page-standard flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar">
             {anchorNavItems.map((item) => {
               const isActive = activeAnchor === item.id;
               return (
@@ -1194,7 +1564,7 @@ export function HotelStorefrontClient({
                   key={item.id}
                   type="button"
                   onClick={() => scrollToAnchor(item.id)}
-                  className={`py-3.5 -mb-px border-b-2 text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
+                  className={`h-12 border-b-2 inline-flex items-center text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
                     isActive
                       ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] font-semibold"
                       : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
@@ -1207,23 +1577,82 @@ export function HotelStorefrontClient({
           </div>
 
           {minRoomPrice > 0 && (
-            <div className="hidden md:flex items-center gap-3 shrink-0 py-2">
+            <div className="hidden lg:flex items-center gap-3 shrink-0 py-2">
               <div className="text-right">
-                <span className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-                  ฿{minRoomPrice.toLocaleString()}
+                <span className="text-[14px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                  {hasConfirmedDates && isMultiRoomHotel && cheapestAvailableRoomPricing
+                    ? `${language === "th" ? "เริ่มต้น " : "From "}฿${cheapestAvailableRoomPricing.subtotalThb.toLocaleString()}`
+                    : hasConfirmedDates && !isMultiRoomHotel && stickyPricing
+                    ? `฿${stickyPricing.netTotalThb.toLocaleString()}`
+                    : `${language === "th" ? "เริ่มต้น " : "From "}฿${minRoomPrice.toLocaleString()}`}
                 </span>
                 <span className="text-[12px] text-[var(--color-text-secondary)]">
                   {" "}
-                  / {language === "th" ? "คืน" : "night"} · ★{" "}
-                  {hotel.ratingAvg.toFixed(1)}
+                  {hasConfirmedDates && stayMinNightsInfo.isBlocked
+                    ? language === "th"
+                      ? `ขั้นต่ำ ${stayMinNightsInfo.requiredMinNights} คืน`
+                      : `Min. ${stayMinNightsInfo.requiredMinNights} nights`
+                    : hasConfirmedDates
+                    ? language === "th"
+                      ? `สำหรับ ${stayNights} คืน`
+                      : `for ${stayNights} ${stayNights === 1 ? "night" : "nights"}`
+                    : `/ ${language === "th" ? "คืน" : "night"}`}{" "}
+                  · ★ {hotel.ratingAvg.toFixed(1)}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => scrollToAnchor("rooms")}
+                onClick={() => {
+                  if (!hasConfirmedDates) {
+                    openDatePicker("checkin");
+                  } else if (stayMinNightsInfo.isBlocked) {
+                    handleCommitStayDates(
+                      checkIn,
+                      addDaysToDate(checkIn, stayMinNightsInfo.requiredMinNights)
+                    );
+                  } else if (isMultiRoomHotel) {
+                    if (matchingAvailableRooms.length > 0) {
+                      setIsChooseRoomSheetOpen(true);
+                    } else {
+                      openDatePicker("checkin");
+                    }
+                  } else if (
+                    singleUnitRoom &&
+                    singleUnitRoom.availableUnits > 0 &&
+                    singleUnitRoom.maxGuests >= guests
+                  ) {
+                    navigateToCheckout(singleUnitRoom);
+                  } else {
+                    openDatePicker("checkin", singleUnitRoom?.id ?? null);
+                  }
+                }}
                 className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
               >
-                {language === "th" ? "ดูห้องว่าง" : "Check rooms"}
+                {!hasConfirmedDates
+                  ? language === "th"
+                    ? "เช็กวันว่าง"
+                    : "Check availability"
+                  : stayMinNightsInfo.isBlocked
+                  ? language === "th"
+                    ? `ปรับเป็น ${stayMinNightsInfo.requiredMinNights} คืน`
+                    : `Extend to ${stayMinNightsInfo.requiredMinNights} nights`
+                  : isMultiRoomHotel
+                  ? matchingAvailableRooms.length > 0
+                    ? language === "th"
+                      ? "เลือกห้องพัก"
+                      : "Choose room"
+                    : language === "th"
+                    ? "เปลี่ยนวัน"
+                    : "Change dates"
+                  : singleUnitRoom &&
+                    singleUnitRoom.availableUnits > 0 &&
+                    singleUnitRoom.maxGuests >= guests
+                  ? language === "th"
+                    ? "จองที่พักนี้"
+                    : "Reserve"
+                  : language === "th"
+                  ? "เปลี่ยนวัน"
+                  : "Change dates"}
               </button>
             </div>
           )}
@@ -1237,8 +1666,8 @@ export function HotelStorefrontClient({
       <div className="grid grid-cols-1 lg:grid-cols-12 items-start pt-2 lg:pt-6 pb-12">
         {/* LEFT MAIN COLUMN (7 OF 12 COLS = 58.33%) */}
         <div className="lg:col-span-7 divide-y divide-[var(--color-border)] min-w-0">
-          {/* 3A. Overview + Airbnb Guest-Favorite Style Trust Box */}
-          <section className="pb-8 space-y-5">
+          {/* 3A. Overview + Inline Rating & Direct Stay Trust Line */}
+          <section className="pb-6 space-y-2.5">
             <div className="space-y-1">
               <h2 className="ty-title text-[var(--color-text-primary)]">
                 {language === "th"
@@ -1246,69 +1675,51 @@ export function HotelStorefrontClient({
                   : `Direct stay in ${hotel.districtTh}, ${hotel.provinceNameEn}`}
               </h2>
               <p className="ty-body text-[var(--color-text-secondary)]">
-                {language === "th"
+                {!isMultiRoomHotel && singleUnitRoom
+                  ? language === "th"
+                    ? `สูงสุด ${singleUnitRoom.maxGuests} ท่าน · ${singleUnitRoom.bedrooms} ห้องนอน · ${singleUnitRoom.beds} เตียง · ${singleUnitRoom.bathrooms} ห้องน้ำ · ${singleUnitRoom.sizeSqm} ตร.ม.`
+                    : `Up to ${singleUnitRoom.maxGuests} guests · ${singleUnitRoom.bedrooms} bedroom · ${singleUnitRoom.beds} bed · ${singleUnitRoom.bathrooms} bath · ${singleUnitRoom.sizeSqm} sqm`
+                  : language === "th"
                   ? `${rooms.length} แบบห้องพัก · เช็กอิน ${hotel.checkInTime} น. · ฟรีค่าธรรมเนียมตัวกลาง 0% GP`
                   : `${rooms.length} room types · Check-in ${hotel.checkInTime} · Direct 0% GP`}
               </p>
             </div>
 
-            {/* Airbnb-Style 3-Column Trust & Rating Highlight Box */}
-            <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <ShieldCheck className="w-6 h-6 text-[var(--color-text-primary)] shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-[var(--color-text-primary)] leading-tight">
-                    {language === "th" ? "ที่พักยืนยันตัวตน" : "Verified Stay"}
-                  </p>
-                  <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                    {language === "th"
-                      ? "โอนตรงบัญชีที่พัก 0% GP"
-                      : "Direct host payment · 0% GP"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-9 w-px bg-[var(--color-border)] shrink-0" />
-
-              <div className="text-center shrink-0 px-1">
-                <p className="text-[18px] font-semibold leading-tight text-[var(--color-text-primary)]">
-                  {hotel.ratingAvg.toFixed(1)}
-                </p>
-                <div
-                  aria-hidden="true"
-                  className="flex items-center justify-center gap-0.5 mt-0.5 text-[var(--color-text-primary)]"
-                >
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Star key={i} className="w-2.5 h-2.5 fill-current" />
-                  ))}
-                </div>
-              </div>
-
-              <div className="h-9 w-px bg-[var(--color-border)] shrink-0" />
-
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14.5px] text-[var(--color-text-primary)]">
+              <span className="inline-flex items-center gap-1 font-semibold">
+                <Star className="w-4 h-4 fill-current" />
+                <span>{hotel.ratingAvg.toFixed(1)}</span>
+              </span>
+              <span aria-hidden="true" className="text-[var(--color-text-secondary)]">·</span>
               <button
                 type="button"
                 onClick={() => scrollToAnchor("reviews")}
-                className="text-center shrink-0 px-1 cursor-pointer group"
+                className="font-semibold underline underline-offset-2 cursor-pointer hover:opacity-80"
               >
-                <p className="text-[18px] font-semibold leading-tight text-[var(--color-text-primary)]">
-                  {reviews.length}
-                </p>
-                <p className="text-[12px] text-[var(--color-text-secondary)] underline group-hover:text-[var(--color-text-primary)]">
-                  {language === "th" ? "รีวิวผู้พัก" : "Reviews"}
-                </p>
+                {language === "th"
+                  ? `${reviews.length} รีวิวผู้พัก`
+                  : `${reviews.length} reviews`}
               </button>
+              <span aria-hidden="true" className="text-[var(--color-text-secondary)]">·</span>
+              <span className="inline-flex items-center gap-1.5 text-[14px] text-[var(--color-text-secondary)]">
+                <ShieldCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
+                <span>
+                  {language === "th"
+                    ? "ที่พักยืนยันตัวตน · โอนตรงบัญชีที่พัก"
+                    : "Verified stay · Direct host payment"}
+                </span>
+              </span>
             </div>
           </section>
 
-          {/* 3B. Host Identity + Direct Coupons */}
+          {/* 3B. Host Identity */}
           <section className="py-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3.5 min-w-0">
                 <img
                   src={avatarUrl}
                   alt={hotel.nameTh}
-                  className="h-12 w-12 rounded-full object-cover bg-[var(--color-background-muted)] border border-[var(--color-border)] shrink-0"
+                  className="h-11 w-11 rounded-full object-cover bg-[var(--color-background-muted)] shrink-0"
                 />
                 <div className="min-w-0">
                   <p className="text-[16px] font-semibold text-[var(--color-text-primary)] truncate">
@@ -1324,52 +1735,83 @@ export function HotelStorefrontClient({
                   </p>
                 </div>
               </div>
-
-              {coupons.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {coupons.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        if (c.isClaimedByMe && activeBookingRoom) {
-                          if (activeBookingRoom.availableUnits > 0) {
-                            navigateToCheckout(activeBookingRoom, c.code);
-                          } else {
-                            setInitialCouponCode(c.code);
-                            scrollToCalendarSection();
-                          }
-                        } else {
-                          void handleClaimHotelCoupon(c);
-                        }
-                      }}
-                      className="h-8 px-3 rounded-[9px] border border-dashed border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Tag className="w-3.5 h-3.5 shrink-0" />
-                      <span className="font-mono font-bold">{c.code}</span>
-                      <span className="text-[var(--color-text-secondary)]">
-                        ·{" "}
-                        {c.discountType === "PERCENT"
-                          ? `ลด ${c.discountValue}%`
-                          : `ลด ฿${c.discountValue.toLocaleString()}`}
-                      </span>
-                      {c.isClaimedByMe ? (
-                        <Check className="w-3.5 h-3.5" />
-                      ) : (
-                        <Plus className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             {contactToast && (
-              <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-4 py-2.5 text-[13.5px] font-semibold">
+              <div className="rounded-[12px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-4 py-2.5 text-[13.5px] font-semibold">
                 {contactToast}
               </div>
             )}
           </section>
+
+          {/* 3B-2. Direct Stay Coupons Section (Signature 3D Flip Ticket Design) */}
+          {coupons.length > 0 && (
+            <section id="section-coupons" className="py-8 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-[18px] sm:text-[20px] font-semibold text-[var(--color-text-primary)]">
+                      {language === "th"
+                        ? "คูปองส่วนลดของที่พักนี้"
+                        : "Direct stay coupons"}
+                    </h2>
+                    {claimedHotelCoupons.length > 0 && (
+                      <span className="h-6 px-2.5 rounded-[8px] bg-[var(--color-background-muted)] text-[12px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" strokeWidth={2.25} />
+                        <span>
+                          {language === "th"
+                            ? `มีในกระเป๋าแล้ว ${claimedHotelCoupons.length} ใบ`
+                            : `${claimedHotelCoupons.length} in your wallet`}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="ty-caption text-[var(--color-text-secondary)]">
+                    {claimedHotelCoupons.length > 0
+                      ? language === "th"
+                        ? "คุณมีคูปองส่วนลดสำหรับที่พักนี้แล้ว · ระบบนำส่วนลดที่คุ้มที่สุดไปคำนวณให้อัตโนมัติตอนจอง"
+                        : "You have saved coupon(s) for this stay · Auto-applied at checkout"
+                      : language === "th"
+                      ? "เก็บคูปองส่วนลดจองตรง 0% GP เข้ากระเป๋า เพื่อใช้ลดราคาห้องพักได้ทันที"
+                      : "Collect direct booking coupons to save on your stay"}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                className={
+                  coupons.length === 1
+                    ? "max-w-[380px]"
+                    : "-mx-4 px-4 scroll-px-4 sm:mx-0 sm:px-0 flex sm:grid sm:grid-cols-2 gap-3.5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory no-scrollbar"
+                }
+              >
+                {coupons.map((coupon) => (
+                  <div
+                    key={coupon.id}
+                    className={
+                      coupons.length > 1
+                        ? "w-[88%] max-w-[340px] sm:w-auto sm:max-w-none shrink-0 snap-start"
+                        : "w-full"
+                    }
+                  >
+                    <HotelCouponTicketCard
+                      deal={coupon}
+                      language={language}
+                      isClaimed={isHotelCouponClaimed(coupon)}
+                      isClaiming={claimingCouponId === coupon.id}
+                      variant="compact"
+                      subtitleMode="campaign"
+                      notchBgClass="bg-[var(--color-background-body)]"
+                      onClaim={(targetDeal, sourceEl) =>
+                        handleClaimHotelCoupon(targetDeal, sourceEl)
+                      }
+                      onRedeem={handleRedeemHotelCoupon}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* 3C. Airbnb Key Highlights Stack */}
           <section className="py-8 space-y-5">
@@ -1414,36 +1856,53 @@ export function HotelStorefrontClient({
             })}
           </section>
 
-          {/* 3D. Editorial Description */}
+          {/* 3D-HOTEL: MULTI-ROOM CHOOSE YOUR ROOM (Promoted right after Highlights — Airbnb Hotel Layout, NO inline 2-month calendar) */}
+          {isMultiRoomHotel && (
+            <HotelChooseRoomSection
+              language={language}
+              checkInDate={checkIn}
+              checkOutDate={checkOut}
+              hasConfirmedDates={hasConfirmedDates}
+              isRefreshingDates={isRefreshingDates}
+              guests={guests}
+              rooms={rooms}
+              dateOverrides={dateOverrides}
+              discountRules={discountRules}
+              selectedRoomId={selectedRoomId}
+              fallbackCoverUrl={coverBannerUrl}
+              onOpenDatePicker={() => openDatePicker("checkin")}
+              onSelectRoom={(rm) => {
+                setSelectedRoomId(rm.id);
+                openRoomDetailsDrawer(rm);
+              }}
+            />
+          )}
+
+          {/* 3D. Editorial Description (Clamped + Opens Slide-Up Bottom Sheet) */}
           {fullBio && (
-            <section className="py-8 space-y-3">
+            <section className="py-8 lg:py-10 space-y-3">
+              <h2 className="ty-title text-[var(--color-text-primary)]">
+                {language === "th"
+                  ? `เกี่ยวกับ ${hotel.nameTh}`
+                  : `About ${hotel.nameEn}`}
+              </h2>
               {(hotel.taglineTh || hotel.taglineEn) &&
                 fullBio !== hotel.taglineTh && (
                   <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
                     {language === "th" ? hotel.taglineTh : hotel.taglineEn}
                   </p>
                 )}
-              <p
-                className={`text-[15.5px] leading-[1.65] text-[var(--color-text-primary)] ${
-                  !isBioExpanded && fullBio.length > 260 ? "line-clamp-4" : ""
-                }`}
-              >
+              <p className="text-[15.5px] leading-[1.65] text-[var(--color-text-primary)] line-clamp-4">
                 {fullBio}
               </p>
-              {fullBio.length > 260 && (
+              {(fullBio.length > 160 || hotel.highlights.length > 0) && (
                 <button
                   type="button"
-                  onClick={() => setIsBioExpanded((v) => !v)}
-                  className="text-[14px] font-semibold text-[var(--color-text-primary)] underline cursor-pointer inline-flex items-center gap-1"
+                  onClick={() => setActiveInfoSheet("description")}
+                  className="text-[14px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer inline-flex items-center gap-1 hover:opacity-80"
                 >
                   <span>
-                    {isBioExpanded
-                      ? language === "th"
-                        ? "ย่อข้อความ"
-                        : "Show less"
-                      : language === "th"
-                      ? "อ่านเพิ่มเติม"
-                      : "Show more"}
+                    {language === "th" ? "อ่านเพิ่มเติม" : "Show more"}
                   </span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1451,393 +1910,90 @@ export function HotelStorefrontClient({
             </section>
           )}
 
-          {/* 3E. DATE-FIRST MULTI-ROOM BOOKING SECTION (#section-rooms) */}
-          <section
-            id="section-rooms"
-            className="py-10 space-y-8 scroll-mt-20 lg:scroll-mt-32"
-          >
-            {/* STEP 1: DATES & GUESTS FIRST (2-Month Multi-Room Calendar) */}
-            <div
-              ref={calendarSectionRef}
-              id="rooms-calendar-section"
-              className="scroll-mt-20 lg:scroll-mt-32"
-            >
-              <AirbnbStayCalendar
-                language={language}
-                todayDate={today}
-                checkInDate={checkIn}
-                checkOutDate={checkOut}
-                onChangeDates={(nextIn, nextOut) => {
-                  setCheckIn(nextIn);
-                  setCheckOut(nextOut);
-                  trackTelemetryEvent({
-                    eventType: "ROOM_CALENDAR_SELECT",
-                    hotelId: storefront.hotel.id,
-                    provinceId: storefront.hotel.provinceId,
-                    stayStyles: storefront.hotel.stayStyles.slice(0, 6),
-                    priceThb:
-                      activeBookingRoom?.weekdayPriceThb ??
-                      rooms[0]?.weekdayPriceThb ??
-                      undefined,
-                    guests,
-                  });
-                }}
-                guests={guests}
-                onChangeGuests={setGuests}
-                stayNights={stayNights}
-                hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
-                rooms={rooms}
-                calendarRoomFilterId={calendarRoomFilterId}
-                onChangeCalendarRoomFilterId={setCalendarRoomFilterId}
-                bookedUnitsByRoomDate={bookedUnitsByRoomDate}
-                dateOverrides={dateOverrides}
-              />
-            </div>
+          {/* 3E-HOST: SINGLE-UNIT WHERE YOU'LL SLEEP SUMMARY (Airbnb Host Layout — Zero redundant room picker!) */}
+          {!isMultiRoomHotel && singleUnitRoom && (
+            <section className="py-8 lg:py-10 space-y-4">
+              <h2 className="ty-title text-[var(--color-text-primary)]">
+                {language === "th" ? "พื้นที่พักผ่อน" : "Where you'll sleep"}
+              </h2>
 
-            {/* STEP 2: AVAILABLE ROOM TYPES FOR CHOSEN DATES (Scalable for 50+ rooms) */}
-            <div
-              id="rooms-list-section"
-              className="pt-8 border-t border-[var(--color-border-subtle)] space-y-5 scroll-mt-20 lg:scroll-mt-32"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="ty-title text-[var(--color-text-primary)]">
-                    {language === "th"
-                      ? "2. เลือกประเภทห้องพัก"
-                      : "2. Choose your room"}
-                  </h2>
-                  <p className="ty-caption text-[var(--color-text-secondary)]">
-                    {isRefreshingDates
-                      ? language === "th"
-                        ? "กำลังอัปเดตสถานะห้องว่าง..."
-                        : "Updating live room availability..."
-                      : language === "th"
-                      ? `ว่างพร้อมเข้าพัก ${matchingAvailableRooms.length} จาก ${rooms.length} แบบห้อง (${formatShortDate(
-                          checkIn,
-                          language
-                        )} – ${formatShortDate(checkOut, language)} · ${guests} ท่าน)`
-                      : `${matchingAvailableRooms.length} of ${rooms.length} room types available (${formatShortDate(
-                          checkIn,
-                          language
-                        )} – ${formatShortDate(checkOut, language)} · ${guests} guests)`}
-                  </p>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => openRoomDetailsDrawer(singleUnitRoom)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openRoomDetailsDrawer(singleUnitRoom);
+                  }
+                }}
+                className="group flex flex-col sm:flex-row sm:items-center gap-4 rounded-[16px] p-3 -mx-3 hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer"
+              >
+                <div className="relative w-full sm:w-[200px] aspect-[16/10] rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 group-hover:brightness-95 transition">
+                  <img
+                    src={getOptimizedPinImageUrl(
+                      singleUnitRoom.galleryUrls[0] || coverBannerUrl,
+                      "gallery"
+                    )}
+                    srcSet={getOptimizedPinImageSrcSet(
+                      singleUnitRoom.galleryUrls[0] || coverBannerUrl,
+                      "gallery"
+                    )}
+                    sizes="(max-width: 639px) 100vw, 200px"
+                    alt={
+                      language === "th"
+                        ? singleUnitRoom.nameTh
+                        : singleUnitRoom.nameEn
+                    }
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {rooms.length > 6 && (
-                    <div className="relative flex items-center">
-                      <Search className="w-3.5 h-3.5 text-[var(--color-text-secondary)] absolute left-3 pointer-events-none" />
-                      <input
-                        type="search"
-                        value={roomSearchQuery}
-                        onChange={(e) => setRoomSearchQuery(e.target.value)}
-                        placeholder={
-                          language === "th"
-                            ? "ค้นหาชื่อห้อง / โค้ด..."
-                            : "Search room..."
-                        }
-                        aria-label={
-                          language === "th" ? "ค้นหาประเภทห้องพัก" : "Search rooms"
-                        }
-                        className="h-9 w-[180px] sm:w-[210px] pl-8 pr-7 rounded-[10px] bg-[var(--color-background-muted)] border border-[var(--color-border)] focus:border-[var(--color-text-primary)] text-[13px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
-                      />
-                      {roomSearchQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setRoomSearchQuery("")}
-                          aria-label="Clear room search"
-                          className="absolute right-2 h-5 w-5 rounded-[6px] hover:bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="inline-flex items-center gap-2 text-[var(--color-text-primary)]">
+                    <BedDouble className="w-5 h-5 shrink-0" strokeWidth={1.75} />
+                    <h3 className="text-[16.5px] font-semibold truncate">
+                      {language === "th"
+                        ? singleUnitRoom.nameTh
+                        : singleUnitRoom.nameEn}
+                    </h3>
+                  </div>
+
+                  <p className="text-[14px] text-[var(--color-text-secondary)]">
+                    {language === "th"
+                      ? `${singleUnitRoom.bedrooms} ห้องนอน · ${singleUnitRoom.beds} เตียง · ${singleUnitRoom.bathrooms} ห้องน้ำ · ${singleUnitRoom.sizeSqm} ตร.ม.`
+                      : `${singleUnitRoom.bedrooms} bedroom · ${singleUnitRoom.beds} bed · ${singleUnitRoom.bathrooms} bath · ${singleUnitRoom.sizeSqm} sqm`}
+                  </p>
+
+                  {(singleUnitRoom.shortDescTh || singleUnitRoom.shortDescEn) && (
+                    <p className="text-[13.5px] text-[var(--color-text-secondary)] line-clamp-2">
+                      {language === "th"
+                        ? singleUnitRoom.shortDescTh
+                        : singleUnitRoom.shortDescEn ||
+                          singleUnitRoom.shortDescTh}
+                    </p>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => setOnlyAvailableRooms((v) => !v)}
-                    className={`h-9 px-3.5 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-colors ${
-                      onlyAvailableRooms
-                        ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                        : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
-                    }`}
-                  >
-                    {onlyAvailableRooms
-                      ? language === "th"
-                        ? `เฉพาะห้องว่าง (${matchingAvailableRooms.length})`
-                        : `Available (${matchingAvailableRooms.length})`
-                      : language === "th"
-                      ? "กรองเฉพาะห้องว่าง"
-                      : "Available only"}
-                  </button>
-                </div>
-              </div>
-
-              {sortedAndFilteredRooms.length === 0 && (
-                <div className="rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-6 text-center space-y-3">
-                  <h3 className="ty-subtitle font-semibold">
-                    {isRoomSearchActive
-                      ? language === "th"
-                        ? `ไม่พบห้องพักที่ตรงกับ "${roomSearchQuery}"`
-                        : `No rooms match "${roomSearchQuery}"`
-                      : language === "th"
-                      ? `ไม่มีห้องว่างสำหรับวันที่ ${formatShortDate(
-                          checkIn,
-                          language
-                        )} – ${formatShortDate(checkOut, language)} (${guests} ท่าน)`
-                      : `No rooms available for ${formatShortDate(
-                          checkIn,
-                          language
-                        )} – ${formatShortDate(checkOut, language)} (${guests} guests)`}
-                  </h3>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={scrollToCalendarSection}
-                      className="h-9 px-4 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-text-primary)] text-[13px] font-semibold text-[var(--color-text-primary)] cursor-pointer"
-                    >
-                      {language === "th" ? "ดูวันว่างบนปฏิทิน" : "Jump to calendar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOnlyAvailableRooms(false);
-                        setRoomSearchQuery("");
-                      }}
-                      className="h-9 px-4 rounded-[10px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13px] font-semibold cursor-pointer"
-                    >
+                  <span className="inline-flex items-center gap-1 pt-1 text-[13.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2">
+                    <span>
                       {language === "th"
-                        ? `แสดงห้องทั้งหมด (${rooms.length})`
-                        : `Show all (${rooms.length})`}
-                    </button>
-                  </div>
+                        ? "ดูรายละเอียดและรูปภาพทั้งหมด"
+                        : "View room details & photos"}
+                    </span>
+                    <ChevronRight className="w-4 h-4" />
+                  </span>
                 </div>
-              )}
-
-              <div className="space-y-4">
-                {sortedAndFilteredRooms.map((room) => {
-                  const hasUnits = room.availableUnits > 0;
-                  const fitsGuests = room.maxGuests >= guests;
-                  const matchesInstantFilter = hasUnits && fitsGuests;
-                  const isHiddenByPagination = !visibleRoomIdSet.has(room.id);
-                  const isSelectedForBooking = activeBookingRoom?.id === room.id;
-                  const roomCover =
-                    room.galleryUrls[0] ||
-                    hotel.coverImageUrl ||
-                    "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
-                  const roomPricing = calculateStayPricing({
-                    room,
-                    checkInDate: checkIn,
-                    checkOutDate: checkOut,
-                    guests,
-                    overrides: dateOverrides,
-                  });
-                  const descText =
-                    (language === "th"
-                      ? room.shortDescTh
-                      : room.shortDescEn || room.shortDescTh) ||
-                    (language === "th"
-                      ? "ห้องพักจองตรง 0% GP พร้อมสิ่งอำนวยความสะดวกครบครัน"
-                      : "Direct 0% GP stay with full resort amenities.");
-
-                  return (
-                    <article
-                      key={room.id}
-                      aria-hidden={isHiddenByPagination}
-                      onClick={() => setSelectedRoomId(room.id)}
-                      className={
-                        isHiddenByPagination
-                          ? "hidden"
-                          : `rounded-[16px] bg-[var(--color-background-card)] border p-4 flex flex-col sm:flex-row gap-4 transition-colors cursor-pointer ${
-                              isSelectedForBooking
-                                ? "border-[#222222] dark:border-[#f5f5f5]"
-                                : "border-[var(--color-border)] hover:border-[var(--color-border-emphasized)]"
-                            } ${!matchesInstantFilter ? "opacity-80" : ""}`
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRoomId(room.id);
-                          openRoomDetailsDrawer(room);
-                        }}
-                        className="relative w-full sm:w-[164px] h-[200px] sm:h-[164px] rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 cursor-pointer text-left"
-                      >
-                        <img
-                          src={getOptimizedPinImageUrl(roomCover, "gallery")}
-                          srcSet={getOptimizedPinImageSrcSet(roomCover, "gallery")}
-                          sizes="(max-width: 639px) 100vw, 180px"
-                          alt={language === "th" ? room.nameTh : room.nameEn}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                        <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-[#222222]/85 backdrop-blur-md !text-white text-[11px] font-semibold">
-                          {room.code}
-                        </span>
-
-                        {!hasUnits && (
-                          <span className="absolute inset-0 bg-black/45 flex items-center justify-center !text-white text-[12px] font-semibold">
-                            {language === "th" ? "เต็มช่วงวันที่เลือก" : "Sold Out"}
-                          </span>
-                        )}
-
-                        {room.galleryUrls.length > 1 && (
-                          <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-[8px] bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold inline-flex items-center gap-1">
-                            <Images className="w-3 h-3" />
-                            {room.galleryUrls.length}
-                          </span>
-                        )}
-                      </button>
-
-                      <div className="flex-1 min-w-0 flex flex-col justify-between gap-3">
-                        <div className="space-y-1.5 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-[16.5px] leading-snug font-semibold text-[var(--color-text-primary)] truncate">
-                              {language === "th" ? room.nameTh : room.nameEn}
-                            </h3>
-                            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] px-2.5 h-6 text-[11.5px] font-semibold">
-                              <span
-                                aria-hidden="true"
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  !hasUnits
-                                    ? "bg-[var(--color-error)]"
-                                    : !fitsGuests
-                                    ? "bg-[var(--color-warning)]"
-                                    : "bg-[var(--color-success)]"
-                                }`}
-                              />
-                              <span>
-                                {!hasUnits
-                                  ? language === "th"
-                                    ? "เต็มช่วงนี้"
-                                    : "Full"
-                                  : !fitsGuests
-                                  ? language === "th"
-                                    ? `สูงสุด ${room.maxGuests} ท่าน`
-                                    : `Max ${room.maxGuests}`
-                                  : language === "th"
-                                  ? `ว่าง ${room.availableUnits} ห้อง`
-                                  : `${room.availableUnits} left`}
-                              </span>
-                            </span>
-                          </div>
-
-                          <p className="text-[13px] text-[var(--color-text-secondary)]">
-                            {language === "th"
-                              ? `สูงสุด ${room.maxGuests} ท่าน · ${room.bedrooms} ห้องนอน · ${room.beds} เตียง · ${room.bathrooms} น้ำ · ${room.sizeSqm} ตร.ม.`
-                              : `Up to ${room.maxGuests} guests · ${room.bedrooms} bed · ${room.bathrooms} bath · ${room.sizeSqm} sqm`}
-                          </p>
-
-                          <p className="text-[13.5px] leading-relaxed text-[var(--color-text-secondary)] line-clamp-2">
-                            {descText}
-                          </p>
-
-                          {room.amenities.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                              {room.amenities.slice(0, 3).map((item) => (
-                                <span
-                                  key={item}
-                                  className="inline-flex items-center rounded-[7px] bg-[var(--color-background-muted)] px-2.5 py-0.5 text-[11.5px] text-[var(--color-text-secondary)]"
-                                >
-                                  {item}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="pt-2.5 border-t border-[var(--color-border-subtle)] flex flex-wrap items-end justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[17.5px] leading-tight font-semibold text-[var(--color-text-primary)]">
-                              ฿{room.weekdayPriceThb.toLocaleString()}
-                              <span className="text-[12.5px] font-normal text-[var(--color-text-secondary)]">
-                                {" "}
-                                / {language === "th" ? "คืน" : "night"}
-                              </span>
-                            </p>
-                            <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                              {language === "th"
-                                ? `รวม ${stayNights} คืน ฿${roomPricing.roomSubtotalThb.toLocaleString()}`
-                                : `${stayNights} nights total ฿${roomPricing.roomSubtotalThb.toLocaleString()}`}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedRoomId(room.id);
-                                openRoomDetailsDrawer(room);
-                              }}
-                              className="h-9 px-3 rounded-[10px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
-                            >
-                              {language === "th" ? "ดูรายละเอียด" : "Details"}
-                            </button>
-                            {hasUnits ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigateToCheckout(room);
-                                }}
-                                className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold cursor-pointer transition-colors"
-                              >
-                                {language === "th" ? "จองเลย" : "Reserve"}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedRoomId(room.id);
-                                  setCalendarRoomFilterId(room.id);
-                                  scrollToCalendarSection();
-                                }}
-                                className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
-                              >
-                                {language === "th"
-                                  ? "เช็กวันว่างห้องนี้"
-                                  : "Check dates"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
               </div>
+            </section>
+          )}
 
-              {sortedAndFilteredRooms.length > INITIAL_VISIBLE_ROOMS &&
-                !isRoomSearchActive && (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAllRooms((v) => !v)}
-                      className="h-11 px-5 rounded-[12px] border border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
-                    >
-                      {showAllRooms
-                        ? language === "th"
-                          ? "ย่อรายการห้องพัก"
-                          : "Show fewer rooms"
-                        : language === "th"
-                        ? `แสดงห้องพักทั้งหมด (${sortedAndFilteredRooms.length} แบบห้อง)`
-                        : `Show all ${sortedAndFilteredRooms.length} rooms`}
-                    </button>
-                  </div>
-                )}
-            </div>
-          </section>
-
-          {/* 3F. AMENITIES SECTION (#section-amenities — Placed cleanly after room selection) */}
+          {/* 3F. AMENITIES SECTION (#section-amenities — Clamped 6 Mobile / 8 Desktop + Bottom Sheet) */}
           {allUniqueAmenities.length > 0 && (
             <section
               id="section-amenities"
-              className="py-10 space-y-5 scroll-mt-20 lg:scroll-mt-32"
+              className="py-8 lg:py-10 space-y-5 scroll-mt-20 lg:scroll-mt-32"
             >
               <h2 className="ty-title text-[var(--color-text-primary)]">
                 {language === "th"
@@ -1846,13 +2002,15 @@ export function HotelStorefrontClient({
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-8">
-                {displayedAmenities.map((item) => {
+                {displayedAmenities.map((item, idx) => {
                   const meta = getFacilityIconMeta(item);
                   const Icon = meta.Icon;
                   return (
                     <div
                       key={item}
-                      className="flex items-center gap-3.5 ty-body text-[var(--color-text-primary)] min-w-0"
+                      className={`${
+                        idx >= 6 ? "hidden sm:flex" : "flex"
+                      } items-center gap-3.5 ty-body text-[var(--color-text-primary)] min-w-0`}
                     >
                       <Icon className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
                       <span className="truncate">{item}</span>
@@ -1861,263 +2019,462 @@ export function HotelStorefrontClient({
                 })}
               </div>
 
-              {allUniqueAmenities.length > 8 && (
+              {allUniqueAmenities.length > 6 && (
                 <button
                   type="button"
-                  onClick={() => setShowAllAmenities((v) => !v)}
-                  className="h-11 px-5 rounded-[12px] border border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                  onClick={() => setActiveInfoSheet("amenities")}
+                  className="w-full sm:w-auto h-12 px-6 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                 >
-                  {showAllAmenities
-                    ? language === "th"
-                      ? "ย่อรายการสิ่งอำนวยความสะดวก"
-                      : "Show fewer amenities"
-                    : language === "th"
+                  {language === "th"
                     ? `แสดงสิ่งอำนวยความสะดวกทั้งหมด (${allUniqueAmenities.length})`
                     : `Show all ${allUniqueAmenities.length} amenities`}
                 </button>
               )}
             </section>
           )}
+
+          {/* 3G-HOST: SINGLE-UNIT INLINE 2-MONTH AVAILABILITY CALENDAR (Host Mode ONLY — 1:1 exact availability) */}
+          {!isMultiRoomHotel && (
+            <section
+              id="section-rooms"
+              ref={calendarSectionRef}
+              className="py-8 lg:py-10 scroll-mt-20 lg:scroll-mt-32"
+            >
+              <AirbnbStayCalendar
+                language={language}
+                todayDate={today}
+                checkInDate={checkIn}
+                checkOutDate={checkOut}
+                onChangeDates={handleCommitStayDates}
+                guests={guests}
+                onChangeGuests={setGuests}
+                stayNights={stayNights}
+                hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
+                rooms={rooms}
+                calendarRoomFilterId={singleUnitRoom?.id ?? calendarRoomFilterId}
+                onChangeCalendarRoomFilterId={setCalendarRoomFilterId}
+                bookedUnitsByRoomDate={bookedUnitsByRoomDate}
+                dateOverrides={dateOverrides}
+              />
+            </section>
+          )}
         </div>
 
-        {/* RIGHT STICKY SIDEBAR (4 OF 12 COLS = 33.33%, WITH COL 8 AS 8.33% BREATHING AIR!) */}
-        <aside className="lg:col-start-9 lg:col-span-4 lg:sticky lg:top-[128px] mt-10 lg:mt-0">
-          {activeBookingRoom && stickyPricing && (
-            <div className="rounded-[16px] border border-[#dddddd] dark:border-[var(--color-border)] bg-[var(--color-background-card)] p-6 space-y-4">
-              {/* Price Header */}
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-[22px] font-semibold tracking-tight text-[var(--color-text-primary)]">
-                    ฿{activeBookingRoom.weekdayPriceThb.toLocaleString()}
-                  </span>
-                  <span className="ty-caption text-[var(--color-text-secondary)]">
-                    / {language === "th" ? "คืน" : "night"}
-                  </span>
-                </div>
-
-                <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--color-text-primary)]">
-                  <span
-                    aria-hidden="true"
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      activeBookingRoom.availableUnits > 0
-                        ? "bg-[var(--color-success)]"
-                        : "bg-[var(--color-error)]"
-                    }`}
-                  />
-                  <span>
-                    {activeBookingRoom.availableUnits > 0
-                      ? language === "th"
-                        ? `ว่าง ${activeBookingRoom.availableUnits} ห้อง`
-                        : `${activeBookingRoom.availableUnits} left`
-                      : language === "th"
-                      ? "เต็มช่วงนี้"
-                      : "Full"}
-                  </span>
-                </span>
-              </div>
-
-              {/* Airbnb Unified Bordered Input Box (Date-First: Dates -> Guests -> Room Type) */}
-              <div className="rounded-[12px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] overflow-hidden divide-y divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)] bg-[var(--color-background-card)]">
-                <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                  <button
-                    type="button"
-                    onClick={scrollToCalendarSection}
-                    className="px-3 py-2.5 text-left hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer"
-                  >
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
-                      {language === "th" ? "เช็กอิน" : "CHECK-IN"}
-                    </span>
-                    <span className="block text-[13.5px] text-[var(--color-text-secondary)] mt-0.5">
-                      {formatShortDate(checkIn, language)}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={scrollToCalendarSection}
-                    className="px-3 py-2.5 text-left hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer"
-                  >
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
-                      {language === "th" ? "เช็กเอาต์" : "CHECKOUT"}
-                    </span>
-                    <span className="block text-[13.5px] text-[var(--color-text-secondary)] mt-0.5">
-                      {formatShortDate(checkOut, language)}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
-                      {language === "th" ? "ผู้เข้าพัก" : "GUESTS"}
-                    </span>
-                    <span className="block text-[13.5px] text-[var(--color-text-secondary)] mt-0.5">
-                      {guests} {language === "th" ? "ท่าน" : "guests"} (
-                      {language === "th" ? "สูงสุด" : "max"}{" "}
-                      {activeBookingRoom.maxGuests})
-                    </span>
-                  </div>
-
-                  <div className="inline-flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setGuests(Math.max(1, guests - 1))}
-                      aria-label="Decrease guests"
-                      className="h-7 w-7 rounded-[8px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-4 text-center text-[13px] font-semibold tabular-nums">
-                      {guests}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setGuests(Math.min(12, guests + 1))}
-                      aria-label="Increase guests"
-                      className="h-7 w-7 rounded-[8px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="px-3 py-2.5">
-                  <label
-                    htmlFor="sticky-room-selector"
-                    className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]"
-                  >
-                    {language === "th" ? "ห้องพักที่เลือก" : "ROOM TYPE"}
-                  </label>
-                  <select
-                    id="sticky-room-selector"
-                    value={activeBookingRoom.id}
-                    onChange={(e) => setSelectedRoomId(e.target.value)}
-                    className="w-full bg-transparent text-[13.5px] text-[var(--color-text-primary)] mt-0.5 focus:outline-none cursor-pointer"
-                  >
-                    {rooms.map((rm) => (
-                      <option key={rm.id} value={rm.id}>
-                        {rm.code} · {language === "th" ? rm.nameTh : rm.nameEn} (฿
-                        {rm.weekdayPriceThb.toLocaleString()} ·{" "}
-                        {rm.availableUnits > 0
-                          ? language === "th"
-                            ? `ว่าง ${rm.availableUnits}`
-                            : `${rm.availableUnits} left`
-                          : language === "th"
-                          ? "เต็ม"
-                          : "Full"}
-                        )
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Primary Reserve CTA */}
-              {activeBookingRoom.availableUnits > 0 &&
-              activeBookingRoom.maxGuests >= guests ? (
+        {/* RIGHT STICKY SIDEBAR (4 OF 12 COLS — HIDDEN ON MOBILE/TABLET, AIRBNB FLOATING FOOTER SHOWN INSTEAD) */}
+        <aside
+          ref={stickySidebarRef}
+          className="hidden lg:block lg:col-start-9 lg:col-span-4 lg:sticky lg:top-[128px] lg:z-20 relative"
+        >
+          {rooms.length > 0 && (
+            <div className="space-y-3">
+              {/* Subtle Direct Coupon Banner above Sticky Widget (Zero extra shadow per Design System v3.0) */}
+              {coupons.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => navigateToCheckout(activeBookingRoom)}
-                  className="w-full h-12 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold cursor-pointer transition-colors"
+                  onClick={() =>
+                    document
+                      .getElementById("section-coupons")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                  className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
                 >
-                  {language === "th"
-                    ? `จองตรงห้อง ${activeBookingRoom.code}`
-                    : `Reserve ${activeBookingRoom.code}`}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeBookingRoom.availableUnits === 0) {
-                      setCalendarRoomFilterId(activeBookingRoom.id);
-                      scrollToCalendarSection();
-                    } else {
-                      document
-                        .getElementById("rooms-list-section")
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }}
-                  className="w-full h-12 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold cursor-pointer transition-colors"
-                >
-                  {activeBookingRoom.availableUnits === 0
-                    ? language === "th"
-                      ? "ห้องเต็มช่วงนี้ · เปลี่ยนวันเข้าพัก"
-                      : "Check availability"
-                    : language === "th"
-                    ? `ผู้เข้าพักเกิน ${activeBookingRoom.maxGuests} ท่าน`
-                    : `Max ${activeBookingRoom.maxGuests} guests`}
+                  <Tag className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">
+                    {language === "th"
+                      ? `มีคูปองส่วนลดจองตรง ${coupons.length} ใบ (0% GP)`
+                      : `${coupons.length} direct stay coupon${
+                          coupons.length > 1 ? "s" : ""
+                        } available`}
+                  </span>
                 </button>
               )}
 
-              <p className="text-center text-[12.5px] text-[var(--color-text-secondary)]">
-                {language === "th"
-                  ? "ยังไม่เรียกเก็บเงินตอนนี้ · ล็อคห้อง 15 นาทีเพื่อโอนตรงที่พัก"
-                  : "You won't be charged yet"}
-              </p>
+              <div
+                ref={stickyCardRef}
+                className="relative rounded-[16px] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] bg-[var(--color-background-card)] p-6 space-y-4"
+              >
+                {/* Anchored Desktop 2-Month Calendar Popover (Portal z-[80] — Zero stacking overlap!) */}
+                <DesktopDateRangePopover
+                  isOpen={desktopDatePopoverPhase !== null}
+                  onClose={() => setDesktopDatePopoverPhase(null)}
+                  anchorRef={stickyCardRef}
+                  language={language}
+                  todayDate={today}
+                  checkInDate={checkIn}
+                  checkOutDate={checkOut}
+                  hasConfirmedDates={hasConfirmedDates}
+                  initialPhase={desktopDatePopoverPhase ?? "checkin"}
+                  guests={guests}
+                  rooms={rooms}
+                  bookedUnitsByRoomDate={bookedUnitsByRoomDate}
+                  dateOverrides={dateOverrides}
+                  specificRoomId={
+                    !isMultiRoomHotel
+                      ? singleUnitRoom?.id ?? null
+                      : datePickerScopeRoomId
+                  }
+                  onCommitDates={handleCommitStayDates}
+                  onClearDates={handleClearStayDates}
+                />
 
-              {/* Price Breakdown */}
-              <div className="space-y-2.5 pt-2 ty-body">
-                <div className="flex justify-between text-[var(--color-text-primary)]">
-                  <span className="underline decoration-[var(--color-border-emphasized)]">
-                    ฿
-                    {Math.round(
-                      (stickyBasePricing?.roomSubtotalThb ??
-                        activeBookingRoom.weekdayPriceThb * stayNights) /
-                        stayNights
-                    ).toLocaleString()}{" "}
-                    × {stayNights} {language === "th" ? "คืน" : "nights"}
-                  </span>
-                  <span>
-                    ฿
-                    {(
-                      (stickyBasePricing?.roomSubtotalThb ?? 0) -
-                      (stickyBasePricing?.extraGuestTotalThb ?? 0)
-                    ).toLocaleString()}
-                  </span>
+                {/* Price Header */}
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  {isMultiRoomHotel ? (
+                    hasConfirmedDates ? (
+                      cheapestAvailableRoomPricing ? (
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-[14px] text-[var(--color-text-secondary)]">
+                            {language === "th" ? "เริ่มต้น" : "From"}
+                          </span>
+                          <span className="text-[22px] font-semibold tracking-tight text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-4 tabular-nums">
+                            ฿
+                            {cheapestAvailableRoomPricing.subtotalThb.toLocaleString()}
+                          </span>
+                          <span className="ty-caption text-[var(--color-text-secondary)]">
+                            {language === "th"
+                              ? `สำหรับ ${stayNights} คืน`
+                              : `for ${stayNights} ${
+                                  stayNights === 1 ? "night" : "nights"
+                                }`}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                          {language === "th"
+                            ? "ไม่มีห้องว่างในช่วงนี้"
+                            : "No rooms available"}
+                        </span>
+                      )
+                    ) : (
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-[14px] text-[var(--color-text-secondary)]">
+                          {language === "th" ? "เริ่มต้น" : "From"}
+                        </span>
+                        <span className="text-[22px] font-semibold tracking-tight text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-4 tabular-nums">
+                          ฿{minRoomPrice.toLocaleString()}
+                        </span>
+                        <span className="ty-caption text-[var(--color-text-secondary)]">
+                          / {language === "th" ? "คืน" : "night"}
+                        </span>
+                      </div>
+                    )
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-[22px] font-semibold tracking-tight text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-4 tabular-nums">
+                          ฿
+                          {(hasConfirmedDates && stickyPricing
+                            ? stickyPricing.netTotalThb
+                            : singleUnitRoom?.weekdayPriceThb ?? minRoomPrice
+                          ).toLocaleString()}
+                        </span>
+                        <span className="ty-caption text-[var(--color-text-secondary)]">
+                          {hasConfirmedDates
+                            ? language === "th"
+                              ? `สำหรับ ${stayNights} คืน`
+                              : `for ${stayNights} ${
+                                  stayNights === 1 ? "night" : "nights"
+                                }`
+                            : `/ ${language === "th" ? "คืน" : "night"}`}
+                        </span>
+                      </div>
+
+                      {hasConfirmedDates && singleUnitRoom && (
+                        <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] px-2.5 py-1 text-[11.5px] font-semibold text-[var(--color-text-primary)]">
+                          <span
+                            aria-hidden="true"
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              singleUnitRoom.availableUnits > 0
+                                ? "bg-[var(--color-success)]"
+                                : "bg-[var(--color-error)]"
+                            }`}
+                          />
+                          <span>
+                            {singleUnitRoom.availableUnits > 0
+                              ? language === "th"
+                                ? "ว่างพร้อมจอง"
+                                : "Available"
+                              : language === "th"
+                              ? "เต็มช่วงนี้"
+                              : "Full"}
+                          </span>
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
 
-                {stickyBasePricing && stickyBasePricing.extraGuestTotalThb > 0 && (
-                  <div className="flex justify-between text-[var(--color-text-primary)]">
-                    <span>
-                      {language === "th" ? "ค่าผู้เข้าพักเสริม" : "Extra guest fee"}
-                    </span>
-                    <span>
-                      +฿{stickyBasePricing.extraGuestTotalThb.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-
-                {stickyPricing.discountThb > 0 && stickyBestCoupon && (
-                  <div className="flex justify-between text-[var(--color-success)] font-medium">
-                    <span className="inline-flex items-center gap-1">
-                      <Tag className="w-3.5 h-3.5" />
-                      <span>
-                        {language === "th"
-                          ? `ส่วนลดคูปอง ${stickyBestCoupon.coupon.code}`
-                          : `Coupon ${stickyBestCoupon.coupon.code}`}
+                {/* Airbnb Unified 2-Row Input Box: CHECK-IN | CHECKOUT + GUESTS (Clean, Zero Room Dropdown) */}
+                <div className="rounded-[12px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] divide-y divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)] bg-[var(--color-background-card)]">
+                  <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                    <button
+                      type="button"
+                      onClick={() => openDatePicker("checkin")}
+                      className="px-3 py-2.5 rounded-tl-[11px] text-left hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer"
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
+                        {language === "th" ? "เช็กอิน" : "CHECK-IN"}
                       </span>
-                    </span>
-                    <span>−฿{stickyPricing.discountThb.toLocaleString()}</span>
+                      <span
+                        className={`block text-[13.5px] mt-0.5 truncate ${
+                          hasConfirmedDates
+                            ? "text-[var(--color-text-primary)] font-medium"
+                            : "text-[var(--color-text-secondary)]"
+                        }`}
+                      >
+                        {hasConfirmedDates
+                          ? formatShortDate(checkIn, language)
+                          : language === "th"
+                          ? "เพิ่มวันที่"
+                          : "Add date"}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openDatePicker("checkout")}
+                      className="px-3 py-2.5 rounded-tr-[11px] text-left hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer"
+                    >
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
+                        {language === "th" ? "เช็กเอาต์" : "CHECKOUT"}
+                      </span>
+                      <span
+                        className={`block text-[13.5px] mt-0.5 truncate ${
+                          hasConfirmedDates
+                            ? "text-[var(--color-text-primary)] font-medium"
+                            : "text-[var(--color-text-secondary)]"
+                        }`}
+                      >
+                        {hasConfirmedDates
+                          ? formatShortDate(checkOut, language)
+                          : language === "th"
+                          ? "เพิ่มวันที่"
+                          : "Add date"}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="px-3 py-2.5 rounded-b-[11px] flex items-center justify-between gap-2">
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
+                        {language === "th" ? "ผู้เข้าพัก" : "GUESTS"}
+                      </span>
+                      <span className="block text-[13.5px] text-[var(--color-text-secondary)] mt-0.5">
+                        {guests}{" "}
+                        {language === "th"
+                          ? "ท่าน"
+                          : guests === 1
+                          ? "guest"
+                          : "guests"}{" "}
+                        ({language === "th" ? "สูงสุด" : "max"}{" "}
+                        {maxHotelGuests})
+                      </span>
+                    </div>
+
+                    <div className="inline-flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setGuests(Math.max(1, guests - 1))}
+                        aria-label="Decrease guests"
+                        className="h-7 w-7 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-4 text-center text-[13px] font-semibold tabular-nums">
+                        {guests}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setGuests(
+                            Math.min(Math.max(12, maxHotelGuests), guests + 1)
+                          )
+                        }
+                        aria-label="Increase guests"
+                        className="h-7 w-7 rounded-[8px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Minimum Stay Notice (Surfaced Immediately When Date Range < minNights) */}
+                {hasConfirmedDates && stayMinNightsInfo.isBlocked && (
+                  <div className="rounded-[12px] bg-[var(--color-background-muted)] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-text-primary)]">
+                    {language === "th"
+                      ? `ช่วงวันที่เลือกกำหนดเข้าพักขั้นต่ำ ${stayMinNightsInfo.requiredMinNights} คืน กรุณาปรับวันเช็กเอาต์`
+                      : `Minimum stay of ${stayMinNightsInfo.requiredMinNights} nights is required for these dates.`}
                   </div>
                 )}
 
-                <div className="flex justify-between text-[var(--color-text-secondary)]">
-                  <span>
+                {/* Primary CTA — Auto-Adjusted by Storefront Mode & Date Confirmation */}
+                {!hasConfirmedDates ? (
+                  <button
+                    type="button"
+                    onClick={() => openDatePicker("checkin")}
+                    className="w-full h-12 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold cursor-pointer transition-colors"
+                  >
+                    {language === "th" ? "เช็กวันว่าง" : "Check availability"}
+                  </button>
+                ) : stayMinNightsInfo.isBlocked ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCommitStayDates(
+                        checkIn,
+                        addDaysToDate(checkIn, stayMinNightsInfo.requiredMinNights)
+                      )
+                    }
+                    className="w-full h-12 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold cursor-pointer transition-colors"
+                  >
                     {language === "th"
-                      ? "ค่าบริการแพลตฟอร์ม (0% GP)"
-                      : "Platform service fee (0% GP)"}
-                  </span>
-                  <span className="text-[var(--color-text-primary)]">฿0</span>
-                </div>
+                      ? `ปรับเป็น ${stayMinNightsInfo.requiredMinNights} คืน`
+                      : `Extend to ${stayMinNightsInfo.requiredMinNights} nights`}
+                  </button>
+                ) : isMultiRoomHotel ? (
+                  matchingAvailableRooms.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsChooseRoomSheetOpen(true)}
+                      className="w-full h-12 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold cursor-pointer transition-colors"
+                    >
+                      {language === "th" ? "เลือกห้องพัก" : "Choose room"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openDatePicker("checkin")}
+                      className="w-full h-12 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14.5px] font-semibold cursor-pointer transition-colors"
+                    >
+                      {language === "th"
+                        ? "ไม่มีห้องว่าง · เปลี่ยนวันเข้าพัก"
+                        : "Change dates"}
+                    </button>
+                  )
+                ) : singleUnitRoom &&
+                  singleUnitRoom.availableUnits > 0 &&
+                  singleUnitRoom.maxGuests >= guests ? (
+                  <button
+                    type="button"
+                    onClick={() => navigateToCheckout(singleUnitRoom)}
+                    className="w-full h-12 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold cursor-pointer transition-colors"
+                  >
+                    {language === "th" ? "จองที่พักนี้" : "Reserve"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openDatePicker("checkin", singleUnitRoom?.id ?? null)
+                    }
+                    className="w-full h-12 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold cursor-pointer transition-colors"
+                  >
+                    {singleUnitRoom && singleUnitRoom.availableUnits === 0
+                      ? language === "th"
+                        ? "เต็มช่วงนี้ · เปลี่ยนวันเข้าพัก"
+                        : "Check availability"
+                      : language === "th"
+                      ? `ผู้เข้าพักเกิน ${singleUnitRoom?.maxGuests ?? maxHotelGuests} ท่าน`
+                      : `Max ${singleUnitRoom?.maxGuests ?? maxHotelGuests} guests`}
+                  </button>
+                )}
 
-                <div className="pt-3.5 border-t border-[var(--color-border)] flex items-baseline justify-between font-semibold text-[var(--color-text-primary)]">
-                  <span>
-                    {language === "th" ? "ยอดรวมสุทธิ" : "Total"}
-                  </span>
-                  <span className="text-[17px]">
-                    ฿{stickyPricing.netTotalThb.toLocaleString()}
-                  </span>
-                </div>
+                {hasConfirmedDates && (
+                  <p className="text-center text-[12.5px] text-[var(--color-text-secondary)]">
+                    {language === "th"
+                      ? "ยังไม่เรียกเก็บเงินตอนนี้ · ล็อคห้อง 15 นาทีเพื่อโอนตรงที่พัก"
+                      : "You won't be charged yet"}
+                  </p>
+                )}
+
+                {/* Single-Unit Host Mode Price Breakdown (Only after dates confirmed & available) */}
+                {!isMultiRoomHotel &&
+                  hasConfirmedDates &&
+                  singleUnitRoom &&
+                  singleUnitRoom.availableUnits > 0 &&
+                  stickyPricing && (
+                    <div className="space-y-2.5 pt-2 ty-body">
+                      <div className="flex justify-between text-[var(--color-text-primary)]">
+                        <span className="underline decoration-[var(--color-border-emphasized)]">
+                          ฿
+                          {Math.round(
+                            (stickyBasePricing?.roomSubtotalThb ??
+                              singleUnitRoom.weekdayPriceThb * stayNights) /
+                              stayNights
+                          ).toLocaleString()}{" "}
+                          × {stayNights}{" "}
+                          {language === "th"
+                            ? "คืน"
+                            : stayNights === 1
+                            ? "night"
+                            : "nights"}
+                        </span>
+                        <span>
+                          ฿
+                          {(
+                            (stickyBasePricing?.roomSubtotalThb ?? 0) -
+                            (stickyBasePricing?.extraGuestTotalThb ?? 0)
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+
+                      {stickyBasePricing &&
+                        stickyBasePricing.extraGuestTotalThb > 0 && (
+                          <div className="flex justify-between text-[var(--color-text-primary)]">
+                            <span>
+                              {language === "th"
+                                ? "ค่าผู้เข้าพักเสริม"
+                                : "Extra guest fee"}
+                            </span>
+                            <span>
+                              +฿
+                              {stickyBasePricing.extraGuestTotalThb.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+
+                      {stickyPricing.discountThb > 0 &&
+                        (stickyPricing.appliedCouponCode ||
+                          stickyPricing.appliedAutoDiscountLabel) && (
+                          <div className="flex justify-between gap-2 text-[var(--color-success)] font-medium">
+                            <span className="inline-flex items-center gap-1 min-w-0">
+                              <Tag className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">
+                                {stickyPricing.appliedCouponCode
+                                  ? language === "th"
+                                    ? `ส่วนลดคูปอง ${stickyPricing.appliedCouponCode}`
+                                    : `Coupon ${stickyPricing.appliedCouponCode}`
+                                  : stickyPricing.appliedAutoDiscountLabel}
+                              </span>
+                            </span>
+                            <span className="shrink-0">
+                              −฿{stickyPricing.discountThb.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+
+                      <div className="flex justify-between text-[var(--color-text-secondary)]">
+                        <span>
+                          {language === "th"
+                            ? "ค่าบริการแพลตฟอร์ม (0% GP)"
+                            : "Platform service fee (0% GP)"}
+                        </span>
+                        <span className="text-[var(--color-text-primary)]">
+                          ฿0
+                        </span>
+                      </div>
+
+                      <div className="pt-3.5 border-t border-[var(--color-border)] flex items-baseline justify-between font-semibold text-[var(--color-text-primary)]">
+                        <span>
+                          {language === "th" ? "ยอดรวมสุทธิ" : "Total"}
+                        </span>
+                        <span className="text-[17px] tabular-nums">
+                          ฿{stickyPricing.netTotalThb.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -2155,7 +2512,7 @@ export function HotelStorefrontClient({
             language={language}
             currentUser={currentUser}
             comments={activePinComments}
-            savedPinIds={optimisticSavedIds}
+            savedPinIds={effectiveSavedPinIds}
             relatedPins={gridHotelPins}
             prevPinPreview={prevHotelPinPreview}
             nextPinPreview={nextHotelPinPreview}
@@ -2166,27 +2523,34 @@ export function HotelStorefrontClient({
             onClose={handleCloseHotelPin}
             onSelectPin={(next) => handleSelectPinFromMasonry(next, true)}
             onNavigatePin={handleNavigateHotelPin}
-            onToggleLike={async (pinId) => {
-              if (!currentUser) {
-                router.push(`/login?callbackUrl=/${cleanSlug}`);
-                return;
-              }
-              await fetch(`/api/pins/${encodeURIComponent(pinId)}/like`, {
-                method: "POST",
+            onToggleLike={(pinId) => {
+              const target =
+                (activePin.id === pinId ? activePin : null) ??
+                storefront.pins.find((p) => p.id === pinId);
+              if (!target) return;
+              togglePinLikeInstant({
+                id: target.id,
+                isLikedByMe: target.isLikedByMe,
+                likesCount: target.likesCount,
               });
-              await Promise.all([loadStorefront(true), loadPinDetail(pinId)]);
             }}
             onToggleSave={async (pinId) => {
-              if (!currentUser) {
-                router.push(`/login?callbackUrl=/${cleanSlug}`);
-                return;
-              }
-              await fetch("/api/boards/toggle-pin", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pinId }),
+              const target =
+                storefront.pins.find((p) => p.id === pinId) ?? activePin;
+              if (!target) return;
+              const res = await triggerPinToBoard({
+                id: target.id,
+                coverImageUrl: target.coverImageUrl,
+                isSavedByMe: effectiveSavedPinIds.has(target.id),
               });
-              await Promise.all([loadStorefront(true), refreshMe()]);
+              if (res) {
+                setOptimisticSavedIds((prev) => {
+                  const next = new Set(prev);
+                  if (res.isSaved) next.add(pinId);
+                  else next.delete(pinId);
+                  return next;
+                });
+              }
             }}
             onSharePin={handleSharePin}
             onExpandMedia={(urls, idx) =>
@@ -2196,19 +2560,26 @@ export function HotelStorefrontClient({
               })
             }
             onAddComment={async (text, parentId) => {
+              const runComment = async () => {
+                await fetch(
+                  `/api/pins/${encodeURIComponent(activePin.id)}/comments`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body: text, parentId }),
+                  }
+                );
+                await loadPinDetail(activePin.id);
+              };
               if (!currentUser) {
-                router.push(`/login?callbackUrl=/${cleanSlug}`);
+                openAuthModal({
+                  reasonTh: "เข้าสู่ระบบเพื่อแสดงความคิดเห็น",
+                  reasonEn: "Log in to post a comment",
+                  onSuccess: runComment,
+                });
                 return;
               }
-              await fetch(
-                `/api/pins/${encodeURIComponent(activePin.id)}/comments`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ body: text, parentId }),
-                }
-              );
-              await loadPinDetail(activePin.id);
+              await runComment();
             }}
             onDeleteComment={async (commentId) => {
               await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
@@ -2238,31 +2609,45 @@ export function HotelStorefrontClient({
                   <PinterestPinCard
                     pin={pin}
                     language={language}
-                    isSaved={pin.isSavedByMe || optimisticSavedIds.has(pin.id)}
+                    isSaved={effectiveSavedPinIds.has(pin.id)}
                     onSelectPin={handleSelectPinFromMasonry}
                     onToggleSave={async (pinId) => {
-                      if (!currentUser) {
-                        router.push(`/login?callbackUrl=/${cleanSlug}`);
-                        return;
-                      }
-                      await fetch("/api/boards/toggle-pin", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ pinId }),
+                      const target =
+                        storefront.pins.find((p) => p.id === pinId) ?? pin;
+                      const res = await triggerPinToBoard({
+                        id: target.id,
+                        coverImageUrl: target.coverImageUrl,
+                        isSavedByMe: effectiveSavedPinIds.has(target.id),
                       });
-                      await Promise.all([loadStorefront(true), refreshMe()]);
+                      if (res) {
+                        setOptimisticSavedIds((prev) => {
+                          const next = new Set(prev);
+                          if (res.isSaved) next.add(pinId);
+                          else next.delete(pinId);
+                          return next;
+                        });
+                      }
+                    }}
+                    onToggleLike={(pinId) => {
+                      const target =
+                        storefront.pins.find((p) => p.id === pinId) ?? pin;
+                      togglePinLikeInstant({
+                        id: target.id,
+                        isLikedByMe: target.isLikedByMe,
+                        likesCount: target.likesCount,
+                      });
                     }}
                     onSharePin={handleSharePin}
                   />
                 )}
               />
 
-              {masonrySectionPins.length > 10 && (
+              {masonrySectionPins.length > 6 && (
                 <div>
                   <button
                     type="button"
                     onClick={() => setShowAllPins((v) => !v)}
-                    className="h-11 px-5 rounded-[12px] border border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                    className="w-full sm:w-auto h-12 px-6 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                   >
                     {showAllPins
                       ? language === "th"
@@ -2279,10 +2664,10 @@ export function HotelStorefrontClient({
         )}
       </section>
 
-      {/* 4B. GUEST REVIEWS (#section-reviews — Airbnb Borderless 2-Column Editorial Grid) */}
+      {/* 4B. GUEST REVIEWS (#section-reviews — Mobile Horizontal Carousel / Desktop 2-Col Editorial Grid) */}
       <section
         id="section-reviews"
-        className="py-12 border-t border-[var(--color-border)] space-y-8 scroll-mt-20 lg:scroll-mt-32"
+        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
       >
         <div className="flex items-center gap-2.5">
           <Star className="w-6 h-6 fill-current text-[var(--color-text-primary)]" />
@@ -2299,68 +2684,109 @@ export function HotelStorefrontClient({
             ยังไม่มีรีวิวสำหรับที่พักนี้
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8">
-            {reviews.map((rv) => (
-              <article key={rv.id} className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <span className="h-11 w-11 rounded-full bg-[var(--color-background-muted)] border border-[var(--color-border)] inline-flex items-center justify-center font-semibold text-[15px] text-[var(--color-text-primary)] shrink-0">
-                    {rv.authorName[0]}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
-                      {rv.authorName}
-                    </p>
-                    <p className="text-[13px] text-[var(--color-text-secondary)]">
-                      {rv.roomCode ? `ห้อง ${rv.roomCode} · ` : ""}
-                      {formatShortDate(rv.createdAt, language)}
-                    </p>
-                  </div>
-                </div>
+          <div className="space-y-6">
+            <div className="flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory gap-3.5 -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:scroll-px-0 md:pb-0 md:grid md:grid-cols-2 md:gap-x-16 md:gap-y-8">
+              {reviews.slice(0, 6).map((rv) => (
+                <article
+                  key={rv.id}
+                  className="w-[82vw] max-w-[330px] shrink-0 snap-start rounded-[16px] border border-[var(--color-border)] p-4 flex flex-col justify-between gap-3 md:w-auto md:max-w-none md:rounded-none md:border-0 md:p-0"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="h-11 w-11 rounded-full bg-[var(--color-background-muted)] inline-flex items-center justify-center font-semibold text-[15px] text-[var(--color-text-primary)] shrink-0">
+                        {rv.authorName[0]}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                          {rv.authorName}
+                        </p>
+                        <p className="text-[13px] text-[var(--color-text-secondary)]">
+                          {rv.roomCode ? `ห้อง ${rv.roomCode} · ` : ""}
+                          {formatShortDate(rv.createdAt, language)}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-1 text-[var(--color-text-primary)]">
-                  {Array.from({ length: Math.max(1, Math.min(5, rv.rating)) }).map(
-                    (_, idx) => (
-                      <Star key={idx} className="w-3 h-3 fill-current" />
-                    )
+                    <div className="flex items-center gap-1 text-[var(--color-text-primary)]">
+                      {Array.from({ length: Math.max(1, Math.min(5, rv.rating)) }).map(
+                        (_, idx) => (
+                          <Star key={idx} className="w-3 h-3 fill-current" />
+                        )
+                      )}
+                    </div>
+
+                    <p className="text-[15.5px] leading-[1.65] text-[var(--color-text-primary)] line-clamp-4">
+                      {rv.commentTh}
+                    </p>
+
+                    {rv.commentTh.length > 130 && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoSheet("reviews")}
+                        className="text-[13.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 hover:opacity-80"
+                      >
+                        <span>{language === "th" ? "อ่านต่อ" : "Show more"}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
+                    {rv.ownerReplyTh && (
+                      <div className="rounded-[12px] bg-[var(--color-background-muted)] px-3.5 py-2.5 space-y-1">
+                        <p className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                          {language === "th"
+                            ? `ตอบกลับจาก ${hotel.nameTh}`
+                            : `Response from ${hotel.nameEn}`}
+                        </p>
+                        <p className="text-[13px] leading-[1.55] text-[var(--color-text-secondary)] line-clamp-3">
+                          {rv.ownerReplyTh}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {rv.photoUrls.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pt-1">
+                      {rv.photoUrls.map((u, idx) => (
+                        <img
+                          key={idx}
+                          src={getOptimizedPinImageUrl(u, "thumb")}
+                          srcSet={getOptimizedPinImageSrcSet(u, "thumb")}
+                          sizes="112px"
+                          alt="Guest photo"
+                          loading="lazy"
+                          decoding="async"
+                          onClick={() =>
+                            setFullscreenMedia({
+                              slides: rv.photoUrls.map((url) => ({
+                                type: "image",
+                                url,
+                              })),
+                              index: idx,
+                            })
+                          }
+                          className="h-20 w-28 rounded-[10px] object-cover cursor-pointer shrink-0 hover:brightness-95 transition"
+                        />
+                      ))}
+                    </div>
                   )}
-                </div>
+                </article>
+              ))}
+            </div>
 
-                <p className="text-[15.5px] leading-[1.65] text-[var(--color-text-primary)]">
-                  {rv.commentTh}
-                </p>
-
-                {rv.photoUrls.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pt-1">
-                    {rv.photoUrls.map((u, idx) => (
-                      <img
-                        key={idx}
-                        src={getOptimizedPinImageUrl(u, "thumb")}
-                        srcSet={getOptimizedPinImageSrcSet(u, "thumb")}
-                        sizes="112px"
-                        alt="Guest photo"
-                        loading="lazy"
-                        decoding="async"
-                        onClick={() =>
-                          setFullscreenMedia({
-                            slides: rv.photoUrls.map((url) => ({
-                              type: "image",
-                              url,
-                            })),
-                            index: idx,
-                          })
-                        }
-                        className="h-20 w-28 rounded-[10px] object-cover cursor-pointer shrink-0 border border-[var(--color-border)]"
-                      />
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
+            <button
+              type="button"
+              onClick={() => setActiveInfoSheet("reviews")}
+              className="w-full sm:w-auto h-12 px-6 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+            >
+              {language === "th"
+                ? `ดูรีวิวทั้งหมด (${reviews.length})`
+                : `Show all ${reviews.length} reviews`}
+            </button>
           </div>
         )}
       </section>
 
-      {/* 4C. LOCATION & NEIGHBORHOOD MAP (#section-location — Full 1120px Width) */}
+      {/* 4C. LOCATION & INTERACTIVE EXPLORER MAP (#section-location — Square Mobile + Fullscreen Modal) */}
       <section
         id="section-location"
         className="py-12 border-t border-[var(--color-border)] space-y-5 scroll-mt-20 lg:scroll-mt-32"
@@ -2380,7 +2806,7 @@ export function HotelStorefrontClient({
               href={hotel.googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-10 px-4 rounded-[10px] border border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 transition-colors shrink-0"
+              className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 transition-colors shrink-0"
             >
               <ExternalLink className="w-4 h-4" />
               <span>
@@ -2390,41 +2816,20 @@ export function HotelStorefrontClient({
           )}
         </div>
 
-        {hotel.latitude && hotel.longitude && (
-          <div className="h-[320px] sm:h-[380px] rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] border border-[var(--color-border)]">
-            <iframe
-              title={hotel.nameTh}
-              src={`https://maps.google.com/maps?q=${hotel.latitude},${hotel.longitude}&hl=${language}&z=14&output=embed`}
-              className="w-full h-full border-0"
-              loading="lazy"
-            />
-          </div>
-        )}
-
-        {hotel.nearbySpots.length > 0 && (
-          <div className="space-y-2.5 pt-1">
-            <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              {language === "th" ? "จุดเช็กอินใกล้เคียง" : "Nearby landmarks"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {hotel.nearbySpots.map((spot, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--color-background-muted)] px-3.5 py-2 ty-caption text-[var(--color-text-primary)]"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-[var(--color-text-secondary)]" />
-                  <strong className="font-semibold">{spot.nameTh}</strong>
-                  <span className="text-[var(--color-text-secondary)]">
-                    ({spot.distTh})
-                  </span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        <HotelLocationMap
+          hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
+          addressText={hotel.addressTh}
+          districtText={hotel.districtTh}
+          provinceText={hotel.provinceNameTh}
+          latitude={hotel.latitude}
+          longitude={hotel.longitude}
+          googleMapsUrl={hotel.googleMapsUrl}
+          nearbySpots={hotel.nearbySpots}
+          language={language}
+        />
       </section>
 
-      {/* 4D. HOTEL GUIDES / BLOG (#section-blog — Rendered when posts exist) */}
+      {/* 4D. HOTEL GUIDES / BLOG (#section-blog — Mobile Snap Carousel / Desktop 3-Col Grid) */}
       {posts.length > 0 && (
         <section
           id="section-blog"
@@ -2439,64 +2844,62 @@ export function HotelStorefrontClient({
 
             <Link
               href={`/${hotel.slug}/posts`}
-              className="h-9 px-3.5 rounded-[10px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
+              className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
             >
               <span>ดูทั้งหมด ({posts.length})</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+          <div className="flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory gap-4 -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:scroll-px-0 md:pb-0 md:grid md:grid-cols-3 md:gap-6 md:items-start">
             {posts.map((post) => (
               <article
                 key={post.id}
-                className="h-full rounded-[16px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col justify-between"
+                className="w-[80vw] max-w-[310px] shrink-0 snap-start md:w-auto md:max-w-none flex flex-col gap-3"
               >
-                <div>
+                <Link
+                  href={`/${hotel.slug}/posts/${post.slug}`}
+                  className="block relative aspect-[16/10] rounded-[14px] bg-[var(--color-background-muted)] overflow-hidden hover:brightness-95 transition"
+                >
+                  <img
+                    src={getOptimizedPinImageUrl(post.coverImageUrl, "gallery")}
+                    srcSet={getOptimizedPinImageSrcSet(
+                      post.coverImageUrl,
+                      "gallery"
+                    )}
+                    sizes={PIN_IMAGE_SIZES.gallery}
+                    alt={post.titleTh}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-[8px] bg-[#222222]/80 backdrop-blur-md text-white text-[11px] font-semibold">
+                    {post.categoryTh}
+                  </span>
+                </Link>
+
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center justify-between text-[12px] text-[var(--color-text-secondary)]">
+                    <span>{formatShortDate(post.publishedAt, language)}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5" />
+                      {post.viewsCount}
+                    </span>
+                  </div>
+
                   <Link
                     href={`/${hotel.slug}/posts/${post.slug}`}
-                    className="block relative h-44 bg-[var(--color-background-muted)] overflow-hidden"
+                    className="block group"
                   >
-                    <img
-                      src={getOptimizedPinImageUrl(post.coverImageUrl, "gallery")}
-                      srcSet={getOptimizedPinImageSrcSet(
-                        post.coverImageUrl,
-                        "gallery"
-                      )}
-                      sizes={PIN_IMAGE_SIZES.gallery}
-                      alt={post.titleTh}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover"
-                    />
-                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-[8px] bg-[#222222]/80 backdrop-blur-md text-white text-[11px] font-semibold">
-                      {post.categoryTh}
-                    </span>
+                    <h3 className="ty-subtitle font-semibold leading-snug group-hover:underline line-clamp-2">
+                      {post.titleTh}
+                    </h3>
                   </Link>
 
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-center justify-between text-[12px] text-[var(--color-text-secondary)]">
-                      <span>{formatShortDate(post.publishedAt, language)}</span>
-                      <span className="inline-flex items-center gap-1">
-                        <Eye className="w-3.5 h-3.5" />
-                        {post.viewsCount}
-                      </span>
-                    </div>
-
-                    <Link
-                      href={`/${hotel.slug}/posts/${post.slug}`}
-                      className="block group"
-                    >
-                      <h3 className="ty-subtitle font-semibold leading-snug group-hover:underline line-clamp-2">
-                        {post.titleTh}
-                      </h3>
-                    </Link>
-
-                    <p className="ty-caption line-clamp-2">{post.excerptTh}</p>
-                  </div>
+                  <p className="ty-caption line-clamp-2">{post.excerptTh}</p>
                 </div>
 
-                <div className="px-4 pb-4 pt-2.5 border-t border-[var(--color-border-subtle)] flex items-center justify-between gap-2">
+                <div className="pt-0.5 flex items-center justify-between gap-2">
                   {post.roomCode ? (
                     <span className="px-2.5 py-1 rounded-[8px] bg-[var(--color-background-muted)] text-[12px] font-semibold text-[var(--color-text-primary)]">
                       ห้อง {post.roomCode} · ฿
@@ -2520,7 +2923,7 @@ export function HotelStorefrontClient({
         </section>
       )}
 
-      {/* 4E. THINGS TO KNOW / POLICIES & FAQS (#section-policies — Airbnb 3-Column Grid) */}
+      {/* 4E. THINGS TO KNOW / POLICIES & FAQS (#section-policies — Mobile Tappable Rows + Bottom Sheets / Desktop 3-Column) */}
       <section
         id="section-policies"
         className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
@@ -2529,7 +2932,71 @@ export function HotelStorefrontClient({
           {language === "th" ? "ข้อควรรู้ก่อนเข้าพัก" : "Things to know"}
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        {/* Mobile/Tablet (< md): Airbnb-Style Compact Tappable Rows -> Bottom Sheet */}
+        <div className="md:hidden divide-y divide-[var(--color-border)] -my-2">
+          <button
+            type="button"
+            onClick={() => setActiveInfoSheet("rules")}
+            className="w-full py-4 flex items-center justify-between gap-4 text-left cursor-pointer"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th" ? "กฎและเวลาเข้าพัก" : "House rules"}
+              </p>
+              <p className="text-[13.5px] text-[var(--color-text-secondary)] truncate">
+                {language === "th"
+                  ? `เช็กอินหลัง ${hotel.checkInTime} น. · เช็กเอาต์ก่อน ${hotel.checkOutTime} น.`
+                  : `Check-in after ${hotel.checkInTime} · Checkout before ${hotel.checkOutTime}`}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveInfoSheet("contact")}
+            className="w-full py-4 flex items-center justify-between gap-4 text-left cursor-pointer"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th"
+                  ? "การจองตรง & ช่องทางติดต่อ"
+                  : "Direct booking & contact"}
+              </p>
+              <p className="text-[13.5px] text-[var(--color-text-secondary)] truncate">
+                {language === "th"
+                  ? "ล็อคห้องพัก 15 นาที · โอนตรงเข้าบัญชีที่พัก 0% GP"
+                  : "15-min room hold · Direct 0% GP PromptPay"}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveInfoSheet("faqs")}
+            className="w-full py-4 flex items-center justify-between gap-4 text-left cursor-pointer"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th" ? "คำถามที่พบบ่อย" : "Common questions"}
+              </p>
+              <p className="text-[13.5px] text-[var(--color-text-secondary)] truncate">
+                {hotel.faqs.length > 0
+                  ? language === "th"
+                    ? `${hotel.faqs.length} คำถามควรรู้ก่อนเข้าพัก`
+                    : `${hotel.faqs.length} FAQs before your stay`
+                  : language === "th"
+                  ? "สอบถามข้อมูลเพิ่มเติมกับเจ้าของที่พัก"
+                  : "Message the host directly for details"}
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
+          </button>
+        </div>
+
+        {/* Desktop (>= md): Airbnb 3-Column Layout + Bottom Sheet Triggers */}
+        <div className="hidden md:grid md:grid-cols-3 gap-8 items-start">
           {/* Col 1: House Rules */}
           <div className="space-y-2.5 ty-body">
             <h3 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
@@ -2545,11 +3012,19 @@ export function HotelStorefrontClient({
                 ? `เช็กเอาต์ก่อน ${hotel.checkOutTime} น.`
                 : `Checkout before ${hotel.checkOutTime}`}
             </p>
-            <p className="text-[var(--color-text-secondary)]">
+            <p className="text-[var(--color-text-secondary)] line-clamp-2">
               {hotel.petsAllowed
                 ? hotel.petPolicyTh || "ต้อนรับสัตว์เลี้ยงเข้าพักได้"
                 : hotel.petPolicyTh || "งดนำสัตว์เลี้ยงเข้าพัก"}
             </p>
+            <button
+              type="button"
+              onClick={() => setActiveInfoSheet("rules")}
+              className="text-[14px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 pt-1 hover:opacity-80"
+            >
+              <span>{language === "th" ? "ดูรายละเอียด" : "Show more"}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Col 2: Direct Booking & Contact Channels */}
@@ -2596,6 +3071,14 @@ export function HotelStorefrontClient({
                 </button>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => setActiveInfoSheet("contact")}
+              className="text-[14px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 pt-1 hover:opacity-80"
+            >
+              <span>{language === "th" ? "ดูรายละเอียด" : "Show more"}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Col 3: FAQs */}
@@ -2611,7 +3094,7 @@ export function HotelStorefrontClient({
               </p>
             ) : (
               <div className="divide-y divide-[var(--color-border-subtle)]">
-                {hotel.faqs.map((faq, idx) => (
+                {hotel.faqs.slice(0, 3).map((faq, idx) => (
                   <div key={idx} className="py-2 first:pt-0">
                     <button
                       type="button"
@@ -2636,22 +3119,549 @@ export function HotelStorefrontClient({
                 ))}
               </div>
             )}
+            {hotel.faqs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveInfoSheet("faqs")}
+                className="text-[14px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 pt-1 hover:opacity-80"
+              >
+                <span>
+                  {language === "th"
+                    ? `ดูทั้งหมด (${hotel.faqs.length})`
+                    : "Show more"}
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 1-Screen Room Details Drawer */}
+      {/* Slide-Up Bottom Sheet Modals (Description / Amenities / Reviews / Rules / Contact / FAQs) */}
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "description"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={language === "th" ? "เกี่ยวกับที่พัก" : "About this space"}
+      >
+        <div className="space-y-5">
+          {(hotel.taglineTh || hotel.taglineEn) &&
+            fullBio !== hotel.taglineTh && (
+              <p className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th" ? hotel.taglineTh : hotel.taglineEn}
+              </p>
+            )}
+          <p className="text-[15.5px] leading-[1.7] text-[var(--color-text-primary)] whitespace-pre-line">
+            {fullBio}
+          </p>
+          {hotel.highlights.length > 0 && (
+            <div className="pt-4 border-t border-[var(--color-border)] space-y-4">
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th" ? "จุดเด่นของที่พัก" : "Property highlights"}
+              </p>
+              {hotel.highlights.map((hl, idx) => {
+                const meta = getFacilityIconMeta(hl.titleTh);
+                const HlIcon = meta.Icon;
+                return (
+                  <div key={idx} className="flex items-start gap-3.5">
+                    <HlIcon className="w-5 h-5 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                        {hl.titleTh}
+                      </p>
+                      <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                        {hl.descTh}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </HotelInfoBottomSheet>
+
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "amenities"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={
+          language === "th"
+            ? `สิ่งอำนวยความสะดวก (${allUniqueAmenities.length})`
+            : `What this place offers (${allUniqueAmenities.length})`
+        }
+      >
+        <div className="divide-y divide-[var(--color-border-subtle)] -my-2">
+          {allUniqueAmenities.map((item) => {
+            const meta = getFacilityIconMeta(item);
+            const Icon = meta.Icon;
+            return (
+              <div key={item} className="py-3.5 flex items-center gap-3.5">
+                <Icon className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
+                <span className="text-[15px] text-[var(--color-text-primary)]">
+                  {item}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </HotelInfoBottomSheet>
+
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "reviews"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={`★ ${hotel.ratingAvg.toFixed(1)} · ${
+          language === "th"
+            ? `${reviews.length} รีวิวจากผู้เข้าพักจริง`
+            : `${reviews.length} reviews`
+        }`}
+      >
+        <div className="divide-y divide-[var(--color-border)] -my-4">
+          {reviews.map((rv) => (
+            <article key={rv.id} className="py-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] inline-flex items-center justify-center font-semibold text-[14px] text-[var(--color-text-primary)] shrink-0">
+                  {rv.authorName[0]}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
+                    {rv.authorName}
+                  </p>
+                  <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                    {rv.roomCode ? `ห้อง ${rv.roomCode} · ` : ""}
+                    {formatShortDate(rv.createdAt, language)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 text-[var(--color-text-primary)]">
+                {Array.from({ length: Math.max(1, Math.min(5, rv.rating)) }).map(
+                  (_, idx) => (
+                    <Star key={idx} className="w-3 h-3 fill-current" />
+                  )
+                )}
+              </div>
+
+              <p className="text-[15px] leading-[1.65] text-[var(--color-text-primary)]">
+                {rv.commentTh}
+              </p>
+
+              {rv.ownerReplyTh && (
+                <div className="rounded-[12px] bg-[var(--color-background-muted)] px-3.5 py-3 space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
+                    <span className="font-semibold text-[var(--color-text-primary)]">
+                      {language === "th"
+                        ? `ตอบกลับจาก ${hotel.nameTh}`
+                        : `Response from ${hotel.nameEn}`}
+                    </span>
+                    {rv.ownerRepliedAt && (
+                      <span className="text-[var(--color-text-secondary)]">
+                        {formatShortDate(rv.ownerRepliedAt, language)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[13.5px] leading-[1.6] text-[var(--color-text-secondary)]">
+                    {rv.ownerReplyTh}
+                  </p>
+                </div>
+              )}
+
+              {rv.photoUrls.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pt-1">
+                  {rv.photoUrls.map((u, idx) => (
+                    <img
+                      key={idx}
+                      src={getOptimizedPinImageUrl(u, "thumb")}
+                      srcSet={getOptimizedPinImageSrcSet(u, "thumb")}
+                      sizes="112px"
+                      alt="Guest photo"
+                      loading="lazy"
+                      decoding="async"
+                      onClick={() =>
+                        setFullscreenMedia({
+                          slides: rv.photoUrls.map((url) => ({
+                            type: "image",
+                            url,
+                          })),
+                          index: idx,
+                        })
+                      }
+                      className="h-20 w-28 rounded-[10px] object-cover cursor-pointer shrink-0 hover:brightness-95 transition"
+                    />
+                  ))}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      </HotelInfoBottomSheet>
+
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "rules"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={language === "th" ? "กฎและเวลาเข้าพัก" : "House rules"}
+      >
+        <div className="divide-y divide-[var(--color-border-subtle)] -my-2">
+          <div className="py-3.5 flex items-start gap-3.5">
+            <Clock className="w-5 h-5 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th"
+                  ? `เช็กอินหลัง ${hotel.checkInTime} น.`
+                  : `Check-in after ${hotel.checkInTime}`}
+              </p>
+              <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                {language === "th"
+                  ? `เช็กเอาต์ก่อน ${hotel.checkOutTime} น.`
+                  : `Checkout before ${hotel.checkOutTime}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="py-3.5 flex items-start gap-3.5">
+            <ShieldCheck className="w-5 h-5 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                {language === "th" ? "นโยบายสัตว์เลี้ยง" : "Pet policy"}
+              </p>
+              <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                {hotel.petsAllowed
+                  ? hotel.petPolicyTh || "ต้อนรับสัตว์เลี้ยงเข้าพักได้"
+                  : hotel.petPolicyTh || "งดนำสัตว์เลี้ยงเข้าพัก"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </HotelInfoBottomSheet>
+
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "contact"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={
+          language === "th"
+            ? "การจองตรง & ช่องทางติดต่อ"
+            : "Direct booking & contact"
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
+            {language === "th"
+              ? "จองตรงกับที่พัก ล็อคห้องพักอัตโนมัติ 15 นาที เพื่อสแกนจ่าย PromptPay เข้าบัญชีเจ้าของที่พักโดยตรง (ค่าธรรมเนียมแพลตฟอร์ม 0% GP)"
+              : "Book directly with the property. Rooms are held for 15 minutes for direct PromptPay settlement with 0% platform GP."}
+          </p>
+
+          <div className="space-y-2">
+            {hotel.contactLine && (
+              <button
+                type="button"
+                onClick={() => handleContactClick("LINE")}
+                className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-between cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>LINE OA: {hotel.contactLine}</span>
+                </span>
+                <ExternalLink className="w-4 h-4 text-[var(--color-text-secondary)]" />
+              </button>
+            )}
+
+            {hotel.facebookPageUrl && (
+              <button
+                type="button"
+                onClick={() => handleContactClick("FACEBOOK_MESSENGER")}
+                className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-between cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Facebook Page</span>
+                </span>
+                <ExternalLink className="w-4 h-4 text-[var(--color-text-secondary)]" />
+              </button>
+            )}
+
+            {hotel.contactPhone && (
+              <button
+                type="button"
+                onClick={() => handleContactClick("PHONE")}
+                className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-between cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <Phone className="w-4 h-4" />
+                  <span>{hotel.contactPhone}</span>
+                </span>
+                <ExternalLink className="w-4 h-4 text-[var(--color-text-secondary)]" />
+              </button>
+            )}
+          </div>
+        </div>
+      </HotelInfoBottomSheet>
+
+      <HotelInfoBottomSheet
+        isOpen={activeInfoSheet === "faqs"}
+        onClose={() => setActiveInfoSheet(null)}
+        title={language === "th" ? "คำถามที่พบบ่อย" : "Common questions"}
+      >
+        {hotel.faqs.length === 0 ? (
+          <p className="text-[15px] text-[var(--color-text-secondary)]">
+            {language === "th"
+              ? "ทักสอบถามรายละเอียดเพิ่มเติมกับเจ้าของที่พักได้โดยตรงผ่าน LINE หรือโทรศัพท์"
+              : "Message the host directly for special requests or questions."}
+          </p>
+        ) : (
+          <div className="divide-y divide-[var(--color-border-subtle)] -my-3">
+            {hotel.faqs.map((faq, idx) => (
+              <div key={idx} className="py-4 space-y-1.5">
+                <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                  {faq.qTh}
+                </p>
+                <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
+                  {faq.aTh}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </HotelInfoBottomSheet>
+
+      {/* Airbnb Sticky Mobile/Tablet Booking Footer (BOOK_IT_FLOATING_FOOTER, < lg) */}
+      {rooms.length > 0 && !activePin && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-background-card)]/95 backdrop-blur-md border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <div className="max-w-[680px] mx-auto flex items-center justify-between gap-3">
+            {/* Left summary (tapping opens Mobile Vertical Month Sheet) */}
+            <button
+              type="button"
+              onClick={() =>
+                openDatePicker(
+                  "checkin",
+                  !isMultiRoomHotel ? singleUnitRoom?.id ?? null : null
+                )
+              }
+              className="min-w-0 text-left cursor-pointer"
+            >
+              {isMultiRoomHotel ? (
+                <>
+                  <div className="flex items-baseline gap-1.5">
+                    {!hasConfirmedDates ? (
+                      <>
+                        <span className="text-[12.5px] text-[var(--color-text-secondary)]">
+                          {language === "th" ? "เริ่มต้น" : "From"}
+                        </span>
+                        <span className="text-[17px] font-semibold text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-2 tabular-nums">
+                          ฿{minRoomPrice.toLocaleString()}
+                        </span>
+                      </>
+                    ) : cheapestAvailableRoomPricing ? (
+                      <>
+                        <span className="text-[12.5px] text-[var(--color-text-secondary)]">
+                          {language === "th" ? "เริ่มต้น" : "From"}
+                        </span>
+                        <span className="text-[17px] font-semibold text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-2 tabular-nums">
+                          ฿
+                          {cheapestAvailableRoomPricing.subtotalThb.toLocaleString()}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                        {language === "th" ? "เต็มช่วงนี้" : "Sold out"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-[var(--color-text-secondary)] truncate mt-0.5">
+                    {hasConfirmedDates && stayMinNightsInfo.isBlocked
+                      ? language === "th"
+                        ? `ช่วงนี้เข้าพักขั้นต่ำ ${stayMinNightsInfo.requiredMinNights} คืน`
+                        : `Min. ${stayMinNightsInfo.requiredMinNights} nights required`
+                      : hasConfirmedDates
+                      ? `${
+                          language === "th"
+                            ? `สำหรับ ${stayNights} คืน`
+                            : `for ${stayNights} ${
+                                stayNights === 1 ? "night" : "nights"
+                              }`
+                        } · ${formatShortDate(
+                          checkIn,
+                          language
+                        )} – ${formatShortDate(checkOut, language)}`
+                      : language === "th"
+                      ? "ต่อคืน · แตะเพื่อเลือกวันเข้าพัก"
+                      : "per night · Tap to pick dates"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[17px] font-semibold text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-2 tabular-nums">
+                      ฿
+                      {(hasConfirmedDates && stickyPricing
+                        ? stickyPricing.netTotalThb
+                        : singleUnitRoom?.weekdayPriceThb ?? minRoomPrice
+                      ).toLocaleString()}
+                    </span>
+                    <span className="text-[12.5px] text-[var(--color-text-secondary)] truncate">
+                      {hasConfirmedDates
+                        ? language === "th"
+                          ? `สำหรับ ${stayNights} คืน`
+                          : `for ${stayNights} ${
+                              stayNights === 1 ? "night" : "nights"
+                            }`
+                        : `/ ${language === "th" ? "คืน" : "night"}`}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-[var(--color-text-secondary)] truncate mt-0.5">
+                    {hasConfirmedDates && stayMinNightsInfo.isBlocked
+                      ? language === "th"
+                        ? `ช่วงนี้เข้าพักขั้นต่ำ ${stayMinNightsInfo.requiredMinNights} คืน`
+                        : `Min. ${stayMinNightsInfo.requiredMinNights} nights required`
+                      : hasConfirmedDates
+                      ? `${formatShortDate(
+                          checkIn,
+                          language
+                        )} – ${formatShortDate(checkOut, language)}`
+                      : language === "th"
+                      ? "แตะเพื่อเลือกวันเข้าพัก"
+                      : "Tap to add dates"}
+                  </p>
+                </>
+              )}
+            </button>
+
+            {/* Right Primary CTA (Auto-Adjusted State Machine) */}
+            {!hasConfirmedDates ? (
+              <button
+                type="button"
+                onClick={() =>
+                  openDatePicker(
+                    "checkin",
+                    !isMultiRoomHotel ? singleUnitRoom?.id ?? null : null
+                  )
+                }
+                className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold shrink-0 cursor-pointer transition-colors"
+              >
+                {language === "th" ? "เช็กวันว่าง" : "Check availability"}
+              </button>
+            ) : stayMinNightsInfo.isBlocked ? (
+              <button
+                type="button"
+                onClick={() =>
+                  handleCommitStayDates(
+                    checkIn,
+                    addDaysToDate(checkIn, stayMinNightsInfo.requiredMinNights)
+                  )
+                }
+                className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold shrink-0 cursor-pointer transition-colors"
+              >
+                {language === "th"
+                  ? `ปรับเป็น ${stayMinNightsInfo.requiredMinNights} คืน`
+                  : `${stayMinNightsInfo.requiredMinNights} nights min`}
+              </button>
+            ) : isMultiRoomHotel ? (
+              matchingAvailableRooms.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setIsChooseRoomSheetOpen(true)}
+                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold shrink-0 cursor-pointer transition-colors"
+                >
+                  {language === "th" ? "เลือกห้องพัก" : "Choose room"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openDatePicker("checkin")}
+                  className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold shrink-0 cursor-pointer transition-colors"
+                >
+                  {language === "th" ? "เปลี่ยนวัน" : "Change dates"}
+                </button>
+              )
+            ) : singleUnitRoom &&
+              singleUnitRoom.availableUnits > 0 &&
+              singleUnitRoom.maxGuests >= guests ? (
+              <button
+                type="button"
+                onClick={() => navigateToCheckout(singleUnitRoom)}
+                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold shrink-0 cursor-pointer transition-colors"
+              >
+                {language === "th" ? "จองที่พักนี้" : "Reserve"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  openDatePicker("checkin", singleUnitRoom?.id ?? null)
+                }
+                className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold shrink-0 cursor-pointer transition-colors"
+              >
+                {language === "th" ? "เปลี่ยนวัน" : "Check dates"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Vertical Multi-Month Date Picker Sheet with "Load more dates" (Airbnb Screenshot 4) */}
+      <MobileDateRangeSheet
+        isOpen={isMobileDateSheetOpen}
+        onClose={() => setIsMobileDateSheetOpen(false)}
+        language={language}
+        todayDate={today}
+        initialCheckIn={checkIn}
+        initialCheckOut={checkOut}
+        hasConfirmedDates={hasConfirmedDates}
+        guests={guests}
+        rooms={rooms}
+        bookedUnitsByRoomDate={bookedUnitsByRoomDate}
+        dateOverrides={dateOverrides}
+        minPriceThb={minRoomPrice}
+        ratingAvg={hotel.ratingAvg}
+        specificRoomId={
+          !isMultiRoomHotel ? singleUnitRoom?.id ?? null : datePickerScopeRoomId
+        }
+        onSaveDates={handleCommitStayDates}
+        onClearDates={handleClearStayDates}
+      />
+
+      {/* Multi-Room Hotel "Choose your room" Slide-Up Bottom Sheet / Desktop Modal (Airbnb Screenshot 6) */}
+      {isMultiRoomHotel && (
+        <ChooseRoomBottomSheet
+          isOpen={isChooseRoomSheetOpen}
+          onClose={() => setIsChooseRoomSheetOpen(false)}
+          language={language}
+          checkInDate={checkIn}
+          checkOutDate={checkOut}
+          guests={guests}
+          availableRooms={matchingAvailableRooms}
+          dateOverrides={dateOverrides}
+          coupons={coupons}
+          discountRules={discountRules}
+          initialCouponCode={initialCouponCode}
+          fallbackCoverUrl={coverBannerUrl}
+          initialSelectedRoomId={selectedRoomId}
+          onInspectRoom={(rm) => {
+            setSelectedRoomId(rm.id);
+            openRoomDetailsDrawer(rm);
+          }}
+          onOpenDatePicker={() => openDatePicker("checkin")}
+          onConfirmRoom={(rm) => navigateToCheckout(rm)}
+        />
+      )}
+
+      {/* Airbnb-Grade Centered Split Room Modal (Desktop Left Switcher Rail / Mobile Bottom Sheet) */}
       <RoomBookingDrawer
         isOpen={isBookingDrawerOpen}
         onClose={() => setIsBookingDrawerOpen(false)}
         hotel={hotel}
+        rooms={rooms}
         selectedRoom={drawerRoom || rooms[0] || null}
+        onSelectRoom={(rm) => {
+          setDrawerRoom(rm);
+          setSelectedRoomId(rm.id);
+        }}
         dateOverrides={dateOverrides}
         coupons={coupons}
+        discountRules={discountRules}
         language={language}
         checkInDate={checkIn}
         checkOutDate={checkOut}
         guests={guests}
+        hasConfirmedDates={hasConfirmedDates}
+        fallbackCoverUrl={coverBannerUrl}
         onExpandPhotos={(urls, idx) =>
           setFullscreenMedia({
             slides: urls.map((u) => ({ type: "image", url: u })),
@@ -2660,19 +3670,51 @@ export function HotelStorefrontClient({
         }
         onProceedToCheckout={(rm) => {
           setIsBookingDrawerOpen(false);
+          setIsChooseRoomSheetOpen(false);
           navigateToCheckout(rm);
         }}
         onCheckRoomDates={(rm) => {
           setSelectedRoomId(rm.id);
           setCalendarRoomFilterId(rm.id);
-          scrollToCalendarSection();
+          if (!isMultiRoomHotel && isDesktopViewport) {
+            scrollToCalendarSection();
+          } else {
+            openDatePicker("checkin", isMultiRoomHotel ? null : rm.id);
+          }
         }}
+        onAutoExtendMinNights={(minNights) =>
+          handleCommitStayDates(checkIn, addDaysToDate(checkIn, minNights))
+        }
       />
 
       <PureMediaViewer
         slides={fullscreenMedia?.slides ?? null}
         initialIndex={fullscreenMedia?.index ?? 0}
         onClose={() => setFullscreenMedia(null)}
+      />
+
+      <ShareStayModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        language={language}
+        shareUrl={
+          typeof window !== "undefined"
+            ? `${window.location.origin}/${encodeURIComponent(hotel.slug)}`
+            : `/${encodeURIComponent(hotel.slug)}`
+        }
+        title={language === "th" ? hotel.nameTh : hotel.nameEn}
+        subtitle={[
+          language === "th" ? hotel.provinceNameTh : hotel.provinceNameEn,
+          hotel.ratingAvg > 0 ? `★ ${hotel.ratingAvg.toFixed(1)}` : null,
+          minRoomPrice > 0
+            ? language === "th"
+              ? `เริ่มต้น ฿${minRoomPrice.toLocaleString()}/คืน`
+              : `from ฿${minRoomPrice.toLocaleString()}/night`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        imageUrl={getOptimizedPinImageUrl(coverBannerUrl, "card")}
       />
     </div>
   );

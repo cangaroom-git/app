@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeftRight,
   Bookmark,
   Building2,
   CalendarCheck,
@@ -100,6 +101,8 @@ export function PrimaryNavigation({
 
   const shouldHideMobileBottomNav =
     isMobileNavHidden && !isMobileProfileDrawerOpen && !isFloatingSearchOpen;
+  const isHotelBookingFlowPage =
+    activeTab === "hotel" && !pathname.includes("/posts");
   const [isBottomNavRendered, setIsBottomNavRendered] = useState(
     !shouldHideMobileBottomNav
   );
@@ -451,9 +454,7 @@ export function PrimaryNavigation({
           <Link
             href="/board"
             title={
-              language === "th"
-                ? `บอร์ดที่บันทึกไว้${savedPinsCount > 0 ? ` (${savedPinsCount})` : ""}`
-                : `Saved Boards${savedPinsCount > 0 ? ` (${savedPinsCount})` : ""}`
+              language === "th" ? "บอร์ดที่บันทึกไว้" : "Saved Boards"
             }
             aria-label="Saved Boards"
             className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors relative ${
@@ -461,11 +462,6 @@ export function PrimaryNavigation({
             }`}
           >
             <PlatformNavIcon id="board" isActive={activeTab === "board"} />
-            {savedPinsCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-[6px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[10px] font-bold inline-flex items-center justify-center leading-none">
-                {savedPinsCount > 99 ? "99+" : savedPinsCount}
-              </span>
-            )}
           </Link>
         </nav>
 
@@ -852,8 +848,30 @@ export function PrimaryNavigation({
 
         {/* DESKTOP RIGHT ACTIONS (>= lg) */}
         <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+          {hasStudioAccess ? (
+            <Link
+              href="/studio"
+              className="h-10 px-3.5 rounded-[12px] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 transition-colors relative whitespace-nowrap"
+            >
+              <span>
+                {language === "th" ? "โหมดเจ้าของที่พัก" : "Switch to hosting"}
+              </span>
+              {pendingStudioBookings > 0 && (
+                <span className="h-2 w-2 rounded-full bg-[var(--color-promo)] shrink-0" />
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/register-hotel"
+              className="h-10 px-3.5 rounded-[12px] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors whitespace-nowrap"
+            >
+              {language === "th" ? "ลงที่พักฟรี 0% GP" : "List your stay"}
+            </Link>
+          )}
+
           <button
             type="button"
+            data-coupon-wallet-target="true"
             onClick={onOpenCouponWallet}
             aria-label={
               language === "th" ? "กระเป๋าคูปองส่วนลด" : "Saved Coupons"
@@ -1092,14 +1110,20 @@ export function PrimaryNavigation({
                 <Link
                   href="/studio"
                   onClick={() => setIsMobileProfileDrawerOpen(false)}
-                  className="w-full h-11 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between ty-body font-medium"
+                  className="w-full h-11 px-3.5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] flex items-center justify-between text-[14px] font-semibold mb-1.5 transition-colors"
                 >
-                  <span className="flex items-center gap-3">
-                    <LayoutDashboard className="w-5 h-5 text-[var(--color-text-secondary)]" />
-                    <span>Hotel Studio</span>
+                  <span className="flex items-center gap-2.5">
+                    <ArrowLeftRight className="w-4 h-4 shrink-0" />
+                    <span>
+                      {language === "th"
+                        ? "สลับเป็นโหมดเจ้าของที่พัก"
+                        : "Switch to hosting"}
+                    </span>
                   </span>
                   {pendingStudioBookings > 0 && (
-                    <span className="badge-promo">{pendingStudioBookings}</span>
+                    <span className="px-1.5 py-0.5 rounded-[6px] bg-[var(--color-promo)] !text-white text-[11px] font-bold">
+                      {pendingStudioBookings}
+                    </span>
                   )}
                 </Link>
               )}
@@ -1206,6 +1230,7 @@ export function PrimaryNavigation({
       <nav
         aria-label="Mobile bottom navigation"
         aria-hidden={shouldHideMobileBottomNav}
+        data-hide-on-hotel={isHotelBookingFlowPage ? "true" : undefined}
         className={`fixed inset-x-3 sm:inset-x-6 max-w-fit mx-auto z-[70] lg:hidden pointer-events-none bg-transparent flex items-center justify-center select-none transition-all duration-300 ease-in-out ${
           shouldHideMobileBottomNav
             ? "translate-y-2 opacity-0"
@@ -1260,6 +1285,7 @@ export function PrimaryNavigation({
               <Link
                 key={tab.id}
                 href={tab.href || "/"}
+                data-coupon-wallet-target={tab.id === "deal" ? "true" : undefined}
                 aria-label={tab.labelEn}
                 onClick={() => {
                   setIsFloatingSearchOpen(false);
@@ -1285,11 +1311,6 @@ export function PrimaryNavigation({
                 />
                 {tab.id === "deal" && savedCouponsCount > 0 && (
                   <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
-                )}
-                {tab.id === "board" && savedPinsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-[5px] bg-[var(--color-promo)] text-[var(--color-on-promo)] text-[9px] font-bold inline-flex items-center justify-center leading-none">
-                    {savedPinsCount > 9 ? "9+" : savedPinsCount}
-                  </span>
                 )}
               </Link>
             );

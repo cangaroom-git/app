@@ -113,13 +113,37 @@ export default async function HotelStorefrontPage({
       ? "rooms"
       : "posts";
 
+  const photoObjects = rooms.flatMap((r) =>
+    (r.galleryMeta && r.galleryMeta.length > 0
+      ? r.galleryMeta
+      : r.galleryUrls.map((url) => ({
+          url,
+          space: "additional" as const,
+          captionTh: undefined,
+        }))
+    ).map((photo) => ({
+      "@type": "ImageObject",
+      url: photo.url,
+      name: `${hotel.nameTh} — ${r.nameTh}`,
+      ...(photo.captionTh ? { caption: photo.captionTh, description: photo.captionTh } : {}),
+    }))
+  );
+
   const lodgingJsonLd = {
     "@context": "https://schema.org",
     "@type": "LodgingBusiness",
     name: hotel.nameTh,
     alternateName: hotel.nameEn,
     description: hotel.descriptionTh || hotel.taglineTh,
-    image: hotel.coverImageUrl || hotel.logoUrl,
+    image:
+      photoObjects.length > 0
+        ? [
+            ...(hotel.coverImageUrl
+              ? [{ "@type": "ImageObject", url: hotel.coverImageUrl, name: hotel.nameTh }]
+              : []),
+            ...photoObjects.slice(0, 20),
+          ]
+        : hotel.coverImageUrl || hotel.logoUrl,
     telephone: hotel.contactPhone,
     checkinTime: hotel.checkInTime,
     checkoutTime: hotel.checkOutTime,
@@ -164,6 +188,7 @@ export default async function HotelStorefrontPage({
       "@type": "Offer",
       name: r.nameTh,
       description: r.shortDescTh,
+      ...(r.galleryUrls.length > 0 ? { image: r.galleryUrls.slice(0, 8) } : {}),
       price: r.weekdayPriceThb,
       priceCurrency: "THB",
       availability:

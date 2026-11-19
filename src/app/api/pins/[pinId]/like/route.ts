@@ -3,7 +3,7 @@ import { getServerSessionUser } from "@/lib/auth/session";
 import { togglePinLike } from "@/lib/services/pinEngagementService";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ pinId: string }> }
 ) {
   try {
@@ -16,7 +16,17 @@ export async function POST(
     }
 
     const { pinId } = await context.params;
-    const result = await togglePinLike(sessionUser.id, pinId);
+    let desiredLiked: boolean | undefined;
+    try {
+      const body = (await request.json()) as { desiredLiked?: unknown };
+      if (typeof body?.desiredLiked === "boolean") {
+        desiredLiked = body.desiredLiked;
+      }
+    } catch {
+      // empty body -> fallback toggle
+    }
+
+    const result = await togglePinLike(sessionUser.id, pinId, desiredLiked);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[POST /api/pins/[pinId]/like]", err);

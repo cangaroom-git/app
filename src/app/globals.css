@@ -43,6 +43,7 @@
   /* Zero Card Shadow Rule (Popover shadow allowed strictly on floating menus) */
   --shadow-card: none;
   --shadow-popover: 0 6px 20px 0 rgba(0, 0, 0, 0.14);
+  --shadow-booking-widget: 0 6px 16px rgba(0, 0, 0, 0.12);
 
   /* Warm Charcoal Ink Tokens (Airbnb --palette-hof & --palette-foggy) */
   --color-text-primary: #222222;
@@ -147,6 +148,7 @@ html.dark {
 
   --shadow-card: none;
   --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.55);
+  --shadow-booking-widget: 0 12px 28px rgba(0, 0, 0, 0.5);
 
   --color-text-primary: #f5f5f5;
   --color-text-secondary: #a8a8a8;
@@ -920,6 +922,157 @@ html.dark .border-stone-300 {
   .cgr-flip-card {
     transition-duration: 0ms;
   }
+  .animate-ticket-sheen,
+  .animate-check-draw,
+  .animate-stamp-pop,
+  .cgr-wallet-bump,
+  .animate-coupon-sheen-loop,
+  .animate-sparkle-1,
+  .animate-sparkle-2,
+  .animate-ticket-attention {
+    animation: none !important;
+  }
+}
+
+/* ============================================================================
+   COUPON CLAIM SATISFYING MICRO-INTERACTIONS (Warm Minimal Monochrome)
+   ============================================================================ */
+@keyframes cgrTicketSheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.animate-ticket-sheen {
+  animation: cgrTicketSheen 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes cgrCheckDraw {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: cgrCheckDraw 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes cgrStampPop {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.65;
+  }
+  55% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-stamp-pop {
+  animation: cgrStampPop 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes cgrWalletBump {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-4px);
+  }
+  70% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.cgr-wallet-bump {
+  animation: cgrWalletBump 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cgrCouponPeriodicSheen {
+  0%,
+  55% {
+    transform: translateX(-140%) skewX(-20deg);
+    opacity: 0;
+  }
+  65% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    transform: translateX(260%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+.animate-coupon-sheen-loop {
+  animation: cgrCouponPeriodicSheen 2.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes cgrSparkleTwinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.75);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+.animate-sparkle-1 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cgrSparkleTwinkle 1.8s ease-in-out infinite;
+}
+
+.animate-sparkle-2 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cgrSparkleTwinkle 1.8s ease-in-out 0.9s infinite;
+}
+
+@keyframes cgrTicketAttention {
+  0%,
+  76%,
+  100% {
+    transform: rotate(0deg);
+  }
+  82% {
+    transform: rotate(-8deg);
+  }
+  88% {
+    transform: rotate(8deg);
+  }
+  94% {
+    transform: rotate(-4deg);
+  }
+}
+
+.animate-ticket-attention {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cgrTicketAttention 3.2s ease-in-out infinite;
 }
 
 /* ============================================================================
@@ -937,5 +1090,255 @@ html.dark .border-stone-300 {
   html[data-mobile-pin-open="true"] div[data-cgr-app-inner="true"] {
     padding-inline: 0 !important;
     padding-top: 0 !important;
+  }
+  html:not([data-mobile-pin-open="true"]) nav[data-hide-on-hotel="true"] {
+    display: none !important;
+  }
+  html[data-hotel-anchor-pinned="true"] header[aria-label="Top navigation bar"],
+  html[data-home-tabs-pinned="true"] header[aria-label="Top navigation bar"] {
+    transform: translateY(-100%) !important;
+  }
+}
+
+.maplibregl-map {
+  font-family: var(--font-family-body) !important;
+}
+
+.maplibregl-canvas:focus {
+  outline: none !important;
+}
+
+/* ============================================================================
+   AIRBNB HOSTING SIDE PANEL SMOOTH SLIDE + FADE DRILL-DOWN TRANSITIONS
+   Calibrated to Airbnb Hosting pacing (simultaneous micro-slide + cross-fade)
+   and Photo Tour shared-element glide (`document.startViewTransition`).
+   ============================================================================ */
+@keyframes cgrStudioPanelForward {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cgrStudioPanelBack {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-studio-panel-forward {
+  animation: cgrStudioPanelForward 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-studio-panel-back {
+  animation: cgrStudioPanelBack 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cgrVtFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cgrVtFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cgrVtSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cgrVtSlideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+
+@keyframes cgrVtSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cgrVtSlideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+@keyframes cgrVtSwapIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cgrVtSwapOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+/* Keep sticky nav & surrounding shell 100% live and interactive during Studio transitions */
+html[data-studio-vt]::view-transition {
+  pointer-events: none;
+}
+
+html[data-studio-vt]::view-transition-old(root) {
+  display: none;
+}
+
+html[data-studio-vt]::view-transition-new(root) {
+  animation: none;
+}
+
+/* Lock pane geometry so horizontal slide + fade NEVER tilts or stretches vertically */
+html[data-studio-vt]::view-transition-group(cgr-studio-pane) {
+  animation: none;
+  overflow: clip;
+}
+
+html[data-studio-vt]::view-transition-old(cgr-studio-pane),
+html[data-studio-vt]::view-transition-new(cgr-studio-pane) {
+  height: auto;
+  width: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+
+/* Forward drill-down (e.g. Space Grid -> Photo Detail) */
+html[data-studio-vt="forward"]::view-transition-old(cgr-studio-pane) {
+  animation: cgrVtSlideOutLeft 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-studio-vt="forward"]::view-transition-new(cgr-studio-pane) {
+  animation: cgrVtSlideInRight 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Reverse back navigation (← button) */
+html[data-studio-vt="back"]::view-transition-old(cgr-studio-pane) {
+  animation: cgrVtSlideOutRight 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-studio-vt="back"]::view-transition-new(cgr-studio-pane) {
+  animation: cgrVtSlideInLeft 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Lateral side-menu / space rail switch (matching Airbnb Hosting silky cross-fade + micro-slide) */
+html[data-studio-vt="swap"]::view-transition-old(cgr-studio-pane) {
+  animation: cgrVtSwapOut 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-studio-vt="swap"]::view-transition-new(cgr-studio-pane) {
+  animation: cgrVtSwapIn 270ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Morph mode: fade incoming/outgoing pane cleanly while shared space cards glide across */
+html[data-studio-vt="morph"]::view-transition-old(cgr-studio-pane) {
+  animation: cgrVtFadeOut 170ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-studio-vt="morph"]::view-transition-new(cgr-studio-pane) {
+  animation: cgrVtFadeIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Photo Tour Shared-Element Glide (Overview Grid <-> Left Vertical Space Rail) */
+html[data-studio-vt]::view-transition-group(cgr-space-all),
+html[data-studio-vt]::view-transition-group(cgr-space-bedroom),
+html[data-studio-vt]::view-transition-group(cgr-space-bathroom),
+html[data-studio-vt]::view-transition-group(cgr-space-balcony),
+html[data-studio-vt]::view-transition-group(cgr-space-pool),
+html[data-studio-vt]::view-transition-group(cgr-space-living),
+html[data-studio-vt]::view-transition-group(cgr-space-exterior),
+html[data-studio-vt]::view-transition-group(cgr-space-additional),
+html[data-studio-vt]::view-transition-group(cgr-photo-active) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 40;
+}
+
+html[data-studio-vt]::view-transition-old(cgr-space-all),
+html[data-studio-vt]::view-transition-new(cgr-space-all),
+html[data-studio-vt]::view-transition-old(cgr-space-bedroom),
+html[data-studio-vt]::view-transition-new(cgr-space-bedroom),
+html[data-studio-vt]::view-transition-old(cgr-space-bathroom),
+html[data-studio-vt]::view-transition-new(cgr-space-bathroom),
+html[data-studio-vt]::view-transition-old(cgr-space-balcony),
+html[data-studio-vt]::view-transition-new(cgr-space-balcony),
+html[data-studio-vt]::view-transition-old(cgr-space-pool),
+html[data-studio-vt]::view-transition-new(cgr-space-pool),
+html[data-studio-vt]::view-transition-old(cgr-space-living),
+html[data-studio-vt]::view-transition-new(cgr-space-living),
+html[data-studio-vt]::view-transition-old(cgr-space-exterior),
+html[data-studio-vt]::view-transition-new(cgr-space-exterior),
+html[data-studio-vt]::view-transition-old(cgr-space-additional),
+html[data-studio-vt]::view-transition-new(cgr-space-additional),
+html[data-studio-vt]::view-transition-old(cgr-photo-active),
+html[data-studio-vt]::view-transition-new(cgr-photo-active) {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .animate-studio-panel-forward,
+  .animate-studio-panel-back {
+    animation-duration: 0s !important;
   }
 }

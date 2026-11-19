@@ -115,7 +115,7 @@ export function PromptPayQrCodeSvg({
 
   return (
     <div
-      className="relative inline-flex items-center justify-center rounded-[16px] bg-[#ffffff] border border-[var(--color-border)] p-2.5 shrink-0 select-none"
+      className="relative inline-flex items-center justify-center rounded-[16px] bg-[#ffffff] border border-black/[0.05] p-2.5 shrink-0 select-none"
       style={{ width: size, height: size }}
     >
       <svg

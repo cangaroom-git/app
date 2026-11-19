@@ -10,8 +10,8 @@ const CreatePinSchema = z.object({
   hotelSlug: z.string().optional(),
   roomId: z.string().trim().optional().nullable(),
   category: z.enum(["ROOMS", "VIEWS", "VIDEOS", "DINING", "REVIEWS"]),
-  titleTh: z.string().trim().min(2).max(160),
-  descriptionTh: z.string().trim().max(800).optional(),
+  titleTh: z.string().trim().max(160).optional().default(""),
+  descriptionTh: z.string().trim().max(800).optional().default(""),
   coverImageUrl: z.string().trim().min(1),
   mediaUrls: z.array(z.string().trim().min(1)).optional(),
   videoUrl: z.string().trim().optional().nullable(),
@@ -22,8 +22,10 @@ const CreatePinSchema = z.object({
 const PatchPinSchema = z.object({
   hotelSlug: z.string().optional(),
   pinId: z.string().trim().min(1),
-  publishStatus: z.enum(["PUBLISHED", "PENDING_APPROVAL", "DISCARDED"]),
+  publishStatus: z.enum(["PUBLISHED", "PENDING_APPROVAL", "DISCARDED"]).optional(),
   roomId: z.string().trim().optional().nullable(),
+  titleTh: z.string().trim().max(160).optional(),
+  descriptionTh: z.string().trim().max(800).optional(),
 });
 
 export async function POST(request: Request) {
@@ -98,9 +100,17 @@ export async function PATCH(request: Request) {
     const updated = await prisma.pin.update({
       where: { id: existing.id },
       data: {
-        publishStatus: parsed.data.publishStatus,
+        ...(parsed.data.publishStatus !== undefined
+          ? { publishStatus: parsed.data.publishStatus }
+          : {}),
         ...(parsed.data.roomId !== undefined
           ? { roomId: parsed.data.roomId || null }
+          : {}),
+        ...(parsed.data.titleTh !== undefined
+          ? { titleTh: parsed.data.titleTh }
+          : {}),
+        ...(parsed.data.descriptionTh !== undefined
+          ? { descriptionTh: parsed.data.descriptionTh }
           : {}),
       },
     });
@@ -111,6 +121,27 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
     }
     return NextResponse.json({ error: "อัปเดต Pin ไม่สำเร็จ" }, { status: 400 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get("id");
+    const hotelSlug = url.searchParams.get("hotel");
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+    const { hotel } = await requireHotelStudioAccess(hotelSlug);
+    await prisma.pin.deleteMany({
+      where: { id, hotelId: hotel.id },
+    });
+
+    return NextResponse.json({ deleted: true });
+  } catch (err) {
+    if (err instanceof StudioAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
+    return NextResponse.json({ error: "ลบ Pin ไม่สำเร็จ" }, { status: 400 });
   }
 }
 

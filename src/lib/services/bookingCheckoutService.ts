@@ -157,6 +157,10 @@ export async function createBookingHold(params: {
       where: { slug: hotelSlug.trim().toLowerCase() },
       include: {
         addons: { where: { isActive: true } },
+        discountRules: {
+          where: { isActive: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
     if (!hotel || hotel.verificationStatus === "SUSPENDED") {
@@ -233,6 +237,17 @@ export async function createBookingHold(params: {
       }
     }
 
+    // Enforce minimum-stay rule if any night in stay has a minNights restriction
+    const requiredMinNights = dateOverrides.reduce(
+      (max, o) => Math.max(max, o.minNights ?? 1),
+      1
+    );
+    if (stayDates.length < requiredMinNights) {
+      throw new Error(
+        `ช่วงวันที่เลือกกำหนดเข้าพักขั้นต่ำ ${requiredMinNights} คืน กรุณาปรับวันเช็กเอาต์`
+      );
+    }
+
     // Resolve optional coupon for THIS hotel
     let couponEntity = null;
     if (couponCode?.trim()) {
@@ -266,10 +281,23 @@ export async function createBookingHold(params: {
         dateStr: formatDateStr(o.date),
         blockedUnits: o.blockedUnits,
         overridePriceThb: o.overridePriceThb,
+        minNights: o.minNights ?? null,
         note: o.note,
       })),
       addons: hotel.addons,
       addonQuantities,
+      discountRules: hotel.discountRules.map((dr) => ({
+        id: dr.id,
+        hotelId: dr.hotelId,
+        ruleType: dr.ruleType,
+        titleTh: dr.titleTh,
+        minNights: dr.minNights,
+        minAdvanceDays: dr.minAdvanceDays,
+        maxAdvanceDays: dr.maxAdvanceDays,
+        discountType: dr.discountType,
+        discountValue: dr.discountValue,
+        isActive: dr.isActive,
+      })),
       coupon: couponEntity
         ? {
             ...couponEntity,
@@ -309,7 +337,7 @@ export async function createBookingHold(params: {
         hotelId: hotel.id,
         roomId: room.id,
         userId,
-        couponId: couponEntity?.id ?? null,
+        couponId: pricing.appliedCouponCode ? (couponEntity?.id ?? null) : null,
         checkInDate: startDateObj,
         checkOutDate: endDateObj,
         nights: pricing.nights,

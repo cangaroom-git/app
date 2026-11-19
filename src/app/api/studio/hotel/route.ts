@@ -4,18 +4,20 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
-import { formatDateStr } from "@/lib/bookingMath";
+import { addDaysToDate, formatDateStr, listDatesInRange } from "@/lib/bookingMath";
 import { prisma } from "@/lib/prisma";
 import { mapBookingRowToDto } from "@/lib/services/bookingCheckoutService";
 import { mapHotelPostToDetailDto } from "@/lib/services/hotelPostService";
-import { mapPinToDto } from "@/lib/services/pinMapper";
+import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
 
 const UpdateHotelSchema = z.object({
   hotelSlug: z.string().optional(),
   nameTh: z.string().trim().min(2).max(120).optional(),
   nameEn: z.string().trim().max(120).optional(),
   taglineTh: z.string().trim().max(240).optional(),
-  descriptionTh: z.string().trim().max(2000).optional(),
+  taglineEn: z.string().trim().max(240).optional(),
+  descriptionTh: z.string().trim().max(3000).optional(),
+  descriptionEn: z.string().trim().max(3000).optional(),
   logoUrl: z.string().trim().max(500).optional().nullable(),
   coverImageUrl: z.string().trim().max(500).optional().nullable(),
   provinceId: z.string().trim().min(2).optional(),
@@ -25,10 +27,40 @@ const UpdateHotelSchema = z.object({
   longitude: z.number().optional().nullable(),
   googleMapsUrl: z.string().trim().max(400).optional().nullable(),
   stayStyles: z.array(z.string()).optional(),
+  propertyType: z
+    .enum(["BOUTIQUE_HOTEL", "RESORT", "POOL_VILLA", "GLAMPING_HOMESTAY"])
+    .optional(),
   checkInTime: z.string().trim().max(10).optional(),
   checkOutTime: z.string().trim().max(10).optional(),
   petsAllowed: z.boolean().optional(),
   petPolicyTh: z.string().trim().max(300).optional(),
+  highlightsJson: z
+    .array(
+      z.object({
+        titleTh: z.string().trim().min(1).max(120),
+        descTh: z.string().trim().max(300),
+      })
+    )
+    .max(6)
+    .optional(),
+  nearbySpotsJson: z
+    .array(
+      z.object({
+        nameTh: z.string().trim().min(1).max(120),
+        distTh: z.string().trim().max(80),
+      })
+    )
+    .max(12)
+    .optional(),
+  faqJson: z
+    .array(
+      z.object({
+        qTh: z.string().trim().min(1).max(200),
+        aTh: z.string().trim().min(1).max(800),
+      })
+    )
+    .max(20)
+    .optional(),
   contactPhone: z.string().trim().max(40).optional(),
   contactLine: z.string().trim().max(80).optional(),
   facebookPageUrl: z.string().trim().max(300).optional(),
@@ -37,9 +69,7 @@ const UpdateHotelSchema = z.object({
   promptPayAccountName: z.string().trim().max(120).optional(),
   bankName: z.string().trim().max(80).optional(),
   bankAccountNo: z.string().trim().max(40).optional(),
-  nearbySpotsJson: z
-    .array(z.object({ nameTh: z.string(), distTh: z.string() }))
-    .optional(),
+  isPublished: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -48,14 +78,23 @@ export async function GET(request: Request) {
     const requestedSlug = url.searchParams.get("hotel");
     const { hotel } = await requireHotelStudioAccess(requestedSlug);
 
+    const todayStr = formatDateStr(new Date());
+    const now = new Date();
+    const rangeStart = new Date(`${todayStr}T00:00:00.000Z`);
+    const rangeEndStr = addDaysToDate(todayStr, 365);
+    const rangeEnd = new Date(`${rangeEndStr}T00:00:00.000Z`);
+
     const [
       fullHotel,
       rooms,
       dateOverrides,
       addons,
       coupons,
+      discountRules,
       pins,
       bookings,
+      activeBookingsInRange,
+      reviews,
       socialConnections,
       campaigns,
       contactClicksCount,
@@ -70,16 +109,19 @@ export async function GET(request: Request) {
       prisma.roomDateOverride.findMany({
         where: {
           room: { hotelId: hotel.id },
-          date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+          date: { gte: rangeStart, lte: rangeEnd },
         },
         orderBy: { date: "asc" },
-        take: 100,
       }),
       prisma.hotelAddon.findMany({
         where: { hotelId: hotel.id },
         orderBy: { sortOrder: "asc" },
       }),
       prisma.coupon.findMany({
+        where: { hotelId: hotel.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.hotelDiscountRule.findMany({
         where: { hotelId: hotel.id },
         orderBy: { createdAt: "desc" },
       }),
@@ -96,6 +138,12 @@ export async function GET(request: Request) {
               verificationStatus: true,
               ratingAvg: true,
               rooms: { select: { weekdayPriceThb: true } },
+              coupons: {
+                where: { isActive: true, expiresAt: { gt: new Date() } },
+                orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+                take: 6,
+                select: PIN_COUPON_SELECT,
+              },
             },
           },
           room: {
@@ -106,13 +154,13 @@ export async function GET(request: Request) {
               weekdayPriceThb: true,
             },
           },
-          coupon: { select: { code: true } },
+          coupon: { select: PIN_COUPON_SELECT },
         },
       }),
       prisma.booking.findMany({
         where: { hotelId: hotel.id },
         orderBy: { createdAt: "desc" },
-        take: 80,
+        take: 150,
         include: {
           hotel: {
             select: {
@@ -127,6 +175,35 @@ export async function GET(request: Request) {
           room: { select: { code: true, nameTh: true, nameEn: true } },
           coupon: { select: { code: true } },
         },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hotelId: hotel.id,
+          checkInDate: { lt: rangeEnd },
+          checkOutDate: { gt: rangeStart },
+          OR: [
+            {
+              status: {
+                in: ["CONFIRMED", "PENDING_VERIFICATION", "COMPLETED"],
+              },
+            },
+            {
+              status: "HOLD_PENDING_PAYMENT",
+              holdExpiresAt: { gt: now },
+            },
+          ],
+        },
+        select: {
+          roomId: true,
+          checkInDate: true,
+          checkOutDate: true,
+          unitsBooked: true,
+        },
+      }),
+      prisma.guestReview.findMany({
+        where: { hotelId: hotel.id },
+        orderBy: { createdAt: "desc" },
+        take: 60,
       }),
       prisma.socialConnection.findMany({
         where: { hotelId: hotel.id },
@@ -154,6 +231,18 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    const bookedUnitsByRoomDate: Record<string, number> = {};
+    for (const bk of activeBookingsInRange) {
+      const inStr = formatDateStr(bk.checkInDate);
+      const outStr = formatDateStr(bk.checkOutDate);
+      for (const dateStr of listDatesInRange(inStr, outStr)) {
+        if (dateStr < todayStr || dateStr > rangeEndStr) continue;
+        const key = `${bk.roomId}:${dateStr}`;
+        bookedUnitsByRoomDate[key] =
+          (bookedUnitsByRoomDate[key] ?? 0) + Math.max(1, bk.unitsBooked);
+      }
+    }
+
     const confirmedRevenueThb = bookings
       .filter((b) => b.status === "CONFIRMED" || b.status === "COMPLETED")
       .reduce((acc, b) => acc + b.netTotalThb, 0);
@@ -167,8 +256,24 @@ export async function GET(request: Request) {
       clickStats[grp.channel] = grp._count._all;
     }
 
+    let hotelResponse: Record<string, unknown> = fullHotel as unknown as Record<
+      string,
+      unknown
+    >;
+    if (!("seasonalRulesJson" in fullHotel)) {
+      const rows = await prisma.$queryRaw<
+        Array<{ seasonalRulesJson: unknown }>
+      >`
+        SELECT "seasonalRulesJson" FROM "Hotel" WHERE "id" = ${hotel.id} LIMIT 1
+      `;
+      hotelResponse = {
+        ...hotelResponse,
+        seasonalRulesJson: rows[0]?.seasonalRulesJson ?? null,
+      };
+    }
+
     return NextResponse.json({
-      hotel: fullHotel,
+      hotel: hotelResponse,
       stats: {
         boardSavesCount: boardSavesAgg,
         contactClicksTotal:
@@ -190,12 +295,32 @@ export async function GET(request: Request) {
         dateStr: formatDateStr(o.date),
         blockedUnits: o.blockedUnits,
         overridePriceThb: o.overridePriceThb,
+        minNights: o.minNights,
         note: o.note,
       })),
+      bookedUnitsByRoomDate,
       addons,
       coupons,
+      discountRules,
       pins: pins.map((p) => mapPinToDto(p)),
       bookings: bookings.map(mapBookingRowToDto),
+      reviews: reviews.map((rv) => ({
+        id: rv.id,
+        hotelId: rv.hotelId,
+        roomCode: rv.roomCode,
+        authorName: rv.authorName,
+        authorAvatar: rv.authorAvatar,
+        rating: rv.rating,
+        commentTh: rv.commentTh,
+        commentEn: rv.commentEn || rv.commentTh,
+        photoUrls: rv.photoUrls,
+        isVerifiedStay: rv.isVerifiedStay,
+        ownerReplyTh: rv.ownerReplyTh,
+        ownerRepliedAt: rv.ownerRepliedAt
+          ? rv.ownerRepliedAt.toISOString()
+          : null,
+        createdAt: rv.createdAt.toISOString(),
+      })),
       socialConnections,
       campaigns,
       posts: posts.map((post) => mapHotelPostToDetailDto(post, fullHotel)),
@@ -221,13 +346,14 @@ export async function PATCH(request: Request) {
     const parsed = UpdateHotelSchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "ข้อมูลไม่ถูกต้อง" },
+        { error: parsed.error.issues[0]?.message || "ข้อมูลไม่ถูกต้อง" },
         { status: 422 }
       );
     }
 
     const { hotel } = await requireHotelStudioAccess(parsed.data.hotelSlug);
     const { hotelSlug: _ignored, ...updateData } = parsed.data;
+    void _ignored;
 
     const updated = await prisma.hotel.update({
       where: { id: hotel.id },
@@ -244,9 +370,8 @@ export async function PATCH(request: Request) {
     }
     console.error("[PATCH /api/studio/hotel]", err);
     return NextResponse.json(
-      { error: "บันทึกข้อมูลที่พักไม่สำเร็จ" },
+      { error: "อัปเดตข้อมูลที่พักไม่สำเร็จ" },
       { status: 500 }
     );
   }
 }
-

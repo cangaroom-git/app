@@ -20,6 +20,7 @@ import {
 import type { LanguageCode } from "@/lib/dateFormatters";
 import type { AuthenticatedMeDto } from "@/types/cangaroom";
 import { authClient } from "@/lib/auth/client";
+import { saveReturningAccountHint } from "@/lib/auth/accountHint";
 import type { PlatformNavTabId } from "@/components/navigation/NavigationIcons";
 
 export type AuthenticatedProfileUser = AuthenticatedMeDto;
@@ -51,7 +52,15 @@ export function useAuthenticatedProfile() {
       const res = await fetch("/api/me", { cache: "no-store" });
       if (res.ok) {
         const data = (await res.json()) as { user?: AuthenticatedMeDto | null };
-        setUser(data.user ?? null);
+        const loadedUser = data.user ?? null;
+        setUser(loadedUser);
+        if (loadedUser?.email) {
+          saveReturningAccountHint({
+            name: loadedUser.name || loadedUser.email.split("@")[0],
+            email: loadedUser.email,
+            avatarUrl: loadedUser.avatarUrl ?? null,
+          });
+        }
       } else {
         setUser(null);
       }

@@ -1,5 +1,43 @@
 import { getProvinceById } from "@/data/thailandProvinces";
-import type { PinFeedItemDto } from "@/types/cangaroom";
+import type { PinActiveCouponDto, PinFeedItemDto } from "@/types/cangaroom";
+
+export const PIN_COUPON_SELECT = {
+  id: true,
+  code: true,
+  titleTh: true,
+  titleEn: true,
+  descriptionTh: true,
+  descriptionEn: true,
+  coverImageUrl: true,
+  discountType: true,
+  discountValue: true,
+  minSpendThb: true,
+  maxDiscountThb: true,
+  totalQuota: true,
+  claimedCount: true,
+  startsAt: true,
+  expiresAt: true,
+  isActive: true,
+} as const;
+
+export interface RawPinCoupon {
+  id: string;
+  code: string;
+  titleTh: string;
+  titleEn: string;
+  descriptionTh: string;
+  descriptionEn: string;
+  coverImageUrl: string | null;
+  discountType: "PERCENT" | "FIXED_THB";
+  discountValue: number;
+  minSpendThb: number;
+  maxDiscountThb: number | null;
+  totalQuota: number | null;
+  claimedCount: number;
+  startsAt: Date;
+  expiresAt: Date;
+  isActive: boolean;
+}
 
 export interface RawPinWithRelations {
   id: string;
@@ -38,6 +76,7 @@ export interface RawPinWithRelations {
     verificationStatus: "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
     ratingAvg: number;
     rooms?: Array<{ weekdayPriceThb: number }>;
+    coupons?: RawPinCoupon[];
   };
   room: {
     code: string;
@@ -45,9 +84,40 @@ export interface RawPinWithRelations {
     nameEn: string;
     weekdayPriceThb: number;
   } | null;
-  coupon: {
-    code: string;
-  } | null;
+  coupon: RawPinCoupon | { code: string } | null;
+}
+
+function isFullCoupon(
+  coupon: RawPinCoupon | { code: string } | null | undefined
+): coupon is RawPinCoupon {
+  return Boolean(coupon && "id" in coupon && "discountValue" in coupon);
+}
+
+function isCouponClaimable(c: RawPinCoupon, nowMs: number): boolean {
+  if (!c.isActive) return false;
+  if (c.expiresAt.getTime() <= nowMs) return false;
+  if (c.totalQuota !== null && c.claimedCount >= c.totalQuota) return false;
+  return true;
+}
+
+function toPinActiveCouponDto(c: RawPinCoupon): PinActiveCouponDto {
+  return {
+    id: c.id,
+    code: c.code,
+    titleTh: c.titleTh,
+    titleEn: c.titleEn || c.titleTh,
+    descriptionTh: c.descriptionTh,
+    descriptionEn: c.descriptionEn || c.descriptionTh,
+    coverImageUrl: c.coverImageUrl,
+    discountType: c.discountType,
+    discountValue: c.discountValue,
+    minSpendThb: c.minSpendThb,
+    maxDiscountThb: c.maxDiscountThb,
+    totalQuota: c.totalQuota,
+    claimedCount: c.claimedCount,
+    startsAt: c.startsAt.toISOString(),
+    expiresAt: c.expiresAt.toISOString(),
+  };
 }
 
 export function mapPinToDto(
@@ -80,6 +150,26 @@ export function mapPinToDto(
     cleanedMediaUrls.push(clean);
   }
 
+  const nowMs = Date.now();
+  const seenCouponIds = new Set<string>();
+  const resolvedRawCoupons: RawPinCoupon[] = [];
+
+  if (isFullCoupon(pin.coupon) && isCouponClaimable(pin.coupon, nowMs)) {
+    seenCouponIds.add(pin.coupon.id);
+    resolvedRawCoupons.push(pin.coupon);
+  }
+  if (pin.hotel.coupons && pin.hotel.coupons.length > 0) {
+    for (const c of pin.hotel.coupons) {
+      if (!seenCouponIds.has(c.id) && isCouponClaimable(c, nowMs)) {
+        seenCouponIds.add(c.id);
+        resolvedRawCoupons.push(c);
+      }
+    }
+  }
+
+  const activeCoupons = resolvedRawCoupons.map(toPinActiveCouponDto);
+  const activeCoupon = activeCoupons[0] ?? null;
+
   return {
     id: pin.id,
     hotelId: pin.hotelId,
@@ -93,8 +183,10 @@ export function mapPinToDto(
     roomCode: pin.room?.code ?? null,
     roomNameTh: pin.room?.nameTh ?? null,
     roomNameEn: pin.room?.nameEn ?? null,
-    couponId: pin.couponId,
-    couponCode: pin.coupon?.code ?? null,
+    couponId: activeCoupon?.id ?? pin.couponId,
+    couponCode: activeCoupon?.code ?? pin.coupon?.code ?? null,
+    activeCoupon,
+    activeCoupons,
     mediaType: pin.mediaType,
     category: pin.category,
     titleTh: pin.titleTh,
@@ -107,7 +199,9 @@ export function mapPinToDto(
     videoUrl: pin.videoUrl,
     aspectRatio: pin.aspectRatio || "aspect-[3/4]",
     provinceId: pin.provinceId,
-    provinceNameTh: province ? province.nameTh.split("(")[0].trim() : pin.provinceId,
+    provinceNameTh: province
+      ? province.nameTh.split("(")[0].trim()
+      : pin.provinceId,
     provinceNameEn: province ? province.nameEn : pin.provinceId,
     stayStyles: pin.stayStyles,
     semanticTags: pin.semanticTags,
@@ -127,4 +221,3 @@ export function mapPinToDto(
     createdAt: pin.createdAt.toISOString(),
   };
 }
-

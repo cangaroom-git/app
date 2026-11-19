@@ -1,3 +1,11 @@
+import type {
+  RoomPhotoMeta,
+  RoomPhotoSpaceId,
+} from "@/lib/roomPhotoSpaces";
+
+export type { RoomPhotoSpaceId };
+export type RoomPhotoMetaDto = RoomPhotoMeta;
+
 export type AppRole = "TRAVELLER" | "HOTEL_OWNER" | "SUPER_ADMIN";
 
 export type VerificationStatusDto = "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
@@ -5,12 +13,39 @@ export type PinMediaTypeDto = "PHOTO" | "CAROUSEL" | "VIDEO";
 export type PinCategoryDto = "ROOMS" | "VIEWS" | "VIDEOS" | "DINING" | "REVIEWS";
 export type PinPublishStatusDto = "PUBLISHED" | "PENDING_APPROVAL" | "DISCARDED";
 export type DiscountTypeDto = "PERCENT" | "FIXED_THB";
+export type PropertyTypeDto =
+  | "BOUTIQUE_HOTEL"
+  | "RESORT"
+  | "POOL_VILLA"
+  | "GLAMPING_HOMESTAY";
+export type DiscountRuleTypeDto =
+  | "LENGTH_OF_STAY"
+  | "EARLY_BIRD"
+  | "LAST_MINUTE";
 export type BookingStatusDto =
   | "HOLD_PENDING_PAYMENT"
   | "PENDING_VERIFICATION"
   | "CONFIRMED"
   | "CANCELLED"
   | "COMPLETED";
+
+export interface PinActiveCouponDto {
+  id: string;
+  code: string;
+  titleTh: string;
+  titleEn: string;
+  descriptionTh: string;
+  descriptionEn: string;
+  coverImageUrl: string | null;
+  discountType: DiscountTypeDto;
+  discountValue: number;
+  minSpendThb: number;
+  maxDiscountThb: number | null;
+  totalQuota: number | null;
+  claimedCount: number;
+  startsAt: string;
+  expiresAt: string;
+}
 
 export interface PinFeedItemDto {
   id: string;
@@ -27,6 +62,8 @@ export interface PinFeedItemDto {
   roomNameEn: string | null;
   couponId: string | null;
   couponCode: string | null;
+  activeCoupon: PinActiveCouponDto | null;
+  activeCoupons: PinActiveCouponDto[];
   mediaType: PinMediaTypeDto;
   category: PinCategoryDto;
   titleTh: string;
@@ -98,6 +135,7 @@ export interface RoomAvailabilityDto {
   petsAllowed: boolean;
   amenities: string[];
   galleryUrls: string[];
+  galleryMeta?: RoomPhotoMetaDto[];
   isActive: boolean;
   sortOrder: number;
 }
@@ -108,7 +146,21 @@ export interface RoomDateOverrideDto {
   dateStr: string;
   blockedUnits: number;
   overridePriceThb: number | null;
+  minNights?: number;
   note: string | null;
+}
+
+export interface HotelDiscountRuleDto {
+  id: string;
+  hotelId: string;
+  ruleType: DiscountRuleTypeDto;
+  titleTh: string;
+  discountType: DiscountTypeDto;
+  discountValue: number;
+  minNights: number | null;
+  minAdvanceDays: number | null;
+  maxAdvanceDays: number | null;
+  isActive: boolean;
 }
 
 export interface HotelAddonDto {
@@ -169,6 +221,8 @@ export interface GuestReviewDto {
   commentEn: string;
   photoUrls: string[];
   isVerifiedStay: boolean;
+  ownerReplyTh?: string | null;
+  ownerRepliedAt?: string | null;
   createdAt: string;
 }
 
@@ -252,6 +306,7 @@ export interface HotelStorefrontDto {
   bookedUnitsByRoomDate?: Record<string, number>;
   addons: HotelAddonDto[];
   coupons: CouponDealDto[];
+  discountRules?: HotelDiscountRuleDto[];
   pins: PinFeedItemDto[];
   reviews: GuestReviewDto[];
   posts: HotelPostSummaryDto[];

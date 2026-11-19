@@ -64,6 +64,19 @@ enum DiscountType {
   FIXED_THB
 }
 
+enum PropertyType {
+  BOUTIQUE_HOTEL
+  RESORT
+  POOL_VILLA
+  GLAMPING_HOMESTAY
+}
+
+enum DiscountRuleType {
+  LENGTH_OF_STAY
+  EARLY_BIRD
+  LAST_MINUTE
+}
+
 enum BookingStatus {
   HOLD_PENDING_PAYMENT
   PENDING_VERIFICATION
@@ -166,6 +179,7 @@ model Hotel {
   highlightsJson       Json?
   nearbySpotsJson      Json?
   faqJson              Json?
+  seasonalRulesJson    Json?
   contactPhone         String              @default("")
   contactLine          String              @default("")
   facebookPageUrl      String              @default("")
@@ -175,6 +189,7 @@ model Hotel {
   bankName             String              @default("")
   bankAccountNo        String              @default("")
   verificationStatus   VerificationStatus  @default(PENDING_REVIEW)
+  propertyType         PropertyType        @default(BOUTIQUE_HOTEL)
   isPublished          Boolean             @default(true)
   ratingAvg            Float               @default(4.9)
   reviewCount          Int                 @default(0)
@@ -184,6 +199,7 @@ model Hotel {
   addons               HotelAddon[]
   pins                 Pin[]
   coupons              Coupon[]
+  discountRules        HotelDiscountRule[]
   bookings             Booking[]
   reviews              GuestReview[]
   contactClicks        ContactClickLog[]
@@ -221,6 +237,7 @@ model Room {
   petsAllowed        Boolean            @default(false)
   amenities          String[]           @default([])
   galleryUrls        String[]           @default([])
+  galleryMetaJson    Json?
   isActive           Boolean            @default(true)
   sortOrder          Int                @default(0)
   createdAt          DateTime           @default(now())
@@ -242,9 +259,29 @@ model RoomDateOverride {
   date             DateTime @db.Date
   blockedUnits     Int      @default(0)
   overridePriceThb Int?
+  minNights        Int      @default(1)
   note             String?
 
   @@unique([roomId, date])
+  @@index([roomId, date])
+}
+
+model HotelDiscountRule {
+  id             String           @id @default(cuid())
+  hotelId        String
+  hotel          Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  ruleType       DiscountRuleType
+  titleTh        String
+  discountType   DiscountType     @default(PERCENT)
+  discountValue  Int
+  minNights      Int?
+  minAdvanceDays Int?
+  maxAdvanceDays Int?
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([hotelId, isActive, ruleType])
 }
 
 model HotelAddon {
@@ -487,9 +524,11 @@ model GuestReview {
   rating         Int      @default(5)
   commentTh      String
   commentEn      String   @default("")
-  photoUrls      String[] @default([])
-  isVerifiedStay Boolean  @default(true)
-  createdAt      DateTime @default(now())
+  photoUrls      String[]  @default([])
+  isVerifiedStay Boolean   @default(true)
+  ownerReplyTh   String?
+  ownerRepliedAt DateTime?
+  createdAt      DateTime  @default(now())
 
   @@index([hotelId, createdAt])
 }

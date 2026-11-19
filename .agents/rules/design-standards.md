@@ -1,23 +1,22 @@
 ---
 trigger: always_on
-description: Mandatory Cangaroom Design System Constitution enforcing 95/5 monochrome palette, zero hover-scale, zero card shadows/gradients, persistent 72px sidebar, unified 3-tier container grid, 3D flip coupons on /deal, and Instagram SSR DOM tabs on /{hotelSlug}.
+description: Mandatory Cangaroom Design System Constitution (v3.0 — Airbnb Warm Minimal) enforcing minimal borders, equal section rhythm, zero hover-scale, controlled sticky/popover shadows, zero gradients, custom ResponsiveSelect, continuous /{hotelSlug} storefront, clean /{hotelSlug}/book checkout, and smooth fractional /map explorer.
 ---
 
-# Mandatory Design System Enforcement (`my-hotel` / Cangaroom)
+# Mandatory Design System Enforcement (`my-hotel` / Cangaroom v3.0)
 
 Before implementing, creating, or modifying any UI component or page in `my-hotel`, you MUST read and obey `/Users/light/my-hotel/.agents/skills/my-hotel-design-system/SKILL.md`:
 
 1. **FORBIDDEN — Zero Hover Scale**: Never use `hover:scale-*`, `group-hover:scale-*`, or `:hover { transform: scale(...) }` anywhere in the app.
-2. **FORBIDDEN — Zero Card Shadows & Zero Gradients/Pastels**: Never use `shadow-*` on cards, banners, or buttons (`1px solid var(--color-border)` only). Never use `bg-gradient-*` or pastel tinted pills/cards (`#0866ff` blue, `#06c755` green, pink/yellow/blue washes are banned).
-3. **95/5 Monochrome, 2-Button System & Unified Squircle Curvature**:
-   - Canvas `#ffffff` (`#121212` Dark), Muted `#efefef` (`#262626` Dark), Ink `#111111` (`#f5f5f5` Dark), Secondary Ink `#737373` (`#a3a3a3` Dark).
-   - Primary buttons are solid `#111111` (`#f5f5f5` Dark); Secondary buttons are flat `#efefef` (`#262626` Dark).
-   - All buttons and inputs across the app MUST use squircle curvature matching the `48px` (`rounded-[16px]`) Mobile Bottom Menu (`rounded-[10px]`–`rounded-[16px]`) — **NEVER** use `rounded-full` on buttons or inputs.
-   - `#e60023` Red is reserved **exclusively** for Pin `'บันทึก'` (`Save`) buttons and small navigation notification badges/dots.
-4. **Unified Shell & 3-Tier Spacing Grid**:
-   - Persistent `72px` Left Sidebar + `64px` Top Bar on every route except `/login`.
-   - Global gutter `px-4 sm:px-6 lg:px-8` + vertical offset `pt-5 pb-12` owned by `HotelAppShell` (pages never add custom outer `px-*` or uneven `py-*`).
-   - Strictly 3 widths: `cgr-page-fluid` (`w-full` for `/`, `/board`), `cgr-page-standard` (`max-w-[1120px]` for `/deal`, `/{hotelSlug}`, `/{hotelSlug}/posts`, `/trips`, `/studio`, `/super-admin`), and `cgr-page-reading` (`760px`) / `cgr-page-form` (`640px`).
-5. **Signature Patterns**:
-   - `/deal`: Clean pure-white ticket cards with **In-Place 3D Flip (`rotateY(180deg)`)** on click (no front-face clutter).
-   - `/{hotelSlug}`: **Facebook Cover Photo Banner Header** (no circular Instagram highlights) + **5 SSR DOM Tabs (`posts` Pinterest Masonry, `rooms` Inline Instant Calendar, `blog`, `reviews`, `more`)** (`hidden` CSS toggle + `?tab=` URL sync + JSON-LD) for 100% Google SEO & AI Crawler visibility.
+2. **FORBIDDEN — Border Fatigue & Uneven Sections (EXCEPT Unified Airbnb Inputs)**: Never wrap inline lists, side-menu items, room cards, add-ons, map POI rows, guides, or reviews in 4-sided `border` boxes. Divide consecutive sections strictly using single `1px` horizontal hairlines (`divide-y divide-[var(--color-border)]`) with **equal vertical padding** (`py-8 lg:py-10` on storefronts, `py-8 first:pt-0` on checkout, `py-4`–`py-5` on list rows).
+   - **MANDATORY — Unified Airbnb Inset-Label Input Standard (ทั้งเว็บทุกจุด)**: ALL form inputs, textareas, checkboxes, date pickers, and form select triggers MUST use the unified Airbnb inset-label style (`<StandardInput />`, `<StandardTextarea />`, `<StandardCheckbox />`, `<StandardFieldGroup />`, `<StandardStepperRow />` from `src/components/ui/standards.tsx`, plus `<StudioDateRangePicker />` for date ranges): pure white `bg-[var(--color-background-card)]`, `rounded-[12px]`, `1px border-[#b0b0b0]` (`focus-within:border-[#222222] focus-within:ring-1`), inset `12px` top-left label inside the box (`min-h-[56px]`), grouped split boxes (`divide-x`/`divide-y`) for related fields, `− / count / +` stepper rows for counts, custom `20×20px` squircle checkboxes (NEVER raw `<input type="checkbox">`), and Airbnb 2-month calendar pickers (NEVER native `<input type="date">`).
+3. **FORBIDDEN — Inline Card Shadows & Gradients/Pastels**: Never use `shadow-*` on inline content cards or buttons (`--shadow-card: none`), and never use `bg-gradient-*` or pastel/colored buttons (`#0866ff` blue, `#06c755` green banned). Only **2 shadow exceptions** exist: `shadow-[var(--shadow-booking-widget)]` (desktop sticky booking/checkout card ONLY) and `shadow-[var(--shadow-popover)]` (floating menus, modals/bottom sheets, map overlays, mobile bottom nav).
+4. **Airbnb Warm Minimal Tokens, 2-Button System & Squircle Curvature**:
+   - Canvas `#ffffff` (`#161616` Dark), Muted `#f7f7f7` (`#2c2c2c` Dark), Hairline `#ebebeb` (`#333333` Dark), Primary Ink `#222222` (`#f5f5f5` Dark), Secondary Ink `#6a6a6a` (`#a8a8a8` Dark), `Plus Jakarta Sans` + `Anuphan`.
+   - Primary buttons are solid `#222222` (`#f5f5f5` Dark); Secondary buttons are flat borderless `#f7f7f7` (`#2c2c2c` Dark).
+   - All buttons and inputs MUST use squircle radii (`rounded-[8px]`–`rounded-[16px]`) — **NEVER** use `rounded-full` on `<button>` or `<input>`. `#e60023` Red is reserved strictly for Save/Bookmark `'บันทึก'` (`Save`) buttons and nav notification dots.
+5. **Responsive Controls & Signature Patterns**:
+   - **Never use native `<select>`**: Always use `<ResponsiveSelect />` (desktop dropdown / mobile slide-up Bottom Sheet).
+   - **Slide-Up Bottom Sheet Law for ALL Mobile Modals**: ALL mobile modals, dialogs, action menus, auth prompts, and save bars (`< sm` / `< lg`) MUST slide up from the bottom edge of the viewport (`items-end`, `w-full`, `rounded-t-[24px]`, grab handle `h-1 w-10 rounded-full`, `animate-slide-up-sheet`, safe-area bottom padding) — never centered popups or floating left-corner cards on mobile. Sheets inside `will-change-transform` or `overflow-hidden` ancestors MUST render via `createPortal(..., document.body)` (`z-[95]`) with `stopPropagation`.
+   - **Mobile Ergonomics**: Clamp long descriptions/lists + open `<HotelInfoBottomSheet />`; pair `-mx-4 px-4` with `scroll-px-4` on horizontal snap carousels; lock sticky anchor bars (`overflow-y-hidden touch-pan-x`).
+   - **`/{hotelSlug}` & `/{hotelSlug}/book` & `/map`**: Continuous single-page `/{hotelSlug}` with `1:1` swipeable mobile Hero / 5-photo desktop mosaic, sticky floating right widget (hidden on mobile -> sticky bottom CTA), `divide-y` minimal-border `/{hotelSlug}/book` checkout, and full-screen seamless WebGL Vector `/map` explorer (`MapLibre` + `OpenFreeMap` + Airbnb floating top-left search/category/results card, plus `HostLocationPicker` drag-to-pin & Google Maps link resolver in `/studio` and `/register-hotel`).

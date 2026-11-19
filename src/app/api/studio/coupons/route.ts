@@ -16,12 +16,22 @@ const CouponCreateSchema = z.object({
   minSpendThb: z.number().int().min(0).optional(),
   maxDiscountThb: z.number().int().min(1).optional().nullable(),
   totalQuota: z.number().int().min(1).optional().nullable(),
+  startsAt: z.string().optional(),
   expiresAt: z.string().optional(),
 });
 
 const CouponPatchSchema = z.object({
   hotelSlug: z.string().optional(),
   id: z.string().trim().min(1),
+  titleTh: z.string().trim().min(2).max(140).optional(),
+  descriptionTh: z.string().trim().max(400).optional(),
+  discountType: z.enum(["PERCENT", "FIXED_THB"]).optional(),
+  discountValue: z.number().int().min(1).optional(),
+  minSpendThb: z.number().int().min(0).optional(),
+  maxDiscountThb: z.number().int().min(1).optional().nullable(),
+  totalQuota: z.number().int().min(1).optional().nullable(),
+  startsAt: z.string().optional(),
+  expiresAt: z.string().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -37,6 +47,9 @@ export async function POST(request: Request) {
     }
 
     const { hotel } = await requireHotelStudioAccess(parsed.data.hotelSlug);
+    const startDate = parsed.data.startsAt
+      ? new Date(parsed.data.startsAt)
+      : new Date();
     const expDate = parsed.data.expiresAt
       ? new Date(parsed.data.expiresAt)
       : new Date(Date.now() + 90 * 86400000);
@@ -53,6 +66,7 @@ export async function POST(request: Request) {
         minSpendThb: parsed.data.minSpendThb ?? 0,
         maxDiscountThb: parsed.data.maxDiscountThb ?? null,
         totalQuota: parsed.data.totalQuota ?? null,
+        startsAt: startDate,
         expiresAt: expDate,
         isActive: true,
       },
@@ -75,20 +89,32 @@ export async function PATCH(request: Request) {
     const raw = await request.json();
     const parsed = CouponPatchSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json({ error: "ข้อมูลไม่ถูกต้อง" }, { status: 422 });
+      return NextResponse.json({ error: "ข้อมูลคูปองไม่ถูกต้อง" }, { status: 422 });
     }
 
     const { hotel } = await requireHotelStudioAccess(parsed.data.hotelSlug);
-    const updated = await prisma.coupon.updateMany({
-      where: { id: parsed.data.id, hotelId: hotel.id },
+    const { id, hotelSlug: _ignored, startsAt, expiresAt, ...rest } = parsed.data;
+    void _ignored;
+
+    const existing = await prisma.coupon.findFirst({
+      where: { id, hotelId: hotel.id },
+      select: { id: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "ไม่พบคูปองนี้" }, { status: 404 });
+    }
+
+    const coupon = await prisma.coupon.update({
+      where: { id: existing.id },
       data: {
-        ...(parsed.data.isActive !== undefined
-          ? { isActive: parsed.data.isActive }
-          : {}),
+        ...rest,
+        ...(rest.titleTh ? { titleEn: rest.titleTh } : {}),
+        ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
+        ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
       },
     });
 
-    return NextResponse.json({ updated: updated.count });
+    return NextResponse.json({ coupon });
   } catch (err) {
     if (err instanceof StudioAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.statusCode });
@@ -117,4 +143,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "ลบคูปองไม่สำเร็จ" }, { status: 400 });
   }
 }
-

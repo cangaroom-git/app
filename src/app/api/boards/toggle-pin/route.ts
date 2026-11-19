@@ -6,6 +6,8 @@ import { toggleSavePinToBoard } from "@/lib/services/pinEngagementService";
 const TogglePinSchema = z.object({
   pinId: z.string().trim().min(1),
   boardId: z.string().trim().optional().nullable(),
+  action: z.enum(["toggle", "save", "unsave", "move"]).optional(),
+  fromBoardId: z.string().trim().optional().nullable(),
 });
 
 export async function POST(request: Request) {
@@ -28,6 +30,8 @@ export async function POST(request: Request) {
       userId: sessionUser.id,
       pinId: parsed.data.pinId,
       boardId: parsed.data.boardId ?? null,
+      action: parsed.data.action ?? "toggle",
+      fromBoardId: parsed.data.fromBoardId ?? null,
     });
 
     return NextResponse.json(result);

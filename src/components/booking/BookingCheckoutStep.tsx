@@ -349,18 +349,21 @@ export function BookingCheckoutStep({
           )}
         </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={couponInput}
-            onChange={(e) => onChangeCouponInput(e.target.value.toUpperCase())}
-            placeholder="กรอกโค้ดส่วนลดของที่พักนี้..."
-            className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-muted)] px-4 ty-body font-mono uppercase focus:ring-2 focus:ring-[var(--color-border-emphasized)] focus:outline-none min-w-0"
-          />
+        <div className="flex items-stretch gap-2.5">
+          <div className="flex-1 min-w-0">
+            <StandardInput
+              label={language === "th" ? "โค้ดส่วนลด" : "Coupon code"}
+              type="text"
+              value={couponInput}
+              onChange={(e) => onChangeCouponInput(e.target.value.toUpperCase())}
+              placeholder="กรอกโค้ดส่วนลดของที่พักนี้..."
+              className="font-mono uppercase"
+            />
+          </div>
           <button
             type="button"
             onClick={() => onApplyCoupon()}
-            className="h-10 px-4 rounded-[12px] bg-[#111111] hover:opacity-90 dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-opacity"
+            className="min-h-[56px] px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
           >
             <Tag className="w-4 h-4" />
             <span>{language === "th" ? "ใช้โค้ด" : "Apply"}</span>

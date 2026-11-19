@@ -29,7 +29,11 @@ import { getFacilityIconMeta } from "@/lib/facilityIcons";
 import { scanSlipQrFromFile, uploadMediaFile } from "@/lib/slipScanner";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { StandardInput } from "@/components/ui/standards";
+import {
+  StandardFieldGroup,
+  StandardInput,
+  StandardTextarea,
+} from "@/components/ui/standards";
 import { AirbnbStayCalendar } from "@/components/booking/AirbnbStayCalendar";
 import { selectBestEligibleCoupon } from "@/components/drawers/RoomBookingDrawer";
 import type { GuestBookingFormValues } from "@/components/booking/BookingCheckoutStep";
@@ -123,6 +127,7 @@ export function HotelCheckoutClient({
     rooms,
     addons,
     coupons,
+    discountRules = [],
     dateOverrides,
     bookedUnitsByRoomDate = {},
   } = storefront;
@@ -355,6 +360,7 @@ export function HotelCheckoutClient({
       addons,
       addonQuantities,
       coupon: matchedCoupon,
+      discountRules,
     });
   }, [
     selectedRoom,
@@ -365,6 +371,7 @@ export function HotelCheckoutClient({
     addons,
     addonQuantities,
     matchedCoupon,
+    discountRules,
     stayNights,
   ]);
 
@@ -637,21 +644,25 @@ export function HotelCheckoutClient({
           </div>
         ))}
 
-        {pricingBreakdown.discountThb > 0 && appliedCouponCode && (
-          <div className="flex justify-between gap-3 text-[var(--color-success)] font-medium">
-            <span className="inline-flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                {isTh
-                  ? `ส่วนลดคูปอง ${appliedCouponCode}`
-                  : `Coupon ${appliedCouponCode}`}
+        {pricingBreakdown.discountThb > 0 &&
+          (pricingBreakdown.appliedCouponCode ||
+            pricingBreakdown.appliedAutoDiscountLabel) && (
+            <div className="flex justify-between gap-3 text-[var(--color-success)] font-medium">
+              <span className="inline-flex items-center gap-1.5 min-w-0">
+                <Tag className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  {pricingBreakdown.appliedCouponCode
+                    ? isTh
+                      ? `ส่วนลดคูปอง ${pricingBreakdown.appliedCouponCode}`
+                      : `Coupon ${pricingBreakdown.appliedCouponCode}`
+                    : pricingBreakdown.appliedAutoDiscountLabel}
+                </span>
               </span>
-            </span>
-            <span className="tabular-nums">
-              −฿{pricingBreakdown.discountThb.toLocaleString()}
-            </span>
-          </div>
-        )}
+              <span className="tabular-nums shrink-0">
+                −฿{pricingBreakdown.discountThb.toLocaleString()}
+              </span>
+            </div>
+          )}
 
         <div className="flex justify-between gap-3 text-[var(--color-text-secondary)]">
           <span>
@@ -686,12 +697,12 @@ export function HotelCheckoutClient({
       {/* =====================================================================
           TOP HEADER BAR (Airbnb Style: Single 1-Click Squircle Back Button + H1)
       ====================================================================== */}
-      <header className="flex items-center gap-3.5 pt-1 pb-6">
+      <header className="flex items-center gap-3.5 pt-1 pb-7">
         <button
           type="button"
           onClick={handleBackToHotel}
           aria-label={isTh ? "กลับหน้าเพจที่พัก" : "Back to property"}
-          className="h-10 w-10 rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+          className="h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -717,8 +728,8 @@ export function HotelCheckoutClient({
         </div>
       </header>
 
-      {/* MOBILE COMPACT PROPERTY SUMMARY (< lg) */}
-      <div className="lg:hidden mb-6 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-4 flex items-center gap-3.5">
+      {/* MOBILE COMPACT PROPERTY SUMMARY (< lg, Borderless Flush Row + Hairline) */}
+      <div className="lg:hidden pb-7 mb-7 border-b border-[var(--color-border)] flex items-center gap-4">
         <img
           src={roomCover}
           alt={isTh ? selectedRoom.nameTh : selectedRoom.nameEn}
@@ -755,7 +766,7 @@ export function HotelCheckoutClient({
           {activeBooking ? (
             <div className="space-y-6">
               {activeBooking.status === "HOLD_PENDING_PAYMENT" && (
-                <div className="rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)] p-4 sm:p-5 space-y-3">
+                <div className="rounded-[16px] bg-[var(--color-background-muted)] p-4 sm:p-5 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <Timer className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
@@ -813,7 +824,7 @@ export function HotelCheckoutClient({
                     <button
                       type="button"
                       onClick={handleBackToHotel}
-                      className="h-11 px-5 rounded-[12px] border border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                      className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                     >
                       {isTh ? "กลับหน้าเพจที่พัก" : "Back to property"}
                     </button>
@@ -843,8 +854,8 @@ export function HotelCheckoutClient({
               onSubmit={handleSubmitHoldBooking}
               className="divide-y divide-[var(--color-border)]"
             >
-              {/* 1. YOUR TRIP (Inline Modal Triggers — ZERO Back History Stack!) */}
-              <section className="pb-7 space-y-5">
+              {/* 1. YOUR TRIP */}
+              <section className="py-8 first:pt-0 space-y-5">
                 <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                   {isTh ? "การเดินทางของคุณ" : "Your trip"}
                 </h2>
@@ -941,7 +952,7 @@ export function HotelCheckoutClient({
                 </div>
 
                 {(!isRoomAvailable || !fitsGuests) && (
-                  <div className="rounded-[12px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] p-3.5 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="rounded-[12px] bg-[var(--color-background-muted)] p-4 flex flex-wrap items-center justify-between gap-2.5">
                     <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                       {!isRoomAvailable
                         ? isTh
@@ -955,7 +966,7 @@ export function HotelCheckoutClient({
                       <button
                         type="button"
                         onClick={() => setIsEditTripOpen(true)}
-                        className="h-8 px-3 rounded-[9px] bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[12.5px] font-semibold cursor-pointer"
+                        className="h-8 px-3 rounded-[9px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold cursor-pointer transition-colors"
                       >
                         {isTh ? "เปลี่ยนวัน / จำนวนคน" : "Edit dates"}
                       </button>
@@ -973,9 +984,9 @@ export function HotelCheckoutClient({
                 )}
               </section>
 
-              {/* 2. PROPERTY ADD-ONS */}
+              {/* 2. PROPERTY ADD-ONS (Borderless divide-y rows) */}
               {addons.length > 0 && (
-                <section className="py-7 space-y-4">
+                <section className="py-8 space-y-4">
                   <div className="space-y-0.5">
                     <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                       {isTh ? "บริการเสริมจากที่พัก" : "Enhance your stay"}
@@ -987,7 +998,7 @@ export function HotelCheckoutClient({
                     </p>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="divide-y divide-[var(--color-border-subtle)]">
                     {addons.map((addon) => {
                       const qty = addonQuantities[addon.id] || 0;
                       const meta = getFacilityIconMeta(addon.nameTh);
@@ -995,17 +1006,17 @@ export function HotelCheckoutClient({
                       return (
                         <div
                           key={addon.id}
-                          className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-3 flex items-center justify-between gap-3"
+                          className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4"
                         >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
                             {addon.imageUrl ? (
                               <img
                                 src={addon.imageUrl}
                                 alt={isTh ? addon.nameTh : addon.nameEn}
-                                className="h-14 w-14 rounded-[10px] object-cover shrink-0 bg-[var(--color-background-muted)] border border-[var(--color-border)]"
+                                className="h-14 w-14 rounded-[10px] object-cover shrink-0 bg-[var(--color-background-muted)]"
                               />
                             ) : (
-                              <div className="h-14 w-14 rounded-[10px] bg-[var(--color-background-muted)] border border-[var(--color-border)] flex items-center justify-center shrink-0 text-[var(--color-text-primary)]">
+                              <div className="h-14 w-14 rounded-[10px] bg-[var(--color-background-muted)] flex items-center justify-center shrink-0 text-[var(--color-text-primary)]">
                                 <FallbackIcon className="w-5 h-5" />
                               </div>
                             )}
@@ -1041,7 +1052,7 @@ export function HotelCheckoutClient({
                                   handleUpdateAddonQty(addon.id, -1)
                                 }
                                 aria-label="Decrease addon quantity"
-                                className="h-8 w-8 rounded-[9px] bg-[var(--color-background-muted)] border border-[var(--color-border)] hover:border-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
+                                className="h-8 w-8 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer transition-colors"
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
@@ -1061,7 +1072,7 @@ export function HotelCheckoutClient({
                             <button
                               type="button"
                               onClick={() => handleUpdateAddonQty(addon.id, 1)}
-                              className="h-9 rounded-[10px] px-3.5 text-[13px] font-semibold bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] inline-flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+                              className="h-9 rounded-[10px] px-3.5 text-[13px] font-semibold bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{isTh ? "เพิ่ม" : "Add"}</span>
@@ -1074,42 +1085,55 @@ export function HotelCheckoutClient({
                 </section>
               )}
 
-              {/* 3. GUEST DETAILS */}
-              <section className="py-7 space-y-4">
-                <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
-                  {isTh ? "ข้อมูลผู้เข้าพัก" : "Guest details"}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* 3. GUEST DETAILS (Unified Airbnb Grouped Inset-Label Inputs) */}
+              <section className="py-8 space-y-4">
+                <div className="space-y-0.5">
+                  <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
+                    {isTh ? "ข้อมูลผู้เข้าพัก" : "Guest details"}
+                  </h2>
+                  <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                    {isTh
+                      ? "กรอกข้อมูลสำหรับออกใบยืนยันการจองตรงกับที่พัก"
+                      : "Used to issue your direct booking confirmation with the property"}
+                  </p>
+                </div>
+
+                <StandardFieldGroup>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                    <StandardInput
+                      grouped
+                      label={isTh ? "ชื่อ - นามสกุล *" : "Full Name *"}
+                      placeholder={
+                        isTh ? "เช่น คุณกานต์ วงศ์สวัสดิ์" : "Full name"
+                      }
+                      required
+                      value={guestForm.guestName}
+                      onChange={(e) =>
+                        setGuestForm((prev) => ({
+                          ...prev,
+                          guestName: e.target.value,
+                        }))
+                      }
+                    />
+                    <StandardInput
+                      grouped
+                      label={isTh ? "เบอร์โทรศัพท์ *" : "Phone Number *"}
+                      type="tel"
+                      placeholder="08X-XXX-XXXX"
+                      required
+                      value={guestForm.guestPhone}
+                      onChange={(e) =>
+                        setGuestForm((prev) => ({
+                          ...prev,
+                          guestPhone: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                   <StandardInput
-                    label={isTh ? "ชื่อ - นามสกุล *" : "Full Name *"}
-                    placeholder={
-                      isTh ? "เช่น คุณกานต์ วงศ์สวัสดิ์" : "Full name"
-                    }
-                    required
-                    value={guestForm.guestName}
-                    onChange={(e) =>
-                      setGuestForm((prev) => ({
-                        ...prev,
-                        guestName: e.target.value,
-                      }))
-                    }
-                  />
-                  <StandardInput
-                    label={isTh ? "เบอร์โทรศัพท์ *" : "Phone Number *"}
-                    type="tel"
-                    placeholder="08X-XXX-XXXX"
-                    required
-                    value={guestForm.guestPhone}
-                    onChange={(e) =>
-                      setGuestForm((prev) => ({
-                        ...prev,
-                        guestPhone: e.target.value,
-                      }))
-                    }
-                  />
-                  <StandardInput
+                    grouped
                     label="LINE ID"
-                    optionalText={isTh ? "รับใบจอง" : "Optional"}
+                    optionalText={isTh ? "รับใบจอง · ไม่บังคับ" : "Optional"}
                     placeholder="@lineid"
                     value={guestForm.guestLine}
                     onChange={(e) =>
@@ -1119,29 +1143,31 @@ export function HotelCheckoutClient({
                       }))
                     }
                   />
-                  <StandardInput
-                    label={
-                      isTh ? "คำขอพิเศษถึงที่พัก" : "Special requests"
-                    }
-                    optionalText={isTh ? "ไม่บังคับ" : "Optional"}
-                    placeholder={
-                      isTh ? "เช่น เช็กอิน 15:00 น." : "e.g. Late check-in"
-                    }
-                    value={guestForm.guestNote}
-                    onChange={(e) =>
-                      setGuestForm((prev) => ({
-                        ...prev,
-                        guestNote: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
+                </StandardFieldGroup>
+
+                <StandardTextarea
+                  label={isTh ? "คำขอพิเศษถึงที่พัก" : "Special requests"}
+                  optionalText={isTh ? "ไม่บังคับ" : "Optional"}
+                  rows={2}
+                  placeholder={
+                    isTh
+                      ? "เช่น เช็กอิน 15:00 น., ขอเตียงเด็ก หรือแพ้อาหาร"
+                      : "e.g. Late check-in around 15:00, extra pillows"
+                  }
+                  value={guestForm.guestNote}
+                  onChange={(e) =>
+                    setGuestForm((prev) => ({
+                      ...prev,
+                      guestNote: e.target.value,
+                    }))
+                  }
+                />
               </section>
 
               {/* 4. ENTER A COUPON */}
-              <section className="py-7 space-y-3.5">
+              <section className="py-8 space-y-4">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                     {isTh ? "คูปองส่วนลด" : "Enter a coupon"}
                   </h2>
                   <button
@@ -1156,49 +1182,61 @@ export function HotelCheckoutClient({
                   </button>
                 </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponInput}
-                    onChange={(e) =>
-                      setCouponInput(e.target.value.toUpperCase())
-                    }
-                    placeholder={
-                      isTh
-                        ? "กรอกโค้ดส่วนลดของที่พักนี้..."
-                        : "Enter coupon code..."
-                    }
-                    className="h-10 flex-1 rounded-[12px] bg-[var(--color-background-muted)] border border-[var(--color-border)] focus:border-[var(--color-border-emphasized)] px-3.5 text-[14px] font-mono uppercase focus:outline-none min-w-0"
-                  />
+                <div className="flex items-stretch gap-2.5">
+                  <div className="flex-1 min-w-0">
+                    <StandardInput
+                      label={isTh ? "โค้ดส่วนลด" : "Coupon code"}
+                      optionalText={isTh ? "ไม่บังคับ" : "Optional"}
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) =>
+                        setCouponInput(e.target.value.toUpperCase())
+                      }
+                      placeholder={
+                        isTh
+                          ? "กรอกโค้ดส่วนลดของที่พักนี้..."
+                          : "Enter coupon code..."
+                      }
+                      className="font-mono uppercase"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleApplyCoupon()}
-                    className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                    className="min-h-[56px] px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
                   >
                     <Tag className="w-4 h-4" />
                     <span>{isTh ? "ใช้โค้ด" : "Apply"}</span>
                   </button>
                 </div>
 
-                {appliedCouponCode && pricingBreakdown.discountThb > 0 && (
-                  <div className="flex items-center justify-between gap-2 rounded-[10px] border border-[var(--color-border)] bg-[var(--color-background-muted)] px-3.5 py-2 text-[13px]">
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--color-success)]">
-                      <Check className="w-4 h-4 shrink-0" />
-                      <span>
-                        {isTh
-                          ? `ใช้โค้ด ${appliedCouponCode} แล้ว (ประหยัด ฿${pricingBreakdown.discountThb.toLocaleString()})`
-                          : `${appliedCouponCode} applied (saved ฿${pricingBreakdown.discountThb.toLocaleString()})`}
+                {pricingBreakdown.discountThb > 0 &&
+                  (pricingBreakdown.appliedCouponCode ||
+                    pricingBreakdown.appliedAutoDiscountLabel) && (
+                    <div className="flex items-center justify-between gap-2 rounded-[12px] bg-[var(--color-background-muted)] px-3.5 py-2.5 text-[13px]">
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--color-success)] min-w-0">
+                        <Check className="w-4 h-4 shrink-0" />
+                        <span className="truncate">
+                          {pricingBreakdown.appliedCouponCode
+                            ? isTh
+                              ? `ใช้โค้ด ${pricingBreakdown.appliedCouponCode} แล้ว (ประหยัด ฿${pricingBreakdown.discountThb.toLocaleString()})`
+                              : `${pricingBreakdown.appliedCouponCode} applied (saved ฿${pricingBreakdown.discountThb.toLocaleString()})`
+                            : isTh
+                            ? `ใช้ส่วนลดอัตโนมัติ "${pricingBreakdown.appliedAutoDiscountLabel}" (ประหยัด ฿${pricingBreakdown.discountThb.toLocaleString()})`
+                            : `Automatic discount applied (saved ฿${pricingBreakdown.discountThb.toLocaleString()})`}
+                        </span>
                       </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline cursor-pointer"
-                    >
-                      {isTh ? "ลบโค้ด" : "Remove"}
-                    </button>
-                  </div>
-                )}
+                      {appliedCouponCode && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline cursor-pointer shrink-0"
+                        >
+                          {isTh ? "ลบโค้ด" : "Remove"}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                 {coupons.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
@@ -1217,10 +1255,10 @@ export function HotelCheckoutClient({
                           key={c.id}
                           type="button"
                           onClick={() => handleApplyCoupon(c.code)}
-                          className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 h-8 text-[12px] font-mono font-bold cursor-pointer transition border ${
+                          className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 h-8 text-[12px] font-mono font-bold cursor-pointer transition-colors ${
                             isApplied
-                              ? "bg-[#222222] border-[#222222] !text-white dark:bg-[#f5f5f5] dark:border-[#f5f5f5] dark:!text-[#222222]"
-                              : "bg-[var(--color-background-muted)] border-[var(--color-border)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                              ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
                           <Tag className="w-3 h-3 shrink-0" />
@@ -1242,14 +1280,16 @@ export function HotelCheckoutClient({
               </section>
 
               {/* 5. PAYMENT METHOD & GROUND RULES */}
-              <section className="py-7 space-y-4">
+              <section className="py-8 space-y-4">
                 <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                   {isTh ? "ช่องทางชำระเงิน & ข้อตกลงการเข้าพัก" : "Payment & ground rules"}
                 </h2>
 
-                <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-4 flex items-start gap-3">
-                  <QrCode className="w-5 h-5 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
-                  <div className="space-y-1">
+                <div className="flex items-start gap-3.5">
+                  <div className="h-10 w-10 rounded-[10px] bg-[var(--color-background-muted)] flex items-center justify-center shrink-0 text-[var(--color-text-primary)]">
+                    <QrCode className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-0.5">
                     <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
                       {isTh
                         ? "สแกนจ่าย PromptPay เข้าบัญชีที่พักโดยตรง (0% GP)"
@@ -1263,7 +1303,7 @@ export function HotelCheckoutClient({
                   </div>
                 </div>
 
-                <ul className="space-y-1.5 text-[13.5px] text-[var(--color-text-secondary)] list-disc pl-5">
+                <ul className="space-y-1.5 text-[13.5px] text-[var(--color-text-secondary)] list-disc pl-5 pt-1">
                   <li>
                     {isTh
                       ? `เช็กอินหลัง ${hotel.checkInTime} น. · เช็กเอาต์ก่อน ${hotel.checkOutTime} น.`
@@ -1284,13 +1324,13 @@ export function HotelCheckoutClient({
               </section>
 
               {/* 6. MOBILE PRICE BREAKDOWN + FINAL CONFIRM CTA */}
-              <section className="pt-7 space-y-5">
-                <div className="lg:hidden rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-4">
+              <section className="py-8 last:pb-0 space-y-6">
+                <div className="lg:hidden pb-6 border-b border-[var(--color-border)]">
                   {renderPriceDetailsBlock()}
                 </div>
 
                 {bookingError && (
-                  <div className="rounded-[12px] border border-[var(--color-error)] bg-[var(--color-background-muted)] p-3.5 text-[13.5px] font-semibold text-[var(--color-error)]">
+                  <div className="rounded-[12px] bg-[var(--color-background-muted)] px-4 py-3 text-[13.5px] font-semibold text-[var(--color-error)]">
                     {bookingError}
                   </div>
                 )}
@@ -1328,9 +1368,9 @@ export function HotelCheckoutClient({
 
         {/* COLUMN 7: 8.33% (~93px) AIRBNB BREATHING AIR -> RIGHT STICKY CARD (COLS 8–12) */}
         <aside className="hidden lg:block lg:col-start-8 lg:col-span-5 lg:sticky lg:top-24">
-          <div className="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-background-card)] p-6 space-y-5">
+          <div className="rounded-[16px] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] bg-[var(--color-background-card)] p-6 divide-y divide-[var(--color-border)]">
             {/* Property & Room Header */}
-            <div className="flex items-start gap-4">
+            <div className="pb-5 flex items-start gap-4">
               <img
                 src={roomCover}
                 alt={isTh ? selectedRoom.nameTh : selectedRoom.nameEn}
@@ -1358,7 +1398,7 @@ export function HotelCheckoutClient({
               </div>
             </div>
 
-            <div className="border-t border-[var(--color-border)] pt-4 flex items-center justify-between gap-2 text-[13.5px]">
+            <div className="py-5 flex items-center justify-between gap-2 text-[13.5px]">
               <div>
                 <p className="font-semibold text-[var(--color-text-primary)]">
                   {formatShortDate(localCheckIn, language)} –{" "}
@@ -1380,24 +1420,26 @@ export function HotelCheckoutClient({
               )}
             </div>
 
-            <div className="border-t border-[var(--color-border)] pt-5">
+            <div className="py-5">
               {renderPriceDetailsBlock()}
             </div>
 
-            <div className="rounded-[12px] bg-[var(--color-background-muted)] p-3.5 flex items-start gap-2.5 text-[12.5px] text-[var(--color-text-secondary)]">
-              <ShieldCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
-              <span>
-                {isTh
-                  ? `โอนตรงบัญชี ${hotel.promptPayAccountName} · ตรวจสลิปอัตโนมัติ รับใบจองทันทีหลังชำระเงิน`
-                  : `Direct payment to ${hotel.promptPayAccountName} · Instant digital voucher after verification`}
-              </span>
+            <div className="pt-5">
+              <div className="rounded-[12px] bg-[var(--color-background-muted)] p-3.5 flex items-start gap-2.5 text-[12.5px] text-[var(--color-text-secondary)]">
+                <ShieldCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0 mt-0.5" />
+                <span>
+                  {isTh
+                    ? `โอนตรงบัญชี ${hotel.promptPayAccountName} · ตรวจสลิปอัตโนมัติ รับใบจองทันทีหลังชำระเงิน`
+                    : `Direct payment to ${hotel.promptPayAccountName} · Instant digital voucher after verification`}
+                </span>
+              </div>
             </div>
           </div>
         </aside>
       </div>
 
       {/* =====================================================================
-          FLOATING MODAL 1: EDIT DATES & GUESTS (Zero Browser History Push!)
+          FLOATING MODAL 1: EDIT DATES & GUESTS (Bottom Sheet on Mobile, Dialog on Desktop)
       ====================================================================== */}
       {isEditTripOpen && (
         <div
@@ -1406,7 +1448,7 @@ export function HotelCheckoutClient({
           aria-label={
             isTh ? "แก้ไขวันเข้าพักและผู้เข้าพัก" : "Edit dates and guests"
           }
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <div
             className="fixed inset-0 bg-black/45 animate-fade-in-backdrop"
@@ -1415,9 +1457,9 @@ export function HotelCheckoutClient({
 
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative z-10 w-full max-w-[740px] max-h-[88dvh] overflow-y-auto rounded-[20px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-5 sm:p-6 space-y-5"
+            className="relative z-10 w-full sm:max-w-[740px] max-h-[88dvh] overflow-y-auto rounded-t-[20px] sm:rounded-[20px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.08] shadow-[var(--shadow-popover)] p-5 sm:p-6 space-y-5 animate-slide-up-sheet sm:animate-none"
           >
-            <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--color-border)]">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--color-text-primary)]">
                 <Calendar className="w-4 h-4" />
                 <span>
@@ -1454,6 +1496,45 @@ export function HotelCheckoutClient({
               headingPrefix=""
             />
 
+            <div className="pt-4 border-t border-[var(--color-border)] flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                  {isTh ? "จำนวนผู้เข้าพัก" : "Guests"}
+                </p>
+                <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                  {isTh
+                    ? `ห้อง ${selectedRoom.code} รองรับสูงสุด ${selectedRoom.maxGuests} ท่าน`
+                    : `Room ${selectedRoom.code} fits up to ${selectedRoom.maxGuests} guests`}
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleGuestsChanged(Math.max(1, localGuests - 1))
+                  }
+                  disabled={localGuests <= 1}
+                  aria-label="Decrease guests"
+                  className="h-8 w-8 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="min-w-[24px] text-center text-[14.5px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                  {localGuests}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleGuestsChanged(Math.min(12, localGuests + 1))
+                  }
+                  aria-label="Increase guests"
+                  className="h-8 w-8 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
             <div className="pt-3 border-t border-[var(--color-border)] flex items-center justify-between gap-3">
               <div className="text-[13px] text-[var(--color-text-secondary)]">
                 {selectedRoom.code} ·{" "}
@@ -1478,14 +1559,14 @@ export function HotelCheckoutClient({
       )}
 
       {/* =====================================================================
-          FLOATING MODAL 2: SWITCH ROOM TYPE (Zero Browser History Push!)
+          FLOATING MODAL 2: SWITCH ROOM TYPE (Borderless divide-y Rows, Bottom Sheet on Mobile)
       ====================================================================== */}
       {isSwitchRoomOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={isTh ? "เปลี่ยนประเภทห้องพัก" : "Switch room type"}
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <div
             className="fixed inset-0 bg-black/45 animate-fade-in-backdrop"
@@ -1494,9 +1575,9 @@ export function HotelCheckoutClient({
 
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative z-10 w-full max-w-[560px] max-h-[85dvh] overflow-y-auto rounded-[20px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-5 sm:p-6 space-y-4"
+            className="relative z-10 w-full sm:max-w-[560px] max-h-[85dvh] overflow-y-auto rounded-t-[20px] sm:rounded-[20px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.08] shadow-[var(--shadow-popover)] p-5 sm:p-6 space-y-4 animate-slide-up-sheet sm:animate-none"
           >
-            <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--color-border)]">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-2 text-[15px] font-semibold text-[var(--color-text-primary)]">
                 <BedDouble className="w-4 h-4" />
                 <span>
@@ -1513,7 +1594,7 @@ export function HotelCheckoutClient({
               </button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="divide-y divide-[var(--color-border)]">
               {rooms.map((rm) => {
                 const isSelected = rm.id === selectedRoom.id;
                 const avail = rm.availableUnits > 0;
@@ -1524,10 +1605,10 @@ export function HotelCheckoutClient({
                     key={rm.id}
                     type="button"
                     onClick={() => handleSwitchRoom(rm)}
-                    className={`w-full text-left rounded-[14px] border p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors ${
+                    className={`w-full text-left py-3.5 px-3 rounded-[12px] flex items-center justify-between gap-3 cursor-pointer transition-colors ${
                       isSelected
-                        ? "border-[#222222] dark:border-[#f5f5f5] bg-[var(--color-background-muted)]"
-                        : "border-[var(--color-border)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-muted)]"
+                        ? "bg-[var(--color-background-muted)]"
+                        : "hover:bg-[var(--color-background-muted)]/60"
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1548,7 +1629,7 @@ export function HotelCheckoutClient({
                       </div>
                     </div>
 
-                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] border border-[var(--color-border)] px-2.5 h-6 text-[11px] font-semibold text-[var(--color-text-primary)]">
+                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--color-background-muted)] px-2.5 h-6 text-[11px] font-semibold text-[var(--color-text-primary)]">
                       <span
                         aria-hidden="true"
                         className={`h-1.5 w-1.5 rounded-full ${

@@ -1,7 +1,55 @@
 import { prisma } from "@/lib/prisma";
 import type { AppRole, PinCommentDto } from "@/types/cangaroom";
 
-export async function togglePinLike(userId: string, pinId: string) {
+export async function togglePinLike(
+  userId: string,
+  pinId: string,
+  desiredLiked?: boolean
+) {
+  // Fast 1-round-trip atomic idempotent CTE when explicit desiredLiked is provided (zero interactive transaction RTTs!)
+  if (typeof desiredLiked === "boolean") {
+    if (desiredLiked) {
+      const rows = await prisma.$queryRaw<Array<{ likesCount: number }>>`
+        WITH ins AS (
+          INSERT INTO "PinLike" ("userId", "pinId", "createdAt")
+          VALUES (${userId}, ${pinId}, NOW())
+          ON CONFLICT ("userId", "pinId") DO NOTHING
+          RETURNING 1
+        ),
+        upd AS (
+          UPDATE "Pin"
+          SET "likesCount" = "likesCount" + (SELECT COUNT(*)::int FROM ins)
+          WHERE "id" = ${pinId}
+          RETURNING "likesCount"
+        )
+        SELECT "likesCount" FROM upd
+      `;
+      return {
+        isLiked: true,
+        likesCount: Math.max(0, Number(rows[0]?.likesCount ?? 0)),
+      };
+    }
+
+    const rows = await prisma.$queryRaw<Array<{ likesCount: number }>>`
+      WITH del AS (
+        DELETE FROM "PinLike"
+        WHERE "userId" = ${userId} AND "pinId" = ${pinId}
+        RETURNING 1
+      ),
+      upd AS (
+        UPDATE "Pin"
+        SET "likesCount" = GREATEST(0, "likesCount" - (SELECT COUNT(*)::int FROM del))
+        WHERE "id" = ${pinId}
+        RETURNING "likesCount"
+      )
+      SELECT "likesCount" FROM upd
+    `;
+    return {
+      isLiked: false,
+      likesCount: Math.max(0, Number(rows[0]?.likesCount ?? 0)),
+    };
+  }
+
   return prisma.$transaction(async (tx) => {
     const existing = await tx.pinLike.findUnique({
       where: { userId_pinId: { userId, pinId } },
@@ -178,8 +226,16 @@ export async function toggleSavePinToBoard(params: {
   userId: string;
   pinId: string;
   boardId?: string | null;
+  action?: "toggle" | "save" | "unsave" | "move";
+  fromBoardId?: string | null;
 }) {
-  const { userId, pinId, boardId } = params;
+  const {
+    userId,
+    pinId,
+    boardId,
+    action = "toggle",
+    fromBoardId = null,
+  } = params;
 
   return prisma.$transaction(async (tx) => {
     const pin = await tx.pin.findUnique({
@@ -197,27 +253,136 @@ export async function toggleSavePinToBoard(params: {
       throw new Error("ไม่พบ Pin ที่ต้องการบันทึก");
     }
 
-    let targetBoardId = boardId || null;
-    if (!targetBoardId) {
-      let defaultBoard = await tx.savedBoard.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
+    const priceSnapshot =
+      pin.room?.weekdayPriceThb ??
+      (pin.hotel.rooms.length > 0
+        ? Math.min(...pin.hotel.rooms.map((r) => r.weekdayPriceThb))
+        : null);
+
+    // Explicit UNSAVE (from specific board if provided, otherwise from all of user's boards)
+    if (action === "unsave") {
+      const hadAnyBefore = await tx.savedBoardPin.count({
+        where: { userId, pinId },
       });
-      if (!defaultBoard) {
-        defaultBoard = await tx.savedBoard.create({
-          data: { userId, name: "ที่พักที่บันทึกไว้" },
+      await tx.savedBoardPin.deleteMany({
+        where: boardId
+          ? { userId, pinId, boardId }
+          : { userId, pinId },
+      });
+      const remainingCount = await tx.savedBoardPin.count({
+        where: { userId, pinId },
+      });
+      if (hadAnyBefore > 0 && remainingCount === 0) {
+        await tx.pin.update({
+          where: { id: pinId },
+          data: { savesCount: { decrement: 1 } },
         });
       }
-      targetBoardId = defaultBoard.id;
+      return {
+        isSaved: remainingCount > 0,
+        boardId: null as string | null,
+        boardName: null as string | null,
+      };
+    }
+
+    // Explicit MOVE from one board to another (e.g. clicking "Change" on the Saved toast)
+    if (action === "move" && boardId) {
+      const targetBoard = await tx.savedBoard.findFirst({
+        where: { id: boardId, userId },
+        select: { id: true, name: true },
+      });
+      if (!targetBoard) {
+        throw new Error("ไม่พบบอร์ดปลายทาง");
+      }
+
+      if (fromBoardId && fromBoardId !== targetBoard.id) {
+        await tx.savedBoardPin.deleteMany({
+          where: { userId, pinId, boardId: fromBoardId },
+        });
+      }
+
+      const existingInTarget = await tx.savedBoardPin.findUnique({
+        where: {
+          boardId_pinId: { boardId: targetBoard.id, pinId },
+        },
+      });
+      if (!existingInTarget) {
+        const hadAny = await tx.savedBoardPin.count({
+          where: { userId, pinId },
+        });
+        await tx.savedBoardPin.create({
+          data: {
+            boardId: targetBoard.id,
+            pinId,
+            userId,
+            savedPriceSnapshotThb: priceSnapshot,
+          },
+        });
+        if (hadAny === 0) {
+          await tx.pin.update({
+            where: { id: pinId },
+            data: { savesCount: { increment: 1 } },
+          });
+        }
+      }
+
+      return {
+        isSaved: true,
+        boardId: targetBoard.id,
+        boardName: targetBoard.name,
+      };
+    }
+
+    // Default TOGGLE with no boardId: if already saved in ANY board, remove cleanly!
+    if (action === "toggle" && !boardId) {
+      const existingAny = await tx.savedBoardPin.findMany({
+        where: { userId, pinId },
+        select: { id: true },
+      });
+      if (existingAny.length > 0) {
+        await tx.savedBoardPin.deleteMany({
+          where: { userId, pinId },
+        });
+        await tx.pin.update({
+          where: { id: pinId },
+          data: { savesCount: { decrement: 1 } },
+        });
+        return {
+          isSaved: false,
+          boardId: null as string | null,
+          boardName: null as string | null,
+        };
+      }
+    }
+
+    let targetBoard: { id: string; name: string } | null = null;
+    if (boardId) {
+      targetBoard = await tx.savedBoard.findFirst({
+        where: { id: boardId, userId },
+        select: { id: true, name: true },
+      });
+    }
+    if (!targetBoard) {
+      targetBoard = await tx.savedBoard.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, name: true },
+      });
+      if (!targetBoard) {
+        targetBoard = await tx.savedBoard.create({
+          data: { userId, name: "ที่พักที่บันทึกไว้" },
+          select: { id: true, name: true },
+        });
+      }
     }
 
     const existingInTarget = await tx.savedBoardPin.findUnique({
       where: {
-        boardId_pinId: { boardId: targetBoardId, pinId },
+        boardId_pinId: { boardId: targetBoard.id, pinId },
       },
     });
 
-    if (existingInTarget) {
+    if (existingInTarget && action === "toggle") {
       await tx.savedBoardPin.delete({
         where: { id: existingInTarget.id },
       });
@@ -232,39 +397,37 @@ export async function toggleSavePinToBoard(params: {
       }
       return {
         isSaved: remainingCount > 0,
-        boardId: targetBoardId,
+        boardId: targetBoard.id,
+        boardName: targetBoard.name,
       };
     }
 
-    const existingAnyForUser = await tx.savedBoardPin.count({
-      where: { userId, pinId },
-    });
-
-    const priceSnapshot =
-      pin.room?.weekdayPriceThb ??
-      (pin.hotel.rooms.length > 0
-        ? Math.min(...pin.hotel.rooms.map((r) => r.weekdayPriceThb))
-        : null);
-
-    await tx.savedBoardPin.create({
-      data: {
-        boardId: targetBoardId,
-        pinId,
-        userId,
-        savedPriceSnapshotThb: priceSnapshot,
-      },
-    });
-
-    if (existingAnyForUser === 0) {
-      await tx.pin.update({
-        where: { id: pinId },
-        data: { savesCount: { increment: 1 } },
+    if (!existingInTarget) {
+      const existingAnyForUser = await tx.savedBoardPin.count({
+        where: { userId, pinId },
       });
+
+      await tx.savedBoardPin.create({
+        data: {
+          boardId: targetBoard.id,
+          pinId,
+          userId,
+          savedPriceSnapshotThb: priceSnapshot,
+        },
+      });
+
+      if (existingAnyForUser === 0) {
+        await tx.pin.update({
+          where: { id: pinId },
+          data: { savesCount: { increment: 1 } },
+        });
+      }
     }
 
     return {
       isSaved: true,
-      boardId: targetBoardId,
+      boardId: targetBoard.id,
+      boardName: targetBoard.name,
     };
   });
 }

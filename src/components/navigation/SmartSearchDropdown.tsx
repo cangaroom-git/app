@@ -75,7 +75,7 @@ export function SmartSearchDropdown({
     tasteKey: string;
     payload: SmartSearchResponseDto;
   } | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   // Sync localStorage recent searches whenever the dropdown opens
   useEffect(() => {
@@ -106,11 +106,12 @@ export function SmartSearchDropdown({
       return;
     }
 
+    let cancelled = false;
+    const reqId = ++requestSeqRef.current;
     const delayMs = trimmedQuery ? 130 : 0;
+
     const timer = window.setTimeout(async () => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+      if (cancelled || reqId !== requestSeqRef.current) return;
 
       setIsLoading(true);
       try {
@@ -121,11 +122,10 @@ export function SmartSearchDropdown({
 
         const res = await fetch(`/api/search/suggestions?${params.toString()}`, {
           cache: "no-store",
-          signal: controller.signal,
         });
-        if (!res.ok) return;
+        if (!res.ok || cancelled || reqId !== requestSeqRef.current) return;
         const payload = (await res.json()) as SmartSearchResponseDto;
-        if (controller.signal.aborted) return;
+        if (cancelled || reqId !== requestSeqRef.current) return;
 
         if (!trimmedQuery) {
           focusCacheRef.current = {
@@ -136,18 +136,18 @@ export function SmartSearchDropdown({
         }
         setData(payload);
         setHighlightedIndex(-1);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+      } catch {
+        // Ignore transient network failures silently on predictive dropdown
       } finally {
-        if (!controller.signal.aborted) {
+        if (!cancelled && reqId === requestSeqRef.current) {
           setIsLoading(false);
         }
       }
     }, delayMs);
 
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
-      abortRef.current?.abort();
     };
   }, [isOpen, trimmedQuery]);
 

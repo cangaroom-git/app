@@ -1,4 +1,9 @@
-import type { CouponDealDto, RoomAvailabilityDto, RoomDateOverrideDto } from "@/types/cangaroom";
+import type {
+  CouponDealDto,
+  HotelDiscountRuleDto,
+  RoomAvailabilityDto,
+  RoomDateOverrideDto,
+} from "@/types/cangaroom";
 
 export const RESERVED_HOTEL_SLUGS = new Set([
   "admin",
@@ -105,6 +110,30 @@ export function calculateNightlyRateForDate(
   return isWeekendNight(dateStr) ? room.weekendPriceThb : room.weekdayPriceThb;
 }
 
+/**
+ * Returns the maximum minNights restriction across all nights in [checkInDate, checkOutDate)
+ * for a given room (matching server-side enforcement in bookingCheckoutService.ts).
+ */
+export function getRequiredMinNightsForStay(
+  roomId: string,
+  checkInDate: string,
+  checkOutDate: string,
+  overrides: ReadonlyArray<RoomDateOverrideDto> = []
+): number {
+  const stayDates = listDatesInRange(checkInDate, checkOutDate);
+  if (stayDates.length === 0) return 1;
+  const dateSet = new Set(stayDates);
+  let required = 1;
+  for (const ov of overrides) {
+    if (ov.roomId === roomId && dateSet.has(ov.dateStr)) {
+      if (ov.minNights && ov.minNights > required) {
+        required = ov.minNights;
+      }
+    }
+  }
+  return required;
+}
+
 export interface StayPricingBreakdown {
   nights: number;
   unitsBooked: number;
@@ -115,7 +144,59 @@ export interface StayPricingBreakdown {
   discountThb: number;
   netTotalThb: number;
   appliedCouponCode: string | null;
+  appliedAutoDiscountLabel?: string | null;
   couponError: string | null;
+}
+
+/**
+ * Compute the highest eligible automatic stay discount (Airbnb "Only one best discount applies per stay" rule).
+ */
+export function computeBestAutomaticDiscount(params: {
+  rules: ReadonlyArray<HotelDiscountRuleDto>;
+  nights: number;
+  checkInDate: string;
+  subtotalThb: number;
+  todayStr?: string;
+}): { rule: HotelDiscountRuleDto; discountThb: number } | null {
+  const { rules, nights, checkInDate, subtotalThb, todayStr } = params;
+  if (!rules.length || subtotalThb <= 0) return null;
+
+  const baseTodayStr = todayStr || formatDateStr(new Date());
+  const todayMs = new Date(`${baseTodayStr.slice(0, 10)}T00:00:00`).getTime();
+  const checkInMs = new Date(`${checkInDate.slice(0, 10)}T00:00:00`).getTime();
+  const advanceDays =
+    !isNaN(todayMs) && !isNaN(checkInMs)
+      ? Math.max(0, Math.round((checkInMs - todayMs) / 86400000))
+      : 0;
+
+  let best: { rule: HotelDiscountRuleDto; discountThb: number } | null = null;
+
+  for (const rule of rules) {
+    if (!rule.isActive || rule.discountValue <= 0) continue;
+
+    let eligible = false;
+    if (rule.ruleType === "LENGTH_OF_STAY") {
+      eligible = nights >= Math.max(2, rule.minNights ?? 2);
+    } else if (rule.ruleType === "EARLY_BIRD") {
+      eligible = advanceDays >= Math.max(1, rule.minAdvanceDays ?? 14);
+    } else if (rule.ruleType === "LAST_MINUTE") {
+      eligible = advanceDays <= Math.max(0, rule.maxAdvanceDays ?? 3);
+    }
+
+    if (!eligible) continue;
+
+    const raw =
+      rule.discountType === "PERCENT"
+        ? Math.round((subtotalThb * rule.discountValue) / 100)
+        : rule.discountValue;
+    const clamped = Math.min(subtotalThb, Math.max(0, raw));
+
+    if (clamped > 0 && (!best || clamped > best.discountThb)) {
+      best = { rule, discountThb: clamped };
+    }
+  }
+
+  return best;
 }
 
 export function computeCouponDiscount(
@@ -163,6 +244,7 @@ export function calculateStayPricing(params: {
   addons?: ReadonlyArray<{ id: string; priceThb: number }>;
   addonQuantities?: Record<string, number>;
   coupon?: CouponDealDto | null;
+  discountRules?: ReadonlyArray<HotelDiscountRuleDto>;
 }): StayPricingBreakdown {
   const {
     room,
@@ -174,6 +256,7 @@ export function calculateStayPricing(params: {
     addons = [],
     addonQuantities = {},
     coupon = null,
+    discountRules = [],
   } = params;
 
   const stayDates = listDatesInRange(checkInDate, checkOutDate);
@@ -202,8 +285,8 @@ export function calculateStayPricing(params: {
 
   const subtotalBeforeDiscountThb = roomSubtotalThb + addonsTotalThb;
 
-  let discountThb = 0;
-  let appliedCouponCode: string | null = null;
+  let couponDiscountThb = 0;
+  let couponCodeCandidate: string | null = null;
   let couponError: string | null = null;
 
   if (coupon) {
@@ -211,9 +294,29 @@ export function calculateStayPricing(params: {
     if (res.error) {
       couponError = res.error;
     } else {
-      discountThb = res.discountThb;
-      appliedCouponCode = coupon.code;
+      couponDiscountThb = res.discountThb;
+      couponCodeCandidate = coupon.code;
     }
+  }
+
+  const bestAuto = computeBestAutomaticDiscount({
+    rules: discountRules,
+    nights,
+    checkInDate,
+    subtotalThb: roomSubtotalThb,
+  });
+
+  // Airbnb Best-Single-Discount rule: apply whichever saves the guest more (never stack)
+  let discountThb = 0;
+  let appliedCouponCode: string | null = null;
+  let appliedAutoDiscountLabel: string | null = null;
+
+  if (bestAuto && bestAuto.discountThb > couponDiscountThb) {
+    discountThb = bestAuto.discountThb;
+    appliedAutoDiscountLabel = bestAuto.rule.titleTh;
+  } else if (couponDiscountThb > 0) {
+    discountThb = couponDiscountThb;
+    appliedCouponCode = couponCodeCandidate;
   }
 
   return {
@@ -226,6 +329,7 @@ export function calculateStayPricing(params: {
     discountThb,
     netTotalThb: Math.max(0, subtotalBeforeDiscountThb - discountThb),
     appliedCouponCode,
+    appliedAutoDiscountLabel,
     couponError,
   };
 }

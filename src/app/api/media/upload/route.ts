@@ -4,6 +4,8 @@ import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { z } from "zod";
+import { getServerSessionUser } from "@/lib/auth/session";
+import { analyzeImageWithGemini } from "@/lib/ai/geminiImageModeration";
 
 const ALLOWED_FOLDERS = z.enum([
   "hero",
@@ -17,9 +19,63 @@ const ALLOWED_FOLDERS = z.enum([
   "reviews",
 ]);
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB post-compression ceiling
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB post-compression ceiling (client compresses to ~200-500 KB)
+
+// Sliding-window rate limit: max 30 uploads per 10 minutes per user/IP
+// Protects both disk/CDN storage and Gemini AI credits against abuse.
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX_UPLOADS = 30;
+const uploadRateBuckets = new Map<string, number[]>();
+
+function checkUploadRateLimit(bucketKey: string): {
+  allowed: boolean;
+  retryAfterSec: number;
+} {
+  const now = Date.now();
+  const prev = uploadRateBuckets.get(bucketKey) ?? [];
+  const recent = prev.filter((ts) => now - ts < RATE_WINDOW_MS);
+
+  if (recent.length >= RATE_MAX_UPLOADS) {
+    const oldest = recent[0] ?? now;
+    const retryAfterSec = Math.max(
+      1,
+      Math.ceil((RATE_WINDOW_MS - (now - oldest)) / 1000)
+    );
+    uploadRateBuckets.set(bucketKey, recent);
+    return { allowed: false, retryAfterSec };
+  }
+
+  recent.push(now);
+  uploadRateBuckets.set(bucketKey, recent);
+
+  // Prevent unbounded Map growth
+  if (uploadRateBuckets.size > 500) {
+    for (const [k, timestamps] of uploadRateBuckets.entries()) {
+      if (timestamps.every((ts) => now - ts >= RATE_WINDOW_MS)) {
+        uploadRateBuckets.delete(k);
+      }
+    }
+  }
+
+  return { allowed: true, retryAfterSec: 0 };
+}
 
 type DetectedImageFormat = "webp" | "jpg" | "png" | "gif" | "avif";
+
+function formatToMimeType(format: DetectedImageFormat): string {
+  switch (format) {
+    case "webp":
+      return "image/webp";
+    case "jpg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "gif":
+      return "image/gif";
+    case "avif":
+      return "image/avif";
+  }
+}
 
 /**
  * Verifies image magic bytes directly from the binary buffer (OWASP file-upload safety).
@@ -106,9 +162,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const folder = parsedFolder.data;
+
+    // Require authenticated user for all studio/content uploads (allow guest slip uploads with IP rate-limit)
+    const sessionUser = await getServerSessionUser().catch(() => null);
+    if (!sessionUser && folder !== "slips") {
+      return NextResponse.json(
+        { error: "กรุณาเข้าสู่ระบบก่อนอัปโหลดรูปภาพ" },
+        { status: 401 }
+      );
+    }
+
+    const forwardedIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "local";
+    const rateKey = sessionUser ? `u:${sessionUser.id}` : `ip:${forwardedIp}`;
+    const rateCheck = checkUploadRateLimit(rateKey);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `อัปโหลดรูปถี่เกินกำหนด (สูงสุด ${RATE_MAX_UPLOADS} รูป / 10 นาที) กรุณารอสักครู่แล้วลองใหม่`,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateCheck.retryAfterSec) },
+        }
+      );
+    }
+
     if (rawFile.size <= 0 || rawFile.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json(
-        { error: "ขนาดไฟล์รูปภาพต้องไม่เกิน 5 MB" },
+        { error: "ขนาดไฟล์หลังบีบอัดต้องไม่เกิน 5 MB" },
         { status: 422 }
       );
     }
@@ -124,7 +209,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const folder = parsedFolder.data;
+    const mimeType = formatToMimeType(detectedFormat);
+
+    // 0. Server-side AI Safety & Hospitality Relevance Moderation (Gemini Vision)
+    const aiResult = await analyzeImageWithGemini(buffer, mimeType, folder);
+    if (aiResult.decision === "BLOCK") {
+      return NextResponse.json(
+        {
+          error:
+            aiResult.reasonTh ||
+            "ไม่สามารถอัปโหลดรูปภาพนี้ได้ เนื่องจากไม่ตรงตามนโยบายความปลอดภัยของแพลตฟอร์ม",
+          code: "MODERATION_BLOCKED",
+          reasonCategory: aiResult.reasonCategory,
+        },
+        { status: 422 }
+      );
+    }
+
+    const aiPayload = {
+      checked: aiResult.checked,
+      suggestedSpace: aiResult.suggestedSpace,
+      suggestedCaptionTh: aiResult.suggestedCaptionTh,
+      warnings: aiResult.warnings,
+      ...(aiResult.skippedReason ? { skippedReason: aiResult.skippedReason } : {}),
+    };
 
     // 1. Primary: Upload compressed WebP directly to Cloudinary when keys are configured
     if (isCloudinaryConfigured()) {
@@ -164,6 +272,7 @@ export async function POST(request: Request) {
         url: uploaded.secure_url,
         provider: "cloudinary",
         bytes: uploaded.bytes,
+        ai: aiPayload,
       });
     }
 
@@ -186,6 +295,7 @@ export async function POST(request: Request) {
       url: `/uploads/${folder}/${fileName}`,
       provider: "local",
       bytes: buffer.length,
+      ai: aiPayload,
     });
   } catch {
     return NextResponse.json(

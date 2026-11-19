@@ -3,7 +3,8 @@ import { getProvinceById } from "@/data/thailandProvinces";
 import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { getRoomsAvailabilityForRange } from "@/lib/services/availabilityService";
 import { mapHotelPostToSummaryDto } from "@/lib/services/hotelPostService";
-import { mapPinToDto } from "@/lib/services/pinMapper";
+import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
+import { normalizeRoomPhotos } from "@/lib/roomPhotoSpaces";
 import type {
   CouponDealDto,
   HotelProfileDto,
@@ -40,6 +41,10 @@ export async function getHotelStorefrontBySlug(
         where: { isActive: true, expiresAt: { gt: new Date() } },
         orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
       },
+      discountRules: {
+        where: { isActive: true },
+        orderBy: { createdAt: "desc" },
+      },
       pins: {
         where: { publishStatus: "PUBLISHED" },
         orderBy: [{ isSponsored: "desc" }, { createdAt: "desc" }],
@@ -53,7 +58,7 @@ export async function getHotelStorefrontBySlug(
               weekdayPriceThb: true,
             },
           },
-          coupon: { select: { code: true } },
+          coupon: { select: PIN_COUPON_SELECT },
         },
       },
       reviews: {
@@ -82,7 +87,7 @@ export async function getHotelStorefrontBySlug(
 
   const now = new Date();
   const rangeStart = new Date(`${todayStr}T00:00:00.000Z`);
-  const rangeEndStr = addDaysToDate(todayStr, 180);
+  const rangeEndStr = addDaysToDate(todayStr, 365);
   const rangeEnd = new Date(`${rangeEndStr}T00:00:00.000Z`);
 
   const [
@@ -269,6 +274,7 @@ export async function getHotelStorefrontBySlug(
       petsAllowed: room.petsAllowed,
       amenities: room.amenities,
       galleryUrls: room.galleryUrls,
+      galleryMeta: normalizeRoomPhotos(room.galleryUrls, room.galleryMetaJson),
       isActive: room.isActive,
       sortOrder: room.sortOrder,
     };
@@ -322,6 +328,7 @@ export async function getHotelStorefrontBySlug(
           verificationStatus: hotel.verificationStatus,
           ratingAvg: hotel.ratingAvg,
           rooms: hotel.rooms.map((r) => ({ weekdayPriceThb: r.weekdayPriceThb })),
+          coupons: hotel.coupons,
         },
       },
       likedSet,
@@ -339,6 +346,7 @@ export async function getHotelStorefrontBySlug(
       dateStr: formatDateStr(o.date),
       blockedUnits: o.blockedUnits,
       overridePriceThb: o.overridePriceThb,
+      minNights: o.minNights,
       note: o.note,
     })),
     addons: hotel.addons.map((a) => ({
@@ -355,6 +363,18 @@ export async function getHotelStorefrontBySlug(
       sortOrder: a.sortOrder,
     })),
     coupons: couponsDto,
+    discountRules: hotel.discountRules.map((dr) => ({
+      id: dr.id,
+      hotelId: dr.hotelId,
+      ruleType: dr.ruleType,
+      titleTh: dr.titleTh,
+      discountType: dr.discountType,
+      discountValue: dr.discountValue,
+      minNights: dr.minNights,
+      minAdvanceDays: dr.minAdvanceDays,
+      maxAdvanceDays: dr.maxAdvanceDays,
+      isActive: dr.isActive,
+    })),
     pins: pinsDto,
     reviews: hotel.reviews.map((rv) => ({
       id: rv.id,
@@ -367,6 +387,8 @@ export async function getHotelStorefrontBySlug(
       commentEn: rv.commentEn || rv.commentTh,
       photoUrls: rv.photoUrls,
       isVerifiedStay: rv.isVerifiedStay,
+      ownerReplyTh: rv.ownerReplyTh,
+      ownerRepliedAt: rv.ownerRepliedAt ? rv.ownerRepliedAt.toISOString() : null,
       createdAt: rv.createdAt.toISOString(),
     })),
     posts: hotel.posts.map((post) => mapHotelPostToSummaryDto(post, hotel)),

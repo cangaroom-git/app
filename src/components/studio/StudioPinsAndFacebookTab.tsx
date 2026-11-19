@@ -7,21 +7,24 @@ import {
   ChevronDown,
   ChevronUp,
   EyeOff,
-  Facebook,
   Heart,
   ImagePlus,
   RefreshCw,
   Sparkles,
+  Trash2,
   Upload,
   Video,
   X,
 } from "lucide-react";
 import { uploadMediaFile } from "@/lib/slipScanner";
+import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
 import {
-  StandardButton,
+  StandardFieldGroup,
   StandardInput,
-  StatusPill,
+  StandardSelectField,
+  StandardTextarea,
 } from "@/components/ui/standards";
+import { StudioSheetModal } from "@/components/studio/StudioSheetModal";
 import type { PinCategoryDto, PinPublishStatusDto } from "@/types/cangaroom";
 import type { StudioPayload } from "@/components/studio/studioTypes";
 
@@ -34,15 +37,12 @@ const PIN_CATEGORY_OPTIONS: Array<{ value: PinCategoryDto; label: string }> = [
 ];
 
 const ASPECT_RATIO_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "aspect-[3/4]", label: "แนวตั้ง 3:4 (1080×1440 · แนะนำสูงสุดแบบ Pinterest)" },
+  { value: "aspect-[3/4]", label: "แนวตั้ง 3:4 (1080×1440 · แนะนำสูงสุด)" },
   { value: "aspect-[4/5]", label: "แนวตั้ง 4:5 (1080×1350 · มาตรฐาน IG/FB)" },
-  { value: "aspect-[2/3]", label: "แนวตั้งยาว 2:3 (1000×1500 · เต็มจอมือถือ)" },
-  { value: "aspect-[9/16]", label: "วิดีโอแนวตั้ง 9:16 (1080×1920 · Reels/Shorts)" },
+  { value: "aspect-[2/3]", label: "แนวตั้งยาว 2:3 (1000×1500)" },
+  { value: "aspect-[9/16]", label: "วิดีโอแนวตั้ง 9:16 (Reels/Shorts)" },
 ];
 
-/**
- * Normalize external URL (Unsplash / Cloudinary) into 3:4 Vertical Portrait (1080x1440)
- */
 function normalizeUrlToVerticalPortrait(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) return trimmed;
@@ -72,9 +72,6 @@ function normalizeUrlToVerticalPortrait(rawUrl: string): string {
   return trimmed;
 }
 
-/**
- * If a user selects a horizontal image file from their device, center-crop it to 3:4 Vertical Portrait (1080x1440)
- */
 async function ensureVerticalImageFile(file: File): Promise<{
   file: File;
   wasAutoCropped: boolean;
@@ -89,25 +86,20 @@ async function ensureVerticalImageFile(file: File): Promise<{
       URL.revokeObjectURL(objectUrl);
       const w = img.naturalWidth;
       const h = img.naturalHeight;
-      // Already vertical portrait (height > width * 1.08)
       if (h >= w * 1.08) {
         resolve({ file, wasAutoCropped: false });
         return;
       }
-      // Horizontal or square -> center-crop to 3:4 vertical portrait
       const targetRatio = 3 / 4;
       let cropW = w;
       let cropH = h;
       if (w / h > targetRatio) {
         cropW = Math.round(h * targetRatio);
-        cropH = h;
       } else {
-        cropW = w;
         cropH = Math.round(w / targetRatio);
       }
       const startX = Math.max(0, Math.round((w - cropW) / 2));
       const startY = Math.max(0, Math.round((h - cropH) / 2));
-
       const outW = Math.min(1080, cropW);
       const outH = Math.round(outW / targetRatio);
       const canvas = document.createElement("canvas");
@@ -125,10 +117,10 @@ async function ensureVerticalImageFile(file: File): Promise<{
             resolve({ file, wasAutoCropped: false });
             return;
           }
-          const croppedFile = new File([blob], file.name, {
-            type: "image/jpeg",
+          resolve({
+            file: new File([blob], file.name, { type: "image/jpeg" }),
+            wasAutoCropped: true,
           });
-          resolve({ file: croppedFile, wasAutoCropped: true });
         },
         "image/jpeg",
         0.9
@@ -155,7 +147,6 @@ export function StudioPinsAndFacebookTab({
     (c) => c.platform === "FACEBOOK"
   );
 
-  // Facebook Auto-Sync state
   const [externalPageId, setExternalPageId] = useState(
     existingFb?.externalPageId || ""
   );
@@ -166,29 +157,24 @@ export function StudioPinsAndFacebookTab({
     existingFb?.pageUrl || data.hotel.facebookPageUrl || ""
   );
   const [graphAccessToken, setGraphAccessToken] = useState("");
+  const [showAdvancedFb, setShowAdvancedFb] = useState(false);
   const [isSyncingFb, setIsSyncingFb] = useState(false);
 
-  // Triage per-pin room assignment & busy tracking
   const [roomAssignmentByPinId, setRoomAssignmentByPinId] = useState<
     Record<string, string>
   >({});
   const [busyPinId, setBusyPinId] = useState<string | null>(null);
   const [showDiscarded, setShowDiscarded] = useState(false);
 
-  // Manual Pin Upload state
-  const [pinTitle, setPinTitle] = useState("");
+  // Manual Pin Upload Modal state
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [pinDesc, setPinDesc] = useState("");
   const [pinCategory, setPinCategory] = useState<PinCategoryDto>("VIEWS");
   const [pinRoomId, setPinRoomId] = useState("");
   const [pinAspectRatio, setPinAspectRatio] = useState("aspect-[3/4]");
   const [pinCoverUrl, setPinCoverUrl] = useState("");
   const [extraMediaUrls, setExtraMediaUrls] = useState<string[]>([]);
-  const [newExtraUrlInput, setNewExtraUrlInput] = useState("");
   const [pinVideoUrl, setPinVideoUrl] = useState("");
-  const [coverDimensions, setCoverDimensions] = useState<{
-    w: number;
-    h: number;
-  } | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isCreatingPin, setIsCreatingPin] = useState(false);
 
@@ -208,7 +194,6 @@ export function StudioPinsAndFacebookTab({
       onNotify("กรุณาระบุ Page ID และชื่อเพจ Facebook ก่อนซิงก์");
       return;
     }
-
     setIsSyncingFb(true);
     try {
       const res = await fetch("/api/studio/facebook-sync", {
@@ -222,10 +207,7 @@ export function StudioPinsAndFacebookTab({
           graphAccessToken: graphAccessToken.trim() || undefined,
         }),
       });
-      const json = (await res.json()) as {
-        syncedCount?: number;
-        error?: string;
-      };
+      const json = (await res.json()) as { syncedCount?: number; error?: string };
       if (!res.ok) {
         onNotify(json.error || "ซิงก์โพสต์จาก Facebook ไม่สำเร็จ");
         return;
@@ -250,7 +232,6 @@ export function StudioPinsAndFacebookTab({
         explicitRoomId !== undefined
           ? explicitRoomId
           : roomAssignmentByPinId[pinId];
-
       const res = await fetch("/api/studio/pins", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -258,22 +239,37 @@ export function StudioPinsAndFacebookTab({
           hotelSlug: data.hotel.slug,
           pinId,
           publishStatus,
-          ...(chosenRoomId !== undefined
-            ? { roomId: chosenRoomId || null }
-            : {}),
+          ...(chosenRoomId !== undefined ? { roomId: chosenRoomId || null } : {}),
         }),
       });
-      const json = (await res.json()) as { error?: string };
       if (!res.ok) {
-        onNotify(json.error || "อัปเดตสถานะ Pin ไม่สำเร็จ");
+        onNotify("อัปเดตสถานะ Pin ไม่สำเร็จ");
         return;
       }
       onNotify(
         publishStatus === "PUBLISHED"
           ? "อนุมัติ Pin ขึ้นหน้าฟีด Cangaroom แล้ว"
-          : "ย้ายโพสต์ไปเก็บในรายการคัดออกแล้ว"
+          : "ซ่อน Pin เรียบร้อยแล้ว"
       );
       await onReload();
+    } finally {
+      setBusyPinId(null);
+    }
+  };
+
+  const handleDeletePin = async (pinId: string) => {
+    setBusyPinId(pinId);
+    try {
+      const res = await fetch(
+        `/api/studio/pins?id=${encodeURIComponent(pinId)}&hotel=${encodeURIComponent(
+          data.hotel.slug
+        )}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        onNotify("ลบ Pin ออกจากระบบถาวรแล้ว");
+        await onReload();
+      }
     } finally {
       setBusyPinId(null);
     }
@@ -306,8 +302,8 @@ export function StudioPinsAndFacebookTab({
       }
       onNotify(
         autoCroppedCount > 0
-          ? `อัปโหลดและครอปเป็นภาพแนวตั้ง 3:4 อัตโนมัติสำเร็จ (${uploadedUrls.length} รูป)`
-          : `อัปโหลดรูปภาพแนวตั้งสำหรับ Pin สำเร็จ (${uploadedUrls.length} รูป)`
+          ? `อัปโหลดและครอปเป็นแนวตั้ง 3:4 แล้ว (${uploadedUrls.length} รูป)`
+          : `อัปโหลดรูปภาพสำเร็จ (${uploadedUrls.length} รูป)`
       );
     } catch {
       onNotify("อัปโหลดรูปภาพไม่สำเร็จ");
@@ -318,17 +314,15 @@ export function StudioPinsAndFacebookTab({
 
   const handleCreateManualPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pinTitle.trim() || !pinCoverUrl.trim()) {
-      onNotify("กรุณากรอกชื่อ Pin และอัปโหลดรูปภาพหน้าปกก่อนเผยแพร่");
+    if (!pinCoverUrl.trim()) {
+      onNotify("กรุณาอัปโหลดรูปภาพหน้าปกก่อนเผยแพร่");
       return;
     }
-
     const normalizedCover = normalizeUrlToVerticalPortrait(pinCoverUrl);
     const normalizedGallery = [
       normalizedCover,
       ...extraMediaUrls.map(normalizeUrlToVerticalPortrait),
     ];
-
     setIsCreatingPin(true);
     try {
       const res = await fetch("/api/studio/pins", {
@@ -338,7 +332,7 @@ export function StudioPinsAndFacebookTab({
           hotelSlug: data.hotel.slug,
           roomId: pinRoomId || null,
           category: pinCategory,
-          titleTh: pinTitle.trim(),
+          titleTh: pinDesc.trim().slice(0, 120),
           descriptionTh: pinDesc.trim(),
           coverImageUrl: normalizedCover,
           mediaUrls: normalizedGallery,
@@ -346,19 +340,16 @@ export function StudioPinsAndFacebookTab({
           aspectRatio: pinAspectRatio,
         }),
       });
-      const json = (await res.json()) as { error?: string };
       if (!res.ok) {
-        onNotify(json.error || "สร้าง Pin ใหม่ไม่สำเร็จ");
+        onNotify("สร้าง Pin ใหม่ไม่สำเร็จ");
         return;
       }
-      setPinTitle("");
+      setIsUploadModalOpen(false);
       setPinDesc("");
       setPinRoomId("");
       setPinCoverUrl("");
       setExtraMediaUrls([]);
-      setNewExtraUrlInput("");
       setPinVideoUrl("");
-      setCoverDimensions(null);
       onNotify("เผยแพร่ Pin แนวตั้งขึ้นหน้าฟีดทันทีแล้ว");
       await onReload();
     } finally {
@@ -367,75 +358,97 @@ export function StudioPinsAndFacebookTab({
   };
 
   return (
-    <div className="space-y-8">
-      {/* 1. Facebook Page Auto-Sync Connection & Trigger */}
-      <section className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h2 className="ty-title flex items-center gap-2">
-              <Facebook className="w-5 h-5 text-[#1877f2]" />
-              <span>Facebook Page Auto-Sync + AI 3-Tier Smart Triage</span>
+    <div className="divide-y divide-[var(--color-border)]">
+      {/* 1. Header + Manual Upload CTA + Facebook Sync */}
+      <section className="pb-8 space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-0.5">
+            <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
+              Pins หน้าฟีด & ซิงก์เพจ Facebook
             </h2>
-            <p className="ty-caption">
-              ดึงโพสต์รูปและวิดีโอล่าสุดจากเพจ Facebook ของคุณมาคัดกรองอัตโนมัติ:
-              AI จะคัดข่าว/มุกตลกทิ้งทันที (Tier 3) และพักรูปที่พักสวยๆ ไว้รอคุณกดยืนยัน 1 คลิก
+            <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+              อัปโหลดรูปบรรยากาศแนวตั้ง 3:4 หรือซิงก์จาก Facebook Page ด้วยระบบคัดกรอง AI 1-Click Approve
             </p>
           </div>
-          {existingFb ? (
-            <StatusPill variant="accent">
-              ซิงก์ล่าสุด:{" "}
-              {existingFb.lastSyncedAt
-                ? new Date(existingFb.lastSyncedAt).toLocaleString("th-TH")
-                : "เชื่อมต่อแล้ว"}
-            </StatusPill>
-          ) : (
-            <StatusPill variant="neutral">ยังไม่เคยซิงก์</StatusPill>
-          )}
+
+          <button
+            type="button"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <ImagePlus className="w-4 h-4" />
+            <span>อัปโหลด Pin ใหม่</span>
+          </button>
         </div>
 
-        <form onSubmit={handleFacebookSync} className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <StandardInput
-              label="Facebook Page ID *"
-              placeholder="เช่น 104592837461"
-              value={externalPageId}
-              onChange={(e) => setExternalPageId(e.target.value)}
-              required
-            />
-            <StandardInput
-              label="ชื่อเพจ Facebook *"
-              placeholder="เช่น Sapan Unseen Resort"
-              value={externalPageName}
-              onChange={(e) => setExternalPageName(e.target.value)}
-              required
-            />
-            <StandardInput
-              label="ลิงก์เพจ Facebook"
-              placeholder="https://facebook.com/yourpage"
-              value={pageUrl}
-              onChange={(e) => setPageUrl(e.target.value)}
-            />
-            <StandardInput
-              label="Page Access Token"
-              optionalText="ไม่บังคับ"
-              type="password"
-              placeholder="วาง Token หรือเว้นว่างเพื่อซิงก์ตัวอย่าง"
-              value={graphAccessToken}
-              onChange={(e) => setGraphAccessToken(e.target.value)}
-            />
+        {/* Clean Facebook Sync Form (Airbnb Grouped Inset-Label Standard) */}
+        <form onSubmit={handleFacebookSync} className="pt-2 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
+                Facebook Page Auto-Sync
+              </h3>
+              <p className="text-[13px] text-[var(--color-text-secondary)]">
+                {existingFb?.lastSyncedAt
+                  ? `ซิงก์ล่าสุดเมื่อ ${new Date(
+                      existingFb.lastSyncedAt
+                    ).toLocaleString("th-TH")}`
+                  : "เชื่อมต่อเพจ Facebook เพื่อดึงรูปที่พักมาพักรอตรวจก่อนเผยแพร่"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFb((v) => !v)}
+              className="text-[13px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
+            >
+              {showAdvancedFb ? "ซ่อนตั้งค่าขั้นสูง" : "ตั้งค่า Token ขั้นสูง"}
+            </button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <p className="ty-caption">
-              โหมดความปลอดภัย:{" "}
-              <span className="font-semibold">1-Click Approve</span> —
-              ไม่มีโพสต์ไร้สาระหลุดขึ้นหน้าเว็บอัตโนมัติแน่นอน
-            </p>
-            <StandardButton
+          <StandardFieldGroup>
+            <div className="grid grid-cols-1 sm:grid-cols-3 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+              <StandardInput
+                grouped
+                label="Facebook Page ID *"
+                placeholder="เช่น 104592837461"
+                value={externalPageId}
+                onChange={(e) => setExternalPageId(e.target.value)}
+                required
+              />
+              <StandardInput
+                grouped
+                label="ชื่อเพจ Facebook *"
+                placeholder="เช่น Sapan Unseen Resort"
+                value={externalPageName}
+                onChange={(e) => setExternalPageName(e.target.value)}
+                required
+              />
+              <StandardInput
+                grouped
+                label="ลิงก์เพจ Facebook"
+                placeholder="https://facebook.com/yourpage"
+                value={pageUrl}
+                onChange={(e) => setPageUrl(e.target.value)}
+              />
+            </div>
+            {showAdvancedFb && (
+              <StandardInput
+                grouped
+                label="Page Access Token"
+                optionalText="ไม่บังคับ"
+                type="password"
+                placeholder="วาง Graph API Token สำหรับดึงโพสต์จริง"
+                value={graphAccessToken}
+                onChange={(e) => setGraphAccessToken(e.target.value)}
+              />
+            )}
+          </StandardFieldGroup>
+
+          <div className="flex justify-end">
+            <button
               type="submit"
-              variant="primary"
-              size="sm"
               disabled={isSyncingFb}
+              className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-4 h-4 ${isSyncingFb ? "animate-spin" : ""}`}
@@ -443,537 +456,216 @@ export function StudioPinsAndFacebookTab({
               <span>
                 {isSyncingFb
                   ? "กำลังซิงก์และคัดกรอง AI..."
-                  : "ซิงก์โพสต์ล่าสุดจากเพจ Facebook"}
+                  : "ซิงก์โพสต์ล่าสุดจาก Facebook"}
               </span>
-            </StandardButton>
+            </button>
           </div>
         </form>
       </section>
 
-      {/* 2. AI Smart Triage 1-Click Approval Queue */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="ty-title flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[var(--color-accent)]" />
+      {/* 2. AI Smart Triage Queue */}
+      {pendingPins.length > 0 && (
+        <section className="py-8 space-y-4">
+          <h3 className="text-[18px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
             <span>รายการรอยืนยัน 1-Click Approve ({pendingPins.length})</span>
-          </h2>
-          {pendingPins.length > 0 && (
-            <StatusPill variant="promo">รอเจ้าของตรวจสอบ</StatusPill>
-          )}
-        </div>
+          </h3>
 
-        {pendingPins.length === 0 ? (
-          <div className="rounded-[18px] bg-[var(--color-background-muted)] p-6 text-center ty-body">
-            ไม่มีโพสต์รอตรวจสอบในคิว — กดซิงก์โพสต์ล่าสุดจากเพจ Facebook เพื่อดึงรูปใหม่เข้าระบบได้เลย
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="divide-y divide-[var(--color-border)]">
             {pendingPins.map((pin) => {
               const selectedRoomId =
                 roomAssignmentByPinId[pin.id] ?? pin.roomId ?? "";
-              const scorePct =
-                pin.aiConfidenceScore !== null
-                  ? Math.round(
-                      pin.aiConfidenceScore <= 1
-                        ? pin.aiConfidenceScore * 100
-                        : pin.aiConfidenceScore
-                    )
-                  : null;
-
               return (
                 <div
                   key={pin.id}
-                  className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-4 flex flex-col sm:flex-row gap-4"
+                  className="py-4 first:pt-0 flex flex-col sm:flex-row gap-4"
                 >
                   <img
                     src={pin.coverImageUrl}
                     alt={pin.titleTh}
-                    className="w-full sm:w-32 h-40 sm:h-auto rounded-[14px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+                    className="w-full sm:w-28 aspect-[3/4] rounded-[12px] object-cover shrink-0 bg-[var(--color-background-muted)]"
                   />
-                  <div className="flex-1 min-w-0 flex flex-col justify-between gap-3">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusPill variant="accent">
-                          {pin.sourcePlatform}
-                        </StatusPill>
-                        {scorePct !== null && (
-                          <StatusPill variant="success">
-                            AI มั่นใจ {scorePct}%
-                          </StatusPill>
-                        )}
-                      </div>
-                      <h3 className="ty-body font-bold line-clamp-2">
-                        {pin.titleTh}
-                      </h3>
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                        {pin.titleTh || "โพสต์รูปบรรยากาศที่พัก"}
+                      </p>
                       {pin.descriptionTh && (
-                        <p className="ty-caption line-clamp-3">
+                        <p className="text-[13.5px] text-[var(--color-text-secondary)] line-clamp-2">
                           {pin.descriptionTh}
                         </p>
                       )}
                       {pin.aiTriageNote && (
-                        <p className="ty-caption rounded-[10px] bg-[var(--color-background-muted)] px-2.5 py-1.5">
-                          <span className="font-semibold">AI Note: </span>
-                          {pin.aiTriageNote}
+                        <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                          AI Note: {pin.aiTriageNote}
                         </p>
                       )}
                     </div>
 
-                    <div className="space-y-2.5 pt-1">
-                      <div>
-                        <label className="ty-caption font-semibold block mb-1">
-                          ผูกเข้ากับห้องพัก (ลิงก์จองตรงจาก Pin นี้):
-                        </label>
-                        <select
-                          className="fw-input w-full text-sm"
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <div className="w-[220px]">
+                        <ResponsiveSelect
                           value={selectedRoomId}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             setRoomAssignmentByPinId((prev) => ({
                               ...prev,
-                              [pin.id]: e.target.value,
+                              [pin.id]: val,
                             }))
                           }
-                        >
-                          <option value="">ไม่ระบุห้อง (ภาพบรรยากาศรวม)</option>
-                          {data.rooms.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {r.nameTh} ({r.code}) — ฿
-                              {r.weekdayPriceThb.toLocaleString()}
-                            </option>
-                          ))}
-                        </select>
+                          sheetTitle="ผูก Pin กับห้องพัก"
+                          triggerClassName="w-full h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] text-[13px] font-medium text-[var(--color-text-primary)]"
+                          options={[
+                            { value: "", label: "ไม่ระบุห้องเฉพาะ" },
+                            ...data.rooms.map((r) => ({
+                              value: r.id,
+                              label: `${r.code} · ${r.nameTh}`,
+                            })),
+                          ]}
+                        />
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <StandardButton
-                          variant="primary"
-                          size="sm"
-                          disabled={busyPinId === pin.id}
-                          onClick={() =>
-                            handleTriageAction(pin.id, "PUBLISHED")
-                          }
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>อนุมัติขึ้นเว็บ</span>
-                        </StandardButton>
-                        <StandardButton
-                          variant="secondary"
-                          size="sm"
-                          disabled={busyPinId === pin.id}
-                          onClick={() =>
-                            handleTriageAction(pin.id, "DISCARDED")
-                          }
-                        >
-                          <X className="w-4 h-4" />
-                          <span>ไม่นำขึ้น</span>
-                        </StandardButton>
-                      </div>
+                      <button
+                        type="button"
+                        disabled={busyPinId === pin.id}
+                        onClick={() => handleTriageAction(pin.id, "PUBLISHED")}
+                        className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>อนุมัติขึ้นเว็บ</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busyPinId === pin.id}
+                        onClick={() => handleTriageAction(pin.id, "DISCARDED")}
+                        className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>ไม่นำขึ้น</span>
+                      </button>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
+        </section>
+      )}
 
-        {/* Collapsible Tier-3 AI-Auto-Discarded Posts */}
-        {discardedPins.length > 0 && (
-          <div className="rounded-[18px] border border-[var(--color-border)] bg-[var(--color-background-card)] overflow-hidden">
+      {/* 3. Published Pins Grid (Clean Borderless Editorial Cards) */}
+      <section className="py-8 space-y-5">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+            Pin ที่เผยแพร่อยู่ ({publishedPins.length})
+          </h3>
+          {discardedPins.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowDiscarded((prev) => !prev)}
-              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-[var(--color-background-muted)] transition-colors"
+              onClick={() => setShowDiscarded((v) => !v)}
+              className="text-[13px] font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
             >
-              <span className="ty-body font-semibold flex items-center gap-2">
-                <EyeOff className="w-4 h-4 text-[var(--color-text-secondary)]" />
-                <span>
-                  โพสต์ที่ AI คัดออกอัตโนมัติ (Tier 3) หรือซ่อนไว้ (
-                  {discardedPins.length})
-                </span>
-              </span>
+              <EyeOff className="w-3.5 h-3.5" />
+              <span>ซ่อนอยู่ ({discardedPins.length})</span>
               {showDiscarded ? (
-                <ChevronUp className="w-4 h-4" />
+                <ChevronUp className="w-3.5 h-3.5" />
               ) : (
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3.5 h-3.5" />
               )}
             </button>
-
-            {showDiscarded && (
-              <div className="border-t border-[var(--color-border)] p-4 space-y-2.5">
-                {discardedPins.map((pin) => (
-                  <div
-                    key={pin.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[12px] bg-[var(--color-background-muted)] p-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={pin.coverImageUrl}
-                        alt={pin.titleTh}
-                        className="w-14 h-14 rounded-[10px] object-cover shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="ty-body font-semibold truncate">
-                          {pin.titleTh}
-                        </p>
-                        <p className="ty-caption truncate">
-                          {pin.aiTriageNote || "ถูกคัดออกโดย AI / เจ้าของที่พัก"}
-                        </p>
-                      </div>
-                    </div>
-                    <StandardButton
-                      variant="secondary"
-                      size="sm"
-                      disabled={busyPinId === pin.id}
-                      onClick={() => handleTriageAction(pin.id, "PUBLISHED")}
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>กู้คืนขึ้นเว็บ</span>
-                    </StandardButton>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 3. Manual Pin Upload Card */}
-      <form
-        onSubmit={handleCreateManualPin}
-        className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 space-y-4"
-      >
-        <h2 className="ty-title flex items-center gap-2">
-          <ImagePlus className="w-5 h-5 text-[var(--color-promo)]" />
-          <span>อัปโหลด Pin ใหม่ด้วยตัวเอง (เผยแพร่ทันที)</span>
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <StandardInput
-              label="หัวข้อ Pin *"
-              placeholder="เช่น สระน้ำริมหน้าผายามพระอาทิตย์ตก"
-              value={pinTitle}
-              onChange={(e) => setPinTitle(e.target.value)}
-              required
-            />
-
-            <div>
-              <label className="ty-caption font-semibold block mb-1">
-                คำบรรยายสำหรับนักเดินทาง & AI Search
-              </label>
-              <textarea
-                rows={3}
-                className="fw-input w-full"
-                placeholder="เล่ารายละเอียดมุมถ่ายรูป ไฮไลต์ห้องพัก หรือช่วงเวลาที่สวยที่สุด..."
-                value={pinDesc}
-                onChange={(e) => setPinDesc(e.target.value)}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="ty-caption font-semibold block mb-1">
-                  หมวดหมู่ Pin
-                </label>
-                <select
-                  className="fw-input w-full"
-                  value={pinCategory}
-                  onChange={(e) =>
-                    setPinCategory(e.target.value as PinCategoryDto)
-                  }
-                >
-                  {PIN_CATEGORY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="ty-caption font-semibold block mb-1">
-                  สัดส่วนภาพบน Grid
-                </label>
-                <select
-                  className="fw-input w-full"
-                  value={pinAspectRatio}
-                  onChange={(e) => setPinAspectRatio(e.target.value)}
-                >
-                  {ASPECT_RATIO_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="ty-caption font-semibold block mb-1">
-                เชื่อมกับห้องพัก (ถ้ามี)
-              </label>
-              <select
-                className="fw-input w-full"
-                value={pinRoomId}
-                onChange={(e) => setPinRoomId(e.target.value)}
-              >
-                <option value="">ไม่ระบุห้องเฉพาะ</option>
-                {data.rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.nameTh} ({r.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {/* Vertical Media Standard Banner */}
-            <div className="rounded-[14px] bg-[var(--color-background-muted)] p-3 space-y-1">
-              <p className="text-[13px] font-bold text-[var(--color-text-primary)]">
-                มาตรฐานภาพแนวตั้ง Cangaroom (3:4 หรือ 4:5 แบบ Pinterest)
-              </p>
-              <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
-                แนะนำใช้ภาพหรือวิดีโอแนวตั้ง (เช่น <strong>1080×1440 px</strong>) เพื่อให้แสดงผลเต็มกรอบแบบไม่มีขอบว่าง หากอัปโหลดไฟล์ภาพแนวนอน ระบบจะช่วยครอปเป็นแนวตั้ง 3:4 ให้อัตโนมัติครับ
-              </p>
-            </div>
-
-            <div>
-              <span className="ty-body font-semibold block mb-1.5">
-                รูปภาพหน้าปก & อัลบั้มแนวตั้ง (เลือกได้หลายรูป) *
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="btn-fw-secondary cursor-pointer shrink-0">
-                  <Upload className="w-4 h-4" />
-                  <span>
-                    {isUploadingCover
-                      ? "กำลังอัปโหลด & ปรับแนวตั้ง..."
-                      : "เลือกไฟล์รูป (1 หรือหลายรูป)"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="sr-only"
-                    onChange={handleUploadPinCover}
-                  />
-                </label>
-                <input
-                  type="url"
-                  className="fw-input flex-1 min-w-[180px]"
-                  placeholder="หรือวาง URL รูปภาพหลัก"
-                  value={pinCoverUrl}
-                  onChange={(e) => {
-                    setPinCoverUrl(e.target.value);
-                    setCoverDimensions(null);
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Additional Album Photos Input */}
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                className="fw-input flex-1"
-                placeholder="เพิ่ม URL รูปที่ 2, 3, 4 ในอัลบั้มเดียวกัน..."
-                value={newExtraUrlInput}
-                onChange={(e) => setNewExtraUrlInput(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const norm = normalizeUrlToVerticalPortrait(newExtraUrlInput);
-                  if (!norm) return;
-                  if (!pinCoverUrl) {
-                    setPinCoverUrl(norm);
-                  } else {
-                    setExtraMediaUrls((prev) => [...prev, norm]);
-                  }
-                  setNewExtraUrlInput("");
-                }}
-                className="h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] shrink-0 cursor-pointer"
-              >
-                + เพิ่มรูปในชุด
-              </button>
-            </div>
-
-            {pinCoverUrl && (
-              <div className="flex flex-wrap items-start gap-3 pt-1">
-                {/* Live Vertical 3:4 Pinterest Frame Preview */}
-                <div className="w-36 aspect-[3/4] rounded-[14px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-background-muted)] shrink-0 relative">
-                  <img
-                    src={pinCoverUrl}
-                    alt="ตัวอย่างภาพ Pin แนวตั้ง"
-                    onLoad={(e) => {
-                      const img = e.currentTarget;
-                      if (img.naturalWidth && img.naturalHeight) {
-                        setCoverDimensions({
-                          w: img.naturalWidth,
-                          h: img.naturalHeight,
-                        });
-                      }
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-[6px] bg-black/65 text-white text-[10px] font-bold">
-                    Preview 3:4
-                  </span>
-                </div>
-
-                <div className="flex-1 min-w-[180px] space-y-2">
-                  {coverDimensions &&
-                    coverDimensions.w >= coverDimensions.h && (
-                      <div className="rounded-[12px] border border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] p-2.5 space-y-1.5">
-                        <p className="text-[12px] font-bold text-[var(--color-text-primary)]">
-                          ตรวจพบภาพแนวนอน ({coverDimensions.w}×{coverDimensions.h} px)
-                        </p>
-                        <p className="text-[11.5px] text-[var(--color-text-secondary)]">
-                          แนะนำให้แปลงเป็นสัดส่วนแนวตั้ง 3:4 เพื่อแสดงเต็มหน้าจอแบบ Pinterest
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPinCoverUrl((prev) =>
-                              normalizeUrlToVerticalPortrait(prev)
-                            );
-                            setCoverDimensions({ w: 1080, h: 1440 });
-                          }}
-                          className="h-8 px-3 rounded-[9px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12px] font-semibold cursor-pointer"
-                        >
-                          ปรับเป็นแนวตั้ง 3:4 อัตโนมัติ
-                        </button>
-                      </div>
-                    )}
-
-                  {extraMediaUrls.length > 0 && (
-                    <div className="space-y-1">
-                      <span className="text-[12px] font-semibold text-[var(--color-text-secondary)]">
-                        รูปในอัลบั้ม ({extraMediaUrls.length + 1} รูป):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {extraMediaUrls.map((u, idx) => (
-                          <div
-                            key={`${u}-${idx}`}
-                            className="relative h-12 w-12 rounded-[10px] overflow-hidden border border-[var(--color-border)]"
-                          >
-                            <img
-                              src={u}
-                              alt={`Slide ${idx + 2}`}
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExtraMediaUrls((prev) =>
-                                  prev.filter((_, i) => i !== idx)
-                                )
-                              }
-                              className="absolute top-0.5 right-0.5 h-4 w-4 rounded-[4px] bg-black/70 text-white flex items-center justify-center text-[10px] cursor-pointer"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <StandardInput
-              label="ลิงก์วิดีโอแนวตั้ง MP4 / Short (9:16 หรือ 3:4)"
-              optionalText="ไม่บังคับ"
-              placeholder="https://.../tour.mp4"
-              value={pinVideoUrl}
-              onChange={(e) => setPinVideoUrl(e.target.value)}
-            />
-
-            <div className="pt-1 flex items-center justify-between gap-2">
-              <span className="ty-caption inline-flex items-center gap-1">
-                <Video className="w-3.5 h-3.5" />
-                <span>ถ้าใส่ URL วิดีโอ ระบบจะแสดงเป็น Video Pin แนวตั้ง</span>
-              </span>
-              <StandardButton
-                type="submit"
-                variant="promo"
-                size="md"
-                disabled={isCreatingPin || isUploadingCover}
-              >
-                <ImagePlus className="w-4 h-4" />
-                <span>
-                  {isCreatingPin ? "กำลังเผยแพร่..." : "เผยแพร่ Pin ขึ้นฟีด"}
-                </span>
-              </StandardButton>
-            </div>
-          </div>
+          )}
         </div>
-      </form>
 
-      {/* 4. Live Published Pins Overview */}
-      <section className="space-y-3">
-        <h2 className="ty-title">
-          Pin ที่เผยแพร่อยู่บนหน้าฟีด ({publishedPins.length})
-        </h2>
-
-        {publishedPins.length === 0 ? (
-          <div className="rounded-[18px] bg-[var(--color-background-muted)] p-6 text-center ty-body">
-            ยังไม่มี Pin ที่เผยแพร่ — อัปโหลดรูปใหม่ด้านบน หรืออนุมัติจาก Facebook Sync ได้เลย
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {publishedPins.map((pin) => (
+        {showDiscarded && discardedPins.length > 0 && (
+          <div className="rounded-[14px] bg-[var(--color-background-muted)] p-4 divide-y divide-[var(--color-border)]">
+            {discardedPins.map((pin) => (
               <div
                 key={pin.id}
-                className="rounded-[18px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col"
+                className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3"
               >
-                <div className="relative h-48 bg-[var(--color-background-muted)]">
+                <div className="flex items-center gap-3 min-w-0">
                   <img
                     src={pin.coverImageUrl}
                     alt={pin.titleTh}
+                    className="h-12 w-10 rounded-[8px] object-cover shrink-0"
+                  />
+                  <p className="text-[13.5px] font-medium truncate">
+                    {pin.titleTh || "Pin ที่ซ่อนอยู่"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleTriageAction(pin.id, "PUBLISHED")}
+                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-card)] text-[12.5px] font-semibold cursor-pointer"
+                  >
+                    กู้คืน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePin(pin.id)}
+                    aria-label="ลบถาวร"
+                    className="h-8 w-8 rounded-[9px] hover:bg-[var(--color-background-subtle)] text-[var(--color-error)] inline-flex items-center justify-center cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {publishedPins.length === 0 ? (
+          <div className="rounded-[16px] bg-[var(--color-background-muted)] py-10 px-6 text-center text-[14px] text-[var(--color-text-secondary)]">
+            ยังไม่มี Pin ที่เผยแพร่ — กดปุ่ม “อัปโหลด Pin ใหม่” ด้านบนได้เลยครับ
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {publishedPins.map((pin) => (
+              <div key={pin.id} className="space-y-2">
+                <div className="relative aspect-[3/4] rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]">
+                  <img
+                    src={pin.coverImageUrl}
+                    alt={pin.titleTh}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
-                  {pin.isSponsored && (
-                    <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-[var(--color-promo)] text-white text-[11px] font-bold">
-                      Sponsored Pin
-                    </span>
-                  )}
                 </div>
-                <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <StatusPill variant="neutral">{pin.category}</StatusPill>
-                      {pin.roomNameTh && (
-                        <span className="ty-caption truncate">
-                          ห้อง: {pin.roomNameTh}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="ty-body font-bold line-clamp-2">
-                      {pin.titleTh}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border)] ty-caption">
-                    <div className="flex items-center gap-3">
+                <div className="space-y-1 px-0.5">
+                  <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] line-clamp-1">
+                    {pin.titleTh || pin.category}
+                  </p>
+                  <div className="flex items-center justify-between text-[12px] text-[var(--color-text-secondary)]">
+                    <div className="flex items-center gap-2.5">
                       <span className="inline-flex items-center gap-1">
-                        <Heart className="w-3.5 h-3.5 text-[var(--color-promo)]" />
+                        <Heart className="w-3 h-3" />
                         {pin.likesCount}
                       </span>
                       <span className="inline-flex items-center gap-1">
-                        <Bookmark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                        <Bookmark className="w-3 h-3" />
                         {pin.savesCount}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busyPinId === pin.id}
-                      onClick={() =>
-                        handleTriageAction(pin.id, "DISCARDED", pin.roomId)
-                      }
-                      className="text-[var(--color-text-secondary)] hover:text-[var(--color-danger)] font-medium transition-colors"
-                    >
-                      ซ่อน Pin
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={busyPinId === pin.id}
+                        onClick={() =>
+                          handleTriageAction(pin.id, "DISCARDED", pin.roomId)
+                        }
+                        className="underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer"
+                      >
+                        ซ่อน
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyPinId === pin.id}
+                        onClick={() => handleDeletePin(pin.id)}
+                        className="hover:text-[var(--color-error)] cursor-pointer"
+                        aria-label="ลบ Pin"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -981,6 +673,140 @@ export function StudioPinsAndFacebookTab({
           </div>
         )}
       </section>
+
+      {/* Manual Pin Upload Modal */}
+      <StudioSheetModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        title="อัปโหลด Pin แนวตั้งใหม่"
+        subtitle="รองรับภาพ 3:4 / 4:5 (ระบบช่วยครอปอัตโนมัติหากอัปโหลดภาพแนวนอน)"
+        maxWidthClass="md:max-w-[620px]"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsUploadModalOpen(false)}
+              className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              form="studio-manual-pin-form"
+              disabled={isCreatingPin || isUploadingCover}
+              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+            >
+              {isCreatingPin ? "กำลังเผยแพร่..." : "เผยแพร่ Pin ขึ้นฟีด"}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="studio-manual-pin-form"
+          onSubmit={handleCreateManualPin}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <span className="ty-body font-semibold block">
+              อัปโหลดรูปภาพ (เลือกได้หลายรูป) *
+            </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0">
+                <Upload className="w-4 h-4" />
+                <span>
+                  {isUploadingCover ? "กำลังอัปโหลด..." : "เลือกไฟล์รูปภาพ"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={handleUploadPinCover}
+                />
+              </label>
+              <input
+                type="url"
+                placeholder="หรือวาง URL รูปภาพหลัก"
+                value={pinCoverUrl}
+                onChange={(e) => setPinCoverUrl(e.target.value)}
+                className="flex-1 min-w-[180px] h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] border border-transparent focus:border-[var(--color-text-primary)] focus:bg-[var(--color-background-card)] text-[14px] focus:outline-none"
+              />
+            </div>
+
+            {pinCoverUrl && (
+              <div className="flex items-start gap-3 pt-1">
+                <img
+                  src={pinCoverUrl}
+                  alt="Preview"
+                  className="w-24 aspect-[3/4] rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                />
+                {extraMediaUrls.length > 0 && (
+                  <p className="text-[13px] text-[var(--color-text-secondary)]">
+                    อัลบั้มทั้งหมด {extraMediaUrls.length + 1} รูป
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <StandardTextarea
+            label="แคปชันสั้นๆ"
+            optionalText="ไม่บังคับ"
+            rows={3}
+            value={pinDesc}
+            onChange={(e) => setPinDesc(e.target.value)}
+            placeholder="เช่น ตื่นมาชมทะเลหมอกหน้าห้อง..."
+          />
+
+          <StandardFieldGroup>
+            <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+              <StandardSelectField
+                grouped
+                label="หมวดหมู่"
+                value={pinCategory}
+                onChange={(v) => setPinCategory(v as PinCategoryDto)}
+                sheetTitle="เลือกหมวดหมู่ Pin"
+                options={PIN_CATEGORY_OPTIONS}
+              />
+              <StandardSelectField
+                grouped
+                label="สัดส่วนภาพ"
+                value={pinAspectRatio}
+                onChange={setPinAspectRatio}
+                sheetTitle="เลือกสัดส่วนภาพ"
+                options={ASPECT_RATIO_OPTIONS}
+              />
+            </div>
+            <StandardSelectField
+              grouped
+              label="เชื่อมกับห้องพัก"
+              optionalText="ไม่บังคับ"
+              value={pinRoomId}
+              onChange={setPinRoomId}
+              sheetTitle="เลือกห้องพักที่เชื่อมกับ Pin"
+              options={[
+                { value: "", label: "ไม่ระบุห้องเฉพาะ" },
+                ...data.rooms.map((r) => ({
+                  value: r.id,
+                  label: `${r.code} · ${r.nameTh}`,
+                })),
+              ]}
+            />
+            <StandardInput
+              grouped
+              label="ลิงก์วิดีโอแนวตั้ง MP4"
+              optionalText="ไม่บังคับ"
+              placeholder="https://.../tour.mp4"
+              value={pinVideoUrl}
+              onChange={(e) => setPinVideoUrl(e.target.value)}
+            />
+          </StandardFieldGroup>
+          <p className="text-[12px] text-[var(--color-text-secondary)] inline-flex items-center gap-1">
+            <Video className="w-3.5 h-3.5" />
+            <span>หากใส่ลิงก์วิดีโอ ระบบจะแสดงเป็น Video Pin เล่นอัตโนมัติบนหน้าฟีด</span>
+          </p>
+        </form>
+      </StudioSheetModal>
     </div>
   );
 }

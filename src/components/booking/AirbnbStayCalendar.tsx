@@ -1,19 +1,8 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  BedDouble,
-  ChevronLeft,
-  ChevronRight,
-  Minus,
-  Plus,
-  Users,
-} from "lucide-react";
-import {
-  addDaysToDate,
-  calculateNightlyRateForDate,
-  formatDateStr,
-} from "@/lib/bookingMath";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import type {
   RoomAvailabilityDto,
@@ -80,7 +69,7 @@ export interface AirbnbStayCalendarProps {
   checkOutDate: string;
   onChangeDates: (nextIn: string, nextOut: string) => void;
   guests: number;
-  onChangeGuests: (nextGuests: number) => void;
+  onChangeGuests?: (nextGuests: number) => void;
   stayNights: number;
   hotelName: string;
   rooms: RoomAvailabilityDto[];
@@ -98,7 +87,6 @@ export function AirbnbStayCalendar({
   checkOutDate,
   onChangeDates,
   guests,
-  onChangeGuests,
   stayNights,
   hotelName,
   rooms,
@@ -106,11 +94,12 @@ export function AirbnbStayCalendar({
   onChangeCalendarRoomFilterId,
   bookedUnitsByRoomDate,
   dateOverrides,
-  headingPrefix = "1. ",
+  headingPrefix = "",
 }: AirbnbStayCalendarProps) {
   const [selectingPhase, setSelectingPhase] = useState<"checkin" | "checkout">(
     "checkin"
   );
+  const [pendingCheckIn, setPendingCheckIn] = useState<string | null>(null);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
 
   const isTh = language === "th";
@@ -158,10 +147,36 @@ export function AirbnbStayCalendar({
     [overrideByRoomDate, bookedUnitsByRoomDate]
   );
 
-  const maxRoomCapacity = useMemo(
-    () => rooms.reduce((max, r) => Math.max(max, r.maxGuests), 1),
-    [rooms]
+  const isNightSoldOut = useCallback(
+    (dateStr: string): boolean => {
+      if (rooms.length === 0) return false;
+      if (selectedScopeRoom) {
+        return getRoomFreeUnitsOnDate(selectedScopeRoom, dateStr) <= 0;
+      }
+      const eligibleRooms = rooms.filter((r) => r.maxGuests >= guests);
+      const pool = eligibleRooms.length > 0 ? eligibleRooms : rooms;
+      return !pool.some((r) => getRoomFreeUnitsOnDate(r, dateStr) > 0);
+    },
+    [getRoomFreeUnitsOnDate, guests, rooms, selectedScopeRoom]
   );
+
+  const activeStartDate =
+    selectingPhase === "checkout" && pendingCheckIn
+      ? pendingCheckIn
+      : checkInDate;
+
+  // When picking check-out, allow checking out on the morning of the first sold-out night, but never spanning across it
+  const firstSoldOutAfterCheckIn = useMemo<string | null>(() => {
+    if (selectingPhase !== "checkout" || !activeStartDate) return null;
+    let cursor = activeStartDate;
+    for (let i = 0; i < 92; i++) {
+      if (isNightSoldOut(cursor)) {
+        return cursor;
+      }
+      cursor = addDaysToDate(cursor, 1);
+    }
+    return null;
+  }, [activeStartDate, isNightSoldOut, selectingPhase]);
 
   const canGoPrevMonth =
     leftMonth.year > todayDate.getFullYear() ||
@@ -188,29 +203,47 @@ export function AirbnbStayCalendar({
   const handleDayClick = (dateStr: string) => {
     if (dateStr < todayStr) return;
 
-    if (selectingPhase === "checkin" || dateStr <= checkInDate) {
-      const nextDayStr = addDaysToDate(dateStr, 1);
-      onChangeDates(dateStr, nextDayStr);
+    if (
+      selectingPhase === "checkin" ||
+      !pendingCheckIn ||
+      dateStr <= pendingCheckIn
+    ) {
+      if (isNightSoldOut(dateStr)) return;
+      setPendingCheckIn(dateStr);
       setSelectingPhase("checkout");
       setHoverDate(null);
     } else {
-      onChangeDates(checkInDate, dateStr);
+      if (
+        firstSoldOutAfterCheckIn !== null &&
+        dateStr > firstSoldOutAfterCheckIn
+      ) {
+        return;
+      }
+      onChangeDates(pendingCheckIn, dateStr);
+      setPendingCheckIn(null);
       setSelectingPhase("checkin");
       setHoverDate(null);
     }
   };
 
   const handleResetDates = () => {
-    const tomorrow = addDaysToDate(todayStr, 1);
-    const nextOut = addDaysToDate(tomorrow, 1);
-    onChangeDates(tomorrow, nextOut);
+    let candidate = addDaysToDate(todayStr, 1);
+    for (let i = 0; i < 60; i++) {
+      if (!isNightSoldOut(candidate)) break;
+      candidate = addDaysToDate(candidate, 1);
+    }
+    const nextOut = addDaysToDate(candidate, 1);
+    setPendingCheckIn(null);
+    onChangeDates(candidate, nextOut);
     setSelectingPhase("checkin");
     setHoverDate(null);
   };
 
   const effectiveRangeEnd =
-    selectingPhase === "checkout" && hoverDate && hoverDate > checkInDate
-      ? hoverDate
+    selectingPhase === "checkout"
+      ? hoverDate && activeStartDate && hoverDate > activeStartDate
+        ? hoverDate
+        : ""
       : checkOutDate;
 
   const weekdayLabels = isTh ? WEEKDAYS_TH : WEEKDAYS_EN;
@@ -219,14 +252,6 @@ export function AirbnbStayCalendar({
     isTh
       ? `${MONTHS_TH[monthIdx]} ${year + 543}`
       : `${MONTHS_EN[monthIdx]} ${year}`;
-
-  const formatCompactRate = (thb: number) => {
-    if (thb >= 1000) {
-      const k = thb / 1000;
-      return `${Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)}k`;
-    }
-    return String(thb);
-  };
 
   const renderMonthGrid = (year: number, monthIdx: number) => {
     const cells = buildMondayFirstMonthCells(year, monthIdx);
@@ -243,7 +268,7 @@ export function AirbnbStayCalendar({
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-y-1">
+        <div className="grid grid-cols-7 gap-0.5">
           {cells.map((cell, idx) => {
             if (!cell) {
               return <div key={`empty-${idx}`} className="h-11" />;
@@ -251,64 +276,37 @@ export function AirbnbStayCalendar({
 
             const { dateStr, dayNumber } = cell;
             const isPast = dateStr < todayStr;
+            const isSoldOut = !isPast && isNightSoldOut(dateStr);
+            const isBlockedBeyondGap =
+              selectingPhase === "checkout" &&
+              dateStr > activeStartDate &&
+              firstSoldOutAfterCheckIn !== null &&
+              dateStr > firstSoldOutAfterCheckIn;
+            const canUseAsCheckoutMorning =
+              selectingPhase === "checkout" &&
+              dateStr > activeStartDate &&
+              firstSoldOutAfterCheckIn === dateStr;
+            const isDisabled =
+              isPast ||
+              isBlockedBeyondGap ||
+              (isSoldOut && !canUseAsCheckoutMorning);
 
-            let isBlocked = false;
-            let isPartiallyFull = false;
-            let nightlyRate: number | null = null;
-
-            if (!isPast && rooms.length > 0) {
-              if (selectedScopeRoom) {
-                const freeUnits = getRoomFreeUnitsOnDate(
-                  selectedScopeRoom,
-                  dateStr
-                );
-                const fitsGuests = selectedScopeRoom.maxGuests >= guests;
-                isBlocked = !fitsGuests || freeUnits <= 0;
-                nightlyRate = calculateNightlyRateForDate(
-                  selectedScopeRoom,
-                  dateStr,
-                  dateOverrides
-                );
-                isPartiallyFull =
-                  fitsGuests &&
-                  freeUnits === 1 &&
-                  selectedScopeRoom.totalUnits > 1;
-              } else {
-                const eligibleRooms = rooms.filter((r) => r.maxGuests >= guests);
-                const openRooms = eligibleRooms.filter(
-                  (r) => getRoomFreeUnitsOnDate(r, dateStr) > 0
-                );
-                isBlocked = openRooms.length === 0;
-                nightlyRate =
-                  openRooms.length > 0
-                    ? Math.min(
-                        ...openRooms.map((r) =>
-                          calculateNightlyRateForDate(
-                            r,
-                            dateStr,
-                            dateOverrides
-                          )
-                        )
-                      )
-                    : null;
-                isPartiallyFull =
-                  openRooms.length > 0 &&
-                  eligibleRooms.length > 1 &&
-                  openRooms.length < eligibleRooms.length;
-              }
-            }
-
-            const isStart = dateStr === checkInDate;
-            const isEnd = dateStr === effectiveRangeEnd;
+            const isStart = dateStr === activeStartDate;
+            const isEnd = Boolean(effectiveRangeEnd) && dateStr === effectiveRangeEnd;
             const isBetween =
-              dateStr > checkInDate && dateStr < effectiveRangeEnd;
-            const hasRange = effectiveRangeEnd > checkInDate;
+              Boolean(effectiveRangeEnd) &&
+              dateStr > activeStartDate &&
+              dateStr < effectiveRangeEnd;
+            const hasRange =
+              Boolean(effectiveRangeEnd) && effectiveRangeEnd > activeStartDate;
+            const showStrikethrough =
+              (isPast || isSoldOut) && !isStart && !isEnd;
 
             return (
               <div
                 key={dateStr}
                 onMouseEnter={() => {
-                  if (!isPast && selectingPhase === "checkout") {
+                  if (!isDisabled && selectingPhase === "checkout") {
                     setHoverDate(dateStr);
                   }
                 }}
@@ -320,56 +318,37 @@ export function AirbnbStayCalendar({
                 className="relative h-11 flex items-center justify-center"
               >
                 {hasRange && isBetween && (
-                  <div className="absolute inset-x-0 inset-y-0.5 bg-[var(--color-background-muted)] pointer-events-none" />
+                  <div className="absolute inset-x-0 inset-y-1 bg-[var(--color-background-muted)] pointer-events-none" />
                 )}
                 {hasRange && isStart && (
-                  <div className="absolute left-1/2 right-0 inset-y-0.5 bg-[var(--color-background-muted)] pointer-events-none" />
+                  <div className="absolute left-1/2 right-0 inset-y-1 bg-[var(--color-background-muted)] pointer-events-none" />
                 )}
                 {hasRange && isEnd && (
-                  <div className="absolute left-0 right-1/2 inset-y-0.5 bg-[var(--color-background-muted)] pointer-events-none" />
+                  <div className="absolute left-0 right-1/2 inset-y-1 bg-[var(--color-background-muted)] pointer-events-none" />
                 )}
 
                 <button
                   type="button"
-                  disabled={isPast}
+                  disabled={isDisabled}
                   onClick={() => handleDayClick(dateStr)}
                   aria-label={`${dateStr}${
-                    isBlocked ? (isTh ? " เต็ม" : " unavailable") : ""
+                    isSoldOut ? (isTh ? " ห้องเต็ม" : " sold out") : ""
                   }`}
-                  className={`relative z-10 h-10 w-full max-w-[44px] rounded-[10px] flex flex-col items-center justify-center transition-colors ${
-                    isPast
-                      ? "text-[var(--color-text-disabled)] cursor-not-allowed"
-                      : isStart || isEnd
+                  className={`relative z-10 h-10 w-10 rounded-[10px] flex items-center justify-center text-[14px] transition-colors tabular-nums ${
+                    isStart || isEnd
                       ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] font-semibold cursor-pointer"
-                      : isBlocked
-                      ? "text-[var(--color-text-disabled)] line-through hover:bg-[var(--color-background-muted)]/60 cursor-pointer"
+                      : isDisabled
+                      ? `text-[var(--color-text-disabled)] cursor-not-allowed ${
+                          showStrikethrough
+                            ? "line-through decoration-[1.5px]"
+                            : ""
+                        }`
+                      : showStrikethrough
+                      ? "text-[var(--color-text-disabled)] line-through decoration-[1.5px] hover:bg-[var(--color-background-muted)] cursor-pointer"
                       : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] font-medium cursor-pointer"
                   }`}
                 >
-                  {isPartiallyFull && !isStart && !isEnd && !isPast && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-[var(--color-warning)]"
-                    />
-                  )}
-                  <span className="text-[13px] leading-none">{dayNumber}</span>
-                  {!isPast && (isBlocked || nightlyRate) && (
-                    <span
-                      className={`text-[9.5px] leading-none mt-1 tabular-nums ${
-                        isStart || isEnd
-                          ? "opacity-85"
-                          : isBlocked
-                          ? "text-[var(--color-text-disabled)]"
-                          : "text-[var(--color-text-secondary)]"
-                      }`}
-                    >
-                      {isBlocked
-                        ? isTh
-                          ? "เต็ม"
-                          : "full"
-                        : formatCompactRate(nightlyRate!)}
-                    </span>
-                  )}
+                  {dayNumber}
                 </button>
               </div>
             );
@@ -380,7 +359,7 @@ export function AirbnbStayCalendar({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 isolate">
       <div className="space-y-1">
         <h2 className="ty-title text-[var(--color-text-primary)]">
           {selectingPhase === "checkout"
@@ -388,93 +367,27 @@ export function AirbnbStayCalendar({
               ? `${headingPrefix}เลือกวันเช็กเอาต์`
               : `${headingPrefix}Select check-out date`
             : isTh
-            ? `${headingPrefix}เลือกวันเข้าพักและผู้เข้าพัก (${stayNights} คืนที่ ${hotelName})`
-            : `${headingPrefix}Select dates & guests (${stayNights} ${
+            ? `${headingPrefix}${stayNights} คืนที่ ${hotelName}`
+            : `${headingPrefix}${stayNights} ${
                 stayNights === 1 ? "night" : "nights"
-              } at ${hotelName})`}
+              } in ${hotelName}`}
         </h2>
         <p className="ty-caption text-[var(--color-text-secondary)]">
-          {formatShortDate(checkInDate, language)} –{" "}
-          {formatShortDate(checkOutDate, language)} · {guests}{" "}
-          {isTh ? "ท่าน" : "guests"} ·{" "}
-          {selectingPhase === "checkout"
+          {selectingPhase === "checkout" && pendingCheckIn
+            ? `${formatShortDate(pendingCheckIn, language)} – ${
+                isTh ? "เลือกวันเช็กเอาต์" : "Select checkout"
+              }`
+            : `${formatShortDate(checkInDate, language)} – ${formatShortDate(
+                checkOutDate,
+                language
+              )}`}
+          {selectedScopeRoom && rooms.length > 1
             ? isTh
-              ? "แตะวันที่ต้องการเช็กเอาต์บนปฏิทิน"
-              : "Tap your check-out date"
-            : selectedScopeRoom
-            ? isTh
-              ? `กำลังดูปฏิทินว่างเฉพาะห้อง ${selectedScopeRoom.code}`
-              : `Viewing calendar for room ${selectedScopeRoom.code}`
-            : isTh
-            ? "เลือกวันและจำนวนผู้เข้าพักก่อน ระบบจะแสดงห้องที่ว่าง"
-            : "Pick your dates first to see matching available rooms"}
+              ? ` · ปฏิทินว่างเฉพาะห้อง ${selectedScopeRoom.code}`
+              : ` · Availability for room ${selectedScopeRoom.code}`
+            : ""}
         </p>
       </div>
-
-      {/* Control Bar: Guest Stepper + Scalable Room Scope Selector */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="h-10 px-3 rounded-[10px] bg-[var(--color-background-muted)] border border-[var(--color-border)] inline-flex items-center gap-2.5 shrink-0">
-          <Users className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
-          <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">
-            {isTh ? "ผู้เข้าพัก" : "Guests"}
-          </span>
-          <button
-            type="button"
-            onClick={() => onChangeGuests(Math.max(1, guests - 1))}
-            aria-label="Decrease guests"
-            className="h-6 w-6 rounded-[7px] bg-[var(--color-background-card)] border border-[var(--color-border)] hover:border-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <span className="text-[13.5px] font-semibold text-[var(--color-text-primary)] min-w-[40px] text-center tabular-nums">
-            {guests} {isTh ? "ท่าน" : ""}
-          </span>
-          <button
-            type="button"
-            onClick={() => onChangeGuests(Math.min(12, guests + 1))}
-            aria-label="Increase guests"
-            className="h-6 w-6 rounded-[7px] bg-[var(--color-background-card)] border border-[var(--color-border)] hover:border-[var(--color-text-primary)] flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-
-        {rooms.length > 1 && (
-          <div className="flex-1 min-w-[230px] h-10 px-3 rounded-[10px] bg-[var(--color-background-muted)] border border-[var(--color-border)] flex items-center gap-2">
-            <BedDouble className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
-            <select
-              aria-label={
-                isTh ? "ตัวกรองปฏิทินห้องว่าง" : "Calendar room filter"
-              }
-              value={calendarRoomFilterId}
-              onChange={(e) => onChangeCalendarRoomFilterId(e.target.value)}
-              className="w-full bg-transparent text-[13px] font-semibold text-[var(--color-text-primary)] focus:outline-none cursor-pointer truncate"
-            >
-              <option value="ALL">
-                {isTh
-                  ? `ภาพรวมทุกแบบห้อง (${rooms.length} แบบ · ราคาเริ่มต้น)`
-                  : `All room types (${rooms.length} · lowest rate)`}
-              </option>
-              {rooms.map((rm) => (
-                <option key={rm.id} value={rm.id}>
-                  {isTh ? "เฉพาะ" : "Only"} {rm.code} ·{" "}
-                  {isTh ? rm.nameTh : rm.nameEn} (
-                  {isTh ? `สูงสุด ${rm.maxGuests} ท่าน` : `max ${rm.maxGuests}`}
-                  )
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {rooms.length > 0 && guests > maxRoomCapacity && (
-        <div className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-background-muted)] px-3.5 py-2.5 text-[12.5px] text-[var(--color-text-secondary)]">
-          {isTh
-            ? `ที่พักนี้รองรับสูงสุดห้องละ ${maxRoomCapacity} ท่าน หากเดินทาง ${guests} ท่านแนะนำเลือกหลายห้องรวมกันครับ`
-            : `Single rooms host up to ${maxRoomCapacity} guests. Consider booking multiple rooms for ${guests} guests.`}
-        </div>
-      )}
 
       <div className="space-y-3 pt-1">
         <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
@@ -518,46 +431,24 @@ export function AirbnbStayCalendar({
         </div>
       </div>
 
-      <div className="pt-1 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--color-text-secondary)]">
-          <span>
-            {selectedScopeRoom
-              ? isTh
-                ? `ตัวเลข = เรทห้อง ${selectedScopeRoom.code}/คืน`
-                : `Rates = ${selectedScopeRoom.code}/night`
-              : isTh
-              ? "ตัวเลข = ราคาเริ่มต้นของห้องที่ว่าง"
-              : "Rates = lowest open room rate"}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-warning)] inline-block" />
-            <span>{isTh ? "บางแบบเริ่มเต็ม" : "Limited rooms"}</span>
-          </span>
-          <span>
-            {isTh ? 'ขีดฆ่า "เต็ม" = หมด' : 'Strikethrough "full" = sold out'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {selectedScopeRoom && (
-            <button
-              type="button"
-              onClick={() => onChangeCalendarRoomFilterId("ALL")}
-              className="h-8 px-2.5 rounded-[9px] text-[12.5px] font-semibold text-[var(--color-text-primary)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] cursor-pointer transition-colors"
-            >
-              {isTh ? "ดูรวมทุกห้อง" : "All rooms"}
-            </button>
-          )}
+      <div className="pt-1 flex items-center justify-end gap-2">
+        {selectedScopeRoom && rooms.length > 1 && (
           <button
             type="button"
-            onClick={handleResetDates}
-            className="h-8 px-2.5 rounded-[9px] text-[13px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] underline cursor-pointer shrink-0 transition-colors"
+            onClick={() => onChangeCalendarRoomFilterId("ALL")}
+            className="h-8 px-3 rounded-[9px] text-[13px] font-semibold text-[var(--color-text-primary)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] cursor-pointer transition-colors"
           >
-            {isTh ? "ล้างวันที่" : "Clear dates"}
+            {isTh ? "ดูรวมทุกห้อง" : "All rooms"}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleResetDates}
+          className="h-8 px-2.5 rounded-[9px] text-[13.5px] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] underline underline-offset-2 cursor-pointer shrink-0 transition-colors"
+        >
+          {isTh ? "ล้างวันที่" : "Clear dates"}
+        </button>
       </div>
     </div>
   );
 }
-
