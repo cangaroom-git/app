@@ -14,6 +14,7 @@ import {
   getOptimizedPinImageUrl,
 } from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import { selectBestEligibleCoupon } from "@/components/drawers/RoomBookingDrawer";
 import type {
   CouponDealDto,
@@ -59,7 +60,8 @@ export function ChooseRoomBottomSheet({
   onOpenDatePicker,
   onConfirmRoom,
 }: ChooseRoomBottomSheetProps) {
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   const isTh = language === "th";
   const [mounted, setMounted] = useState(false);
@@ -155,24 +157,26 @@ export function ChooseRoomBottomSheet({
     [pricedRooms, pickedRoomId]
   );
 
-  if (!isOpen || !mounted) return null;
+  if (!shouldRender || !mounted) return null;
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "เลือกห้องพัก" : "Choose your room"}
+      data-state={dataState}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-[95] bg-black/50 flex items-end md:items-center justify-center animate-fade-in-backdrop"
+      className="fixed inset-0 z-[95] bg-black/48 flex items-end md:items-center justify-center cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full md:max-w-[560px] max-h-[90dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet"
+        className="w-full md:max-w-[560px] max-h-[90dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden cgr-modal-surface-md"
       >
         {/* Mobile grab handle */}
         <div

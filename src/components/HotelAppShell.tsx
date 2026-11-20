@@ -656,6 +656,41 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Detect classic (layout-consuming) OS scrollbars vs macOS native overlay scrollbars.
+  // macOS overlay scrollbars measure 0px -> keep native Airbnb-like floating overlay.
+  // Windows/Linux/external-mouse classic scrollbars measure >0px -> activate clean floating pill styling.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const syncScrollbarMode = () => {
+      const html = document.documentElement;
+      delete html.dataset.classicScrollbars;
+      const probe = document.createElement("div");
+      probe.style.cssText =
+        "position:fixed;top:-9999px;left:-9999px;width:64px;height:64px;overflow:scroll;visibility:hidden;pointer-events:none;";
+      document.body.appendChild(probe);
+      const hasClassicScrollbars = probe.offsetWidth - probe.clientWidth > 0;
+      probe.remove();
+      if (hasClassicScrollbars) {
+        html.dataset.classicScrollbars = "true";
+      }
+    };
+
+    syncScrollbarMode();
+
+    let resizeTimer: number | null = null;
+    const handleResize = () => {
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(syncScrollbarMode, 250);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+    };
+  }, []);
+
   const setLang = useCallback((nextLang: Lang) => {
     setLangState(nextLang);
     try {

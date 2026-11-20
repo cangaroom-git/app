@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, X } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 
 export interface StudioSheetModalProps {
   isOpen: boolean;
@@ -32,7 +33,8 @@ export function StudioSheetModal({
   footer,
   children,
 }: StudioSheetModalProps) {
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -48,24 +50,26 @@ export function StudioSheetModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !mounted) return null;
+  if (!shouldRender || !mounted) return null;
 
   return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      data-state={dataState}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-[95] bg-black/50 flex items-end md:items-center justify-center animate-fade-in-backdrop"
+      className="fixed inset-0 z-[95] bg-black/48 flex items-end md:items-center justify-center cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${maxWidthClass} ${heightClass} rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet`}
+        className={`w-full ${maxWidthClass} ${heightClass} rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden cgr-modal-surface-md`}
       >
         {/* Mobile grab handle */}
         <div

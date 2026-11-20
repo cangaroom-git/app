@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 
 export function HotelInfoBottomSheet({
   isOpen,
@@ -15,7 +16,8 @@ export function HotelInfoBottomSheet({
   title: string;
   children: React.ReactNode;
 }) {
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -28,19 +30,21 @@ export function HotelInfoBottomSheet({
     return () => window.removeEventListener("keydown", handleKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      data-state={dataState}
       onClick={onClose}
-      className="fixed inset-0 z-[80] bg-black/50 flex items-end md:items-center justify-center animate-fade-in-backdrop"
+      className="fixed inset-0 z-[80] bg-black/48 flex items-end md:items-center justify-center cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full md:max-w-[680px] max-h-[88dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet"
+        className="w-full md:max-w-[680px] max-h-[88dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden cgr-modal-surface-md"
       >
         {/* Mobile bottom sheet drag handle */}
         <div

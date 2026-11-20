@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Bookmark, Check, Loader2, Plus, X } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { getOptimizedPinImageUrl } from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import { StandardInput } from "@/components/ui/standards";
 import type { SavedBoardDto } from "@/types/cangaroom";
 
@@ -88,7 +89,8 @@ export function CreateBoardModal({
   const isTh = language === "th";
   const [name, setName] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   useEffect(() => {
     if (isOpen) {
@@ -106,7 +108,7 @@ export function CreateBoardModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   const trimmed = name.trim();
 
@@ -132,12 +134,14 @@ export function CreateBoardModal({
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "สร้างบอร์ดใหม่" : "Create board"}
+      data-state={dataState}
       onClick={onClose}
-      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 animate-fade-in-backdrop"
+      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-[460px] rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden animate-slide-up-sheet sm:animate-none"
+        className="w-full sm:max-w-[460px] rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden cgr-modal-surface-sm"
       >
         <div className="sm:hidden pt-3 pb-1 flex justify-center">
           <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
@@ -227,7 +231,8 @@ export function ChooseBoardModal({
   onOpenCreateNew: () => void;
 }) {
   const isTh = language === "th";
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -238,19 +243,21 @@ export function ChooseBoardModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "เลือกบอร์ดที่ต้องการบันทึก" : "Save to board"}
+      data-state={dataState}
       onClick={onClose}
-      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 animate-fade-in-backdrop"
+      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-[440px] max-h-[80dvh] flex flex-col rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden animate-slide-up-sheet sm:animate-none"
+        className="w-full sm:max-w-[440px] max-h-[80dvh] flex flex-col rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden cgr-modal-surface-sm"
       >
         <div className="sm:hidden pt-3 pb-1 flex justify-center shrink-0">
           <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
@@ -340,7 +347,11 @@ export function DeleteBoardConfirmModal({
   onConfirmDelete: () => Promise<void>;
 }) {
   const isTh = language === "th";
-  useBodyScrollLock(Boolean(board));
+  const { shouldRender, dataState } = useModalPresence(Boolean(board), 270);
+  useBodyScrollLock(shouldRender);
+  const lastBoardRef = useRef<SavedBoardDto | null>(board);
+  if (board) lastBoardRef.current = board;
+  const activeBoard = board ?? lastBoardRef.current;
 
   useEffect(() => {
     if (!board) return;
@@ -351,19 +362,21 @@ export function DeleteBoardConfirmModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [board, onClose]);
 
-  if (!board) return null;
+  if (!shouldRender || !activeBoard) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "ยืนยันการลบบอร์ด" : "Delete board"}
+      data-state={dataState}
       onClick={onClose}
-      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 animate-fade-in-backdrop"
+      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full sm:max-w-[400px] rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden animate-slide-up-sheet sm:animate-none"
+        className="relative w-full sm:max-w-[400px] rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden cgr-modal-surface-sm"
       >
         <div className="sm:hidden pt-3 pb-1 flex justify-center">
           <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
@@ -384,8 +397,8 @@ export function DeleteBoardConfirmModal({
           </h2>
           <p className="text-[14px] text-[var(--color-text-secondary)]">
             {isTh
-              ? `“${board.name}” จะถูกลบออกอย่างถาวร`
-              : `“${board.name}” will be permanently deleted.`}
+              ? `“${activeBoard.name}” จะถูกลบออกอย่างถาวร`
+              : `“${activeBoard.name}” will be permanently deleted.`}
           </p>
         </div>
 

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, Code2, Copy, Mail, MoreHorizontal, X } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 
 export interface ShareStayModalProps {
   isOpen: boolean;
@@ -84,7 +85,8 @@ export function ShareStayModal({
   const isTh = language === "th";
   const [copiedMode, setCopiedMode] = useState<"link" | "embed" | null>(null);
 
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   useEffect(() => {
     if (!isOpen) {
@@ -98,7 +100,7 @@ export function ShareStayModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || typeof document === "undefined") return null;
+  if (!shouldRender || typeof document === "undefined") return null;
 
   const resolvedText = shareText || `${title}${subtitle ? ` · ${subtitle}` : ""}`;
   const encodedUrl = encodeURIComponent(shareUrl);
@@ -167,20 +169,22 @@ export function ShareStayModal({
   return createPortal(
     <div
       data-swipe-ignore="true"
+      data-state={dataState}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-[96] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[96] flex items-end sm:items-center justify-center sm:p-4 bg-black/48 cgr-modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "แชร์ที่พักนี้" : "Share this place"}
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-[540px] max-h-[88vh] flex flex-col rounded-t-[24px] sm:rounded-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] animate-slide-up-sheet sm:animate-none overflow-hidden"
+        className="w-full sm:max-w-[540px] max-h-[88vh] flex flex-col rounded-t-[24px] sm:rounded-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] cgr-modal-surface-sm overflow-hidden"
       >
         {/* Mobile Drag Handle */}
         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">

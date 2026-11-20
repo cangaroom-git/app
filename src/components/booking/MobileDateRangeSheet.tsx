@@ -18,6 +18,7 @@ import {
 } from "@/lib/calendarAvailability";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import type {
   RoomAvailabilityDto,
   RoomDateOverrideDto,
@@ -64,7 +65,8 @@ export function MobileDateRangeSheet({
   onSaveDates,
   onClearDates,
 }: MobileDateRangeSheetProps) {
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   const isTh = language === "th";
   const todayStr = useMemo(() => formatDateStr(todayDate), [todayDate]);
@@ -212,7 +214,7 @@ export function MobileDateRangeSheet({
     ? SUNDAY_FIRST_WEEKDAYS_TH
     : SUNDAY_FIRST_WEEKDAYS_EN;
 
-  if (!isOpen || !mounted) return null;
+  if (!shouldRender || !mounted) return null;
 
   const headerTitle = !draftCheckIn
     ? isTh
@@ -243,17 +245,19 @@ export function MobileDateRangeSheet({
       role="dialog"
       aria-modal="true"
       aria-label={headerTitle}
+      data-state={dataState}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-[95] bg-black/50 flex items-end md:items-center justify-center animate-fade-in-backdrop"
+      className="fixed inset-0 z-[95] bg-black/48 flex items-end md:items-center justify-center cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="w-full md:max-w-[520px] h-[92dvh] md:h-[84dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet"
+        className="w-full md:max-w-[520px] h-[92dvh] md:h-[84dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden cgr-modal-surface-md"
       >
         {/* Mobile grab handle */}
         <div

@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/accountHint";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import {
   StandardFieldGroup,
   StandardInput,
@@ -56,7 +57,8 @@ export function AuthPromptModal({
   onAuthenticated,
 }: AuthPromptModalProps) {
   const isTh = language === "th";
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
 
   const [returningHint, setReturningHint] =
     useState<ReturningAccountHint | null>(null);
@@ -98,7 +100,7 @@ export function AuthPromptModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -236,12 +238,14 @@ export function AuthPromptModal({
       role="dialog"
       aria-modal="true"
       aria-label={isTh ? "เข้าสู่ระบบหรือสมัครสมาชิก" : "Log in or sign up"}
+      data-state={dataState}
       onClick={onClose}
-      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 animate-fade-in-backdrop"
+      className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
     >
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full sm:max-w-[432px] max-h-[82dvh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] px-6 pt-3 sm:pt-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:pb-7 animate-slide-up-sheet sm:animate-none"
+        className="relative w-full sm:max-w-[432px] max-h-[82dvh] overflow-y-auto rounded-t-[24px] sm:rounded-[20px] bg-[var(--color-background-popover)] border-t sm:border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] px-6 pt-3 sm:pt-6 pb-[max(24px,env(safe-area-inset-bottom))] sm:pb-7 cgr-modal-surface-sm"
       >
         {/* Mobile Sheet Drag Handle */}
         <div className="sm:hidden pb-2 flex justify-center">

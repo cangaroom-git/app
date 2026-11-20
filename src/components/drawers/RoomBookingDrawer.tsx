@@ -27,6 +27,7 @@ import {
   getOptimizedPinImageUrl,
 } from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import type {
   CouponDealDto,
   HotelDiscountRuleDto,
@@ -58,7 +59,7 @@ export function RoomBookingDrawer({
   onClose,
   hotel,
   rooms = [],
-  selectedRoom,
+  selectedRoom: selectedRoomProp,
   onSelectRoom,
   dateOverrides,
   coupons,
@@ -94,7 +95,15 @@ export function RoomBookingDrawer({
   onCheckRoomDates?: (room: RoomAvailabilityDto) => void;
   onAutoExtendMinNights?: (minNights: number) => void;
 }) {
-  useBodyScrollLock(isOpen);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 270);
+  useBodyScrollLock(shouldRender);
+
+  // Preserve last non-null room during exit transition so closing never flashes blank
+  const lastRoomRef = useRef<RoomAvailabilityDto | null>(selectedRoomProp);
+  if (selectedRoomProp) {
+    lastRoomRef.current = selectedRoomProp;
+  }
+  const selectedRoom = selectedRoomProp ?? lastRoomRef.current;
 
   const isTh = language === "th";
   const [mounted, setMounted] = useState(false);
@@ -241,7 +250,7 @@ export function RoomBookingDrawer({
     baseBreakdown,
   ]);
 
-  if (!isOpen || !selectedRoom || !mounted) return null;
+  if (!shouldRender || !selectedRoom || !mounted) return null;
 
   const gallery =
     selectedRoom.galleryUrls.length > 0
@@ -630,17 +639,19 @@ export function RoomBookingDrawer({
       role="dialog"
       aria-modal="true"
       aria-label={roomName}
+      data-state={dataState}
       onClick={onClose}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
-      className="fixed inset-0 z-[100] bg-black/45 backdrop-blur-[4px] flex items-end lg:items-center justify-center lg:p-6 animate-fade-in-backdrop"
+      className="fixed inset-0 z-[100] bg-black/48 flex items-end lg:items-center justify-center lg:p-6 cgr-modal-backdrop"
     >
       {/* =====================================================================
           DESKTOP (>= lg): AIRBNB LEFT VERTICAL ROOM SWITCHER + CENTERED SPLIT MODAL
       ====================================================================== */}
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="hidden lg:flex items-center justify-center gap-4 w-full max-w-[1160px]"
+        className="hidden lg:flex items-center justify-center gap-4 w-full max-w-[1160px] cgr-modal-fade-slide"
       >
         {/* Left Floating Vertical Room Switcher Rail (Exact Airbnb Images 2–4!) */}
         {canSwitchRooms && (
@@ -824,8 +835,9 @@ export function RoomBookingDrawer({
           MOBILE & TABLET (< lg): AIRBNB SLIDE-UP BOTTOM SHEET (Images 5–6!)
       ====================================================================== */}
       <div
+        data-state={dataState}
         onClick={(e) => e.stopPropagation()}
-        className="lg:hidden relative w-full h-[92dvh] rounded-t-[24px] bg-[var(--color-background-card)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden animate-slide-up-sheet"
+        className="lg:hidden relative w-full h-[92dvh] rounded-t-[24px] bg-[var(--color-background-card)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden cgr-modal-sheet-only"
       >
         {/* Floating Top-Right Close Button (Exact Images 5–6!) */}
         <button
