@@ -120,8 +120,8 @@
   --font-size-body: 0.96875rem;     /* 15.5px */
   --font-size-caption: 0.875rem;    /* 14px */
 
-  --font-family-body: "Plus Jakarta Sans", "Anuphan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-family-heading: "Plus Jakarta Sans", "Anuphan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-body: var(--font-jakarta), var(--font-anuphan), "Plus Jakarta Sans", "Anuphan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-heading: var(--font-jakarta), var(--font-anuphan), "Plus Jakarta Sans", "Anuphan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 @media (max-width: 1023.98px) {
@@ -1658,21 +1658,21 @@ html[data-studio-vt]::view-transition-new(cgr-photo-active) {
   overflow: hidden;
 }
 
-/* Ratio-Locked Responsive Ticket Coupon Card (Photo aspect 4:3 + Fixed Stub Height -> Zero Stretching & Zero Dead Side Gaps!) */
+/* Ratio-Locked Responsive Ticket Coupon Card (Integer 1px Border Alignment -> Zero Subpixel Grey Bleed on iOS Safari!) */
 .cgr-coupon-outer {
-  -webkit-mask-image: radial-gradient(circle 8px at 0px calc(100% - 97.5px), transparent 96%, #000 100%),
-    radial-gradient(circle 8px at 100% calc(100% - 97.5px), transparent 96%, #000 100%);
-  mask-image: radial-gradient(circle 8px at 0px calc(100% - 97.5px), transparent 96%, #000 100%),
-    radial-gradient(circle 8px at 100% calc(100% - 97.5px), transparent 96%, #000 100%);
+  -webkit-mask-image: radial-gradient(circle 8px at 0px calc(100% - 97px), transparent 96%, #000 100%),
+    radial-gradient(circle 8px at 100% calc(100% - 97px), transparent 96%, #000 100%);
+  mask-image: radial-gradient(circle 8px at 0px calc(100% - 97px), transparent 96%, #000 100%),
+    radial-gradient(circle 8px at 100% calc(100% - 97px), transparent 96%, #000 100%);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
 }
 
 .cgr-coupon-inner {
-  -webkit-mask-image: radial-gradient(circle 9.5px at -1.5px calc(100% - 96px), transparent 96%, #000 100%),
-    radial-gradient(circle 9.5px at calc(100% + 1.5px) calc(100% - 96px), transparent 96%, #000 100%);
-  mask-image: radial-gradient(circle 9.5px at -1.5px calc(100% - 96px), transparent 96%, #000 100%),
-    radial-gradient(circle 9.5px at calc(100% + 1.5px) calc(100% - 96px), transparent 96%, #000 100%);
+  -webkit-mask-image: radial-gradient(circle 9px at -1px calc(100% - 96px), transparent 96%, #000 100%),
+    radial-gradient(circle 9px at calc(100% + 1px) calc(100% - 96px), transparent 96%, #000 100%);
+  mask-image: radial-gradient(circle 9px at -1px calc(100% - 96px), transparent 96%, #000 100%),
+    radial-gradient(circle 9px at calc(100% + 1px) calc(100% - 96px), transparent 96%, #000 100%);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
 }
@@ -1687,19 +1687,19 @@ html[data-studio-vt]::view-transition-new(cgr-photo-active) {
 
 @media (min-width: 640px) {
   .cgr-coupon-outer {
-    -webkit-mask-image: radial-gradient(circle 9px at 0px calc(100% - 109.5px), transparent 96%, #000 100%),
-      radial-gradient(circle 9px at 100% calc(100% - 109.5px), transparent 96%, #000 100%);
-    mask-image: radial-gradient(circle 9px at 0px calc(100% - 109.5px), transparent 96%, #000 100%),
-      radial-gradient(circle 9px at 100% calc(100% - 109.5px), transparent 96%, #000 100%);
+    -webkit-mask-image: radial-gradient(circle 9px at 0px calc(100% - 109px), transparent 96%, #000 100%),
+      radial-gradient(circle 9px at 100% calc(100% - 109px), transparent 96%, #000 100%);
+    mask-image: radial-gradient(circle 9px at 0px calc(100% - 109px), transparent 96%, #000 100%),
+      radial-gradient(circle 9px at 100% calc(100% - 109px), transparent 96%, #000 100%);
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
   }
 
   .cgr-coupon-inner {
-    -webkit-mask-image: radial-gradient(circle 10.5px at -1.5px calc(100% - 108px), transparent 96%, #000 100%),
-      radial-gradient(circle 10.5px at calc(100% + 1.5px) calc(100% - 108px), transparent 96%, #000 100%);
-    mask-image: radial-gradient(circle 10.5px at -1.5px calc(100% - 108px), transparent 96%, #000 100%),
-      radial-gradient(circle 10.5px at calc(100% + 1.5px) calc(100% - 108px), transparent 96%, #000 100%);
+    -webkit-mask-image: radial-gradient(circle 10px at -1px calc(100% - 108px), transparent 96%, #000 100%),
+      radial-gradient(circle 10px at calc(100% + 1px) calc(100% - 108px), transparent 96%, #000 100%);
+    mask-image: radial-gradient(circle 10px at -1px calc(100% - 108px), transparent 96%, #000 100%),
+      radial-gradient(circle 10px at calc(100% + 1px) calc(100% - 108px), transparent 96%, #000 100%);
     -webkit-mask-composite: source-in;
     mask-composite: intersect;
   }

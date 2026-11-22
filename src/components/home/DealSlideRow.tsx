@@ -9,7 +9,7 @@ import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
 export const COUPON_CARD_SLOT_WIDTH_CLASS =
-  "w-[calc((100%-14px)/2)] sm:w-[calc((100%-28px)/3)] lg:w-[252px] shrink-0 snap-start flex";
+  "w-[calc((100%-36px)/2)] sm:w-[calc((100%-52px)/3)] lg:w-[252px] shrink-0 snap-start flex items-start";
 
 export interface DealSlideRowProps {
   id?: string;
@@ -32,7 +32,7 @@ export interface DealSlideRowProps {
   onHoverDeal?: (pin: PinFeedItemDto | null) => void;
 }
 
-export function DealSlideRow({
+export const DealSlideRow = React.memo(function DealSlideRow({
   id,
   title,
   subtitle,
@@ -105,10 +105,14 @@ export function DealSlideRow({
       id={id}
       className={`${
         compactHeader
-          ? "py-4 first:pt-1 space-y-3"
+          ? "py-3 first:pt-1 space-y-2.5"
           : compactTop
-          ? "py-6 first:pt-2 space-y-4"
-          : "py-7 sm:py-8 first:pt-4 space-y-4"
+          ? "py-3.5 sm:py-4.5 first:pt-2 space-y-2.5 sm:space-y-3"
+          : "py-3.5 sm:py-5 first:pt-2.5 space-y-2.5 sm:space-y-3.5"
+      } ${
+        priorityRow
+          ? ""
+          : "[content-visibility:auto] [contain-intrinsic-size:auto_280px]"
       } scroll-mt-[126px] lg:scroll-mt-[128px]`}
     >
       {/* Header Row: Clean Title Left | Far-Right Signature ">" Action (+ Desktop Slide Controls) */}
@@ -202,11 +206,11 @@ export function DealSlideRow({
         </div>
       </div>
 
-      {/* Pure Horizontal Card Slide Track (Standardized Fixed Portrait Coupon Width Across the Whole Web!) */}
+      {/* Pure Horizontal Card Slide Track — Allows BOTH Vertical Page Scroll & Horizontal Slide on Touch Devices! */}
       <div
         ref={trackRef}
         data-swipe-ignore="true"
-        className={`${trackEdgeClassName} flex gap-3.5 lg:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory touch-pan-x`}
+        className={`${trackEdgeClassName} flex items-start gap-3 lg:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-proximity`}
       >
         {visibleDeals.map((deal, idx) => (
           <div
@@ -216,7 +220,7 @@ export function DealSlideRow({
             <VerticalCouponCard
               pin={deal}
               language={language}
-              priority={priorityRow && idx < 4}
+              priority={priorityRow && idx < 2}
               isSaved={savedPinIds.has(deal.id)}
               isHighlighted={highlightedPinId === deal.id}
               notchBgClass={notchBgClass}
@@ -243,4 +247,4 @@ export function DealSlideRow({
       </div>
     </section>
   );
-}
+});

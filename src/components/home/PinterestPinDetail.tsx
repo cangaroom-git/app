@@ -68,6 +68,13 @@ import { InstagramEmojiPicker } from "@/components/shared/InstagramEmojiPicker";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { getProvinceById } from "@/data/thailandProvinces";
 import { getCouponTimeInfo } from "@/lib/couponHelpers";
+import {
+  clearLastClickedPinOrigin,
+  getLastClickedPinOrigin,
+  setLastClickedPinOrigin,
+} from "@/lib/pinOriginStore";
+
+export { clearLastClickedPinOrigin };
 import { getDealDiscountHeadline } from "@/components/home/VerticalCouponCard";
 import { DealHeroCouponSlide } from "@/components/home/DealHeroCouponSlide";
 import { DealTermsModal } from "@/components/home/DealTermsModal";
@@ -211,21 +218,6 @@ function SparklingCouponIconButton({
       )}
     </button>
   );
-}
-
-interface ClickedPinOrigin {
-  pinId: string;
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  timestamp: number;
-}
-
-let lastClickedPinOrigin: ClickedPinOrigin | null = null;
-
-export function clearLastClickedPinOrigin(): void {
-  lastClickedPinOrigin = null;
 }
 
 const QUICK_EMOJIS = ["😍", "🔥", "🌿", "✨", "🌊", "🏡", "❤️", "🙌"];
@@ -909,17 +901,17 @@ export function PinterestPinCard({
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       const rect = mediaBoxRef.current?.getBoundingClientRect();
       if (rect && rect.width > 0 && rect.height > 0) {
-        lastClickedPinOrigin = {
+        setLastClickedPinOrigin({
           pinId: pin.id,
           top: rect.top,
           left: rect.left,
           width: rect.width,
           height: rect.height,
           timestamp: Date.now(),
-        };
+        });
       }
     } else {
-      lastClickedPinOrigin = null;
+      clearLastClickedPinOrigin();
     }
     onSelectPin(pin);
   };
@@ -1506,7 +1498,7 @@ export function PinterestPinDetail({
 
   // Pinterest-style FLIP expansion animation from the clicked card box -> full hero stage
   useIsomorphicLayoutEffect(() => {
-    const origin = lastClickedPinOrigin;
+    const origin = getLastClickedPinOrigin();
     if (
       !origin ||
       origin.pinId !== pin.id ||
@@ -1514,7 +1506,7 @@ export function PinterestPinDetail({
     ) {
       return;
     }
-    lastClickedPinOrigin = null;
+    clearLastClickedPinOrigin();
 
     if (
       typeof window === "undefined" ||
@@ -2073,7 +2065,7 @@ export function PinterestPinDetail({
         track.style.transform = "translate3d(-100%, 0, 0)";
         swipeCommitTimerRef.current = window.setTimeout(() => {
           swipeCommitTimerRef.current = null;
-          lastClickedPinOrigin = null;
+          clearLastClickedPinOrigin();
           navFn("next");
         }, 260);
       } else if (commitPrev) {
@@ -2082,7 +2074,7 @@ export function PinterestPinDetail({
         track.style.transform = "translate3d(100%, 0, 0)";
         swipeCommitTimerRef.current = window.setTimeout(() => {
           swipeCommitTimerRef.current = null;
-          lastClickedPinOrigin = null;
+          clearLastClickedPinOrigin();
           if (prevP && navFn) {
             navFn("prev");
           } else {

@@ -58,9 +58,9 @@ export function getDealDiscountHeadline(
   return isTh ? "โปรที่พักพิเศษ" : "Special stay deal";
 }
 
-const BORDER_THICKNESS_PX = 1.5;
+const BORDER_THICKNESS_PX = 1;
 
-export function VerticalCouponCard({
+export const VerticalCouponCard = React.memo(function VerticalCouponCard({
   pin,
   language,
   isSaved,
@@ -227,8 +227,8 @@ export function VerticalCouponCard({
       }}
       className="cgr-coupon-outer group relative flex flex-col w-full rounded-[16px] cursor-pointer select-none text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
     >
-      {/* Inner Masked Ticket Body — Curves Seamlessly 1.5px Inside Both Semicircular Notches */}
-      <div className="cgr-coupon-inner relative flex flex-col w-full rounded-[14.5px] bg-[var(--color-background-card)] overflow-hidden">
+      {/* Inner Masked Ticket Body — Curves Seamlessly 1px Inside Both Semicircular Notches (h-full flex-1 prevents outer grey bleed!) */}
+      <div className="cgr-coupon-inner relative flex flex-col flex-1 h-full w-full rounded-[15px] bg-[var(--color-background-card)] overflow-hidden">
         {/* Top Photo Zone — Pixel-Aligned With Perforation Seam & Semicircular Notches */}
         <div
           onTouchStart={handlePhotoTouchStart}
@@ -452,4 +452,4 @@ export function VerticalCouponCard({
       </div>
     </article>
   );
-}
+});

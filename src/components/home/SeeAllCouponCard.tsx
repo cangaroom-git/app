@@ -152,7 +152,7 @@ export function SeeAllCouponCard({
               <div className="relative flex-1 min-h-0 w-full overflow-hidden bg-[var(--color-background-subtle)]">
                 {ticket?.imageUrl ? (
                   <img
-                    src={getOptimizedPinImageUrl(ticket.imageUrl, "card")}
+                    src={getOptimizedPinImageUrl(ticket.imageUrl, "thumb")}
                     alt=""
                     loading="lazy"
                     decoding="async"
@@ -213,12 +213,12 @@ export function SeeAllCouponCard({
       href={href}
       data-fanned={isFanned ? "true" : "false"}
       aria-label={isTh ? `ดูทั้งหมดใน ${title}` : `See all in ${title}`}
-      className="cgr-seeall-link group relative flex flex-col items-center justify-center w-full min-h-full py-2 px-1 cursor-pointer select-none text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[16px]"
+      className="cgr-seeall-link group relative flex flex-col items-center justify-center w-full py-1 px-1 cursor-pointer select-none text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[16px]"
     >
       {/* Frameless Open Canvas — 3 Floating Fanned Vertical Coupon Tickets */}
       <div
         aria-hidden="true"
-        className="relative w-full flex-1 min-h-[178px] sm:min-h-[218px] flex items-center justify-center pt-4 pb-1"
+        className="relative w-full min-h-[156px] sm:min-h-[196px] flex items-center justify-center pt-2 pb-0.5"
       >
         <div className="relative flex items-center justify-center">
           {renderMiniTicket(leftTicket, "left")}

@@ -40,6 +40,8 @@ export interface SearchStaysParams extends PersonalizationRequestHints {
   } | null;
   limit?: number;
   userId?: string | null;
+  /** Strip heavy detail-only fields (nearbySpotsJson, full gallery mediaUrls, multi-coupons, descriptions) for ultra-fast Home SSR payload */
+  compact?: boolean;
 }
 
 /**
@@ -249,6 +251,7 @@ export async function searchDiscoveryPins(
     sessionSignal,
     originProvinceId,
     deviceType,
+    compact = false,
   } = params;
 
   const trimmedQuery = q?.trim() || "";
@@ -289,61 +292,76 @@ export async function searchDiscoveryPins(
     where.stayStyles = { has: style };
   }
 
-  const rawPins = await prisma.pin.findMany({
-    where,
-    orderBy: [
-      { isSponsored: "desc" },
-      { sponsoredPriority: "desc" },
-      { likesCount: "desc" },
-      { createdAt: "desc" },
-    ],
-    take: Math.min(limit * 2, 120),
-    include: {
-      hotel: {
-        select: {
-          slug: true,
-          nameTh: true,
-          nameEn: true,
-          districtTh: true,
-          addressTh: true,
-          latitude: true,
-          longitude: true,
-          googleMapsUrl: true,
-          nearbySpotsJson: true,
-          logoUrl: true,
-          verificationStatus: true,
-          ratingAvg: true,
-          rooms: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              weekdayPriceThb: true,
-              maxGuests: true,
+  // Parallelize primary pins query + user taste profile lookup (eliminates sequential Neon DB waterfall!)
+  const [rawPins, taste] = await Promise.all([
+    prisma.pin.findMany({
+      where,
+      orderBy: [
+        { isSponsored: "desc" },
+        { sponsoredPriority: "desc" },
+        { likesCount: "desc" },
+        { createdAt: "desc" },
+      ],
+      take: compact ? Math.min(limit, 80) : Math.min(limit * 2, 120),
+      include: {
+        hotel: {
+          select: {
+            slug: true,
+            nameTh: true,
+            nameEn: true,
+            districtTh: true,
+            ...(compact
+              ? {}
+              : {
+                  addressTh: true,
+                  googleMapsUrl: true,
+                  nearbySpotsJson: true,
+                  logoUrl: true,
+                }),
+            latitude: true,
+            longitude: true,
+            verificationStatus: true,
+            ratingAvg: true,
+            rooms: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                weekdayPriceThb: true,
+                maxGuests: true,
+              },
+            },
+            coupons: {
+              where: { isActive: true, expiresAt: { gt: nowDate } },
+              orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+              take: compact ? 1 : 6,
+              select: PIN_COUPON_SELECT,
             },
           },
-          coupons: {
-            where: { isActive: true, expiresAt: { gt: nowDate } },
-            orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
-            take: 6,
-            select: PIN_COUPON_SELECT,
+        },
+        room: {
+          select: {
+            id: true,
+            code: true,
+            nameTh: true,
+            nameEn: true,
+            weekdayPriceThb: true,
+            maxGuests: true,
           },
         },
-      },
-      room: {
-        select: {
-          id: true,
-          code: true,
-          nameTh: true,
-          nameEn: true,
-          weekdayPriceThb: true,
-          maxGuests: true,
+        coupon: {
+          select: PIN_COUPON_SELECT,
         },
       },
-      coupon: {
-        select: PIN_COUPON_SELECT,
-      },
-    },
-  });
+    }),
+    loadMergedTasteContext({
+      userId,
+      visitorId,
+      hasAnalyticsConsent,
+      sessionSignal,
+      originProvinceId,
+      deviceType,
+    }),
+  ]);
 
   const filteredPins = rawPins.filter((pin) => {
     const referencePrice =
@@ -380,16 +398,36 @@ export async function searchDiscoveryPins(
   const districtByPinId = new Map<string, string>();
   const candidateDtos = filteredPins.map((p) => {
     districtByPinId.set(p.id, p.hotel.districtTh || "");
-    return mapPinToDto(p, likedSet, savedSet);
-  });
-
-  const taste = await loadMergedTasteContext({
-    userId,
-    visitorId,
-    hasAnalyticsConsent,
-    sessionSignal,
-    originProvinceId,
-    deviceType,
+    const dto = mapPinToDto(
+      {
+        ...p,
+        hotel: {
+          ...p.hotel,
+          logoUrl: "logoUrl" in p.hotel ? p.hotel.logoUrl : null,
+          addressTh: "addressTh" in p.hotel ? p.hotel.addressTh : null,
+          googleMapsUrl:
+            "googleMapsUrl" in p.hotel ? p.hotel.googleMapsUrl : null,
+          nearbySpotsJson:
+            "nearbySpotsJson" in p.hotel ? p.hotel.nearbySpotsJson : null,
+        },
+      },
+      likedSet,
+      savedSet
+    );
+    if (!compact) return dto;
+    // Strip heavy detail-only fields from Home SSR payload (loaded on-demand via /api/pins/[id] when clicked!)
+    return {
+      ...dto,
+      descriptionTh: "",
+      descriptionEn: "",
+      mediaUrls: [dto.coverImageUrl],
+      hotelAddressTh: "",
+      hotelGoogleMapsUrl: null,
+      hotelNearbySpots: [],
+      activeCoupons: dto.activeCoupon ? [dto.activeCoupon] : [],
+      semanticTags: [],
+      aiTriageNote: null,
+    };
   });
 
   const personalizedBase = rankPersonalizedHomeFeed({

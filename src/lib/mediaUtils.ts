@@ -328,11 +328,11 @@ const VARIANT_CONFIG: Record<PinImageVariant, VariantSpec> = {
     sizes: "64px",
   },
   card: {
-    width: 600,
-    quality: 82,
+    width: 520,
+    quality: 80,
     cloudinaryQuality: "q_auto:good",
-    srcSetWidths: [400, 640, 840],
-    sizes: "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 240px",
+    srcSetWidths: [360, 560, 760],
+    sizes: "(max-width: 639px) 46vw, (max-width: 1023px) 32vw, 252px",
   },
   gallery: {
     width: 800,

@@ -117,7 +117,8 @@ export default async function HomePage({
   };
 
   let initialPins: PinFeedItemDto[] = [];
-  let initialRecentPins: PinFeedItemDto[] = [];
+  let initialRecentPinIds: string[] = [];
+  let initialExtraRecentPins: PinFeedItemDto[] = [];
   let initialPinDetail: {
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
@@ -128,7 +129,8 @@ export default async function HomePage({
     const [fetchedPins, fetchedDetail, recentPinIds] = await Promise.all([
       searchDiscoveryPins({
         style: null,
-        limit: 80,
+        limit: 64,
+        compact: true,
         userId: sessionUser?.id ?? null,
         ...hints,
       }),
@@ -141,25 +143,35 @@ export default async function HomePage({
         userId: sessionUser?.id ?? null,
         visitorId,
         hasAnalyticsConsent: consent === "analytics",
-        limit: 20,
+        limit: 16,
       }),
     ]);
     initialPins = fetchedPins;
     initialPinDetail = fetchedDetail;
+    initialRecentPinIds = recentPinIds;
 
+    // Deduplicate RSC serialization: only send recent pins NOT already included in `initialPins`!
     if (recentPinIds.length > 0) {
-      const byId = new Map(fetchedPins.map((p) => [p.id, p]));
-      const missingIds = recentPinIds.filter((id) => !byId.has(id));
+      const existingIds = new Set(fetchedPins.map((p) => p.id));
+      const missingIds = recentPinIds.filter((id) => !existingIds.has(id));
       if (missingIds.length > 0) {
         const extraPins = await getPinsByIds(
           missingIds,
           sessionUser?.id ?? null
         );
-        for (const ep of extraPins) byId.set(ep.id, ep);
+        initialExtraRecentPins = extraPins.map((dto) => ({
+          ...dto,
+          descriptionTh: "",
+          descriptionEn: "",
+          mediaUrls: [dto.coverImageUrl],
+          hotelAddressTh: "",
+          hotelGoogleMapsUrl: null,
+          hotelNearbySpots: [],
+          activeCoupons: dto.activeCoupon ? [dto.activeCoupon] : [],
+          semanticTags: [],
+          aiTriageNote: null,
+        }));
       }
-      initialRecentPins = recentPinIds
-        .map((id) => byId.get(id))
-        .filter((p): p is PinFeedItemDto => Boolean(p));
     }
   } catch (err) {
     console.error("[HomePage SSR]", err);
@@ -168,7 +180,8 @@ export default async function HomePage({
   return (
     <HomeFeedClient
       initialPins={initialPins}
-      initialRecentPins={initialRecentPins}
+      initialRecentPinIds={initialRecentPinIds}
+      initialRecentPins={initialExtraRecentPins}
       initialStyleTab={initialStyleTab}
       initialSourceFilter={initialSourceFilter}
       initialStayId={stayId}

@@ -8,8 +8,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Map as MapIcon, X } from "lucide-react";
 import {
   getProvinceById,
   STAY_STYLE_TABS,
@@ -23,17 +23,27 @@ import {
   trackPinInteraction,
   trackTelemetryEvent,
 } from "@/lib/telemetry/clientTelemetry";
+import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
 import { useHotelApp } from "@/components/HotelAppShell";
-import {
-  PureMediaViewer,
-  type PureMediaSlide,
-} from "@/components/media/PureMediaViewer";
-import {
-  clearLastClickedPinOrigin,
-  PinterestPinDetail,
-} from "@/components/home/PinterestPinDetail";
+import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import { DealSlideRow } from "@/components/home/DealSlideRow";
 import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
+
+// Code-split heavy detail modal (3,950+ lines) & fullscreen media viewer out of the initial Home JS bundle!
+const PinterestPinDetail = dynamic(
+  () =>
+    import("@/components/home/PinterestPinDetail").then(
+      (m) => m.PinterestPinDetail
+    ),
+  { ssr: false }
+);
+const PureMediaViewer = dynamic(
+  () =>
+    import("@/components/media/PureMediaViewer").then(
+      (m) => m.PureMediaViewer
+    ),
+  { ssr: false }
+);
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -42,6 +52,7 @@ export type DealSourceFilter = "ALL" | "INTERNAL" | "EXTERNAL";
 
 export interface HomeFeedClientProps {
   initialPins: PinFeedItemDto[];
+  initialRecentPinIds?: string[];
   initialRecentPins?: PinFeedItemDto[];
   initialStyleTab?: string;
   initialSourceFilter?: DealSourceFilter;
@@ -93,6 +104,7 @@ const STYLE_GROUP_TITLES: Record<string, { th: string; en: string }> = {
 
 export function HomeFeedClient({
   initialPins,
+  initialRecentPinIds = [],
   initialRecentPins = [],
   initialStyleTab = "all",
   initialSourceFilter = "ALL",
@@ -126,7 +138,9 @@ export function HomeFeedClient({
 
   const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>(initialPins);
   const [recentPinIds, setRecentPinIds] = useState<string[]>(() =>
-    initialRecentPins.map((p) => p.id)
+    initialRecentPinIds.length > 0
+      ? initialRecentPinIds
+      : initialRecentPins.map((p) => p.id)
   );
   const [extraRecentPinsById, setExtraRecentPinsById] = useState<
     Record<string, PinFeedItemDto>
@@ -241,7 +255,10 @@ export function HomeFeedClient({
   // Sync recently viewed pin IDs (local instant history + DB SSR history + cross-tab sync)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const dbIds = initialRecentPins.map((p) => p.id);
+    const dbIds =
+      initialRecentPinIds.length > 0
+        ? initialRecentPinIds
+        : initialRecentPins.map((p) => p.id);
 
     const mergeIds = (localIds: string[]) => {
       const merged: string[] = [];
@@ -272,7 +289,7 @@ export function HomeFeedClient({
       window.removeEventListener(RECENT_VIEWS_UPDATED_EVENT, onUpdated);
       window.removeEventListener("storage", onStorage);
     };
-  }, [initialRecentPins]);
+  }, [initialRecentPinIds, initialRecentPins]);
 
   // Hydrate any locally recorded recent pin IDs not present in masterPins from real Postgres DB
   useEffect(() => {
@@ -613,6 +630,18 @@ export function HomeFeedClient({
     }
   };
 
+  const handleToggleSaveRef = useRef(handleToggleSave);
+  handleToggleSaveRef.current = handleToggleSave;
+  const handleToggleSaveStable = useCallback((pinId: string) => {
+    void handleToggleSaveRef.current(pinId);
+  }, []);
+
+  const handleSelectPinRef = useRef(handleSelectPin);
+  handleSelectPinRef.current = handleSelectPin;
+  const handleSelectFeedDeal = useCallback((p: PinFeedItemDto) => {
+    handleSelectPinRef.current(p, false);
+  }, []);
+
   const effectiveSavedPinIds =
     currentUser && !hasLoadedBoardsOnce ? optimisticSavedIds : globalSavedPinIds;
 
@@ -837,7 +866,7 @@ export function HomeFeedClient({
     return () => observer.disconnect();
   }, [activePin]);
 
-  // Smooth Scroll-Spy for Anchor Tabs
+  // Smooth rAF-Throttled Scroll-Spy for Anchor Tabs (zero layout thrash on mobile scroll!)
   useEffect(() => {
     if (activePin || typeof window === "undefined") return;
     const sectionIds = STAY_STYLE_TABS.map((t) => ({
@@ -845,10 +874,12 @@ export function HomeFeedClient({
       domId: t.id === "all" ? "group-all" : `group-${t.id}`,
     }));
 
-    const onScroll = () => {
+    let rafId = 0;
+    const evaluateScroll = () => {
+      rafId = 0;
       if (Date.now() < anchorScrollLockUntilRef.current) return;
       if (window.scrollY < 100) {
-        setActiveAnchorId("all");
+        setActiveAnchorId((prev) => (prev === "all" ? prev : "all"));
         return;
       }
       let current = "all";
@@ -861,11 +892,20 @@ export function HomeFeedClient({
           current = item.tabId;
         }
       }
-      setActiveAnchorId(current);
+      setActiveAnchorId((prev) => (prev === current ? prev : current));
+    };
+
+    const onScroll = () => {
+      if (rafId === 0) {
+        rafId = window.requestAnimationFrame(evaluateScroll);
+      }
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (rafId !== 0) window.cancelAnimationFrame(rafId);
+    };
   }, [activePin, visibleCatalog.length]);
 
   // Keep active anchor tab centered in horizontal scroller
@@ -927,9 +967,6 @@ export function HomeFeedClient({
     }
   }, []);
 
-  const hasQueryOrSourceFilter =
-    sourceFilter !== "ALL" || Boolean(globalSearchQuery.trim());
-
   const handleResetFilters = () => {
     setSourceFilter("ALL");
     setGlobalSearchQuery("");
@@ -989,10 +1026,10 @@ export function HomeFeedClient({
         </nav>
       )}
 
-      {/* Top Inline Anchor Tabs + Minimal Source Filter & Map Trigger */}
+      {/* Top Inline Anchor Tabs */}
       <div
         aria-hidden={Boolean(activePin)}
-        className={activePin ? "hidden" : "space-y-3"}
+        className={activePin ? "hidden" : ""}
       >
         <div ref={inlineTabsSentinelRef}>
           <div
@@ -1021,54 +1058,6 @@ export function HomeFeedClient({
               );
             })}
           </div>
-        </div>
-
-        {/* Minimal Single-Row Source Switcher & Explore Map Action */}
-        <div className="flex items-center justify-between gap-2.5 flex-wrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {(
-              [
-                { id: "ALL", th: "ทุกโปรที่พัก", en: "All deals" },
-                { id: "INTERNAL", th: "จองตรง 0% GP", en: "Direct 0% GP" },
-                { id: "EXTERNAL", th: "ดีลจากเว็บอื่น", en: "External deals" },
-              ] as const
-            ).map((opt) => {
-              const active = sourceFilter === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSourceFilter(opt.id)}
-                  className={`h-9 px-3.5 rounded-[10px] text-[13px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                    active
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  {isTh ? opt.th : opt.en}
-                </button>
-              );
-            })}
-
-            {hasQueryOrSourceFilter && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="h-9 px-3 rounded-[10px] text-[13px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-4 inline-flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                <span>{isTh ? "ล้างตัวกรอง" : "Reset"}</span>
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <Link
-            href={exploreMapHref}
-            className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors"
-          >
-            <MapIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
-            <span>{isTh ? "ดูบนแผนที่" : "Explore map"}</span>
-          </Link>
         </div>
       </div>
 
@@ -1213,7 +1202,7 @@ export function HomeFeedClient({
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--color-border)]">
+          <div className="space-y-0.5 sm:space-y-1">
             {/* Search Results Slide Row (When searching) */}
             {globalSearchQuery.trim() && (
               <DealSlideRow
@@ -1228,8 +1217,8 @@ export function HomeFeedClient({
                 language={language}
                 savedPinIds={effectiveSavedPinIds}
                 priorityRow={true}
-                onSelectDeal={(p) => handleSelectPin(p, false)}
-                onToggleSave={handleToggleSave}
+                onSelectDeal={handleSelectFeedDeal}
+                onToggleSave={handleToggleSaveStable}
               />
             )}
 
@@ -1249,8 +1238,8 @@ export function HomeFeedClient({
                     language={language}
                     savedPinIds={effectiveSavedPinIds}
                     priorityRow={true}
-                    onSelectDeal={(p) => handleSelectPin(p, false)}
-                    onToggleSave={handleToggleSave}
+                    onSelectDeal={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
                   />
                 )}
 
@@ -1267,8 +1256,8 @@ export function HomeFeedClient({
                     language={language}
                     savedPinIds={effectiveSavedPinIds}
                     priorityRow={recentViewedDeals.length === 0}
-                    onSelectDeal={(p) => handleSelectPin(p, false)}
-                    onToggleSave={handleToggleSave}
+                    onSelectDeal={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
                   />
                 )}
 
@@ -1293,8 +1282,8 @@ export function HomeFeedClient({
                       recentViewedDeals.length === 0 &&
                       slideGroups.internalDeals.length === 0
                     }
-                    onSelectDeal={(p) => handleSelectPin(p, false)}
-                    onToggleSave={handleToggleSave}
+                    onSelectDeal={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
                   />
                 )}
               </>
@@ -1310,18 +1299,20 @@ export function HomeFeedClient({
                 deals={group.deals}
                 language={language}
                 savedPinIds={effectiveSavedPinIds}
-                onSelectDeal={(p) => handleSelectPin(p, false)}
-                onToggleSave={handleToggleSave}
+                onSelectDeal={handleSelectFeedDeal}
+                onToggleSave={handleToggleSaveStable}
               />
             ))}
           </div>
         ))}
 
-      <PureMediaViewer
-        slides={fullscreenMedia?.slides ?? null}
-        initialIndex={fullscreenMedia?.index ?? 0}
-        onClose={() => setFullscreenMedia(null)}
-      />
+      {fullscreenMedia && (
+        <PureMediaViewer
+          slides={fullscreenMedia.slides}
+          initialIndex={fullscreenMedia.index}
+          onClose={() => setFullscreenMedia(null)}
+        />
+      )}
     </div>
   );
 }
