@@ -30,7 +30,7 @@ const GEMINI_MODELS = [
 
 function buildModerationPrompt(folder: string): string {
   if (folder === "slips") {
-    return `You are a safety moderator for a Thai hotel booking platform (Cangaroom).
+    return `You are a safety moderator for a Thai hotel booking platform (Nondii).
 This upload is a BANK PAYMENT SLIP / QR TRANSFER RECEIPT.
 Only block if the image contains explicit pornography/nudity, graphic violence/gore, or illegal content.
 Do NOT block bank slips, receipts, screenshots, or QR codes.
@@ -45,7 +45,7 @@ Return strict JSON only:
   }
 
   const isRoomPhoto = folder === "rooms";
-  return `You are a helpful AI image moderator and hospitality photo assistant for Cangaroom, a Thai boutique hotel, resort, pool villa, and glamping booking platform.
+  return `You are a helpful AI image moderator and hospitality photo assistant for Nondii, a Thai boutique hotel, resort, pool villa, and glamping booking platform.
 
 Evaluate the uploaded image carefully with HIGH PRECISION and LOW FALSE POSITIVES (never unfairly block genuine Thai hotel/resort photos!):
 

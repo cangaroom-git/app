@@ -11,7 +11,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   BadgeCheck,
   BedDouble,
   Check,
@@ -44,7 +43,10 @@ import {
   getOptimizedPinImageUrl,
   PIN_IMAGE_SIZES,
 } from "@/lib/mediaUtils";
-import { trackTelemetryEvent } from "@/lib/telemetry/clientTelemetry";
+import {
+  recordRecentViewedPinId,
+  trackTelemetryEvent,
+} from "@/lib/telemetry/clientTelemetry";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
@@ -228,6 +230,14 @@ export function HotelStorefrontClient({
   const [isBookingDrawerOpen, setIsBookingDrawerOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [drawerRoom, setDrawerRoom] = useState<RoomAvailabilityDto | null>(null);
+
+  // Record this property's primary deal pin into Recently Viewed when visiting /{hotelSlug}
+  useEffect(() => {
+    const primaryPinId = initialStorefront.pins[0]?.id;
+    if (primaryPinId) {
+      recordRecentViewedPinId(primaryPinId);
+    }
+  }, [initialStorefront.hotel.id, initialStorefront.pins]);
   const [initialCouponCode, setInitialCouponCode] = useState<string | null>(
     null
   );
@@ -735,7 +745,7 @@ export function HotelStorefrontClient({
       }
     ).catch(() => {});
 
-    const prefillMsg = `สวัสดีครับ ดูที่พัก ${storefront.hotel.nameTh} มาจาก Cangaroom สนใจเข้าพักวันที่ ${checkIn} ถึง ${checkOut} (${guests} ท่าน)`;
+    const prefillMsg = `สวัสดีครับ ดูที่พัก ${storefront.hotel.nameTh} มาจาก Nondii สนใจเข้าพักวันที่ ${checkIn} ถึง ${checkOut} (${guests} ท่าน)`;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(prefillMsg).catch(() => {});
     }
@@ -2800,20 +2810,6 @@ export function HotelStorefrontClient({
               {hotel.addressTh || `${hotel.districtTh} จ.${hotel.provinceNameTh}`}
             </p>
           </div>
-
-          {hotel.googleMapsUrl && (
-            <a
-              href={hotel.googleMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 transition-colors shrink-0"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>
-                {language === "th" ? "เปิดใน Google Maps" : "Open Google Maps"}
-              </span>
-            </a>
-          )}
         </div>
 
         <HotelLocationMap
@@ -2847,7 +2843,7 @@ export function HotelStorefrontClient({
               className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
             >
               <span>ดูทั้งหมด ({posts.length})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -2914,7 +2910,7 @@ export function HotelStorefrontClient({
                     className="text-[13px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1 hover:underline"
                   >
                     <span>อ่านต่อ</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </article>

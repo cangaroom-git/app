@@ -567,7 +567,7 @@ export function SmartSearchDropdown({
               <div className="flex items-center gap-1.5 text-[var(--color-text-primary)]">
                 <Flame className="w-4 h-4 text-[var(--color-text-secondary)]" />
                 <h3 className="ty-caption font-semibold">
-                  {isTh ? "กำลังฮิตใน Cangaroom" : "Trending on Cangaroom"}
+                  {isTh ? "กำลังฮิตใน Nondii" : "Trending on Nondii"}
                 </h3>
               </div>
 

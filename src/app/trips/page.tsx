@@ -3,8 +3,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   CalendarCheck,
+  ChevronRight,
   Search,
   Settings,
   TicketPercent,
@@ -169,8 +169,8 @@ export default function TripsAndAccountPage() {
             {user
               ? `${user.name} (${user.email})`
               : language === "th"
-              ? "ดูใบจองจากทุกที่พักบน Cangaroom หรือค้นหาด้วยรหัสการจอง"
-              : "Manage bookings across all Cangaroom properties"}
+              ? "ดูใบจองจากทุกที่พักบน Nondii หรือค้นหาด้วยรหัสการจอง"
+              : "Manage bookings across all Nondii properties"}
           </p>
         </div>
 
@@ -277,7 +277,7 @@ export default function TripsAndAccountPage() {
               <h2 className="ty-title">ยังไม่มีประวัติการจอง</h2>
               <p className="ty-caption">
                 {user
-                  ? "เมื่อคุณจองที่พักบน Cangaroom ใบจองและคิวอาร์โค้ดเช็กอินจะแสดงที่นี่ทันที"
+                  ? "เมื่อคุณจองที่พักบน Nondii ใบจองและคิวอาร์โค้ดเช็กอินจะแสดงที่นี่ทันที"
                   : "เข้าสู่ระบบ หรือกรอกรหัสใบจอง + เบอร์โทรด้านบนเพื่อตรวจสอบสถานะ"}
               </p>
             </div>
@@ -353,9 +353,9 @@ export default function TripsAndAccountPage() {
         <div className="space-y-3">
           {walletCoupons.length === 0 ? (
             <div className="rounded-[20px] bg-[var(--color-background-muted)] p-8 text-center space-y-3">
-              <h2 className="ty-title">ยังไม่มีคูปองในกระเป๋า</h2>
-              <Link href="/deal" className="btn-promo-solid inline-flex">
-                ไปเก็บคูปองส่วนลดที่หน้า Deals
+              <h2 className="ty-title">ยังไม่มีคูปองที่บันทึกไว้</h2>
+              <Link href="/" className="btn-round-solid inline-flex">
+                ไปดูคูปองและโปรที่พักทั้งหมด
               </Link>
             </div>
           ) : (
@@ -390,7 +390,7 @@ export default function TripsAndAccountPage() {
                       className="btn-round-solid !h-9 !px-3.5 shrink-0"
                     >
                       <span>จองเลย</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   )}
                 </div>

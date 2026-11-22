@@ -353,7 +353,7 @@ export function BookingDigitalVoucherCard({
 
         <div className="flex flex-col items-center shrink-0">
           <PromptPayQrCodeSvg
-            rawPayload={`CANGAROOM-CHECKIN:${booking.bookingCode}|HOTEL:${booking.hotelSlug}|ROOM:${booking.roomCode}|IN:${booking.checkInDate}|OUT:${booking.checkOutDate}`}
+            rawPayload={`NONDII-CHECKIN:${booking.bookingCode}|HOTEL:${booking.hotelSlug}|ROOM:${booking.roomCode}|IN:${booking.checkInDate}|OUT:${booking.checkOutDate}`}
             size={96}
           />
           <span className="ty-caption font-mono mt-1.5">CHECK-IN PASS</span>

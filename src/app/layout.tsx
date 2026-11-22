@@ -9,9 +9,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Cangaroom — ค้นหาที่พักสวยทั่วไทย & จองตรงฟรีค่า GP 0%",
+  title: "Nondii — ค้นหาที่พักสวยทั่วไทย & จองตรงฟรีค่า GP 0%",
   description:
-    "Cangaroom แพลตฟอร์มรวมที่พักไทยสไตล์ Pinterest ทั้งภูเขา ทะเล พูลวิลล่า แกลมปิ้ง พร้อมเก็บคูปองส่วนลดและจองห้องพักตรงกับโรงแรม 0% GP",
+    "Nondii แพลตฟอร์มรวมที่พักไทยสไตล์ Pinterest ทั้งภูเขา ทะเล พูลวิลล่า แกลมปิ้ง พร้อมเก็บคูปองส่วนลดและจองห้องพักตรงกับโรงแรม 0% GP",
 };
 
 export default function RootLayout({

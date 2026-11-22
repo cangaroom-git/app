@@ -4,10 +4,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowRight,
   BadgeCheck,
   BedDouble,
   CalendarCheck,
+  ChevronRight,
   Eye,
   MapPin,
   Tag,
@@ -24,7 +24,7 @@ export async function generateMetadata({
   const { hotelSlug, postSlug } = await params;
   const detail = await getPublishedHotelPostDetail(hotelSlug, postSlug);
   if (!detail) {
-    return { title: "ไม่พบบทความ | Cangaroom" };
+    return { title: "ไม่พบบทความ | Nondii" };
   }
 
   return {
@@ -162,7 +162,7 @@ export default async function HotelPostDetailPage({
     },
     publisher: {
       "@type": "Organization",
-      name: "Cangaroom",
+      name: "Nondii",
     },
     keywords: post.tags.join(", "),
   };
@@ -376,7 +376,7 @@ export default async function HotelPostDetailPage({
         >
           <BedDouble className="w-4 h-4" />
           <span>เช็กวันว่าง & จองห้องนี้</span>
-          <ArrowRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4" />
         </Link>
       </section>
 

@@ -10,6 +10,7 @@ export type NearbyPlaceCategory =
 
 export interface NearbyPlaceItem {
   id: string;
+  googlePlaceId?: string;
   nameTh: string;
   nameEn: string;
   category: Exclude<NearbyPlaceCategory, "all">;
@@ -22,9 +23,10 @@ export interface NearbyPlaceItem {
   walkMinutes: number;
   description?: string;
   thumbnailUrl?: string;
+  photoNames?: string[];
   isHostPick?: boolean;
   isApproximateCoord?: boolean;
-  source: "host" | "osm" | "wikipedia" | "search";
+  source: "host" | "nondii_db" | "google" | "osm" | "wikipedia" | "search";
 }
 
 const EARTH_RADIUS_KM = 6371;

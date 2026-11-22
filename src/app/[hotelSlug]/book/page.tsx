@@ -19,13 +19,13 @@ export async function generateMetadata({
 
   if (!storefront) {
     return {
-      title: "ยืนยันและชำระเงิน | Cangaroom",
+      title: "ยืนยันและชำระเงิน | Nondii",
       robots: { index: false, follow: false },
     };
   }
 
   return {
-    title: `ยืนยันการจอง · ${storefront.hotel.nameTh} | Cangaroom`,
+    title: `ยืนยันการจอง · ${storefront.hotel.nameTh} | Nondii`,
     robots: { index: false, follow: false },
   };
 }

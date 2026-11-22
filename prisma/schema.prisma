@@ -45,6 +45,11 @@ enum PinPublishStatus {
   DISCARDED
 }
 
+enum DealSourceType {
+  INTERNAL
+  EXTERNAL
+}
+
 enum CommentStatus {
   VISIBLE
   HIDDEN
@@ -278,10 +283,12 @@ model HotelDiscountRule {
   minAdvanceDays Int?
   maxAdvanceDays Int?
   isActive       Boolean          @default(true)
+  sortOrder      Int              @default(0)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([hotelId, isActive, ruleType])
+  @@index([hotelId, sortOrder])
 }
 
 model HotelAddon {
@@ -322,10 +329,20 @@ model Pin {
   provinceId        String
   stayStyles        String[]          @default([])
   semanticTags      String[]          @default([])
-  sourcePlatform    SocialPlatform    @default(MANUAL)
-  externalPostId    String?
-  externalPermalink String?
-  publishStatus     PinPublishStatus  @default(PUBLISHED)
+  sourcePlatform     SocialPlatform    @default(MANUAL)
+  dealSourceType     DealSourceType    @default(INTERNAL)
+  externalDealUrl    String?
+  externalSourceName String?
+  promoHeadlineTh    String?
+  promoHeadlineEn    String?
+  promoCode          String?
+  promoOriginalPriceThb Int?
+  promoDealPriceThb  Int?
+  promoExpiresAt     DateTime?
+  externalClickCount Int               @default(0)
+  externalPostId     String?
+  externalPermalink  String?
+  publishStatus      PinPublishStatus  @default(PUBLISHED)
   aiConfidenceScore Int?
   aiTriageNote      String?
   isSponsored       Boolean           @default(false)
@@ -345,6 +362,7 @@ model Pin {
 
   @@unique([hotelId, sourcePlatform, externalPostId])
   @@index([publishStatus, provinceId])
+  @@index([publishStatus, dealSourceType, promoExpiresAt])
   @@index([publishStatus, isSponsored, sponsoredPriority, createdAt])
 }
 
@@ -449,6 +467,7 @@ model Coupon {
   expiresAt      DateTime
   isFeaturedDeal Boolean             @default(false)
   isActive       Boolean             @default(true)
+  sortOrder      Int                 @default(0)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   walletClaims   UserCouponWallet[]
@@ -458,6 +477,7 @@ model Coupon {
 
   @@unique([hotelId, code])
   @@index([isActive, isFeaturedDeal, expiresAt])
+  @@index([hotelId, sortOrder])
 }
 
 model UserCouponWallet {
@@ -667,4 +687,43 @@ model TelemetryEvent {
   @@index([pinId, eventType, createdAt])
   @@index([visitorId, createdAt])
   @@index([expiresAt])
+}
+
+model ApiQuotaUsage {
+  id           String   @id @default(cuid())
+  sku          String
+  monthKey     String
+  dayKey       String
+  monthlyCount Int      @default(0)
+  dailyCount   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([sku, monthKey])
+  @@index([monthKey])
+}
+
+model ThailandPlace {
+  id              String   @id @default(cuid())
+  source          String
+  externalId      String
+  nameTh          String
+  nameEn          String   @default("")
+  category        String
+  subcategoryTh   String   @default("")
+  subcategoryEn   String   @default("")
+  provinceId      String?
+  lat             Float
+  lng             Float
+  description     String?
+  thumbnailUrl    String?
+  popularityScore Int      @default(50)
+  syncedAt        DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([lat, lng])
+  @@index([category, lat, lng])
+  @@index([provinceId, category, popularityScore])
 }

@@ -19,7 +19,8 @@ export function resolveRoleFromEmail(email?: string | null): AppRole {
 
   if (
     SUPER_ADMIN_EMAILS.has(normalized) ||
-    normalized.endsWith("@cangaroom.com")
+    normalized.endsWith("@cangaroom.com") ||
+    normalized.endsWith("@nondii.com")
   ) {
     return "SUPER_ADMIN";
   }

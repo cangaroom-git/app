@@ -73,7 +73,7 @@ export function StudioReviewsPanel({
             </span>
           </h1>
           <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-            ตอบกลับคำชมหรือข้อเสนอแนะเพื่อสร้างความน่าเชื่อถือบนหน้าร้าน cangaroom.com/{hotel.slug}
+            ตอบกลับคำชมหรือข้อเสนอแนะเพื่อสร้างความน่าเชื่อถือบนหน้าร้าน nondii.com/{hotel.slug}
           </p>
         </div>
       </div>

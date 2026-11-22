@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { haversineDistanceKm } from "@/lib/geo/nearbyPlacesTypes";
+import { consumeGoogleQuota } from "@/lib/geo/googlePlacesQuota";
+import { isValidGooglePhotoName } from "@/lib/geo/googlePlacesServer";
 
 interface CachedPhotoResult {
   expiresAt: number;
@@ -91,7 +93,7 @@ async function queryWikipediaOnce(
 
   const res = await fetch(url.toString(), {
     headers: {
-      "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+      "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
     },
     signal: AbortSignal.timeout(3200),
   });
@@ -181,7 +183,7 @@ async function searchCommonsNamedPhoto(rawName: string): Promise<string | null> 
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(3200),
     });
@@ -205,6 +207,57 @@ async function searchCommonsNamedPhoto(rawName: string): Promise<string | null> 
 }
 
 export async function GET(request: NextRequest) {
+  // Mode 1: Secure Backend Proxy for Google Places API (New) Photos (hides API key + enforces dynamic monthly quota!)
+  const googlePhotoName = (
+    request.nextUrl.searchParams.get("googlePhotoName") || ""
+  ).trim();
+  if (googlePhotoName) {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
+    if (!apiKey || !isValidGooglePhotoName(googlePhotoName)) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    const rawWidth = Number.parseInt(
+      request.nextUrl.searchParams.get("maxWidth") || "480",
+      10
+    );
+    const maxWidth = Number.isFinite(rawWidth)
+      ? Math.max(120, Math.min(800, rawWidth))
+      : 480;
+
+    const quota = await consumeGoogleQuota("PLACES_PHOTO", 1);
+    if (!quota.allowed) {
+      return new NextResponse(null, { status: 429 });
+    }
+
+    try {
+      const mediaUrl = `https://places.googleapis.com/v1/${googlePhotoName}/media?maxWidthPx=${maxWidth}&key=${encodeURIComponent(
+        apiKey
+      )}`;
+      const upstream = await fetch(mediaUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!upstream.ok) {
+        return new NextResponse(null, { status: 404 });
+      }
+      const contentType =
+        upstream.headers.get("content-type") || "image/jpeg";
+      const buf = await upstream.arrayBuffer();
+      return new NextResponse(buf, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          // Browser & edge cache prevents duplicate photo quota consumption on repeated views
+          "Cache-Control":
+            "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+        },
+      });
+    } catch {
+      return new NextResponse(null, { status: 502 });
+    }
+  }
+
   const name = (request.nextUrl.searchParams.get("name") || "").trim();
   const lat = Number.parseFloat(request.nextUrl.searchParams.get("lat") || "");
   const lng = Number.parseFloat(request.nextUrl.searchParams.get("lng") || "");

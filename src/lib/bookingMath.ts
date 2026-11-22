@@ -34,6 +34,7 @@ export const RESERVED_HOTEL_SLUGS = new Set([
   "chat",
   "auth",
   "cangaroom",
+  "nondii",
   "default",
   "www",
   "app",

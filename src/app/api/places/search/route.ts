@@ -4,6 +4,11 @@ import {
   haversineDistanceKm,
   type NearbyPlaceItem,
 } from "@/lib/geo/nearbyPlacesTypes";
+import {
+  isGooglePlacesConfigured,
+  searchGoogleAutocomplete,
+  searchGoogleText,
+} from "@/lib/geo/googlePlacesServer";
 
 interface CachedSearchEntry {
   expiresAt: number;
@@ -119,7 +124,7 @@ async function fetchNominatimSearch(
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(6000),
     });
@@ -185,7 +190,7 @@ async function fetchPhotonSearch(
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(6000),
     });
@@ -272,6 +277,59 @@ export async function GET(request: NextRequest) {
     parsedOriginLng <= 180
       ? parsedOriginLng
       : lng;
+
+  const mode = (request.nextUrl.searchParams.get("mode") || "text").trim();
+  const providerParam = (
+    request.nextUrl.searchParams.get("provider") || "auto"
+  ).trim();
+  const sessionToken =
+    (request.nextUrl.searchParams.get("sessionToken") || "").trim() ||
+    undefined;
+  const langParam =
+    request.nextUrl.searchParams.get("lang") === "en" ? "en" : "th";
+  const radiusParam = Number.parseFloat(
+    request.nextUrl.searchParams.get("radius") ?? ""
+  );
+
+  // Mode 1: Fast Thailand-biased Autocomplete (New) — 10,000 free calls/month
+  if (mode === "autocomplete") {
+    if (providerParam !== "osm" && isGooglePlacesConfigured()) {
+      const ac = await searchGoogleAutocomplete({
+        input: q,
+        lat,
+        lng,
+        sessionToken,
+        language: langParam,
+      });
+      if (!ac.quotaExceeded) {
+        return NextResponse.json({
+          suggestions: ac.suggestions,
+          providerUsed: "google",
+        });
+      }
+    }
+    return NextResponse.json({ suggestions: [], providerUsed: "osm" });
+  }
+
+  // Mode 2: Google Places Text Search (New) — 5,000 free calls/month (falls back to OSM when quota hit)
+  if (providerParam !== "osm" && isGooglePlacesConfigured()) {
+    const gText = await searchGoogleText({
+      query: q,
+      lat,
+      lng,
+      originLat,
+      originLng,
+      radiusMeters:
+        Number.isFinite(radiusParam) && radiusParam > 0 ? radiusParam : 15000,
+      language: langParam,
+    });
+    if (!gText.quotaExceeded) {
+      return NextResponse.json({
+        items: gText.items,
+        providerUsed: "google",
+      });
+    }
+  }
 
   const cacheKey = `${q.toLowerCase()}|${lat.toFixed(2)},${lng.toFixed(
     2

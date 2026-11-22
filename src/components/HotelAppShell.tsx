@@ -750,8 +750,11 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       setWalletCoupons([]);
       return;
     }
-    void loadWalletCoupons();
-  }, [user?.id, loadWalletCoupons]);
+    // Only fetch legacy coupon wallet rows on booking/trips routes where coupons are redeemed
+    if (activeTab === "hotel" || activeTab === "trips") {
+      void loadWalletCoupons();
+    }
+  }, [user?.id, activeTab, loadWalletCoupons]);
 
   const claimedCouponIds = useMemo(() => {
     const set = new Set<string>(walletCoupons.map((c) => c.id));
@@ -865,8 +868,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeTab === "register-hotel";
 
   const showSearchBar =
-    activeTab === "home" || activeTab === "board" || activeTab === "deal";
-  const isFluidFeedPage = activeTab === "home" || activeTab === "board";
+    activeTab === "home" || activeTab === "explore" || activeTab === "board";
+  const isExploreFullBleed = activeTab === "explore";
 
   const contextValue: PlatformAppContextValue = useMemo(
     () => ({
@@ -1022,32 +1025,38 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
           <main
             data-cgr-app-main="true"
-            className="pt-16 pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]"
+            className={
+              isExploreFullBleed
+                ? "pt-16 pb-0 lg:pl-[72px]"
+                : "pt-16 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]"
+            }
           >
             <div
               data-cgr-app-inner="true"
               className={
-                isFluidFeedPage
-                  ? "px-1.5 sm:px-6 lg:px-8 pt-2 sm:pt-5"
-                  : "px-4 sm:px-6 lg:px-8 pt-5"
+                isExploreFullBleed
+                  ? "p-0"
+                  : "px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5"
               }
             >
               {children}
             </div>
           </main>
 
-          <CouponWalletDrawer
-            isOpen={isWalletOpen}
-            onClose={() => setIsWalletOpen(false)}
-            language={lang}
-            isAuthenticated={Boolean(user)}
-            walletCoupons={walletCoupons}
-            claimedCouponIds={claimedCouponIds}
-            recommendedDeals={recommendedDeals}
-            onClaimCoupon={claimCouponToWallet}
-            onRemoveCoupon={removeCouponFromWallet}
-            onOpenAuthModal={openAuthModal}
-          />
+          {isWalletOpen && (
+            <CouponWalletDrawer
+              isOpen={isWalletOpen}
+              onClose={() => setIsWalletOpen(false)}
+              language={lang}
+              isAuthenticated={Boolean(user)}
+              walletCoupons={walletCoupons}
+              claimedCouponIds={claimedCouponIds}
+              recommendedDeals={recommendedDeals}
+              onClaimCoupon={claimCouponToWallet}
+              onRemoveCoupon={removeCouponFromWallet}
+              onOpenAuthModal={openAuthModal}
+            />
+          )}
 
           <AuthPromptModal
             isOpen={isAuthModalOpen}

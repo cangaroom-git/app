@@ -242,9 +242,18 @@ export async function toggleSavePinToBoard(params: {
       where: { id: pinId },
       include: {
         room: { select: { weekdayPriceThb: true } },
+        coupon: {
+          select: { id: true, isActive: true, expiresAt: true, totalQuota: true, claimedCount: true },
+        },
         hotel: {
           select: {
             rooms: { where: { isActive: true }, select: { weekdayPriceThb: true } },
+            coupons: {
+              where: { isActive: true, expiresAt: { gt: new Date() } },
+              orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+              take: 1,
+              select: { id: true, isActive: true, expiresAt: true, totalQuota: true, claimedCount: true },
+            },
           },
         },
       },
@@ -420,6 +429,36 @@ export async function toggleSavePinToBoard(params: {
         await tx.pin.update({
           where: { id: pinId },
           data: { savesCount: { increment: 1 } },
+        });
+      }
+    }
+
+    // Saving an Internal Coupon Pin also silently syncs its active coupon to UserCouponWallet
+    // so the traveller's saved deal auto-applies cleanly on /{hotelSlug}/book without a separate wallet UI!
+    const nowMs = Date.now();
+    const candidateCoupon =
+      pin.coupon &&
+      pin.coupon.isActive &&
+      pin.coupon.expiresAt.getTime() > nowMs &&
+      (pin.coupon.totalQuota === null ||
+        pin.coupon.claimedCount < pin.coupon.totalQuota)
+        ? pin.coupon
+        : pin.hotel.coupons[0] ?? null;
+
+    if (pin.dealSourceType === "INTERNAL" && candidateCoupon) {
+      const alreadyClaimed = await tx.userCouponWallet.findUnique({
+        where: {
+          userId_couponId: { userId, couponId: candidateCoupon.id },
+        },
+        select: { id: true },
+      });
+      if (!alreadyClaimed) {
+        await tx.userCouponWallet.create({
+          data: { userId, couponId: candidateCoupon.id },
+        });
+        await tx.coupon.update({
+          where: { id: candidateCoupon.id },
+          data: { claimedCount: { increment: 1 } },
         });
       }
     }

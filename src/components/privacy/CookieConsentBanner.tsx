@@ -118,7 +118,7 @@ export function CookieConsentBanner({
           ? "การตั้งค่าคุกกี้และความเป็นส่วนตัว (PDPA)"
           : "Cookie & Privacy Preferences"
       }
-      className="fixed bottom-[calc(74px+env(safe-area-inset-bottom))] inset-x-2.5 sm:inset-x-auto sm:right-5 lg:bottom-5 z-[45] sm:w-[416px] pointer-events-none select-none animate-fade-in-backdrop"
+      className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] inset-x-3 sm:inset-x-auto sm:right-5 lg:bottom-5 z-[76] sm:w-[416px] pointer-events-none select-none animate-fade-in-backdrop"
     >
       <div className="pointer-events-auto rounded-[18px] bg-[var(--color-background-popover)]/96 backdrop-blur-md border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3.5 sm:p-4 space-y-3">
         {/* Compact Header + Non-Blocking Copy */}
@@ -136,7 +136,7 @@ export function CookieConsentBanner({
               <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
                 {language === "th"
                   ? "เราใช้คุกกี้เพื่อจดจำสไตล์ที่พักที่คุณสนใจและพัฒนาเว็บไซต์ตามมาตรฐาน PDPA โดยไม่เก็บเลข IP ดิบของคุณ"
-                  : "We use cookies to remember your stay preferences and improve Cangaroom under Thailand PDPA without storing raw IPs."}
+                  : "We use cookies to remember your stay preferences and improve Nondii under Thailand PDPA without storing raw IPs."}
               </p>
             </div>
           </div>

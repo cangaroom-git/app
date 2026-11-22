@@ -4,9 +4,9 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   Building2,
   CheckCircle2,
+  ChevronRight,
   Home,
   Loader2,
   Tent,
@@ -191,7 +191,7 @@ export default function RegisterHotelPage() {
               />
             </svg>
             <span className="text-[15px] font-semibold tracking-tight">
-              Cangaroom Studio
+              Nondii Studio
             </span>
           </Link>
 
@@ -217,7 +217,7 @@ export default function RegisterHotelPage() {
                   เข้าสู่ระบบก่อนเปิดบัญชีเจ้าของที่พัก
                 </h1>
                 <p className="text-[14.5px] text-[var(--color-text-secondary)]">
-                  ใช้บัญชี Google หรืออีเมลของคุณ เพื่อเชื่อมสิทธิ์จัดการหลังบ้าน Cangaroom Studio ฟรี 0% GP
+                  ใช้บัญชี Google หรืออีเมลของคุณ เพื่อเชื่อมสิทธิ์จัดการหลังบ้าน Nondii Studio ฟรี 0% GP
                 </p>
               </div>
               <Link
@@ -318,7 +318,7 @@ export default function RegisterHotelPage() {
                     <StandardInput
                       grouped
                       label="ลิงก์หน้าร้าน (URL Slug) *"
-                      prefixText="cangaroom.com/"
+                      prefixText="nondii.com/"
                       required
                       placeholder="sapan-unseen"
                       value={slug}
@@ -354,7 +354,7 @@ export default function RegisterHotelPage() {
                       <>
                         <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
                         <span className="font-medium text-[var(--color-success)]">
-                          ใช้งานได้ทันที: cangaroom.com/{slug}
+                          ใช้งานได้ทันที: nondii.com/{slug}
                         </span>
                       </>
                     ) : slugStatus.available === false ? (
@@ -388,7 +388,7 @@ export default function RegisterHotelPage() {
                         ? "กำลังสร้างบัญชีที่พัก..."
                         : "เปิดใช้งานหลังบ้าน (ไปตั้งค่าห้องพักต่อ)"}
                     </span>
-                    {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+                    {!isSubmitting && <ChevronRight className="w-4 h-4" />}
                   </button>
                   <p className="text-[12.5px] text-[var(--color-text-tertiary)] text-center mt-2.5">
                     ระบบจะสร้างเป็นฉบับร่าง (Draft) ให้ก่อน คุณสามารถกรอกห้องพักและกดเผยแพร่ได้เมื่อพร้อม

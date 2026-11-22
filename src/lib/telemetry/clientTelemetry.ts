@@ -10,6 +10,72 @@ import {
 } from "@/lib/telemetry/tasteTypes";
 
 export const OPEN_PRIVACY_SETTINGS_EVENT = "cgr:open-privacy-settings";
+export const RECENT_VIEWS_UPDATED_EVENT = "cgr:recent-views-updated";
+export const RECENT_VIEWED_PINS_STORAGE_KEY = "cgr_recent_viewed_pins_v1";
+const MAX_RECENT_VIEWED_PINS = 24;
+
+export function getRecentViewedPinIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_VIEWED_PINS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const item of parsed) {
+      const id =
+        typeof item === "string"
+          ? item.trim()
+          : item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string"
+          ? (item as { id: string }).id.trim()
+          : "";
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+      if (out.length >= MAX_RECENT_VIEWED_PINS) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export function recordRecentViewedPinId(pinId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const trimmed = pinId.trim();
+  if (!trimmed) return getRecentViewedPinIds();
+
+  const existing = getRecentViewedPinIds();
+  const next = [trimmed, ...existing.filter((id) => id !== trimmed)].slice(
+    0,
+    MAX_RECENT_VIEWED_PINS
+  );
+  try {
+    window.localStorage.setItem(
+      RECENT_VIEWED_PINS_STORAGE_KEY,
+      JSON.stringify(next)
+    );
+  } catch {
+    // ignore storage quota errors
+  }
+  window.dispatchEvent(
+    new CustomEvent(RECENT_VIEWS_UPDATED_EVENT, { detail: { pinIds: next } })
+  );
+  return next;
+}
+
+export function clearRecentViewedPinIds(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(RECENT_VIEWED_PINS_STORAGE_KEY);
+  } catch {
+    // ignore storage errors
+  }
+  window.dispatchEvent(
+    new CustomEvent(RECENT_VIEWS_UPDATED_EVENT, { detail: { pinIds: [] } })
+  );
+}
 
 interface InMemorySessionTaste {
   styleScores: Record<string, number>;
@@ -95,6 +161,7 @@ function applyInMemoryTasteUpdate(ev: TelemetrySingleEventInput) {
     ].slice(-24);
     sessionState.quickSkippedPinIds.delete(ev.pinId);
     sessionState.interactionCounter += 1;
+    recordRecentViewedPinId(ev.pinId);
   }
 
   let weight = 0;
@@ -452,6 +519,7 @@ export function resetClientSessionTaste(): void {
   sessionState.interactionCounter = 0;
   eventQueue = [];
   clearRecentSearches();
+  clearRecentViewedPinIds();
 }
 
 export function openPrivacySettingsModal(): void {

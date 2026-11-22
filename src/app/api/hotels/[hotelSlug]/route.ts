@@ -21,7 +21,7 @@ export async function GET(
 
     if (!storefront) {
       return NextResponse.json(
-        { error: `ไม่พบที่พัก "@${hotelSlug}" บนระบบ Cangaroom` },
+        { error: `ไม่พบที่พัก "@${hotelSlug}" บนระบบ Nondii` },
         { status: 404 }
       );
     }

@@ -4,11 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   Bath,
   BedDouble,
   Check,
   CheckSquare,
+  ChevronRight,
   FolderInput,
   Home,
   Image as ImageIcon,
@@ -1288,7 +1288,7 @@ export function RoomPhotoStudio({
                               aria-label="เลื่อนไปทางขวา"
                               className="h-6.5 w-6.5 rounded-[7px] bg-white/92 dark:bg-[#222222]/92 text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer disabled:opacity-35"
                             >
-                              <ArrowRight className="w-3 h-3" />
+                              <ChevronRight className="w-3 h-3" />
                             </button>
                           </div>
                         )}
@@ -1376,7 +1376,7 @@ export function RoomPhotoStudio({
                     className="h-8.5 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
                   >
                     <span>ถัดไป</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

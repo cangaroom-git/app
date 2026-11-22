@@ -26,9 +26,9 @@ export async function GET(request: Request) {
     )
     .join("\n");
 
-  const body = `# Cangaroom — Thailand Visual Stay Discovery & 0% GP Direct Booking
+  const body = `# Nondii — Thailand Visual Stay Discovery & 0% GP Direct Booking
 
-> Cangaroom connects travelers directly with verified Thai hotels, pool villas, mountain cabins, beachfront stays, and glamping properties with zero OTA commission (0% GP).
+> Nondii connects travelers directly with verified Thai hotels, pool villas, mountain cabins, beachfront stays, and glamping properties with zero OTA commission (0% GP).
 
 ## Agentic Endpoints
 - A2A Agent Card: ${origin}/.well-known/agent-card.json

@@ -6,6 +6,7 @@ import {
   RESERVED_HOTEL_SLUGS,
 } from "@/lib/bookingMath";
 import { prisma } from "@/lib/prisma";
+import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 
 const OnboardingSchema = z.object({
   propertyType: z
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       available: !existing,
       slug,
-      profileUrl: `cangaroom.com/${slug}`,
+      profileUrl: `nondii.com/${slug}`,
       reason: existing ? "ชื่อลิงก์นี้มีที่พักอื่นใช้งานแล้ว" : null,
     });
   } catch (err) {
@@ -222,7 +223,7 @@ export async function POST(request: Request) {
             roomId: starterRoom.id,
             category: "ROOMS",
             titleTh: parsed.data.nameTh,
-            descriptionTh: `จองตรง ${parsed.data.nameTh} ฟรีค่า GP ผ่าน Cangaroom`,
+            descriptionTh: `จองตรง ${parsed.data.nameTh} ฟรีค่า GP ผ่าน Nondii`,
             coverImageUrl: fallbackImg,
             mediaUrls: starterGallery,
             aspectRatio: "aspect-[4/5]",
@@ -243,6 +244,17 @@ export async function POST(request: Request) {
 
       return hotel;
     });
+
+    if (
+      typeof created.latitude === "number" &&
+      typeof created.longitude === "number"
+    ) {
+      void ensureThailandPlacesAroundCoord(
+        created.latitude,
+        created.longitude,
+        created.provinceId
+      );
+    }
 
     return NextResponse.json({ hotel: created }, { status: 201 });
   } catch (err) {

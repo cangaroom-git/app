@@ -229,8 +229,13 @@ export default function LoginPage() {
 
       <main className="w-full max-w-[420px] mx-auto px-4 py-8 space-y-4">
         <div className="app-card p-5 sm:p-6 space-y-4">
-          <div className="text-center space-y-1">
-            <h1 className="ty-display text-[var(--color-text-primary)]">Cangaroom</h1>
+          <div className="text-center space-y-2">
+            <h1 className="sr-only">Nondii</h1>
+            <img
+              src="/brand/nondi-icon-with-text-black.svg"
+              alt="Nondii"
+              className="h-12 w-auto mx-auto object-contain dark:invert"
+            />
             <p className="ty-body-muted">
               {lang === "th"
                 ? "บันทึกบอร์ดที่พัก เก็บคูปอง และจองตรง 0% GP"
@@ -460,7 +465,7 @@ export default function LoginPage() {
       </main>
 
       <footer className="w-full py-5 px-4 text-center ty-caption">
-        Cangaroom © {new Date().getFullYear()} · Direct Stay Platform
+        Nondii © {new Date().getFullYear()} · Direct Stay Platform
       </footer>
     </div>
   );

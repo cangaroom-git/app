@@ -248,7 +248,7 @@ export function StudioPinsAndFacebookTab({
       }
       onNotify(
         publishStatus === "PUBLISHED"
-          ? "อนุมัติ Pin ขึ้นหน้าฟีด Cangaroom แล้ว"
+          ? "อนุมัติ Pin ขึ้นหน้าฟีด Nondii แล้ว"
           : "ซ่อน Pin เรียบร้อยแล้ว"
       );
       await onReload();

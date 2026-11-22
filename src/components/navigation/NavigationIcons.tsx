@@ -6,6 +6,7 @@ import {
   Building2,
   CalendarCheck,
   LayoutDashboard,
+  Map,
   PlusSquare,
   Search,
   TicketPercent,
@@ -13,6 +14,7 @@ import {
 
 export type PlatformNavTabId =
   | "home"
+  | "explore"
   | "board"
   | "deal"
   | "search"
@@ -24,19 +26,19 @@ export type PlatformNavTabId =
   | "login";
 
 export const MOBILE_BOTTOM_TABS: ReadonlyArray<{
-  id: "home" | "deal" | "search" | "board";
-  href?: string;
+  id: "home" | "explore" | "board";
+  href: string;
   labelTh: string;
   labelEn: string;
 }> = [
   { id: "home", href: "/", labelTh: "หน้าแรก", labelEn: "Home" },
-  { id: "deal", href: "/deal", labelTh: "ดีลคูปอง", labelEn: "Deal" },
-  { id: "search", labelTh: "ค้นหา", labelEn: "Search" },
-  { id: "board", href: "/board", labelTh: "บอร์ด", labelEn: "Board" },
+  { id: "explore", href: "/explore", labelTh: "แผนที่", labelEn: "Map" },
+  { id: "board", href: "/board", labelTh: "บันทึกไว้", labelEn: "Saved" },
 ];
 
 export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
   if (pathname === "/" || pathname === "") return "home";
+  if (pathname.startsWith("/explore")) return "explore";
   if (pathname.startsWith("/board")) return "board";
   if (pathname.startsWith("/deal")) return "deal";
   if (pathname.startsWith("/studio") || pathname.startsWith("/admin")) {
@@ -95,6 +97,14 @@ export function PlatformNavIcon({
           <path d="M3 10.5 12 3l9 7.5V19.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" />
           <path d="M9.5 21.5v-7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v7" />
         </svg>
+      );
+
+    case "explore":
+      return (
+        <Map
+          className={className}
+          strokeWidth={isActive ? 2.4 : 1.95}
+        />
       );
 
     case "board":

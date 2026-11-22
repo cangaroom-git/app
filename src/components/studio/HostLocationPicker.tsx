@@ -23,8 +23,11 @@ import {
 } from "@/components/ui/standards";
 import { getProvinceById } from "@/data/thailandProvinces";
 import {
+  configureThailandMapInteractions,
   ensureMapLibreWorker,
   getAirbnbVectorMapStyle,
+  THAILAND_MAX_ZOOM,
+  WORLD_MIN_ZOOM,
 } from "@/lib/geo/airbnbMapLibreStyle";
 import {
   getProvinceCenter,
@@ -139,12 +142,13 @@ export function HostLocationPicker({
         style,
         center: initialCenter,
         zoom: initialZoom,
-        minZoom: 5,
-        maxZoom: 19,
+        minZoom: WORLD_MIN_ZOOM,
+        maxZoom: THAILAND_MAX_ZOOM,
         dragRotate: false,
         touchPitch: false,
         attributionControl: false,
       });
+      configureThailandMapInteractions(map);
 
       map.on("dragstart", () => {
         setIsDraggingMap(true);
@@ -429,7 +433,7 @@ export function HostLocationPicker({
           compact ? "h-[240px]" : "h-[280px] sm:h-[310px]"
         } rounded-[16px] overflow-hidden bg-[#F6F4EF] dark:bg-[#191919] select-none`}
       >
-        <div ref={mapContainerRef} className="w-full h-full" />
+        <div ref={mapContainerRef} className="w-full h-full touch-none" />
 
         {/* Fixed Center Crosshair Resort House Pin */}
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">

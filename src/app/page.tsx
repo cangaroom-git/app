@@ -5,6 +5,8 @@ import { VALID_STYLE_TAGS } from "@/data/thailandProvinces";
 import { getServerSessionUser } from "@/lib/auth/session";
 import {
   getPinDetailById,
+  getPinsByIds,
+  getRecentViewedPinIdsForRequest,
   searchDiscoveryPins,
 } from "@/lib/services/stayDiscoveryService";
 import { inferCoarseContextFromHeaders } from "@/lib/telemetry/geoHeaders";
@@ -29,6 +31,7 @@ interface HomeSearchParams {
   stay?: string;
   pin?: string;
   style?: string;
+  source?: string;
 }
 
 export async function generateMetadata({
@@ -41,27 +44,25 @@ export async function generateMetadata({
 
   if (!stayId) {
     return {
-      title: "Cangaroom — ค้นหาที่พักสวยทั่วไทย & จองตรงฟรีค่า GP 0%",
+      title: "Nondii — รวมคูปองและโปรที่พักสวยทั่วไทย · จองตรง 0% GP",
       description:
-        "Cangaroom แพลตฟอร์มรวมที่พักไทยสไตล์ Pinterest ทั้งภูเขา ทะเล พูลวิลล่า แกลมปิ้ง พร้อมเก็บคูปองส่วนลดและจองห้องพักตรงกับโรงแรม 0% GP",
+        "ศูนย์รวมส่วนลด คูปอง และโปรโมชั่นที่พักสวยทั่วไทย ทั้งโปรจองตรง 0% GP และดีลคัดพิเศษจากทุกแหล่ง ค้นหาตามจังหวัด สไตล์ และแผนที่ได้ในที่เดียว",
     };
   }
 
   const detail = await loadPinDetailForSsr(stayId);
   if (!detail) {
     return {
-      title: "Cangaroom — ค้นหาที่พักสวยทั่วไทย",
+      title: "Nondii — รวมคูปองและโปรที่พักทั่วไทย",
     };
   }
 
   const { pin } = detail;
-  const priceTag = pin.nightlyPriceThb
-    ? ` · เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
-    : "";
-  const title = `${pin.hotelNameTh} — ${pin.titleTh}${priceTag} | Cangaroom`;
+  const promoTag = pin.promoHeadlineTh ? ` (${pin.promoHeadlineTh})` : "";
+  const title = `${pin.hotelNameTh}${promoTag} | Nondii`;
   const description =
     pin.descriptionTh ||
-    `ชมบรรยากาศจริงและจองห้องพักตรง 0% GP ที่ ${pin.hotelNameTh} จ.${pin.provinceNameTh}`;
+    `ดูรายละเอียดโปรโมชั่น คูปองส่วนลด และทำเลที่พัก ${pin.hotelNameTh} จ.${pin.provinceNameTh}`;
 
   return {
     title,
@@ -98,6 +99,11 @@ export default async function HomePage({
   const initialStyleTab = VALID_STYLE_TAGS.has(styleParam)
     ? styleParam
     : "all";
+  const sourceParam = (sp?.source || "").trim().toUpperCase();
+  const initialSourceFilter: "ALL" | "INTERNAL" | "EXTERNAL" =
+    sourceParam === "INTERNAL" || sourceParam === "EXTERNAL"
+      ? sourceParam
+      : "ALL";
 
   const consent = cookieStore.get(CGR_CONSENT_COOKIE)?.value;
   const visitorId = cookieStore.get(CGR_VISITOR_COOKIE)?.value ?? null;
@@ -111,6 +117,7 @@ export default async function HomePage({
   };
 
   let initialPins: PinFeedItemDto[] = [];
+  let initialRecentPins: PinFeedItemDto[] = [];
   let initialPinDetail: {
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
@@ -118,10 +125,10 @@ export default async function HomePage({
   } | null = null;
 
   try {
-    const [fetchedPins, fetchedDetail] = await Promise.all([
+    const [fetchedPins, fetchedDetail, recentPinIds] = await Promise.all([
       searchDiscoveryPins({
         style: null,
-        limit: 60,
+        limit: 80,
         userId: sessionUser?.id ?? null,
         ...hints,
       }),
@@ -130,9 +137,30 @@ export default async function HomePage({
           ? getPinDetailById(stayId, sessionUser.id, hints)
           : loadPinDetailForSsr(stayId)
         : Promise.resolve(null),
+      getRecentViewedPinIdsForRequest({
+        userId: sessionUser?.id ?? null,
+        visitorId,
+        hasAnalyticsConsent: consent === "analytics",
+        limit: 20,
+      }),
     ]);
     initialPins = fetchedPins;
     initialPinDetail = fetchedDetail;
+
+    if (recentPinIds.length > 0) {
+      const byId = new Map(fetchedPins.map((p) => [p.id, p]));
+      const missingIds = recentPinIds.filter((id) => !byId.has(id));
+      if (missingIds.length > 0) {
+        const extraPins = await getPinsByIds(
+          missingIds,
+          sessionUser?.id ?? null
+        );
+        for (const ep of extraPins) byId.set(ep.id, ep);
+      }
+      initialRecentPins = recentPinIds
+        .map((id) => byId.get(id))
+        .filter((p): p is PinFeedItemDto => Boolean(p));
+    }
   } catch (err) {
     console.error("[HomePage SSR]", err);
   }
@@ -140,7 +168,9 @@ export default async function HomePage({
   return (
     <HomeFeedClient
       initialPins={initialPins}
+      initialRecentPins={initialRecentPins}
       initialStyleTab={initialStyleTab}
+      initialSourceFilter={initialSourceFilter}
       initialStayId={stayId}
       initialPinDetail={initialPinDetail}
     />

@@ -12,6 +12,7 @@ export type VerificationStatusDto = "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
 export type PinMediaTypeDto = "PHOTO" | "CAROUSEL" | "VIDEO";
 export type PinCategoryDto = "ROOMS" | "VIEWS" | "VIDEOS" | "DINING" | "REVIEWS";
 export type PinPublishStatusDto = "PUBLISHED" | "PENDING_APPROVAL" | "DISCARDED";
+export type DealSourceTypeDto = "INTERNAL" | "EXTERNAL";
 export type DiscountTypeDto = "PERCENT" | "FIXED_THB";
 export type PropertyTypeDto =
   | "BOUTIQUE_HOTEL"
@@ -56,6 +57,12 @@ export interface PinFeedItemDto {
   hotelLogoUrl: string | null;
   hotelVerificationStatus: VerificationStatusDto;
   hotelRatingAvg: number;
+  hotelLatitude: number | null;
+  hotelLongitude: number | null;
+  hotelDistrictTh: string;
+  hotelAddressTh: string;
+  hotelGoogleMapsUrl: string | null;
+  hotelNearbySpots: Array<{ nameTh: string; distTh: string }>;
   roomId: string | null;
   roomCode: string | null;
   roomNameTh: string | null;
@@ -64,6 +71,16 @@ export interface PinFeedItemDto {
   couponCode: string | null;
   activeCoupon: PinActiveCouponDto | null;
   activeCoupons: PinActiveCouponDto[];
+  dealSourceType: DealSourceTypeDto;
+  externalDealUrl: string | null;
+  externalSourceName: string | null;
+  promoHeadlineTh: string | null;
+  promoHeadlineEn: string | null;
+  promoCode: string | null;
+  promoOriginalPriceThb: number | null;
+  promoDealPriceThb: number | null;
+  promoExpiresAt: string | null;
+  externalClickCount: number;
   mediaType: PinMediaTypeDto;
   category: PinCategoryDto;
   titleTh: string;

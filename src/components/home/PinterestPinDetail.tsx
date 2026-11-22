@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,14 +19,19 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Copy,
   CornerDownRight,
   EyeOff,
   Flag,
   Heart,
+  Images,
   Link2,
   Loader2,
+  MapPin,
   MessageCircle,
   MoreHorizontal,
+  Play,
   Send,
   Share,
   Smile,
@@ -60,6 +66,25 @@ import { HotelCouponTicketCard } from "@/components/deals/HotelCouponTicketCard"
 import { ShareStayModal } from "@/components/shared/ShareStayModal";
 import { InstagramEmojiPicker } from "@/components/shared/InstagramEmojiPicker";
 import { useHotelApp } from "@/components/HotelAppShell";
+import { getProvinceById } from "@/data/thailandProvinces";
+import { getCouponTimeInfo } from "@/lib/couponHelpers";
+import { getDealDiscountHeadline } from "@/components/home/VerticalCouponCard";
+import { DealHeroCouponSlide } from "@/components/home/DealHeroCouponSlide";
+import { DealTermsModal } from "@/components/home/DealTermsModal";
+import { DealSlideRow } from "@/components/home/DealSlideRow";
+
+const DealDetailInlineMap = dynamic(
+  () =>
+    import("@/components/home/DealDetailInlineMap").then(
+      (mod) => mod.DealDetailInlineMap
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full min-h-[340px] bg-[var(--color-background-muted)] animate-pulse" />
+    ),
+  }
+);
 
 function mapPinCouponToDealDto(
   c: PinActiveCouponDto,
@@ -1307,7 +1332,9 @@ export function PinterestPinDetail({
   const [isCarouselAnimated, setIsCarouselAnimated] = useState(false);
   const [isCommentsSheetOpen, setIsCommentsSheetOpen] = useState(false);
   const [isCouponPopoverOpen, setIsCouponPopoverOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [hasMountedMapSlide, setHasMountedMapSlide] = useState(false);
   const [claimingCouponId, setClaimingCouponId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [replyingTo, setReplyingTo] = useState<{
@@ -1365,6 +1392,7 @@ export function PinterestPinDetail({
     (mobileOverlayMode && isMobileViewport) ||
       (isCommentsSheetOpen && isMobileViewport) ||
       isCouponPopoverOpen ||
+      isTermsModalOpen ||
       isShareModalOpen
   );
 
@@ -1388,8 +1416,10 @@ export function PinterestPinDetail({
     }
     setIsCarouselAnimated(false);
     setSlideIndex(0);
+    setHasMountedMapSlide(false);
     setIsCommentsSheetOpen(false);
     setIsCouponPopoverOpen(false);
+    setIsTermsModalOpen(false);
     setClaimingCouponId(null);
     setReplyingTo(null);
     setPullDownOffset(0);
@@ -1460,18 +1490,19 @@ export function PinterestPinDetail({
     setIsNavigatingToHotel(false);
   }, [pathname]);
 
-  // Close Comments Sheet / Stay Coupons Modal on Escape
+  // Close Comments Sheet / Stay Coupons / Terms Modal on Escape
   useEffect(() => {
-    if (!isCommentsSheetOpen && !isCouponPopoverOpen) return;
+    if (!isCommentsSheetOpen && !isCouponPopoverOpen && !isTermsModalOpen) return;
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsCommentsSheetOpen(false);
         setIsCouponPopoverOpen(false);
+        setIsTermsModalOpen(false);
       }
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [isCommentsSheetOpen, isCouponPopoverOpen]);
+  }, [isCommentsSheetOpen, isCouponPopoverOpen, isTermsModalOpen]);
 
   // Pinterest-style FLIP expansion animation from the clicked card box -> full hero stage
   useIsomorphicLayoutEffect(() => {
@@ -1594,11 +1625,48 @@ export function PinterestPinDetail({
     return filtered.length > 0 ? filtered : baseImages.slice(0, 1);
   }, [baseImages, failedMediaUrls]);
 
-  useEffect(() => {
-    if (slideIndex >= images.length) {
-      setSlideIndex(Math.max(0, images.length - 1));
+  // Unified Swipeable Deck: Slide 0 = Designed Coupon | Slides 1..N = Property Video & Photos | Last Slide = Interactive Map
+  const stageSlides = useMemo(() => {
+    type StageSlide =
+      | { kind: "coupon"; id: string }
+      | { kind: "video"; id: string; videoUrl: string }
+      | { kind: "photo"; id: string; url: string; photoIdx: number }
+      | { kind: "map"; id: string };
+
+    const deck: StageSlide[] = [{ kind: "coupon", id: `${pin.id}-coupon` }];
+    if (pin.videoUrl) {
+      deck.push({
+        kind: "video",
+        id: `${pin.id}-video`,
+        videoUrl: pin.videoUrl,
+      });
     }
-  }, [slideIndex, images.length]);
+    images.forEach((url, idx) => {
+      deck.push({
+        kind: "photo",
+        id: `${pin.id}-photo-${idx}`,
+        url,
+        photoIdx: idx,
+      });
+    });
+    deck.push({ kind: "map", id: `${pin.id}-map` });
+    return deck;
+  }, [pin.id, pin.videoUrl, images]);
+
+  const totalSlides = stageSlides.length;
+  const hasVideoSlide = Boolean(pin.videoUrl);
+  const videoSlideIndex = hasVideoSlide ? 1 : -1;
+  const firstPhotoSlideIndex = hasVideoSlide ? 2 : 1;
+  const mapSlideIndex = totalSlides - 1;
+
+  useEffect(() => {
+    if (slideIndex >= totalSlides) {
+      setSlideIndex(Math.max(0, totalSlides - 1));
+    }
+    if (slideIndex === mapSlideIndex) {
+      setHasMountedMapSlide(true);
+    }
+  }, [slideIndex, totalSlides, mapSlideIndex]);
 
   const handleMarkMediaError = (brokenUrl: string) => {
     setFailedMediaUrls((prev) => {
@@ -1650,8 +1718,11 @@ export function PinterestPinDetail({
     setSlideIndex((prev) => {
       const resolved =
         typeof nextIdxOrFn === "function" ? nextIdxOrFn(prev) : nextIdxOrFn;
-      const clamped = Math.max(0, Math.min(images.length - 1, resolved));
-      if (clamped !== prev && images.length > 1) {
+      const clamped = Math.max(0, Math.min(totalSlides - 1, resolved));
+      if (clamped === mapSlideIndex) {
+        setHasMountedMapSlide(true);
+      }
+      if (clamped !== prev && totalSlides > 1) {
         trackPinInteraction("CAROUSEL_SWIPE", pin, {
           carouselDepth: clamped + 1,
         });
@@ -1754,8 +1825,8 @@ export function PinterestPinDetail({
         state.lastTime = now;
       }
 
-      const { imagesCount, hasVideo } = gestureCallbacksRef.current;
-      const isMultiPhoto = imagesCount > 1 && !hasVideo;
+      const { imagesCount } = gestureCallbacksRef.current;
+      const isMultiPhoto = imagesCount > 1;
 
       // Prevent diagonal thumb arcs from scrolling the outer page vertically before horizontal lock commits
       if (
@@ -1893,10 +1964,9 @@ export function PinterestPinDetail({
       const t = e.touches[0];
       if (!t) return;
       const target = e.target as HTMLElement | null;
-      const { imagesCount, hasVideo } = gestureCallbacksRef.current;
+      const { imagesCount } = gestureCallbacksRef.current;
       const insideMultiPhotoHero =
         imagesCount > 1 &&
-        !hasVideo &&
         Boolean(mediaStageRef.current?.contains(target));
       const ignore =
         insideMultiPhotoHero ||
@@ -2160,8 +2230,8 @@ export function PinterestPinDetail({
     prevPinPreview,
     nextPinPreview,
     canStepBack,
-    imagesCount: images.length,
-    hasVideo: Boolean(pin.videoUrl),
+    imagesCount: totalSlides,
+    hasVideo: false,
     mobileOverlayMode,
   };
 
@@ -2204,8 +2274,42 @@ export function PinterestPinDetail({
         currentUser.ownedHotels.some((h) => h.id === pin.hotelId))
   );
 
+  const isExternalDeal = pin.dealSourceType === "EXTERNAL";
+  const effectivePromoCode = pin.promoCode || pin.activeCoupon?.code || null;
+  const dealDiscountHeadline = getDealDiscountHeadline(pin, language);
+  const dealPrice = pin.promoDealPriceThb ?? pin.nightlyPriceThb;
+  const dealOriginalPrice =
+    pin.promoOriginalPriceThb &&
+    dealPrice &&
+    pin.promoOriginalPriceThb > dealPrice
+      ? pin.promoOriginalPriceThb
+      : null;
+  const effectiveExpiresAt =
+    pin.promoExpiresAt || pin.activeCoupon?.expiresAt || null;
+  const dealTimeInfo = effectiveExpiresAt
+    ? getCouponTimeInfo(effectiveExpiresAt, language)
+    : null;
+  const internalHotelHref = effectivePromoCode
+    ? `/${pin.hotelSlug}?coupon=${encodeURIComponent(effectivePromoCode)}`
+    : `/${pin.hotelSlug}`;
+  const externalDealHref = pin.externalDealUrl || `/${pin.hotelSlug}`;
+
+  const handleExternalDealClick = () => {
+    fetch(`/api/pins/${encodeURIComponent(pin.id)}/click`, {
+      method: "POST",
+    }).catch(() => {});
+  };
+
   const handleMediaPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) return;
+    if (slideIndex === mapSlideIndex) return;
+    if (e.pointerType !== "mouse" || totalSlides <= 1) return;
+    if (
+      (e.target as HTMLElement | null)?.closest(
+        "button, a, [data-swipe-ignore='true']"
+      )
+    ) {
+      return;
+    }
     mouseDragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -2215,7 +2319,7 @@ export function PinterestPinDetail({
 
   const handleMediaPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const st = mouseDragRef.current;
-    if (!st || e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) {
+    if (!st || e.pointerType !== "mouse" || totalSlides <= 1) {
       return;
     }
     const dx = e.clientX - st.startX;
@@ -2226,7 +2330,7 @@ export function PinterestPinDetail({
     if (st.dragging && carouselTrackRef.current) {
       const curr = slideIndexRef.current;
       const atEdge =
-        (curr === 0 && dx > 0) || (curr === images.length - 1 && dx < 0);
+        (curr === 0 && dx > 0) || (curr === totalSlides - 1 && dx < 0);
       const effDx = atEdge ? dx * 0.28 : dx;
       carouselTrackRef.current.style.transition = "none";
       carouselTrackRef.current.style.transform = `translate3d(calc(${-curr * 100}% + ${effDx}px), 0, 0)`;
@@ -2236,13 +2340,14 @@ export function PinterestPinDetail({
   const handleMediaPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     const st = mouseDragRef.current;
     mouseDragRef.current = null;
-    if (!st || e.pointerType !== "mouse" || images.length <= 1 || pin.videoUrl) {
+    if (!st || e.pointerType !== "mouse" || totalSlides <= 1) {
       return;
     }
+    if (!st.dragging) return;
     const dx = e.clientX - st.startX;
     const stageW = mediaStageRef.current?.clientWidth || 500;
     let targetIdx = slideIndex;
-    if (dx < -Math.min(72, stageW * 0.16) && slideIndex < images.length - 1) {
+    if (dx < -Math.min(72, stageW * 0.16) && slideIndex < totalSlides - 1) {
       targetIdx = slideIndex + 1;
     } else if (dx > Math.min(72, stageW * 0.16) && slideIndex > 0) {
       targetIdx = slideIndex - 1;
@@ -2336,7 +2441,9 @@ export function PinterestPinDetail({
 
         <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:gap-10 lg:h-[min(82vh,740px)] lg:min-h-[540px]">
         {/* =================================================================
-            LEFT / HERO STAGE: PHOTO-FIRST + MOBILE BACK & MORE ATTACHED TO IMAGE
+            LEFT / HERO STAGE: UNIFIED SWIPEABLE DECK
+            Slide 0: Designed Coupon -> Slide 1..N: Property Video & Photos -> Last Slide: Map
+            Bottom-Right: Fast-Warp Icons (Coupon / Image / Map) + Mobile Save & More
         ================================================================== */}
         <div className="lg:col-span-6 min-h-0 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-0 flex flex-col gap-2.5 sm:gap-3 lg:h-full">
           <div
@@ -2346,20 +2453,14 @@ export function PinterestPinDetail({
             onPointerUp={handleMediaPointerUp}
             onPointerCancel={handleMediaPointerUp}
             style={
-              !pin.videoUrl
-                ? ({
-                    "--pin-aspect": heroAspectCss,
-                    touchAction: images.length > 1 ? "pan-y" : undefined,
-                  } as React.CSSProperties)
-                : undefined
+              {
+                "--pin-aspect": "4 / 5",
+                touchAction: slideIndex === mapSlideIndex ? "none" : "pan-y",
+              } as React.CSSProperties
             }
-            className={`relative w-full min-h-0 ${
-              !pin.videoUrl
-                ? "max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[76svh] lg:max-h-none"
-                : "min-h-[280px]"
-            } lg:flex-1 rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-muted)] flex items-center justify-center overflow-hidden`}
+            className="relative w-full min-h-0 max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[76svh] lg:max-h-none lg:flex-1 rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-body)] flex items-center justify-center overflow-hidden"
           >
-            {/* Mobile Back (<) Top-Left & Grouped Save + More (...) Bottom-Right Attached Directly to Image */}
+            {/* Mobile Back (<) Top-Left */}
             <button
               type="button"
               data-swipe-ignore="true"
@@ -2368,96 +2469,140 @@ export function PinterestPinDetail({
                 handleStepBack();
               }}
               aria-label={isTh ? "ย้อนกลับ" : "Back"}
-              className="lg:hidden absolute top-3 left-3 z-20 h-10 w-10 rounded-[12px] bg-black/50 hover:bg-black/70 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+              className="lg:hidden absolute top-3 left-3 z-30 h-10 w-10 rounded-[12px] bg-black/55 hover:bg-black/75 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
             >
               <ChevronLeft className="w-5 h-5" strokeWidth={2.4} />
             </button>
 
+            {/* Vertical Airbnb Wishlist-Style Floating Icon Rail (Bottom-Right: Coupon > Video (if any) > Image > Map + Mobile Save & More) */}
             <div
               data-swipe-ignore="true"
-              className={`lg:hidden absolute ${
-                pin.videoUrl ? "bottom-14" : "bottom-3"
-              } right-3 z-20 flex items-center gap-2`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="absolute bottom-3.5 right-3 z-30 flex flex-col items-center gap-2"
             >
-              {activeCoupons.length > 0 && (
-                <SparklingCouponIconButton
-                  hasUnclaimed={hasUnclaimedCoupons}
-                  sizeClass="h-10 w-10 rounded-[12px]"
-                  activeSurfaceClass="bg-[var(--color-promo)] hover:bg-[#d5001f] !text-white"
-                  claimedSurfaceClass="bg-black/50 hover:bg-black/70 text-white backdrop-blur-md"
-                  ariaLabel={
-                    isTh
-                      ? `ดูคูปองส่วนลดของ ${hotelName}`
-                      : `View coupons from ${hotelName}`
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsCouponPopoverOpen(true);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              )}
-
+              {/* 1. Coupon */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onToggleSave(pin.id);
+                  navigateCarouselSlide(0);
                 }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                aria-label={
-                  isSaved
-                    ? isTh
-                      ? "นำออกจากบอร์ด"
-                      : "Remove from board"
-                    : isTh
-                    ? "บันทึกเข้าบอร์ด"
-                    : "Save to board"
-                }
-                className={`h-10 w-10 rounded-[12px] inline-flex items-center justify-center transition-colors cursor-pointer ${
-                  isSaved
-                    ? "bg-[var(--color-promo)] !text-white"
-                    : "bg-black/50 hover:bg-black/70 text-white backdrop-blur-md"
+                title={isTh ? "คูปองส่วนลด" : "Coupon"}
+                aria-label={isTh ? "ไปที่การ์ดคูปอง" : "Jump to coupon"}
+                className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                  slideIndex === 0
+                    ? "bg-white text-[#222222] border-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+                    : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
                 }`}
               >
-                <Bookmark
-                  className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
-                  strokeWidth={2.1}
-                />
+                <TicketPercent className="w-[19px] h-[19px]" strokeWidth={2} />
               </button>
 
-              <PinMoreOptionsControl
-                pin={pin}
-                language={language}
-                isSaved={isSaved}
-                onToggleSave={onToggleSave}
-                onSharePin={handleShareWithFeedback}
-                onHidePin={onHidePin}
-                iconClassName="w-5 h-5"
-                triggerClassName="h-10 w-10 rounded-[12px] bg-black/50 hover:bg-black/70 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
-              />
+              {/* 2. Video (Strictly hidden when card has no video!) */}
+              {hasVideoSlide && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateCarouselSlide(videoSlideIndex);
+                  }}
+                  title={isTh ? "วิดีโอที่พัก" : "Property video"}
+                  aria-label={isTh ? "ไปที่วิดีโอที่พัก" : "Jump to video"}
+                  className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                    slideIndex === videoSlideIndex
+                      ? "bg-white text-[#222222] border-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+                      : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
+                  }`}
+                >
+                  <Play className="w-[18px] h-[18px]" strokeWidth={2} />
+                </button>
+              )}
+
+              {/* 3. Image */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateCarouselSlide(firstPhotoSlideIndex);
+                }}
+                title={isTh ? "รูปภาพที่พัก" : "Property photos"}
+                aria-label={isTh ? "ไปที่รูปภาพที่พัก" : "Jump to photos"}
+                className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                  slideIndex >= firstPhotoSlideIndex &&
+                  slideIndex < mapSlideIndex
+                    ? "bg-white text-[#222222] border-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+                    : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
+                }`}
+              >
+                <Images className="w-[19px] h-[19px]" strokeWidth={2} />
+              </button>
+
+              {/* 4. Map */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateCarouselSlide(mapSlideIndex);
+                }}
+                title={isTh ? "แผนที่ & สถานที่ใกล้เคียง" : "Map & nearby"}
+                aria-label={isTh ? "ไปที่แผนที่" : "Jump to map"}
+                className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                  slideIndex === mapSlideIndex
+                    ? "bg-white text-[#222222] border-white shadow-[0_4px_14px_rgba(0,0,0,0.28)]"
+                    : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
+                }`}
+              >
+                <MapPin className="w-[19px] h-[19px]" strokeWidth={2} />
+              </button>
+
+              {/* Mobile Bookmark (Airbnb Wishlist Aesthetic) & More (...) stacked cleanly underneath */}
+              <div className="flex lg:hidden flex-col items-center gap-2 pt-0.5">
+                <span
+                  aria-hidden="true"
+                  className="w-4 h-px bg-white/35 rounded-full"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSave(pin.id);
+                  }}
+                  aria-label={
+                    isSaved
+                      ? isTh
+                        ? "นำคูปองออกจากบอร์ด"
+                        : "Remove from board"
+                      : isTh
+                      ? "บันทึกคูปองเข้าบอร์ด"
+                      : "Save to board"
+                  }
+                  className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center transition-colors cursor-pointer ${
+                    isSaved
+                      ? "bg-[#e60023] border-white/80 !text-white shadow-[0_4px_14px_rgba(230,0,35,0.35)]"
+                      : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
+                  }`}
+                >
+                  <Bookmark
+                    className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
+                    strokeWidth={2}
+                  />
+                </button>
+
+                <PinMoreOptionsControl
+                  pin={pin}
+                  language={language}
+                  isSaved={isSaved}
+                  onToggleSave={onToggleSave}
+                  onSharePin={handleShareWithFeedback}
+                  onHidePin={onHidePin}
+                  iconClassName="w-[19px] h-[19px]"
+                  triggerClassName="h-10 w-10 rounded-[12px] bg-black/45 hover:bg-black/62 text-white backdrop-blur-md border border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)] inline-flex items-center justify-center transition-colors cursor-pointer"
+                />
+              </div>
             </div>
 
-          {pin.videoUrl ? (
-            <div className="w-full h-full bg-[var(--color-background-body)] flex items-center justify-center">
-              <UniversalVideoPlayer
-                videoUrl={getOptimizedVideoUrl(pin.videoUrl, "hero")}
-                posterUrl={getOptimizedPinImageUrl(pin.coverImageUrl, "hero")}
-                posterSrcSet={getOptimizedPinImageSrcSet(
-                  pin.coverImageUrl,
-                  "hero"
-                )}
-                posterSizes={PIN_IMAGE_SIZES.hero}
-                title={title || hotelName}
-                aspectRatio={videoAspect}
-                fitMode={videoAspect === "16/9" ? "contain" : "cover"}
-                autoPlay={true}
-                initialMuted={false}
-              />
-            </div>
-          ) : (
+            {/* Unified Horizontal Swipe Track: Coupon -> Photos/Video -> Map */}
             <div
               ref={carouselTrackRef}
               className="flex w-full h-full will-change-transform"
@@ -2468,103 +2613,236 @@ export function PinterestPinDetail({
                   : "none",
               }}
             >
-              {images.map((imgUrl, idx) => {
-                const isHeroLoaded = loadedHeroUrls.has(imgUrl);
+              {stageSlides.map((slide) => {
+                if (slide.kind === "coupon") {
+                  return (
+                    <div
+                      key={slide.id}
+                      className="relative w-full h-full shrink-0 overflow-hidden"
+                    >
+                      <DealHeroCouponSlide
+                        pin={pin}
+                        language={language}
+                        hotelName={hotelName}
+                        provinceLabel={provinceLabel}
+                        discountHeadline={dealDiscountHeadline}
+                        dealPrice={dealPrice}
+                        dealOriginalPrice={dealOriginalPrice}
+                        expiryLabel={dealTimeInfo?.label || null}
+                        onOpenTerms={() => setIsTermsModalOpen(true)}
+                      />
+                    </div>
+                  );
+                }
+
+                if (slide.kind === "video") {
+                  return (
+                    <div
+                      key={slide.id}
+                      className="relative w-full h-full shrink-0 bg-black flex items-center justify-center overflow-hidden"
+                    >
+                      <UniversalVideoPlayer
+                        videoUrl={getOptimizedVideoUrl(slide.videoUrl, "hero")}
+                        posterUrl={getOptimizedPinImageUrl(
+                          pin.coverImageUrl,
+                          "hero"
+                        )}
+                        posterSrcSet={getOptimizedPinImageSrcSet(
+                          pin.coverImageUrl,
+                          "hero"
+                        )}
+                        posterSizes={PIN_IMAGE_SIZES.hero}
+                        title={title || hotelName}
+                        aspectRatio={videoAspect}
+                        fitMode={videoAspect === "16/9" ? "contain" : "cover"}
+                        autoPlay={slideIndex === 1}
+                        initialMuted={true}
+                      />
+                    </div>
+                  );
+                }
+
+                if (slide.kind === "map") {
+                  return (
+                    <div
+                      key={slide.id}
+                      className="relative w-full h-full shrink-0 overflow-hidden"
+                    >
+                      {hasMountedMapSlide || slideIndex === mapSlideIndex ? (
+                        <DealDetailInlineMap
+                          hotelName={hotelName}
+                          provinceId={pin.provinceId}
+                          provinceLabel={provinceLabel}
+                          districtTh={pin.hotelDistrictTh}
+                          addressTh={pin.hotelAddressTh}
+                          latitude={pin.hotelLatitude}
+                          longitude={pin.hotelLongitude}
+                          googleMapsUrl={pin.hotelGoogleMapsUrl}
+                          nearbySpots={pin.hotelNearbySpots}
+                          language={language}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-secondary)] text-[13px]">
+                          <MapPin className="w-5 h-5 mr-1.5" />
+                          <span>{isTh ? "แผนที่ที่พัก" : "Property map"}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                const isHeroLoaded = loadedHeroUrls.has(slide.url);
                 return (
                   <div
-                    key={`${imgUrl}-${idx}`}
+                    key={slide.id}
                     className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
                   >
                     {!isHeroLoaded && (
                       <img
-                        src={getOptimizedPinImageUrl(imgUrl, "card")}
+                        src={getOptimizedPinImageUrl(slide.url, "card")}
                         alt=""
                         aria-hidden="true"
-                        loading={idx === 0 ? "eager" : "lazy"}
+                        loading={slide.photoIdx === 0 ? "eager" : "lazy"}
                         decoding="sync"
                         draggable={false}
                         className="absolute inset-0 w-full h-full object-cover select-none"
                       />
                     )}
                     <img
-                      src={getOptimizedPinImageUrl(imgUrl, "hero")}
-                      srcSet={getOptimizedPinImageSrcSet(imgUrl, "hero")}
+                      src={getOptimizedPinImageUrl(slide.url, "hero")}
+                      srcSet={getOptimizedPinImageSrcSet(slide.url, "hero")}
                       sizes={PIN_IMAGE_SIZES.hero}
                       alt={
-                        idx === 0
+                        slide.photoIdx === 0
                           ? title || hotelName
-                          : `${title || hotelName} (${idx + 1})`
+                          : `${title || hotelName} (${slide.photoIdx + 1})`
                       }
-                      loading={idx <= 1 ? "eager" : "lazy"}
-                      fetchPriority={idx === 0 ? "high" : "auto"}
-                      decoding={idx === 0 ? "sync" : "async"}
+                      loading={slide.photoIdx <= 1 ? "eager" : "lazy"}
+                      decoding={slide.photoIdx === 0 ? "sync" : "async"}
                       draggable={false}
-                      onLoad={() => handleMarkHeroLoaded(imgUrl)}
-                      onError={() => handleMarkMediaError(imgUrl)}
+                      onLoad={() => handleMarkHeroLoaded(slide.url)}
+                      onError={() => handleMarkMediaError(slide.url)}
                       className="relative z-10 w-full h-full object-cover select-none"
                     />
                   </div>
                 );
               })}
             </div>
-          )}
           </div>
 
-          {/* Multi-Photo Set Squircle Thumbnail Strip Underneath Hero Image */}
-          {images.length > 1 && !pin.videoUrl && (
+          {/* Unified Squircle Thumbnail Strip: Coupon | Photos/Video | Map */}
+          <div
+            data-swipe-ignore="true"
+            className="shrink-0 flex items-center gap-2 px-1.5 sm:px-0.5 lg:px-0"
+          >
             <div
-              data-swipe-ignore="true"
-              className="shrink-0 flex items-center gap-2 px-1.5 sm:px-0.5 lg:px-0"
+              ref={thumbnailStripRef}
+              className="flex-1 flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-1.5 -mx-1.5"
             >
-              <div
-                ref={thumbnailStripRef}
-                className="flex-1 flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-1.5 -mx-1.5"
-              >
-                {images.map((imgUrl, idx) => {
-                  const isCurrent = idx === slideIndex;
+              {stageSlides.map((slide, idx) => {
+                const isCurrent = idx === slideIndex;
+                const activeRingClass = isCurrent
+                  ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-body)] opacity-100"
+                  : "opacity-65 hover:opacity-100";
+
+                if (slide.kind === "coupon") {
                   return (
                     <button
-                      key={`${imgUrl}-${idx}`}
+                      key={`thumb-${slide.id}`}
                       type="button"
                       data-thumb-idx={idx}
                       onClick={() => navigateCarouselSlide(idx)}
-                      aria-label={
-                        isTh ? `ดูภาพที่ ${idx + 1}` : `View photo ${idx + 1}`
-                      }
-                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${
-                        isCurrent
-                          ? "ring-2 ring-[var(--color-text-primary)] ring-offset-2 ring-offset-[var(--color-background-body)] opacity-100"
-                          : "opacity-65 hover:opacity-100"
-                      }`}
+                      aria-label={isTh ? "การ์ดคูปอง" : "Coupon card"}
+                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] flex flex-col items-center justify-center gap-0.5 ${activeRingClass}`}
                     >
-                      <img
-                        src={getOptimizedPinImageUrl(imgUrl, "thumb")}
-                        srcSet={getOptimizedPinImageSrcSet(imgUrl, "thumb")}
-                        sizes={PIN_IMAGE_SIZES.thumb}
-                        alt={`${title || hotelName} ${idx + 1}`}
-                        loading="eager"
-                        decoding="async"
-                        draggable={false}
-                        onError={() => handleMarkMediaError(imgUrl)}
-                        className="w-full h-full object-cover"
-                      />
+                      <TicketPercent className="w-4 h-4 shrink-0" strokeWidth={2} />
+                      <span className="text-[10px] font-semibold leading-none">
+                        {isTh ? "คูปอง" : "Deal"}
+                      </span>
                     </button>
                   );
-                })}
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigateCarouselSlide((prev) => (prev + 1) % images.length)
                 }
-                aria-label={isTh ? "ภาพถัดไป" : "Next photo"}
-                className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" strokeWidth={2.1} />
-              </button>
+
+                if (slide.kind === "video") {
+                  return (
+                    <button
+                      key={`thumb-${slide.id}`}
+                      type="button"
+                      data-thumb-idx={idx}
+                      onClick={() => navigateCarouselSlide(idx)}
+                      aria-label={isTh ? "ดูวิดีโอ" : "Watch video"}
+                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${activeRingClass}`}
+                    >
+                      <img
+                        src={getOptimizedPinImageUrl(pin.coverImageUrl, "thumb")}
+                        alt={hotelName}
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute inset-0 bg-black/35 flex items-center justify-center text-white">
+                        <Play className="w-4 h-4 fill-current" />
+                      </span>
+                    </button>
+                  );
+                }
+
+                if (slide.kind === "map") {
+                  return (
+                    <button
+                      key={`thumb-${slide.id}`}
+                      type="button"
+                      data-thumb-idx={idx}
+                      onClick={() => navigateCarouselSlide(idx)}
+                      aria-label={isTh ? "ดูแผนที่" : "View map"}
+                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex flex-col items-center justify-center gap-0.5 border border-[var(--color-border)] ${activeRingClass}`}
+                    >
+                      <MapPin className="w-4 h-4 shrink-0" strokeWidth={2.1} />
+                      <span className="text-[10px] font-semibold leading-none">
+                        {isTh ? "แผนที่" : "Map"}
+                      </span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    key={`thumb-${slide.id}`}
+                    type="button"
+                    data-thumb-idx={idx}
+                    onClick={() => navigateCarouselSlide(idx)}
+                    aria-label={
+                      isTh
+                        ? `ดูภาพที่ ${slide.photoIdx + 1}`
+                        : `View photo ${slide.photoIdx + 1}`
+                    }
+                    className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-background-muted)] ${activeRingClass}`}
+                  >
+                    <img
+                      src={getOptimizedPinImageUrl(slide.url, "thumb")}
+                      srcSet={getOptimizedPinImageSrcSet(slide.url, "thumb")}
+                      sizes={PIN_IMAGE_SIZES.thumb}
+                      alt={`${title || hotelName} ${slide.photoIdx + 1}`}
+                      loading="eager"
+                      decoding="async"
+                      draggable={false}
+                      onError={() => handleMarkMediaError(slide.url)}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                );
+              })}
             </div>
-          )}
+
+            <button
+              type="button"
+              onClick={() =>
+                navigateCarouselSlide((prev) => (prev + 1) % totalSlides)
+              }
+              aria-label={isTh ? "สไลด์ถัดไป" : "Next slide"}
+              className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" strokeWidth={2.1} />
+            </button>
+          </div>
         </div>
 
         {/* =================================================================
@@ -2616,22 +2894,39 @@ export function PinterestPinDetail({
             </Link>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <Link
-                href={`/${pin.hotelSlug}`}
-                prefetch={true}
-                onClick={handleVisitHotelClick}
-                aria-busy={isNavigatingToHotel}
-                className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 ${
-                  isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
-                }`}
-              >
-                <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
-                {isNavigatingToHotel ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                ) : (
+              {isExternalDeal ? (
+                <a
+                  href={externalDealHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleExternalDealClick}
+                  className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0"
+                >
+                  <span>
+                    {isTh
+                      ? `ไปที่ ${pin.externalSourceName || "หน้าโปร"}`
+                      : `Open ${pin.externalSourceName || "deal"}`}
+                  </span>
                   <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                )}
-              </Link>
+                </a>
+              ) : (
+                <Link
+                  href={internalHotelHref}
+                  prefetch={true}
+                  onClick={handleVisitHotelClick}
+                  aria-busy={isNavigatingToHotel}
+                  className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 ${
+                    isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
+                  }`}
+                >
+                  <span>{isTh ? "จองตรง 0% GP" : "Book direct 0% GP"}</span>
+                  {isNavigatingToHotel ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                  )}
+                </Link>
+              )}
 
               <PinMoreOptionsControl
                 pin={pin}
@@ -2692,22 +2987,39 @@ export function PinterestPinDetail({
               </div>
 
               <div data-swipe-ignore="true" className="shrink-0">
-                <Link
-                  href={`/${pin.hotelSlug}`}
-                  prefetch={true}
-                  onClick={handleVisitHotelClick}
-                  aria-busy={isNavigatingToHotel}
-                  className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
-                    isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
-                  }`}
-                >
-                  <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
-                  {isNavigatingToHotel ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                  ) : (
+                {isExternalDeal ? (
+                  <a
+                    href={externalDealHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleExternalDealClick}
+                    className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0"
+                  >
+                    <span>
+                      {isTh
+                        ? `ไปที่ ${pin.externalSourceName || "หน้าโปร"}`
+                        : `Open ${pin.externalSourceName || "deal"}`}
+                    </span>
                     <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                  )}
-                </Link>
+                  </a>
+                ) : (
+                  <Link
+                    href={internalHotelHref}
+                    prefetch={true}
+                    onClick={handleVisitHotelClick}
+                    aria-busy={isNavigatingToHotel}
+                    className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
+                      isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
+                    }`}
+                  >
+                    <span>{isTh ? "จองตรง 0% GP" : "Book direct"}</span>
+                    {isNavigatingToHotel ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                    )}
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -2763,10 +3075,10 @@ export function PinterestPinDetail({
             )}
           </div>
 
-          {/* 2. DESKTOP MIDDLE SCROLLABLE AREA (Airy Instagram Caption + Comments, NO Heavy Header!) */}
+          {/* 2. DESKTOP MIDDLE SCROLLABLE AREA (Caption + Comments) */}
           <div
             ref={desktopCommentsSectionRef}
-            className="hidden lg:flex flex-col flex-1 min-h-0 overflow-y-auto py-5 pr-1 space-y-5"
+            className="hidden lg:flex flex-col flex-1 min-h-0 overflow-y-auto py-4 pr-1 space-y-4"
           >
             {/* Optional Instagram-Style Short Caption (No big title header, no hashtag clutter) */}
             {captionText && (
@@ -2977,54 +3289,48 @@ export function PinterestPinDetail({
               </div>
 
               <div className="flex items-center gap-2">
-                {activeCoupons.length > 0 && (
-                  <SparklingCouponIconButton
-                    hasUnclaimed={hasUnclaimedCoupons}
-                    sizeClass="h-9 w-9 rounded-[10px]"
-                    activeSurfaceClass="bg-[var(--color-promo)] hover:bg-[#d5001f] !text-white"
-                    claimedSurfaceClass="bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    ariaLabel={
-                      isTh
-                        ? `ดูคูปองส่วนลดของ ${hotelName}`
-                        : `View coupons from ${hotelName}`
-                    }
-                    onClick={() => setIsCouponPopoverOpen(true)}
-                  />
-                )}
-
                 <button
                   type="button"
                   onClick={() => onToggleSave(pin.id)}
                   aria-label={
                     isSaved
                       ? isTh
-                        ? "นำออกจากบอร์ด"
+                        ? "นำคูปองออกจากบอร์ด"
                         : "Remove from board"
                       : isTh
-                      ? "บันทึกเข้าบอร์ด"
+                      ? "บันทึกคูปองเข้าบอร์ด"
                       : "Save to board"
                   }
                   title={
                     isSaved
                       ? isTh
-                        ? "บันทึกแล้ว"
-                        : "Saved"
+                        ? "บันทึกโปรแล้ว"
+                        : "Deal saved"
                       : isTh
-                      ? "บันทึก"
-                      : "Save"
+                      ? "บันทึกโปรเข้าบอร์ด"
+                      : "Save deal"
                   }
-                  className={`h-9 w-9 rounded-[10px] inline-flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`h-9 px-3 rounded-[10px] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isSaved
                       ? "bg-[var(--color-promo)] !text-white"
-                      : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
                   <Bookmark
-                    className={`w-[20px] h-[20px] ${
+                    className={`w-[16px] h-[16px] ${
                       isSaved ? "fill-current" : ""
                     }`}
-                    strokeWidth={1.95}
+                    strokeWidth={2}
                   />
+                  <span>
+                    {isSaved
+                      ? isTh
+                        ? "บันทึกแล้ว"
+                        : "Saved"
+                      : isTh
+                      ? "บันทึกโปร"
+                      : "Save"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -3127,37 +3433,100 @@ export function PinterestPinDetail({
         </div>
       </div>
 
-      {/* MOBILE / TABLET "MORE TO EXPLORE" 2-COLUMN MASONRY (Clean 1px Section Divider) */}
-      {relatedPins.length > 0 && (
-        <div className="lg:hidden px-1.5 pt-5 mt-2 border-t border-[var(--color-border)] pb-[calc(96px+env(safe-area-inset-bottom))] space-y-3 bg-[var(--color-background-body)]">
-          <h2 className="px-1 text-[15.5px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ" : "More to explore"}
-          </h2>
-          <div className="flex gap-1.5 items-start">
-            {[0, 1].map((colIdx) => (
-              <div key={colIdx} className="flex-1 min-w-0 flex flex-col gap-1.5">
-                {relatedPins
-                  .slice(0, 14)
-                  .filter((_, idx) => idx % 2 === colIdx)
-                  .map((relPin, itemIdx) => (
-                    <PinterestPinCard
-                      key={relPin.id}
-                      pin={relPin}
-                      language={language}
-                      priority={itemIdx < 2}
-                      isSaved={savedPinIds.has(relPin.id)}
-                      onSelectPin={(next) => onSelectPin?.(next)}
-                      onToggleSave={onToggleSave}
-                      onToggleLike={onToggleLike}
-                      onSharePin={onSharePin}
-                      onHidePin={onHidePin}
-                    />
-                  ))}
-              </div>
-            ))}
+      {/* MOBILE / TABLET SYMMETRICAL GROUPED CARD SLIDE ROWS (Matches Home Airbnb Card Slide Standard!) */}
+      {relatedPins.length > 0 && (() => {
+        const seenHotelIds = new Set<string>();
+        const safeRelated = relatedPins.filter((cand) => {
+          if (
+            cand.id === pin.id ||
+            cand.hotelId === pin.hotelId ||
+            cand.hotelSlug === pin.hotelSlug
+          ) {
+            return false;
+          }
+          if (seenHotelIds.has(cand.hotelId)) return false;
+          seenHotelIds.add(cand.hotelId);
+          return true;
+        });
+        if (safeRelated.length === 0) return null;
+
+        const anchorStyles = new Set(pin.stayStyles);
+        const anchorRegion = getProvinceById(pin.provinceId)?.region ?? null;
+        const sameStyleDeals = safeRelated.filter((cand) =>
+          cand.stayStyles.some((st) => anchorStyles.has(st))
+        );
+        const nearbyDeals = [...safeRelated]
+          .filter((cand) => {
+            if (cand.provinceId === pin.provinceId) return true;
+            return (
+              Boolean(anchorRegion) &&
+              getProvinceById(cand.provinceId)?.region === anchorRegion
+            );
+          })
+          .sort(
+            (a, b) =>
+              (b.provinceId === pin.provinceId ? 1 : 0) -
+              (a.provinceId === pin.provinceId ? 1 : 0)
+          );
+        const directDeals = safeRelated.filter(
+          (cand) => cand.dealSourceType === "INTERNAL"
+        );
+
+        return (
+          <div className="lg:hidden px-4 sm:px-6 mt-2 border-t border-[var(--color-border)] pb-[calc(88px+env(safe-area-inset-bottom))] divide-y divide-[var(--color-border)] bg-[var(--color-background-body)]">
+            {sameStyleDeals.length > 0 && (
+              <DealSlideRow
+                title={isTh ? "โปรที่พักแนวเดียวกัน" : "Similar style deals"}
+                seeAllHref={
+                  pin.stayStyles[0]
+                    ? `/explore?style=${encodeURIComponent(pin.stayStyles[0])}`
+                    : "/explore"
+                }
+                deals={sameStyleDeals}
+                language={language}
+                savedPinIds={savedPinIds}
+                compactTop={true}
+                onSelectDeal={(next) => onSelectPin?.(next)}
+                onToggleSave={onToggleSave}
+              />
+            )}
+
+            {nearbyDeals.length > 0 && (
+              <DealSlideRow
+                title={
+                  isTh
+                    ? `โปรที่พักใกล้เคียง (${provinceLabel} & ภาคเดียวกัน)`
+                    : `Nearby stays (${provinceLabel} & region)`
+                }
+                seeAllHref={`/explore?province=${encodeURIComponent(pin.provinceId)}`}
+                deals={nearbyDeals}
+                language={language}
+                savedPinIds={savedPinIds}
+                compactTop={true}
+                onSelectDeal={(next) => onSelectPin?.(next)}
+                onToggleSave={onToggleSave}
+              />
+            )}
+
+            {directDeals.length > 0 && (
+              <DealSlideRow
+                title={
+                  isTh
+                    ? "โปรจองตรง 0% GP ที่น่าสนใจ"
+                    : "More direct 0% GP deals"
+                }
+                seeAllHref="/explore?source=INTERNAL"
+                deals={directDeals}
+                language={language}
+                savedPinIds={savedPinIds}
+                compactTop={true}
+                onSelectDeal={(next) => onSelectPin?.(next)}
+                onToggleSave={onToggleSave}
+              />
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
       </div>
 
       {/* =====================================================================
@@ -3526,6 +3895,28 @@ export function PinterestPinDetail({
           </div>,
           document.body
         )}
+
+      {/* ===================================================================
+          PROMO TERMS MODAL (Desktop Centered / Mobile Slide-Up Sheet)
+      ==================================================================== */}
+      <DealTermsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        pin={pin}
+        language={language}
+        hotelName={hotelName}
+        provinceLabel={provinceLabel}
+        discountHeadline={dealDiscountHeadline}
+        dealPrice={dealPrice}
+        dealOriginalPrice={dealOriginalPrice}
+        expiryLabel={dealTimeInfo?.label || null}
+        isSaved={isSaved}
+        internalHotelHref={internalHotelHref}
+        externalDealHref={externalDealHref}
+        onToggleSave={onToggleSave}
+        onVisitHotelClick={handleVisitHotelClick}
+        onExternalDealClick={handleExternalDealClick}
+      />
 
       {/* ===================================================================
           AIRBNB-STYLE SHARE MODAL (Desktop Centered / Mobile Slide-Up Sheet)

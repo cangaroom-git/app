@@ -1,6 +1,27 @@
-import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
+import { setWorkerUrl, type Map as MapLibreMap, type StyleSpecification } from "maplibre-gl";
 
 const OPENFREEMAP_LIBERTY_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+export const WORLD_MIN_ZOOM = 2;
+export const THAILAND_MAX_ZOOM = 18.5;
+export const THAILAND_DEFAULT_CENTER: [number, number] = [100.52, 13.4];
+export const THAILAND_DEFAULT_ZOOM = 5.4;
+
+/**
+ * Enable standard mobile/tablet 1-finger pan and 2-finger pinch-to-zoom while disabling
+ * accidental map rotation or 3D pitch.
+ */
+export function configureThailandMapInteractions(map: MapLibreMap): void {
+  try {
+    map.dragPan?.enable();
+    map.touchZoomRotate?.enable();
+    map.touchZoomRotate?.disableRotation();
+    map.dragRotate?.disable();
+    map.touchPitch?.disable();
+  } catch {
+    // ignore if map was disposed during async setup
+  }
+}
 
 let workerConfigured = false;
 let rawLibertyPromise: Promise<StyleSpecification> | null = null;
@@ -191,11 +212,29 @@ export async function getAirbnbVectorMapStyle(
         }
       }
 
-      // Symbols: Native Vector POIs, Street Names & Place Labels
+      // Symbols: Native Vector POIs, Street Names & Place Labels (Thai-first, zero stacked bilingual clutter)
       if (layer.type === "symbol") {
         if (id === "road_shield_us" || id === "highway-shield-us-interstate") {
           layout.visibility = "none";
           return layer;
+        }
+
+        const existingTextField = layout["text-field"];
+        const isShieldOrNumber =
+          id.includes("shield") ||
+          id.includes("ref") ||
+          id.includes("housenumber");
+        if (
+          existingTextField &&
+          !isShieldOrNumber &&
+          JSON.stringify(existingTextField).includes("name")
+        ) {
+          layout["text-field"] = [
+            "coalesce",
+            ["get", "name:th"],
+            ["get", "name"],
+            ["get", "name:en"],
+          ];
         }
 
         // Progressive Airbnb-style POI density: calm overview at z13-14, detail reveals cleanly as user zooms in!

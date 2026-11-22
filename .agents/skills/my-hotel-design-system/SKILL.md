@@ -73,7 +73,39 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
 
 ---
 
-## 3. Unified App Shell, 3-Tier Grid & Mobile/Tablet UX
+## 3. Motion & Animation Constitution (กฎมาตรฐาน Animation — Smooth Airbnb / iOS Physics)
+
+Every modal, bottom sheet, drawer, dropdown, search transition, and interactive reveal across the entire app **MUST** feel physically continuous, calm, and 120fps smooth — **NEVER** snapping open/closed via abrupt conditional unmounts, **NEVER** bouncing like a cartoon, and strictly honoring **ZERO Hover Scale**.
+
+### Canonical Motion Tokens (`globals.css`)
+| Token | Value | Usage |
+|---|---|---|
+| `--ease-out-expo` | `cubic-bezier(0.22, 1, 0.36, 1)` | Primary Airbnb deceleration (popovers, view transitions, content reveals, modal enter) |
+| `--ease-ios-sheet` | `cubic-bezier(0.32, 0.72, 0, 1)` | Native iOS/Airbnb sheet glide (bottom sheets, multi-detent morphs, modal/drawer exits) |
+| `--ease-spring-subtle` | `cubic-bezier(0.22, 1.25, 0.36, 1)` | Reserved **ONLY** for expressive physical reveals (e.g., fanned ticket deck) — never hover |
+| `--duration-micro` | `150ms` | Color, background, focus ring, icon opacity transitions |
+| `--duration-popover` / `exit` | `220ms` / `160ms` | Floating menus, tooltips, travel-time dropdowns, search dropdowns |
+| `--duration-sheet` / `exit` | `360ms` / `250ms` | Modals, slide-up bottom sheets, drawers (**exit is always ~25–30% faster than enter**) |
+| `--duration-morph` | `420ms` | Continuous multi-detent sheet expand/collapse (e.g. bottom search card -> full-height search sheet) |
+
+### 5 Mandatory Motion Laws (บังคับใช้ทั้งเว็บ)
+1. **2-Frame Enter & Exit Presence Law (`useModalPresence` — ห้ามเปิด/ปิดแบบกระตุก)**:
+   - Every modal, bottom sheet, floating overlay, and popover MUST pair React `useModalPresence(isOpen, exitDurationMs)` (`src/lib/useModalPresence.ts`) with GPU-composited `data-state="open" | "closed"` CSS classes (`.cgr-modal-backdrop`, `.cgr-modal-surface-sm/md/lg`, `.cgr-modal-sheet-only`, `.cgr-floating-card-motion`, `.cgr-popover-motion`) so **both opening AND closing** animate smoothly without instant unmounting.
+   - Always pass `shouldRender` (not `isOpen`) to `useBodyScrollLock(shouldRender)` so scrollbars never jump mid-exit. When exiting a detail card bound to nullable state (e.g., `selectedPlace`), cache the last non-null item in a ref so its photo/text stays intact during the exit glide.
+2. **Continuous Sheet Morphing Law (`ห้ามสลับกล่องตัดฉับ`)**:
+   - Multi-state mobile sheets (e.g., Idle floating card <-> Full-height Search overlay <-> Collapsed / Half / Full Results sheet) MUST keep **ONE persistent sheet container** (`.cgr-map-mobile-sheet`) that smoothly morphs its height, edge insets, border-radius, and `transform` via `--ease-ios-sheet` (`420ms`) instead of unmounting one card and flashing another.
+   - Inner content swaps inside an open sheet use subtle vertical rise-fade (`.cgr-sheet-content-in`, `10px`, `260ms var(--ease-out-expo)`).
+3. **1:1 Direct Touch Manipulation Law (`นิ้วลากติดมือบนมือถือ`)**:
+   - Every draggable mobile sheet MUST track finger `touchmove` delta live (`data-dragging="true"` disables CSS transition while dragging, with gentle `0.35×` rubber-banding past bounds) and spring smoothly to the target detent on `touchend`.
+4. **GPU-First & Zero Hover-Scale Law**:
+   - Animate `transform: translate3d(...)` and `opacity` with `will-change` + `backface-visibility: hidden` for all enter/exit motions. Never animate layout properties inside scrolling page flow (isolated `position: fixed/absolute` multi-detent sheets only).
+   - **NEVER** use `scale` on hover (`hover:scale-*` / `group-hover:scale-*` remain strictly forbidden).
+5. **Accessibility Law (`prefers-reduced-motion`)**:
+   - Every animation utility and keyframe MUST provide a `@media (prefers-reduced-motion: reduce)` rule that removes spatial translation and preserves a calm `120–140ms` opacity crossfade.
+
+---
+
+## 4. Unified App Shell, 3-Tier Grid & Mobile/Tablet UX
 
 ### Persistent Navigation Shell (`HotelAppShell.tsx` & `PrimaryNavigation.tsx`)
 - **Desktop Left Sidebar (`w-[72px]`, fixed)**: Persistent across **every** route except `/login` and full-screen modals (`z-[85]`). Center holds strictly **3 Traveller-First items (`Home /`, `Deal /deal`, `Board /board`)**; secondary routes (`/trips`, `/register-hotel`, `/studio`, `/super-admin`) live in **`More (≡)`**.
@@ -95,7 +127,7 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
 
 ---
 
-## 4. Signature Page Specifications
+## 5. Signature Page Specifications
 
 ### A. Home (`/`) & Saved Boards (`/board`)
 - Underline Stay Style tabs + `<MasonryGrid columnWidth={236} gutter={16} />` (`6px` mobile gutter).

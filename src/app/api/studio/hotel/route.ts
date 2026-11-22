@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/studioAccess";
 import { addDaysToDate, formatDateStr, listDatesInRange } from "@/lib/bookingMath";
 import { prisma } from "@/lib/prisma";
+import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 import { mapBookingRowToDto } from "@/lib/services/bookingCheckoutService";
 import { mapHotelPostToDetailDto } from "@/lib/services/hotelPostService";
 import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
@@ -117,14 +118,46 @@ export async function GET(request: Request) {
         where: { hotelId: hotel.id },
         orderBy: { sortOrder: "asc" },
       }),
-      prisma.coupon.findMany({
-        where: { hotelId: hotel.id },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.hotelDiscountRule.findMany({
-        where: { hotelId: hotel.id },
-        orderBy: { createdAt: "desc" },
-      }),
+      prisma.coupon
+        .findMany({
+          where: { hotelId: hotel.id },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+        })
+        .catch(async () => {
+          const [rows, orderRows] = await Promise.all([
+            prisma.coupon.findMany({
+              where: { hotelId: hotel.id },
+              orderBy: { createdAt: "desc" },
+            }),
+            prisma.$queryRaw<Array<{ id: string; sortOrder: number }>>`
+              SELECT "id", "sortOrder" FROM "Coupon" WHERE "hotelId" = ${hotel.id}
+            `.catch(() => []),
+          ]);
+          const orderMap = new Map(orderRows.map((r) => [r.id, r.sortOrder]));
+          return [...rows].sort(
+            (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0)
+          );
+        }),
+      prisma.hotelDiscountRule
+        .findMany({
+          where: { hotelId: hotel.id },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+        })
+        .catch(async () => {
+          const [rows, orderRows] = await Promise.all([
+            prisma.hotelDiscountRule.findMany({
+              where: { hotelId: hotel.id },
+              orderBy: { createdAt: "desc" },
+            }),
+            prisma.$queryRaw<Array<{ id: string; sortOrder: number }>>`
+              SELECT "id", "sortOrder" FROM "HotelDiscountRule" WHERE "hotelId" = ${hotel.id}
+            `.catch(() => []),
+          ]);
+          const orderMap = new Map(orderRows.map((r) => [r.id, r.sortOrder]));
+          return [...rows].sort(
+            (a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0)
+          );
+        }),
       prisma.pin.findMany({
         where: { hotelId: hotel.id },
         orderBy: { createdAt: "desc" },
@@ -359,6 +392,17 @@ export async function PATCH(request: Request) {
       where: { id: hotel.id },
       data: updateData,
     });
+
+    if (
+      typeof updated.latitude === "number" &&
+      typeof updated.longitude === "number"
+    ) {
+      void ensureThailandPlacesAroundCoord(
+        updated.latitude,
+        updated.longitude,
+        updated.provinceId
+      );
+    }
 
     return NextResponse.json({ hotel: updated });
   } catch (err) {

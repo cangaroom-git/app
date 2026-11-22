@@ -667,8 +667,8 @@ export function HotelCheckoutClient({
         <div className="flex justify-between gap-3 text-[var(--color-text-secondary)]">
           <span>
             {isTh
-              ? "ค่าบริการแพลตฟอร์ม Cangaroom (0% GP)"
-              : "Cangaroom service fee (0% GP)"}
+              ? "ค่าบริการแพลตฟอร์ม Nondii (0% GP)"
+              : "Nondii service fee (0% GP)"}
           </span>
           <span className="text-[var(--color-text-primary)]">฿0</span>
         </div>

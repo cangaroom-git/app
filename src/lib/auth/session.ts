@@ -27,7 +27,9 @@ export async function getServerSessionUser(): Promise<ServerAuthUser | null> {
 
     const email = rawUser.email.trim().toLowerCase();
     const isBootstrapAdmin =
-      SUPER_ADMIN_EMAILS.has(email) || email.endsWith("@cangaroom.com");
+      SUPER_ADMIN_EMAILS.has(email) ||
+      email.endsWith("@cangaroom.com") ||
+      email.endsWith("@nondii.com");
 
     const dbUser = await prisma.user.upsert({
       where: { email },

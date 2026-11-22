@@ -346,7 +346,7 @@ export function AuthPromptModal({
                 {step === "password"
                   ? authMode === "signup"
                     ? isTh
-                      ? "สร้างบัญชี Cangaroom"
+                      ? "สร้างบัญชี Nondii"
                       : "Finish signing up"
                     : isTh
                     ? "กรอกรหัสผ่านเพื่อเข้าสู่ระบบ"
@@ -463,7 +463,7 @@ export function AuthPromptModal({
                     {authMode === "signin"
                       ? isTh
                         ? "ยังไม่มีบัญชี? สมัครสมาชิกใหม่"
-                        : "New to Cangaroom? Create an account"
+                        : "New to Nondii? Create an account"
                       : isTh
                       ? "มีบัญชีอยู่แล้ว? เข้าสู่ระบบ"
                       : "Already have an account? Log in"}

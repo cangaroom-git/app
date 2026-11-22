@@ -8,8 +8,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { Map as MapIcon, X } from "lucide-react";
 import {
   getProvinceById,
   STAY_STYLE_TABS,
@@ -17,6 +17,9 @@ import {
 } from "@/data/thailandProvinces";
 import {
   getEncodedSessionTasteParam,
+  getRecentViewedPinIds,
+  RECENT_VIEWS_UPDATED_EVENT,
+  recordRecentViewedPinId,
   trackPinInteraction,
   trackTelemetryEvent,
 } from "@/lib/telemetry/clientTelemetry";
@@ -25,20 +28,23 @@ import {
   PureMediaViewer,
   type PureMediaSlide,
 } from "@/components/media/PureMediaViewer";
-import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
   clearLastClickedPinOrigin,
-  PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
+import { DealSlideRow } from "@/components/home/DealSlideRow";
 import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+export type DealSourceFilter = "ALL" | "INTERNAL" | "EXTERNAL";
+
 export interface HomeFeedClientProps {
   initialPins: PinFeedItemDto[];
+  initialRecentPins?: PinFeedItemDto[];
   initialStyleTab?: string;
+  initialSourceFilter?: DealSourceFilter;
   initialStayId?: string | null;
   initialPinDetail?: {
     pin: PinFeedItemDto;
@@ -47,13 +53,52 @@ export interface HomeFeedClientProps {
   } | null;
 }
 
+/**
+ * Deduplicate pins by hotelId + dealSourceType so every Card Slide row displays
+ * distinct properties/deals instead of repeating the same stay.
+ */
+function pickPrimaryDealPerHotel(pins: PinFeedItemDto[]): PinFeedItemDto[] {
+  const bestByHotel = new Map<string, PinFeedItemDto>();
+
+  const scoreDeal = (p: PinFeedItemDto) => {
+    let sc = 0;
+    if (p.promoHeadlineTh) sc += 100;
+    if (p.activeCoupon || p.promoCode) sc += 60;
+    if (p.promoDealPriceThb) sc += 40;
+    if (p.isSponsored) sc += 25;
+    if (p.mediaUrls.length > 1) sc += 10;
+    sc += Math.min(20, p.likesCount * 0.05);
+    return sc;
+  };
+
+  for (const pin of pins) {
+    const key = `${pin.hotelId}:${pin.dealSourceType}`;
+    const existing = bestByHotel.get(key);
+    if (!existing || scoreDeal(pin) > scoreDeal(existing)) {
+      bestByHotel.set(key, pin);
+    }
+  }
+
+  return Array.from(bestByHotel.values());
+}
+
+const STYLE_GROUP_TITLES: Record<string, { th: string; en: string }> = {
+  mountain: { th: "ภูเขา & ทะเลหมอก", en: "Mountain & mist stays" },
+  "pool-villa": { th: "พูลวิลล่าส่วนตัว", en: "Private pool villas" },
+  sea: { th: "ติดทะเล & ชายหาด", en: "Beachfront & island deals" },
+  bars: { th: "บาร์ & รูฟท็อป", en: "Rooftop & bar stays" },
+  bathtub: { th: "อ่างแช่น้ำ & ออนเซ็น", en: "Onsen & soaking tubs" },
+  glamping: { th: "แกลมปิ้ง & เคบิน", en: "Glamping & mountain cabins" },
+};
+
 export function HomeFeedClient({
   initialPins,
+  initialRecentPins = [],
   initialStyleTab = "all",
+  initialSourceFilter = "ALL",
   initialStayId = null,
   initialPinDetail = null,
 }: HomeFeedClientProps) {
-  const router = useRouter();
   const {
     lang: language,
     user: currentUser,
@@ -66,15 +111,30 @@ export function HomeFeedClient({
     togglePinLikeInstant,
   } = useHotelApp();
 
-  const resolvedInitialStyle = VALID_STYLE_TAGS.has(initialStyleTab)
+  const isTh = language === "th";
+
+  const resolvedInitialAnchor = VALID_STYLE_TAGS.has(initialStyleTab)
     ? initialStyleTab
     : "all";
 
-  const [activeStyleTab, setActiveStyleTab] =
-    useState<string>(resolvedInitialStyle);
+  const [activeAnchorId, setActiveAnchorId] = useState<string>(
+    resolvedInitialAnchor
+  );
+  const [sourceFilter, setSourceFilter] =
+    useState<DealSourceFilter>(initialSourceFilter);
   const [isTabsPinned, setIsTabsPinned] = useState<boolean>(false);
 
   const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>(initialPins);
+  const [recentPinIds, setRecentPinIds] = useState<string[]>(() =>
+    initialRecentPins.map((p) => p.id)
+  );
+  const [extraRecentPinsById, setExtraRecentPinsById] = useState<
+    Record<string, PinFeedItemDto>
+  >(() => {
+    const map: Record<string, PinFeedItemDto> = {};
+    for (const p of initialRecentPins) map[p.id] = p;
+    return map;
+  });
   const [searchPins, setSearchPins] = useState<PinFeedItemDto[] | null>(null);
   const [isLoadingPins, setIsLoadingPins] = useState<boolean>(
     initialPins.length === 0
@@ -116,15 +176,11 @@ export function HomeFeedClient({
   const stickyTabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
     {}
   );
-  const feedGridContainerRef = useRef<HTMLElement | null>(null);
   const savedFeedScrollYRef = useRef<number>(0);
-  const openedFromFeedRef = useRef<{ pinId: string; scrollY: number } | null>(
-    null
-  );
-  const lastOpenPinIdRef = useRef<string | null>(initialStayId);
   const wasPinOpenRef = useRef<boolean>(Boolean(initialStayId));
+  const anchorScrollLockUntilRef = useRef<number>(0);
 
-  // Sync ?stay=... (backward compatible with legacy ?pin=...) & ?style=...
+  // Sync URL query params (?stay=..., ?source=...)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const syncFromUrl = () => {
@@ -132,19 +188,9 @@ export function HomeFeedClient({
       const stayParam = params.get("stay") || params.get("pin");
       setSelectedPinId(stayParam);
 
-      if (params.has("pin") && !params.has("stay") && stayParam) {
-        params.set("stay", stayParam);
-        params.delete("pin");
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}?${params.toString()}`
-        );
-      }
-
-      const styleParam = params.get("style");
-      if (styleParam && VALID_STYLE_TAGS.has(styleParam)) {
-        setActiveStyleTab(styleParam);
+      const srcParam = (params.get("source") || "").toUpperCase();
+      if (srcParam === "INTERNAL" || srcParam === "EXTERNAL") {
+        setSourceFilter(srcParam);
       }
     };
     syncFromUrl();
@@ -157,12 +203,10 @@ export function HomeFeedClient({
     setFetchError(null);
     try {
       const qs = new URLSearchParams();
+      qs.set("limit", "100");
       const tasteParam = getEncodedSessionTasteParam();
-      if (tasteParam) {
-        qs.set("taste", tasteParam);
-      }
-      const suffix = qs.toString();
-      const res = await fetch(`/api/pins${suffix ? `?${suffix}` : ""}`, {
+      if (tasteParam) qs.set("taste", tasteParam);
+      const res = await fetch(`/api/pins?${qs.toString()}`, {
         cache: "no-store",
       });
       const data = (await res.json()) as {
@@ -170,7 +214,7 @@ export function HomeFeedClient({
         error?: string;
       };
       if (!res.ok) {
-        throw new Error(data.error || "ไม่สามารถโหลดข้อมูลที่พักได้");
+        throw new Error(data.error || "ไม่สามารถโหลดรายการโปรที่พักได้");
       }
       const fetched = data.pins || [];
       setMasterPins(fetched);
@@ -180,7 +224,7 @@ export function HomeFeedClient({
     } catch (err) {
       if (!silent) {
         setFetchError(
-          err instanceof Error ? err.message : "โหลดข้อมูลที่พักไม่สำเร็จ"
+          err instanceof Error ? err.message : "โหลดรายการโปรที่พักไม่สำเร็จ"
         );
       }
     } finally {
@@ -188,14 +232,100 @@ export function HomeFeedClient({
     }
   }, []);
 
-  // Only fetch /api/pins on mount if SSR fallback was empty (eliminates redundant cold waterfall!)
   useEffect(() => {
     if (initialPins.length === 0) {
       void loadMasterPins(false);
     }
   }, [initialPins.length, loadMasterPins]);
 
-  // Debounced 3-Tier Zero-Dead-End Search when globalSearchQuery is active
+  // Sync recently viewed pin IDs (local instant history + DB SSR history + cross-tab sync)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const dbIds = initialRecentPins.map((p) => p.id);
+
+    const mergeIds = (localIds: string[]) => {
+      const merged: string[] = [];
+      const seen = new Set<string>();
+      for (const id of [...localIds, ...dbIds]) {
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        merged.push(id);
+        if (merged.length >= 24) break;
+      }
+      setRecentPinIds(merged);
+    };
+
+    mergeIds(getRecentViewedPinIds());
+
+    const onUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<{ pinIds?: string[] }>).detail;
+      mergeIds(Array.isArray(detail?.pinIds) ? detail.pinIds : getRecentViewedPinIds());
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "cgr_recent_viewed_pins_v1") {
+        mergeIds(getRecentViewedPinIds());
+      }
+    };
+    window.addEventListener(RECENT_VIEWS_UPDATED_EVENT, onUpdated);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(RECENT_VIEWS_UPDATED_EVENT, onUpdated);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [initialRecentPins]);
+
+  // Hydrate any locally recorded recent pin IDs not present in masterPins from real Postgres DB
+  useEffect(() => {
+    if (recentPinIds.length === 0) return;
+    const known = new Set<string>(masterPins.map((p) => p.id));
+    for (const id of Object.keys(extraRecentPinsById)) known.add(id);
+    const missing = recentPinIds.filter((id) => !known.has(id)).slice(0, 20);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    fetch(`/api/pins?ids=${encodeURIComponent(missing.join(","))}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { pins?: PinFeedItemDto[] } | null) => {
+        if (cancelled || !data?.pins?.length) return;
+        setExtraRecentPinsById((prev) => {
+          const next = { ...prev };
+          for (const p of data.pins!) next[p.id] = p;
+          return next;
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [recentPinIds, masterPins, extraRecentPinsById]);
+
+  const recentViewedDeals = useMemo(() => {
+    if (recentPinIds.length === 0) return [];
+    const byId = new Map<string, PinFeedItemDto>();
+    for (const p of Object.values(extraRecentPinsById)) byId.set(p.id, p);
+    for (const p of masterPins) byId.set(p.id, p);
+
+    const seenHotels = new Set<string>();
+    const out: PinFeedItemDto[] = [];
+    for (const id of recentPinIds) {
+      if (hiddenPinIds.has(id)) continue;
+      const pin = byId.get(id);
+      if (!pin) continue;
+      if (sourceFilter !== "ALL" && pin.dealSourceType !== sourceFilter) {
+        continue;
+      }
+      if (seenHotels.has(pin.hotelId)) continue;
+      seenHotels.add(pin.hotelId);
+      out.push(pin);
+      if (out.length >= 16) break;
+    }
+    return out;
+  }, [recentPinIds, extraRecentPinsById, masterPins, hiddenPinIds, sourceFilter]);
+
+  // Debounced search query fetch
   useEffect(() => {
     const trimmed = globalSearchQuery.trim();
     if (!trimmed) {
@@ -210,6 +340,7 @@ export function HomeFeedClient({
       try {
         const qs = new URLSearchParams();
         qs.set("q", trimmed);
+        qs.set("limit", "100");
         const tasteParam = getEncodedSessionTasteParam();
         if (tasteParam) qs.set("taste", tasteParam);
 
@@ -221,7 +352,7 @@ export function HomeFeedClient({
           error?: string;
         };
         if (!res.ok) {
-          throw new Error(data.error || "ไม่สามารถค้นหาที่พักได้");
+          throw new Error(data.error || "ไม่สามารถค้นหาโปรที่พักได้");
         }
         if (!cancelled) {
           setSearchPins(data.pins || []);
@@ -229,7 +360,7 @@ export function HomeFeedClient({
       } catch (err) {
         if (!cancelled && masterPins.length === 0) {
           setFetchError(
-            err instanceof Error ? err.message : "ค้นหาที่พักไม่สำเร็จ"
+            err instanceof Error ? err.message : "ค้นหาโปรที่พักไม่สำเร็จ"
           );
         }
       } finally {
@@ -243,34 +374,51 @@ export function HomeFeedClient({
     };
   }, [globalSearchQuery, masterPins.length]);
 
-  useEffect(() => {
-    if (activeStyleTab !== "all") {
-      trackTelemetryEvent({
-        eventType: "SEARCH_FILTER",
-        styleTab: activeStyleTab,
-      });
-    }
-  }, [activeStyleTab]);
+  // Deduplicated deal catalog (1 hero coupon per hotel+source) filtered by Source switcher
+  const visibleCatalog = useMemo(() => {
+    const base = globalSearchQuery.trim()
+      ? searchPins ?? masterPins
+      : masterPins;
+    const nonHidden = base.filter((p) => !hiddenPinIds.has(p.id));
+    const deduped = pickPrimaryDealPerHotel(nonHidden);
+    if (sourceFilter === "ALL") return deduped;
+    return deduped.filter((p) => p.dealSourceType === sourceFilter);
+  }, [globalSearchQuery, searchPins, masterPins, hiddenPinIds, sourceFilter]);
 
-  const getPinsForStyleTab = useCallback(
-    (tabId: string): PinFeedItemDto[] => {
-      const base = globalSearchQuery.trim()
-        ? searchPins ?? masterPins
-        : masterPins;
-      const visible = base.filter((p) => !hiddenPinIds.has(p.id));
-      if (tabId === "all") return visible;
-      const matching = visible.filter((p) => p.stayStyles.includes(tabId));
-      return globalSearchQuery.trim() && matching.length === 0
-        ? visible
-        : matching;
-    },
-    [globalSearchQuery, searchPins, masterPins, hiddenPinIds]
-  );
+  // Build pure horizontal Card Slide groups matching the top Anchor Tabs
+  const slideGroups = useMemo(() => {
+    const internalDeals = visibleCatalog.filter(
+      (p) => p.dealSourceType === "INTERNAL"
+    );
+    const externalDeals = visibleCatalog.filter(
+      (p) => p.dealSourceType === "EXTERNAL"
+    );
 
-  const pins = useMemo(
-    () => getPinsForStyleTab(activeStyleTab),
-    [getPinsForStyleTab, activeStyleTab]
-  );
+    const styleGroups = STAY_STYLE_TABS.filter((t) => t.id !== "all").map(
+      (tab) => {
+        const titleMeta = STYLE_GROUP_TITLES[tab.id] ?? {
+          th: tab.labelTh,
+          en: tab.labelEn,
+        };
+        return {
+          id: tab.id,
+          anchorDomId: `group-${tab.id}`,
+          titleTh: titleMeta.th,
+          titleEn: titleMeta.en,
+          seeAllHref: `/explore?style=${encodeURIComponent(tab.id)}${
+            sourceFilter !== "ALL" ? `&source=${sourceFilter}` : ""
+          }`,
+          deals: visibleCatalog.filter((p) => p.stayStyles.includes(tab.id)),
+        };
+      }
+    );
+
+    return {
+      internalDeals,
+      externalDeals,
+      styleGroups,
+    };
+  }, [visibleCatalog, sourceFilter]);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
     latestPinReqRef.current = pinId;
@@ -296,9 +444,7 @@ export function HomeFeedClient({
 
   useEffect(() => {
     if (selectedPinId) {
-      if (pinDetail?.pin.id === selectedPinId) {
-        return;
-      }
+      if (pinDetail?.pin.id === selectedPinId) return;
       setPinDetail(null);
       void loadPinDetail(selectedPinId);
     } else {
@@ -325,9 +471,7 @@ export function HomeFeedClient({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onResetHomePin = () => {
-      handleClosePin();
-    };
+    const onResetHomePin = () => handleClosePin();
     window.addEventListener("cgr:reset-home-pin", onResetHomePin);
     return () =>
       window.removeEventListener("cgr:reset-home-pin", onResetHomePin);
@@ -338,21 +482,17 @@ export function HomeFeedClient({
     if (pinDetail?.pin.id === selectedPinId) return pinDetail.pin;
     if (selectedPinSnapshot?.id === selectedPinId) return selectedPinSnapshot;
     return (
-      pins.find((p) => p.id === selectedPinId) ??
+      visibleCatalog.find((p) => p.id === selectedPinId) ??
       masterPins.find((p) => p.id === selectedPinId) ??
       null
     );
-  }, [pinDetail, selectedPinId, selectedPinSnapshot, pins, masterPins]);
+  }, [pinDetail, selectedPinId, selectedPinSnapshot, visibleCatalog, masterPins]);
 
   const handleSelectPin = useCallback(
     (pin: PinFeedItemDto, pushHistoryStack = true) => {
       setDetailRestoreScrollY(null);
 
       if (typeof window !== "undefined" && !currentOpenPin) {
-        openedFromFeedRef.current = {
-          pinId: pin.id,
-          scrollY: window.scrollY,
-        };
         savedFeedScrollYRef.current = window.scrollY;
       }
 
@@ -369,7 +509,11 @@ export function HomeFeedClient({
           ].slice(-20)
         );
       }
-      lastOpenPinIdRef.current = pin.id;
+
+      recordRecentViewedPinId(pin.id);
+      setExtraRecentPinsById((prev) =>
+        prev[pin.id] ? prev : { ...prev, [pin.id]: pin }
+      );
       setSelectedPinSnapshot(pin);
       setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
       setSelectedPinId(pin.id);
@@ -386,7 +530,6 @@ export function HomeFeedClient({
     [currentOpenPin]
   );
 
-  // Drill-down step-back: pops previous Stay card in stack until returning to Home feed!
   const handleStepBackPin = useCallback(() => {
     if (pinHistoryStack.length === 0) {
       handleClosePin();
@@ -395,7 +538,6 @@ export function HomeFeedClient({
     const prevEntry = pinHistoryStack[pinHistoryStack.length - 1];
     setPinHistoryStack((prev) => prev.slice(0, -1));
     setDetailRestoreScrollY(prevEntry.scrollY);
-    lastOpenPinIdRef.current = prevEntry.pin.id;
     setSelectedPinSnapshot(prevEntry.pin);
     setPinDetail(null);
     setSelectedPinId(prevEntry.pin.id);
@@ -431,7 +573,7 @@ export function HomeFeedClient({
     const targetPin =
       (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
       masterPins.find((p) => p.id === pinId) ??
-      pins.find((p) => p.id === pinId) ??
+      visibleCatalog.find((p) => p.id === pinId) ??
       (selectedPinSnapshot?.id === pinId ? selectedPinSnapshot : null);
 
     if (!targetPin) return;
@@ -464,7 +606,9 @@ export function HomeFeedClient({
     );
     if (pinDetail?.pin.id === pinId) {
       setPinDetail((prev) =>
-        prev ? { ...prev, pin: { ...prev.pin, isSavedByMe: result.isSaved } } : prev
+        prev
+          ? { ...prev, pin: { ...prev.pin, isSavedByMe: result.isSaved } }
+          : prev
       );
     }
   };
@@ -475,8 +619,7 @@ export function HomeFeedClient({
   const handleToggleLike = (pinId: string) => {
     const targetPin =
       (pinDetail?.pin.id === pinId ? pinDetail.pin : null) ??
-      masterPins.find((p) => p.id === pinId) ??
-      pins.find((p) => p.id === pinId);
+      masterPins.find((p) => p.id === pinId);
     if (!targetPin) return;
     togglePinLikeInstant({
       id: targetPin.id,
@@ -505,7 +648,7 @@ export function HomeFeedClient({
         });
         channel = "WEB_SHARE";
       } catch {
-        // fallback clipboard below
+        // fallback clipboard
       }
     }
     if (
@@ -541,9 +684,7 @@ export function HomeFeedClient({
               body: JSON.stringify({ body: text, parentId }),
             }
           );
-          if (res.ok) {
-            await loadPinDetail(selectedPinId);
-          }
+          if (res.ok) await loadPinDetail(selectedPinId);
         },
       });
       return;
@@ -557,9 +698,7 @@ export function HomeFeedClient({
         body: JSON.stringify({ body: text, parentId }),
       }
     );
-    if (res.ok) {
-      await loadPinDetail(selectedPinId);
-    }
+    if (res.ok) await loadPinDetail(selectedPinId);
   };
 
   const handleDeleteComment = async (commentId: string) => {
@@ -568,103 +707,22 @@ export function HomeFeedClient({
       `/api/comments/${encodeURIComponent(commentId)}`,
       { method: "DELETE" }
     );
-    if (res.ok) {
-      await loadPinDetail(selectedPinId);
-    }
+    if (res.ok) await loadPinDetail(selectedPinId);
   };
 
   const activePin = currentOpenPin;
 
-  useEffect(() => {
-    if (activePin) {
-      lastOpenPinIdRef.current = activePin.id;
-    }
-  }, [activePin]);
-
-  // Restore exact card scroll position synchronously BEFORE paint when closing Stay on any viewport (like Pinterest!)
+  // Restore scroll position when closing Detail Stage
   useIsomorphicLayoutEffect(() => {
     const isNowOpen = Boolean(activePin);
-    if (
-      wasPinOpenRef.current &&
-      !isNowOpen &&
-      typeof window !== "undefined"
-    ) {
-      const openedOrigin = openedFromFeedRef.current;
-      const targetPinId =
-        lastOpenPinIdRef.current || openedOrigin?.pinId || null;
-      const panelEl = feedGridContainerRef.current;
-
-      const computeTargetScrollY = (): number => {
-        const cardEl = targetPinId
-          ? panelEl?.querySelector<HTMLElement>(
-              `[data-masonry-item-id="${targetPinId}"]`
-            )
-          : null;
-
-        if (openedOrigin && openedOrigin.pinId === targetPinId) {
-          if (cardEl) {
-            const rect = cardEl.getBoundingClientRect();
-            const cardDocTop = rect.top + window.scrollY;
-            const cardDocBottom = rect.bottom + window.scrollY;
-            const visibleTop = openedOrigin.scrollY + 56;
-            const visibleBottom =
-              openedOrigin.scrollY + window.innerHeight - 64;
-            if (
-              rect.height > 0 &&
-              (cardDocBottom < visibleTop || cardDocTop > visibleBottom)
-            ) {
-              return Math.max(
-                0,
-                Math.round(
-                  cardDocTop -
-                    Math.max(88, (window.innerHeight - rect.height) * 0.32)
-                )
-              );
-            }
-          }
-          return openedOrigin.scrollY;
-        }
-
-        if (cardEl) {
-          const rect = cardEl.getBoundingClientRect();
-          if (rect.height > 0) {
-            const cardDocTop = rect.top + window.scrollY;
-            return Math.max(
-              0,
-              Math.round(
-                cardDocTop -
-                  Math.max(88, (window.innerHeight - rect.height) * 0.32)
-              )
-            );
-          }
-        }
-
-        return openedOrigin?.scrollY ?? savedFeedScrollYRef.current;
-      };
-
-      const initialResolvedY = computeTargetScrollY();
+    if (wasPinOpenRef.current && !isNowOpen && typeof window !== "undefined") {
       window.scrollTo({
-        top: initialResolvedY,
+        top: savedFeedScrollYRef.current,
         behavior: "instant" as ScrollBehavior,
       });
-
-      window.requestAnimationFrame(() => {
-        const settledY = computeTargetScrollY();
-        if (Math.abs(window.scrollY - settledY) > 6) {
-          window.scrollTo({
-            top: settledY,
-            behavior: "instant" as ScrollBehavior,
-          });
-        }
-        openedFromFeedRef.current = null;
-        lastOpenPinIdRef.current = null;
-        setDetailRestoreScrollY(null);
-      });
-    } else if (isNowOpen && activePin) {
-      lastOpenPinIdRef.current = activePin.id;
     }
     wasPinOpenRef.current = isNowOpen;
-  }, [activePin, activeStyleTab]);
+  }, [activePin]);
 
   const activePinComments = useMemo(
     () =>
@@ -672,82 +730,65 @@ export function HomeFeedClient({
     [activePin, pinDetail]
   );
 
-  // Instant client-side similarity sort across the entire master catalog (~0ms)
-  const instantSimilarFallback = useMemo(() => {
+  // Deduplicated related deals + symmetrical Card Slide groups for Deal Detail (both Mobile & Desktop!)
+  // Strictly excludes the currently viewed card AND any other deal from the same hotel.
+  const allOtherDeals = useMemo(() => {
     if (!activePin) return [];
+    const catalog = pickPrimaryDealPerHotel(
+      masterPins.filter((p) => !hiddenPinIds.has(p.id))
+    );
+    const seenHotels = new Set<string>([activePin.hotelId]);
+    return catalog.filter((p) => {
+      if (
+        p.id === activePin.id ||
+        p.hotelId === activePin.hotelId ||
+        p.hotelSlug === activePin.hotelSlug
+      ) {
+        return false;
+      }
+      if (seenHotels.has(p.hotelId)) return false;
+      seenHotels.add(p.hotelId);
+      return true;
+    });
+  }, [activePin, masterPins, hiddenPinIds]);
+
+  const detailRelatedGroups = useMemo(() => {
+    if (!activePin) {
+      return { sameStyle: [], nearbyArea: [], directPicks: [] };
+    }
     const anchorStyles = new Set(activePin.stayStyles);
     const anchorRegion = getProvinceById(activePin.provinceId)?.region ?? null;
-    const sourceCatalog = masterPins.length > 0 ? masterPins : pins;
 
-    const otherHotels = sourceCatalog.filter(
-      (p) =>
-        p.id !== activePin.id &&
-        p.hotelId !== activePin.hotelId &&
-        !hiddenPinIds.has(p.id)
+    const sameStyle = allOtherDeals.filter((cand) =>
+      cand.stayStyles.some((st) => anchorStyles.has(st))
     );
-    return [...otherHotels].sort((a, b) => {
-      const scorePin = (cand: PinFeedItemDto) => {
-        let sc = 0;
-        for (const s of cand.stayStyles) {
-          if (anchorStyles.has(s)) sc += 18;
-        }
-        if (cand.provinceId === activePin.provinceId) sc += 15;
-        else if (
-          anchorRegion &&
+
+    const nearbyArea = [...allOtherDeals]
+      .filter((cand) => {
+        if (cand.provinceId === activePin.provinceId) return true;
+        return (
+          Boolean(anchorRegion) &&
           getProvinceById(cand.provinceId)?.region === anchorRegion
-        ) {
-          sc += 9;
-        }
-        if (activePin.nightlyPriceThb && cand.nightlyPriceThb) {
-          const diff = Math.abs(
-            Math.log(cand.nightlyPriceThb / activePin.nightlyPriceThb)
-          );
-          sc += 10 * Math.exp(-1.3 * diff);
-        }
-        return sc;
-      };
-      return scorePin(b) - scorePin(a);
-    });
-  }, [activePin, masterPins, pins, hiddenPinIds]);
-
-  const gridPins = useMemo(() => {
-    if (!activePin) {
-      return pins;
-    }
-    if (instantSimilarFallback.length > 0) {
-      if (
-        pinDetail?.pin.id === activePin.id &&
-        pinDetail.relatedPins.length > 0
-      ) {
-        const existingIds = new Set(instantSimilarFallback.map((p) => p.id));
-        const extraFromServer = pinDetail.relatedPins.filter(
-          (p) => !existingIds.has(p.id) && !hiddenPinIds.has(p.id)
         );
-        return [...instantSimilarFallback, ...extraFromServer];
-      }
-      return instantSimilarFallback;
-    }
-    if (
-      pinDetail?.pin.id === activePin.id &&
-      pinDetail.relatedPins.length > 0
-    ) {
-      return pinDetail.relatedPins.filter((p) => !hiddenPinIds.has(p.id));
-    }
-    return [];
-  }, [activePin, pinDetail, pins, instantSimilarFallback, hiddenPinIds]);
+      })
+      .sort((a, b) => {
+        const aExact = a.provinceId === activePin.provinceId ? 1 : 0;
+        const bExact = b.provinceId === activePin.provinceId ? 1 : 0;
+        return bExact - aExact;
+      });
 
-  const prevPinPreview = useMemo<PinFeedItemDto | null>(() => {
-    if (!activePin) return null;
-    if (pinHistoryStack.length > 0) {
-      return pinHistoryStack[pinHistoryStack.length - 1]?.pin ?? null;
-    }
-    return gridPins.length > 0 ? gridPins[gridPins.length - 1] ?? null : null;
-  }, [activePin, pinHistoryStack, gridPins]);
+    const directPicks = allOtherDeals.filter(
+      (cand) => cand.dealSourceType === "INTERNAL"
+    );
 
-  const nextPinPreview = useMemo<PinFeedItemDto | null>(() => {
-    if (!activePin || gridPins.length === 0) return null;
-    return gridPins[0] ?? null;
-  }, [activePin, gridPins]);
+    return { sameStyle, nearbyArea, directPicks };
+  }, [activePin, allOtherDeals]);
+
+  const prevPinPreview =
+    pinHistoryStack.length > 0
+      ? pinHistoryStack[pinHistoryStack.length - 1]?.pin ?? null
+      : allOtherDeals[allOtherDeals.length - 1] ?? null;
+  const nextPinPreview = allOtherDeals[0] ?? null;
 
   const handleNavigatePin = useCallback(
     (direction: "prev" | "next") => {
@@ -757,23 +798,23 @@ export function HomeFeedClient({
         handleStepBackPin();
         return;
       }
-      if (gridPins.length === 0) return;
-      const nextPin =
-        direction === "next" ? gridPins[0] : gridPins[gridPins.length - 1];
-      if (nextPin) {
-        handleSelectPin(nextPin, true);
-      }
+      if (allOtherDeals.length === 0) return;
+      const target =
+        direction === "next"
+          ? allOtherDeals[0]
+          : allOtherDeals[allOtherDeals.length - 1];
+      if (target) handleSelectPin(target, true);
     },
     [
       activePin,
       pinHistoryStack.length,
-      gridPins,
+      allOtherDeals,
       handleStepBackPin,
       handleSelectPin,
     ]
   );
 
-  // Show Sticky Tabs Bar cleanly once scrolled past inline tabs (mirrors HotelStorefrontClient anchor bar)
+  // Sticky Anchor Tabs Observer
   useEffect(() => {
     if (activePin) {
       setIsTabsPinned(false);
@@ -788,33 +829,46 @@ export function HomeFeedClient({
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        if (entry) {
-          setIsTabsPinned(!entry.isIntersecting);
-        }
+        if (entry) setIsTabsPinned(!entry.isIntersecting);
       },
-      {
-        rootMargin: "-64px 0px 0px 0px",
-        threshold: 0,
-      }
+      { rootMargin: "-64px 0px 0px 0px", threshold: 0 }
     );
     observer.observe(sentinelEl);
     return () => observer.disconnect();
   }, [activePin]);
 
-  // Slide global Mobile Top Bar out smoothly when Home Sticky Tabs Bar is pinned at top-0
+  // Smooth Scroll-Spy for Anchor Tabs
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (isTabsPinned && !activePin) {
-      document.documentElement.dataset.homeTabsPinned = "true";
-    } else {
-      delete document.documentElement.dataset.homeTabsPinned;
-    }
-    return () => {
-      delete document.documentElement.dataset.homeTabsPinned;
-    };
-  }, [isTabsPinned, activePin]);
+    if (activePin || typeof window === "undefined") return;
+    const sectionIds = STAY_STYLE_TABS.map((t) => ({
+      tabId: t.id,
+      domId: t.id === "all" ? "group-all" : `group-${t.id}`,
+    }));
 
-  // Keep active tab centered inside both inline and sticky horizontal tab scrollers
+    const onScroll = () => {
+      if (Date.now() < anchorScrollLockUntilRef.current) return;
+      if (window.scrollY < 100) {
+        setActiveAnchorId("all");
+        return;
+      }
+      let current = "all";
+      const offsetTop = 160;
+      for (const item of sectionIds) {
+        const el = document.getElementById(item.domId);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= offsetTop) {
+          current = item.tabId;
+        }
+      }
+      setActiveAnchorId(current);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [activePin, visibleCatalog.length]);
+
+  // Keep active anchor tab centered in horizontal scroller
   useEffect(() => {
     if (activePin) return;
     const syncScroller = (
@@ -833,77 +887,112 @@ export function HomeFeedClient({
       );
       scroller.scrollTo({ left: targetLeft, behavior: "smooth" });
     };
-    syncScroller(tabsScrollRef.current, tabButtonRefs.current[activeStyleTab]);
+    syncScroller(tabsScrollRef.current, tabButtonRefs.current[activeAnchorId]);
     syncScroller(
       stickyTabsScrollRef.current,
-      stickyTabButtonRefs.current[activeStyleTab]
+      stickyTabButtonRefs.current[activeAnchorId]
     );
-  }, [activeStyleTab, activePin, language]);
+  }, [activeAnchorId, activePin, language]);
 
-  const selectStyleTabByTap = useCallback(
-    (tabId: string) => {
-      setActiveStyleTab(tabId);
-      if (isTabsPinned && typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    },
-    [isTabsPinned]
-  );
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (isTabsPinned && !activePin) {
+      document.documentElement.dataset.homeTabsPinned = "true";
+    } else {
+      delete document.documentElement.dataset.homeTabsPinned;
+    }
+    return () => {
+      delete document.documentElement.dataset.homeTabsPinned;
+    };
+  }, [isTabsPinned, activePin]);
 
-  const hasActiveFilter =
-    activeStyleTab !== "all" || Boolean(globalSearchQuery.trim());
+  // Anchor Scroll Handler — scrolls smoothly to the target Slide Group without switching tabs!
+  const scrollToGroupAnchor = useCallback((tabId: string) => {
+    setActiveAnchorId(tabId);
+    anchorScrollLockUntilRef.current = Date.now() + 700;
+    if (tabId !== "all") {
+      trackTelemetryEvent({
+        eventType: "SEARCH_FILTER",
+        styleTab: tabId,
+      });
+    }
+    if (typeof window === "undefined") return;
+    if (tabId === "all") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const targetEl = document.getElementById(`group-${tabId}`);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  const hasQueryOrSourceFilter =
+    sourceFilter !== "ALL" || Boolean(globalSearchQuery.trim());
 
   const handleResetFilters = () => {
-    selectStyleTabByTap("all");
+    setSourceFilter("ALL");
     setGlobalSearchQuery("");
+    scrollToGroupAnchor("all");
   };
 
+  const exploreMapHref = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (activeAnchorId !== "all") qs.set("style", activeAnchorId);
+    if (sourceFilter !== "ALL") qs.set("source", sourceFilter);
+    if (globalSearchQuery.trim()) qs.set("q", globalSearchQuery.trim());
+    const str = qs.toString();
+    return str ? `/explore?${str}` : "/explore";
+  }, [activeAnchorId, sourceFilter, globalSearchQuery]);
+
   return (
-    <div className="cgr-page-fluid space-y-4 sm:space-y-5 [overflow-anchor:none]">
-      {/* Scroll-Reveal Sticky Stay Style Tabs Bar (Fixed Top Bar under 64px Header on Desktop / Top Edge on Mobile) */}
+    <div className="cgr-page-standard pb-14 [overflow-anchor:none]">
+      {/* Scroll-Reveal Sticky Anchor Tabs Bar */}
       {!activePin && (
         <nav
-          aria-label={language === "th" ? "หมวดหมู่สไตล์ที่พัก" : "Stay styles"}
+          aria-label={isTh ? "ลัดไปกลุ่มโปรที่พัก" : "Jump to deal category"}
           aria-hidden={!isTabsPinned}
-          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-3 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
+          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
             isTabsPinned
               ? "opacity-100 translate-y-0 pointer-events-auto"
               : "opacity-0 -translate-y-2 pointer-events-none"
           }`}
         >
-          <div
-            ref={stickyTabsScrollRef}
-            data-style-tabs-bar="true"
-            className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar select-none"
-          >
-            {STAY_STYLE_TABS.map((tab) => {
-              const isActive = activeStyleTab === tab.id;
-              return (
-                <button
-                  key={`sticky-${tab.id}`}
-                  ref={(el) => {
-                    stickyTabButtonRefs.current[tab.id] = el;
-                  }}
-                  type="button"
-                  onClick={() => selectStyleTabByTap(tab.id)}
-                  className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
-                    isActive
-                      ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
-                      : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
-                </button>
-              );
-            })}
+          <div className="max-w-[1120px] mx-auto">
+            <div
+              ref={stickyTabsScrollRef}
+              data-style-tabs-bar="true"
+              className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar select-none"
+            >
+              {STAY_STYLE_TABS.map((tab) => {
+                const isActive = activeAnchorId === tab.id;
+                return (
+                  <button
+                    key={`sticky-${tab.id}`}
+                    ref={(el) => {
+                      stickyTabButtonRefs.current[tab.id] = el;
+                    }}
+                    type="button"
+                    onClick={() => scrollToGroupAnchor(tab.id)}
+                    className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
+                      isActive
+                        ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                        : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span>{isTh ? tab.labelTh : tab.labelEn}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </nav>
       )}
 
-      {/* Inline Stay Style Tabs Bar + Active Search Filter Banner (Persisted silently when activePin is open!) */}
+      {/* Top Inline Anchor Tabs + Minimal Source Filter & Map Trigger */}
       <div
         aria-hidden={Boolean(activePin)}
-        className={activePin ? "hidden" : "space-y-2"}
+        className={activePin ? "hidden" : "space-y-3"}
       >
         <div ref={inlineTabsSentinelRef}>
           <div
@@ -912,7 +1001,7 @@ export function HomeFeedClient({
             className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
           >
             {STAY_STYLE_TABS.map((tab) => {
-              const isActive = activeStyleTab === tab.id;
+              const isActive = activeAnchorId === tab.id;
               return (
                 <button
                   key={tab.id}
@@ -920,40 +1009,70 @@ export function HomeFeedClient({
                     tabButtonRefs.current[tab.id] = el;
                   }}
                   type="button"
-                  onClick={() => selectStyleTabByTap(tab.id)}
+                  onClick={() => scrollToGroupAnchor(tab.id)}
                   className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
                     isActive
                       ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
                       : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <span>{language === "th" ? tab.labelTh : tab.labelEn}</span>
+                  <span>{isTh ? tab.labelTh : tab.labelEn}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {globalSearchQuery.trim() && (
-          <div className="flex items-center justify-between gap-2 px-1">
-            <p className="ty-caption truncate">
-              {language === "th"
-                ? `ผลค้นหา: "${globalSearchQuery.trim()}"`
-                : `Results for "${globalSearchQuery.trim()}"`}
-            </p>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="shrink-0 h-8 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ty-caption font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <span>{language === "th" ? "ล้างคำค้นหา" : "Clear search"}</span>
-              <X className="w-3.5 h-3.5" />
-            </button>
+        {/* Minimal Single-Row Source Switcher & Explore Map Action */}
+        <div className="flex items-center justify-between gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {(
+              [
+                { id: "ALL", th: "ทุกโปรที่พัก", en: "All deals" },
+                { id: "INTERNAL", th: "จองตรง 0% GP", en: "Direct 0% GP" },
+                { id: "EXTERNAL", th: "ดีลจากเว็บอื่น", en: "External deals" },
+              ] as const
+            ).map((opt) => {
+              const active = sourceFilter === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSourceFilter(opt.id)}
+                  className={`h-9 px-3.5 rounded-[10px] text-[13px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                    active
+                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  {isTh ? opt.th : opt.en}
+                </button>
+              );
+            })}
+
+            {hasQueryOrSourceFilter && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-9 px-3 rounded-[10px] text-[13px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-4 inline-flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                <span>{isTh ? "ล้างตัวกรอง" : "Reset"}</span>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        )}
+
+          <Link
+            href={exploreMapHref}
+            className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors"
+          >
+            <MapIcon className="w-4 h-4 shrink-0" strokeWidth={2} />
+            <span>{isTh ? "ดูบนแผนที่" : "Explore map"}</span>
+          </Link>
+        </div>
       </div>
 
-      {/* Stay Close-Up Stage at Very Top (Native Window Scroll on Mobile for Translucent Safari Bar + 1:1 Card Slide!) */}
+      {/* Deal Detail Stage (Slide 0: Coupon -> Slide 1..N: Photos/Video -> Last Slide: Map) */}
       {activePin && (
         <PinterestPinDetail
           pin={activePin}
@@ -961,7 +1080,7 @@ export function HomeFeedClient({
           currentUser={currentUser}
           comments={activePinComments}
           savedPinIds={effectiveSavedPinIds}
-          relatedPins={gridPins}
+          relatedPins={allOtherDeals}
           prevPinPreview={prevPinPreview}
           nextPinPreview={nextPinPreview}
           canStepBack={pinHistoryStack.length > 0}
@@ -985,9 +1104,58 @@ export function HomeFeedClient({
         />
       )}
 
-      {/* Error State (Explicit — Zero Silent Mock Fallback!) */}
-      {fetchError && (
-        <div className="rounded-[16px] bg-[var(--color-error-muted)] p-5 flex items-center justify-between gap-4">
+      {/* Symmetrical Grouped Card Slide Rows Below Open Deal Detail (Desktop >= lg; Mobile renders inside PinterestPinDetail) */}
+      {activePin && allOtherDeals.length > 0 && (
+        <div className="hidden lg:block mt-8 border-t border-[var(--color-border)] divide-y divide-[var(--color-border)]">
+          {detailRelatedGroups.sameStyle.length > 0 && (
+            <DealSlideRow
+              title={isTh ? "โปรที่พักแนวเดียวกัน" : "Similar style deals"}
+              seeAllHref={
+                activePin.stayStyles[0]
+                  ? `/explore?style=${encodeURIComponent(activePin.stayStyles[0])}`
+                  : "/explore"
+              }
+              deals={detailRelatedGroups.sameStyle}
+              language={language}
+              savedPinIds={effectiveSavedPinIds}
+              onSelectDeal={(p) => handleSelectPin(p, true)}
+              onToggleSave={handleToggleSave}
+            />
+          )}
+
+          {detailRelatedGroups.nearbyArea.length > 0 && (
+            <DealSlideRow
+              title={
+                isTh
+                  ? `โปรที่พักใกล้เคียง (${activePin.provinceNameTh} & ภาคเดียวกัน)`
+                  : `Nearby deals (${activePin.provinceNameEn} & region)`
+              }
+              seeAllHref={`/explore?province=${encodeURIComponent(activePin.provinceId)}`}
+              deals={detailRelatedGroups.nearbyArea}
+              language={language}
+              savedPinIds={effectiveSavedPinIds}
+              onSelectDeal={(p) => handleSelectPin(p, true)}
+              onToggleSave={handleToggleSave}
+            />
+          )}
+
+          {detailRelatedGroups.directPicks.length > 0 && (
+            <DealSlideRow
+              title={isTh ? "โปรจองตรง 0% GP ที่น่าสนใจ" : "More direct 0% GP stays"}
+              seeAllHref="/explore?source=INTERNAL"
+              deals={detailRelatedGroups.directPicks}
+              language={language}
+              savedPinIds={effectiveSavedPinIds}
+              onSelectDeal={(p) => handleSelectPin(p, true)}
+              onToggleSave={handleToggleSave}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Error State */}
+      {fetchError && !activePin && (
+        <div className="mt-6 rounded-[16px] bg-[var(--color-background-muted)] p-5 flex items-center justify-between gap-4">
           <p className="ty-body font-semibold text-[var(--color-error)]">
             {fetchError}
           </p>
@@ -996,118 +1164,158 @@ export function HomeFeedClient({
             onClick={() => void loadMasterPins(false)}
             className="btn-round-solid !h-9 shrink-0"
           >
-            {language === "th" ? "ลองใหม่" : "Retry"}
+            {isTh ? "ลองใหม่" : "Retry"}
           </button>
         </div>
       )}
 
-      {/* Desktop Close-Up Related Grid (Equal Section Rhythm via Single 1px Hairline) */}
-      {activePin && gridPins.length > 0 && (
-        <section className="hidden lg:block pt-8 lg:pt-10 border-t border-[var(--color-border)] space-y-4">
-          <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            {language === "th"
-              ? "ที่พักสไตล์ใกล้เคียงที่คุณน่าจะชอบ"
-              : "You may also like"}
-          </h2>
-          <MasonryGrid
-            key={`related-${activePin.id}`}
-            items={gridPins.map((p) => ({
-              ...p,
-              aspectClass: p.aspectRatio,
-            }))}
-            columnWidth={184}
-            maxColumnWidth={235}
-            gutter={14}
-            fitContainer={true}
-            renderItem={(pin, cardIdx) => (
-              <PinterestPinCard
-                pin={pin}
+      {/* Pure 100% Card Slide Home Feed (Airbnb-Style Horizontal Carousels Only!) */}
+      {!activePin &&
+        (isLoadingPins && masterPins.length === 0 ? (
+          <div className="pt-6 space-y-8">
+            {[0, 1].map((row) => (
+              <div key={row} className="space-y-4">
+                <div className="h-6 w-56 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
+                <div className="flex gap-4 overflow-hidden">
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="w-[266px] h-[296px] shrink-0 rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : visibleCatalog.length === 0 ? (
+          <div className="mt-6 rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+            <h2 className="ty-title">
+              {isTh
+                ? "ยังไม่พบโปรที่พักที่ตรงกับคำค้นหานี้"
+                : "No stay deals match your search"}
+            </h2>
+            <p className="ty-caption">
+              {isTh
+                ? "ลองล้างคำค้นหา หรือสำรวจทุกโปรบนแผนที่ทั่วไทย"
+                : "Try clearing filters or exploring all deals on the map."}
+            </p>
+            <div className="flex items-center justify-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="btn-round-solid"
+              >
+                {isTh ? "แสดงโปรทั้งหมด" : "Show all deals"}
+              </button>
+              <Link href="/explore" className="btn-fw-secondary">
+                {isTh ? "เปิดแผนที่" : "Open map"}
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-[var(--color-border)]">
+            {/* Search Results Slide Row (When searching) */}
+            {globalSearchQuery.trim() && (
+              <DealSlideRow
+                id="group-all"
+                title={
+                  isTh
+                    ? `ผลค้นหา "${globalSearchQuery.trim()}" (${visibleCatalog.length})`
+                    : `Results for "${globalSearchQuery.trim()}" (${visibleCatalog.length})`
+                }
+                seeAllHref={exploreMapHref}
+                deals={visibleCatalog}
                 language={language}
-                priority={cardIdx < 6}
-                isSaved={effectiveSavedPinIds.has(pin.id)}
-                onSelectPin={(p) => handleSelectPin(p, true)}
+                savedPinIds={effectiveSavedPinIds}
+                priorityRow={true}
+                onSelectDeal={(p) => handleSelectPin(p, false)}
                 onToggleSave={handleToggleSave}
-                onToggleLike={handleToggleLike}
-                onSharePin={handleSharePin}
-                onHidePin={handleHidePin}
               />
             )}
-          />
-        </section>
-      )}
 
-      {/* Persistent Masonry Feed Stage (Never Unmounts on Pin Open = Exact Scroll Restore!) */}
-      {isLoadingPins && masterPins.length === 0 && !activePin ? (
-        <div className="flex flex-wrap justify-center gap-3.5">
-          {Array.from({ length: 14 }).map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-[calc(50%-8px)] sm:w-[200px] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse ${
-                idx % 3 === 0
-                  ? "aspect-[2/3]"
-                  : idx % 2 === 0
-                  ? "aspect-[4/5]"
-                  : "aspect-[3/4]"
-              }`}
-            />
-          ))}
-        </div>
-      ) : (
-        <section
-          ref={feedGridContainerRef}
-          aria-hidden={Boolean(activePin)}
-          className={activePin ? "hidden" : "relative space-y-3"}
-        >
-          {pins.length === 0 ? (
-            <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
-              <h2 className="ty-title">
-                {language === "th"
-                  ? "ไม่พบที่พักที่ตรงกับหมวดหมู่นี้"
-                  : "No stays match this category"}
-              </h2>
-              <p className="ty-body text-[var(--color-text-secondary)]">
-                {language === "th"
-                  ? "เลือกหมวดหมู่อื่นด้านบน หรือกดแสดงที่พักทั้งหมดในระบบ"
-                  : "Pick another category above, or view all stays."}
-              </p>
-              {hasActiveFilter && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="btn-round-solid inline-flex"
-                >
-                  {language === "th" ? "แสดงที่พักทั้งหมด" : "Show All Stays"}
-                </button>
-              )}
-            </div>
-          ) : (
-            <MasonryGrid
-              key={`tab-grid-${activeStyleTab}`}
-              items={pins.map((p) => ({
-                ...p,
-                aspectClass: p.aspectRatio,
-              }))}
-              columnWidth={184}
-              maxColumnWidth={235}
-              gutter={14}
-              fitContainer={true}
-              renderItem={(pin, cardIdx) => (
-                <PinterestPinCard
-                  pin={pin}
-                  language={language}
-                  priority={cardIdx < 8}
-                  isSaved={effectiveSavedPinIds.has(pin.id)}
-                  onSelectPin={(p) => handleSelectPin(p, true)}
-                  onToggleSave={handleToggleSave}
-                  onToggleLike={handleToggleLike}
-                  onSharePin={handleSharePin}
-                  onHidePin={handleHidePin}
-                />
-              )}
-            />
-          )}
-        </section>
-      )}
+            {/* Featured Top Anchor Section (#group-all) */}
+            {!globalSearchQuery.trim() && (
+              <>
+                {recentViewedDeals.length > 0 && (
+                  <DealSlideRow
+                    id="group-all"
+                    title={isTh ? "ดูล่าสุด" : "Recently viewed"}
+                    seeAllHref={
+                      sourceFilter !== "ALL"
+                        ? `/explore?recent=1&source=${sourceFilter}`
+                        : "/explore?recent=1"
+                    }
+                    deals={recentViewedDeals}
+                    language={language}
+                    savedPinIds={effectiveSavedPinIds}
+                    priorityRow={true}
+                    onSelectDeal={(p) => handleSelectPin(p, false)}
+                    onToggleSave={handleToggleSave}
+                  />
+                )}
+
+                {slideGroups.internalDeals.length > 0 && (
+                  <DealSlideRow
+                    id={recentViewedDeals.length === 0 ? "group-all" : undefined}
+                    title={
+                      isTh
+                        ? "โปรจองตรง 0% GP แนะนำ"
+                        : "Direct 0% GP featured deals"
+                    }
+                    seeAllHref="/explore?source=INTERNAL"
+                    deals={slideGroups.internalDeals}
+                    language={language}
+                    savedPinIds={effectiveSavedPinIds}
+                    priorityRow={recentViewedDeals.length === 0}
+                    onSelectDeal={(p) => handleSelectPin(p, false)}
+                    onToggleSave={handleToggleSave}
+                  />
+                )}
+
+                {slideGroups.externalDeals.length > 0 && (
+                  <DealSlideRow
+                    id={
+                      recentViewedDeals.length === 0 &&
+                      slideGroups.internalDeals.length === 0
+                        ? "group-all"
+                        : undefined
+                    }
+                    title={
+                      isTh
+                        ? "รวมโปรเด็ดจากทุกแหล่งทั่วไทย"
+                        : "Curated deals from every source"
+                    }
+                    seeAllHref="/explore?source=EXTERNAL"
+                    deals={slideGroups.externalDeals}
+                    language={language}
+                    savedPinIds={effectiveSavedPinIds}
+                    priorityRow={
+                      recentViewedDeals.length === 0 &&
+                      slideGroups.internalDeals.length === 0
+                    }
+                    onSelectDeal={(p) => handleSelectPin(p, false)}
+                    onToggleSave={handleToggleSave}
+                  />
+                )}
+              </>
+            )}
+
+            {/* All 6 Travel-Style Anchor Slide Groups */}
+            {slideGroups.styleGroups.map((group) => (
+              <DealSlideRow
+                key={group.id}
+                id={group.anchorDomId}
+                title={isTh ? group.titleTh : group.titleEn}
+                seeAllHref={group.seeAllHref}
+                deals={group.deals}
+                language={language}
+                savedPinIds={effectiveSavedPinIds}
+                onSelectDeal={(p) => handleSelectPin(p, false)}
+                onToggleSave={handleToggleSave}
+              />
+            ))}
+          </div>
+        ))}
 
       <PureMediaViewer
         slides={fullscreenMedia?.slides ?? null}
@@ -1117,4 +1325,3 @@ export function HomeFeedClient({
     </div>
   );
 }
-

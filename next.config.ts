@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
     ? { distDir: process.env.NEXT_BUILD_DIR }
     : {}),
   images: {
+    loader: "custom",
+    loaderFile: "./src/lib/imageLoader.ts",
     deviceSizes: [360, 480, 640, 750, 828, 1080, 1200, 1920],
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = (
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://cangaroom.com"
+    "https://nondii.com"
   ).replace(/\/$/, "");
 
   const [hotels, posts] = await Promise.all([

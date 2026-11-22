@@ -323,7 +323,7 @@ export function StudioBlogPostsTab({
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
         title={editingPostId ? "แก้ไขบทความ Blog" : "เขียนบทความ Blog / คู่มือเที่ยว"}
-        subtitle={`URL: cangaroom.com/${data.hotel.slug}/posts/${slug || "..."}`}
+        subtitle={`URL: nondii.com/${data.hotel.slug}/posts/${slug || "..."}`}
         maxWidthClass="md:max-w-[720px]"
         footer={
           <div className="flex items-center justify-between gap-2">

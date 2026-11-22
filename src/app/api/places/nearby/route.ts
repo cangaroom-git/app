@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   estimateRoadDistanceAndTime,
   haversineDistanceKm,
+  type NearbyPlaceCategory,
   type NearbyPlaceItem,
 } from "@/lib/geo/nearbyPlacesTypes";
+import {
+  isGooglePlacesConfigured,
+  searchGoogleNearbyCategory,
+} from "@/lib/geo/googlePlacesServer";
+import { queryRecommendedThailandPlaces } from "@/lib/geo/thailandPlacesDb";
+
+const VALID_GOOGLE_CATEGORIES = new Set<
+  Exclude<NearbyPlaceCategory, "all" | "host">
+>(["dining", "cafe", "groceries", "shopping", "essential", "attraction"]);
 
 interface CachedNearbyEntry {
   expiresAt: number;
@@ -200,7 +210,7 @@ out center tags qt 100;
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+            "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
           },
           body: encodedBody,
           signal: AbortSignal.timeout(4500),
@@ -240,7 +250,7 @@ async function fetchWikipediaNearby(
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(4500),
     });
@@ -331,7 +341,7 @@ async function fetchPhotonCategorySupplement(
 
       const res = await fetch(url.toString(), {
         headers: {
-          "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+          "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
         },
         signal: AbortSignal.timeout(4500),
       });
@@ -438,7 +448,7 @@ async function fetchNominatimCategorySupplement(
 
         const res = await fetch(url.toString(), {
           headers: {
-            "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+            "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
           },
           signal: AbortSignal.timeout(4500),
         });
@@ -541,6 +551,77 @@ export async function GET(request: NextRequest) {
     parsedOriginLng <= 180
       ? parsedOriginLng
       : lng;
+
+  // On-demand Google Places API (New) per-category search (Airbnb strategy + Dynamic Monthly Quota Pacing!)
+  const categoryParam = (
+    request.nextUrl.searchParams.get("category") || ""
+  ).trim() as Exclude<NearbyPlaceCategory, "all" | "host">;
+  const providerParam = (
+    request.nextUrl.searchParams.get("provider") || "auto"
+  ).trim();
+  const radiusParam = Number.parseFloat(
+    request.nextUrl.searchParams.get("radius") ?? ""
+  );
+  const langParam =
+    request.nextUrl.searchParams.get("lang") === "en" ? "en" : "th";
+
+  if (
+    providerParam !== "osm" &&
+    VALID_GOOGLE_CATEGORIES.has(categoryParam) &&
+    isGooglePlacesConfigured()
+  ) {
+    const radiusMeters =
+      Number.isFinite(radiusParam) && radiusParam > 0
+        ? Math.max(500, Math.min(25000, radiusParam))
+        : 5000;
+
+    const googleRes = await searchGoogleNearbyCategory({
+      lat,
+      lng,
+      originLat,
+      originLng,
+      category: categoryParam,
+      radiusMeters,
+      language: langParam,
+    });
+
+    if (googleRes.items.length > 0 || !googleRes.quotaExceeded) {
+      // If Google returned results cleanly (even 0 in an empty forest within tiny radius), return directly;
+      // if quota was exceeded, fall through to free OSM + Wikipedia automatically!
+      if (!googleRes.quotaExceeded) {
+        return NextResponse.json({
+          items: googleRes.items,
+          radiusUsedKm: Math.round(radiusMeters / 1000),
+          providerUsed: "google",
+          fromCache: googleRes.fromCache,
+        });
+      }
+    }
+  }
+
+  // Fast Zero-Cost DB Fallback: check our own `ThailandPlace` table in Neon Postgres (< 30ms) BEFORE external Overpass!
+  const dbFallbackItems = await queryRecommendedThailandPlaces({
+    lat,
+    lng,
+    originLat,
+    originLng,
+    radiusKm:
+      Number.isFinite(radiusParam) && radiusParam > 0
+        ? Math.max(2, Math.min(25, radiusParam / 1000))
+        : 12,
+    category: VALID_GOOGLE_CATEGORIES.has(categoryParam) ? categoryParam : "all",
+    limit: 20,
+    autoHarvestIfEmpty: true,
+  }).catch(() => []);
+
+  if (dbFallbackItems.length >= 3) {
+    return NextResponse.json({
+      items: dbFallbackItems,
+      radiusUsedKm: 12,
+      providerUsed: "osm",
+      fromDb: true,
+    });
+  }
 
   const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}|${originLat.toFixed(
     3

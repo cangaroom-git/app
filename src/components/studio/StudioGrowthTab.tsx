@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  Edit3,
+  CalendarRange,
+  Clock,
   ImagePlus,
-  PauseCircle,
+  Moon,
   Percent,
-  PlayCircle,
   Plus,
   Tag,
-  Trash2,
+  TicketPercent,
 } from "lucide-react";
+import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
+import { formatShortDate } from "@/lib/dateFormatters";
 import { HotelCouponTicketCard } from "@/components/deals/HotelCouponTicketCard";
 import {
   StandardFieldGroup,
@@ -19,6 +21,8 @@ import {
   StandardSelectField,
   StandardStepperRow,
 } from "@/components/ui/standards";
+import { StudioDateRangePicker } from "@/components/ui/StudioDateRangePicker";
+import { SortableList } from "@/components/ui/SortableList";
 import { StudioBlogPostsTab } from "@/components/studio/StudioBlogPostsTab";
 import { StudioPinsAndFacebookTab } from "@/components/studio/StudioPinsAndFacebookTab";
 import { StudioSheetModal } from "@/components/studio/StudioSheetModal";
@@ -35,40 +39,45 @@ import type {
 
 type GrowthSubTabId = "discounts" | "pins" | "blog";
 
-const QUICK_DISCOUNT_PRESETS: Array<{
+interface AutoDiscountRowItem extends HotelDiscountRuleDto {
+  isTemplate?: boolean;
+  templateKey?: string;
+}
+
+const BUILTIN_DISCOUNT_TEMPLATES: Array<{
+  templateKey: string;
   ruleType: DiscountRuleTypeDto;
   titleTh: string;
-  descTh: string;
   discountValue: number;
   minNights?: number;
   minAdvanceDays?: number;
   maxAdvanceDays?: number;
 }> = [
   {
+    templateKey: "stay-2-nights",
     ruleType: "LENGTH_OF_STAY",
     titleTh: "ส่วนลดพักต่อเนื่อง 2 คืนขึ้นไป",
-    descTh: "ลดอัตโนมัติเมื่อลูกค้าจองตั้งแต่ 2 คืนขึ้นไป",
     discountValue: 10,
     minNights: 2,
   },
   {
+    templateKey: "weekly-7-nights",
     ruleType: "LENGTH_OF_STAY",
     titleTh: "ส่วนลดพักยาวรายสัปดาห์ (7+ คืน)",
-    descTh: "ดึงดูดสาย Workation & พูลวิลล่าระยะยาว",
     discountValue: 20,
     minNights: 7,
   },
   {
+    templateKey: "early-bird-14d",
     ruleType: "EARLY_BIRD",
     titleTh: "จองล่วงหน้า Early Bird (14+ วัน)",
-    descTh: "ลดอัตโนมัติเมื่อจองล่วงหน้าอย่างน้อย 14 วัน",
     discountValue: 10,
     minAdvanceDays: 14,
   },
   {
+    templateKey: "last-minute-3d",
     ruleType: "LAST_MINUTE",
     titleTh: "ดีลนาทีสุดท้าย Last-Minute (≤ 3 วัน)",
-    descTh: "ช่วยระบายห้องว่างใกล้เข้าพักภายใน 3 วัน",
     discountValue: 15,
     maxAdvanceDays: 3,
   },
@@ -86,8 +95,109 @@ export function StudioGrowthTab({
   onNotify: (msg: string) => void;
 }) {
   const { hotel, coupons, discountRules = [], posts } = data;
+  const todayStr = useMemo(() => formatDateStr(new Date()), []);
   const [subTab, setSubTab] = useState<GrowthSubTabId>(() =>
     mode === "content" ? "pins" : "discounts"
+  );
+
+  // =========================================================================
+  // OPTIMISTIC ORDER & TOGGLE STATE (1:1 with Rooms & Seasonal Pricing)
+  // =========================================================================
+  const [orderedCouponIds, setOrderedCouponIds] = useState<string[] | null>(
+    null
+  );
+  const [optimisticCouponActive, setOptimisticCouponActive] = useState<
+    Record<string, boolean>
+  >({});
+  const [togglingCouponId, setTogglingCouponId] = useState<string | null>(null);
+  const [deletingCouponId, setDeletingCouponId] = useState<string | null>(null);
+
+  const [orderedRuleIds, setOrderedRuleIds] = useState<string[] | null>(null);
+  const [optimisticRuleActive, setOptimisticRuleActive] = useState<
+    Record<string, boolean>
+  >({});
+  const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrderedCouponIds(null);
+    setOptimisticCouponActive({});
+  }, [coupons]);
+
+  useEffect(() => {
+    setOrderedRuleIds(null);
+    setOptimisticRuleActive({});
+  }, [discountRules]);
+
+  const orderedCoupons = useMemo<StudioCouponRecord[]>(() => {
+    const hydrated = coupons.map((c) => ({
+      ...c,
+      isActive: optimisticCouponActive[c.id] ?? c.isActive,
+    }));
+    if (!orderedCouponIds) return hydrated;
+    const byId = new Map(hydrated.map((c) => [c.id, c]));
+    const next: StudioCouponRecord[] = [];
+    for (const id of orderedCouponIds) {
+      const found = byId.get(id);
+      if (found) next.push(found);
+    }
+    for (const c of hydrated) {
+      if (!orderedCouponIds.includes(c.id)) next.push(c);
+    }
+    return next;
+  }, [coupons, optimisticCouponActive, orderedCouponIds]);
+
+  const orderedRules = useMemo<AutoDiscountRowItem[]>(() => {
+    const savedRows: AutoDiscountRowItem[] = discountRules.map((r) => {
+      const matchedTpl = BUILTIN_DISCOUNT_TEMPLATES.find(
+        (tpl) => tpl.titleTh.trim() === r.titleTh.trim()
+      );
+      return {
+        ...r,
+        isActive: optimisticRuleActive[r.id] ?? r.isActive,
+        isTemplate: Boolean(matchedTpl),
+        templateKey: matchedTpl?.templateKey,
+      };
+    });
+
+    const savedTitles = new Set(savedRows.map((r) => r.titleTh.trim()));
+    const merged: AutoDiscountRowItem[] = [...savedRows];
+
+    for (const tpl of BUILTIN_DISCOUNT_TEMPLATES) {
+      if (savedTitles.has(tpl.titleTh.trim())) continue;
+      const tplId = `tpl-${tpl.templateKey}`;
+      merged.push({
+        id: tplId,
+        hotelId: hotel.id,
+        ruleType: tpl.ruleType,
+        titleTh: tpl.titleTh,
+        discountType: "PERCENT",
+        discountValue: tpl.discountValue,
+        minNights: tpl.minNights ?? null,
+        minAdvanceDays: tpl.minAdvanceDays ?? null,
+        maxAdvanceDays: tpl.maxAdvanceDays ?? null,
+        isActive: optimisticRuleActive[tplId] ?? false,
+        isTemplate: true,
+        templateKey: tpl.templateKey,
+      });
+    }
+
+    if (!orderedRuleIds) return merged;
+    const byId = new Map(merged.map((r) => [r.id, r]));
+    const next: AutoDiscountRowItem[] = [];
+    for (const id of orderedRuleIds) {
+      const found = byId.get(id);
+      if (found) next.push(found);
+    }
+    for (const r of merged) {
+      if (!orderedRuleIds.includes(r.id)) next.push(r);
+    }
+    return next;
+  }, [discountRules, hotel.id, optimisticRuleActive, orderedRuleIds]);
+
+  const activeAutoDiscountsCount = useMemo(
+    () => orderedRules.filter((r) => r.isActive).length,
+    [orderedRules]
   );
 
   // =========================================================================
@@ -103,8 +213,10 @@ export function StudioGrowthTab({
   const [cpMinSpend, setCpMinSpend] = useState(2000);
   const [cpMaxDiscount, setCpMaxDiscount] = useState("");
   const [cpTotalQuota, setCpTotalQuota] = useState("");
-  const [cpStartsAt, setCpStartsAt] = useState("");
-  const [cpExpiresAt, setCpExpiresAt] = useState("");
+  const [cpStartsAt, setCpStartsAt] = useState(todayStr);
+  const [cpExpiresAt, setCpExpiresAt] = useState(() =>
+    addDaysToDate(todayStr, 90)
+  );
   const [isSavingCoupon, setIsSavingCoupon] = useState(false);
 
   const openCreateCouponModal = () => {
@@ -117,8 +229,8 @@ export function StudioGrowthTab({
     setCpMinSpend(2000);
     setCpMaxDiscount("");
     setCpTotalQuota("");
-    setCpStartsAt(new Date().toISOString().slice(0, 10));
-    setCpExpiresAt("");
+    setCpStartsAt(todayStr);
+    setCpExpiresAt(addDaysToDate(todayStr, 90));
     setIsCouponModalOpen(true);
   };
 
@@ -132,8 +244,10 @@ export function StudioGrowthTab({
     setCpMinSpend(c.minSpendThb);
     setCpMaxDiscount(c.maxDiscountThb ? String(c.maxDiscountThb) : "");
     setCpTotalQuota(c.totalQuota ? String(c.totalQuota) : "");
-    setCpStartsAt(c.startsAt ? c.startsAt.slice(0, 10) : "");
-    setCpExpiresAt(c.expiresAt ? c.expiresAt.slice(0, 10) : "");
+    setCpStartsAt(c.startsAt ? c.startsAt.slice(0, 10) : todayStr);
+    setCpExpiresAt(
+      c.expiresAt ? c.expiresAt.slice(0, 10) : addDaysToDate(todayStr, 90)
+    );
     setIsCouponModalOpen(true);
   };
 
@@ -156,7 +270,7 @@ export function StudioGrowthTab({
       code: (cpCode || "DIRECT300").toUpperCase(),
       titleTh: cpTitle || "ลดทันทีสำหรับลูกค้าจองตรง 0% GP",
       titleEn: cpTitle || "Direct Booking Discount",
-      descriptionTh: cpDesc || "ใช้ได้เฉพาะการจองตรงผ่าน Cangaroom",
+      descriptionTh: cpDesc || "ใช้ได้เฉพาะการจองตรงผ่าน Nondii",
       descriptionEn: cpDesc || "Valid on direct booking",
       coverImageUrl: hotel.coverImageUrl,
       discountType: cpType,
@@ -234,34 +348,92 @@ export function StudioGrowthTab({
     }
   };
 
-  const handleToggleCoupon = async (id: string, nextActive: boolean) => {
-    const res = await fetch("/api/studio/coupons", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hotelSlug: hotel.slug, id, isActive: nextActive }),
-    });
-    if (res.ok) {
-      onNotify(nextActive ? "เปิดใช้งานคูปองแล้ว" : "พักใช้งานคูปองชั่วคราวแล้ว");
+  const handleToggleCoupon = async (coupon: StudioCouponRecord) => {
+    const nextActive = !coupon.isActive;
+    setOptimisticCouponActive((prev) => ({ ...prev, [coupon.id]: nextActive }));
+    setTogglingCouponId(coupon.id);
+    try {
+      const res = await fetch("/api/studio/coupons", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotelSlug: hotel.slug,
+          id: coupon.id,
+          isActive: nextActive,
+        }),
+      });
+      if (!res.ok) {
+        setOptimisticCouponActive((prev) => ({
+          ...prev,
+          [coupon.id]: coupon.isActive,
+        }));
+        onNotify("เปลี่ยนสถานะคูปองไม่สำเร็จ");
+        return;
+      }
+      onNotify(
+        nextActive
+          ? `เปิดใช้งานคูปอง ${coupon.code} แล้ว`
+          : `ปิดใช้งานคูปอง ${coupon.code} ชั่วคราวแล้ว`
+      );
       await onReload();
+    } catch {
+      setOptimisticCouponActive((prev) => ({
+        ...prev,
+        [coupon.id]: coupon.isActive,
+      }));
+      onNotify("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+    } finally {
+      setTogglingCouponId(null);
+    }
+  };
+
+  const handleReorderCoupons = async (nextCoupons: StudioCouponRecord[]) => {
+    const nextIds = nextCoupons.map((c) => c.id);
+    setOrderedCouponIds(nextIds);
+    try {
+      const res = await fetch("/api/studio/coupons", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reorder",
+          hotelSlug: hotel.slug,
+          orderedIds: nextIds,
+        }),
+      });
+      if (!res.ok) {
+        setOrderedCouponIds(null);
+        onNotify("บันทึกลำดับคูปองไม่สำเร็จ");
+        return;
+      }
+      onNotify("จัดลำดับคูปองเรียบร้อย");
+      await onReload();
+    } catch {
+      setOrderedCouponIds(null);
+      onNotify("ไม่สามารถเชื่อมต่อเพื่อบันทึกลำดับคูปองได้");
     }
   };
 
   const handleDeleteCoupon = async (id: string) => {
-    const res = await fetch(
-      `/api/studio/coupons?id=${encodeURIComponent(id)}&hotel=${encodeURIComponent(
-        hotel.slug
-      )}`,
-      { method: "DELETE" }
-    );
-    if (res.ok) {
-      setIsCouponModalOpen(false);
-      onNotify("ลบคูปองออกจากระบบแล้ว");
-      await onReload();
+    setDeletingCouponId(id);
+    try {
+      const res = await fetch(
+        `/api/studio/coupons?id=${encodeURIComponent(id)}&hotel=${encodeURIComponent(
+          hotel.slug
+        )}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setIsCouponModalOpen(false);
+        onNotify("ลบคูปองออกจากระบบแล้ว");
+        await onReload();
+      }
+    } finally {
+      setDeletingCouponId(null);
     }
   };
 
   // =========================================================================
-  // 2. AUTOMATIC STAY DISCOUNTS (HotelDiscountRule CRUD)
+  // 2. AUTOMATIC STAY DISCOUNTS (HotelDiscountRule CRUD + DnD Sort)
   // =========================================================================
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -275,22 +447,21 @@ export function StudioGrowthTab({
   const [rlMaxAdvanceDays, setRlMaxAdvanceDays] = useState(3);
   const [isSavingRule, setIsSavingRule] = useState(false);
 
-  const openCreateRuleModal = (
-    preset?: (typeof QUICK_DISCOUNT_PRESETS)[number]
-  ) => {
+  const openCreateRuleModal = () => {
     setEditingRuleId(null);
-    setRlType(preset?.ruleType ?? "LENGTH_OF_STAY");
-    setRlTitle(preset?.titleTh ?? "ส่วนลดพักต่อเนื่อง");
+    setRlType("LENGTH_OF_STAY");
+    setRlTitle("ส่วนลดพักต่อเนื่อง");
     setRlDiscountType("PERCENT");
-    setRlDiscountValue(preset?.discountValue ?? 10);
-    setRlMinNights(preset?.minNights ?? 2);
-    setRlMinAdvanceDays(preset?.minAdvanceDays ?? 14);
-    setRlMaxAdvanceDays(preset?.maxAdvanceDays ?? 3);
+    setRlDiscountValue(10);
+    setRlMinNights(2);
+    setRlMinAdvanceDays(14);
+    setRlMaxAdvanceDays(3);
     setIsRuleModalOpen(true);
   };
 
-  const openEditRuleModal = (rule: HotelDiscountRuleDto) => {
-    setEditingRuleId(rule.id);
+  const openEditRuleModal = (rule: AutoDiscountRowItem) => {
+    // Unsaved built-in template opens prefilled so saving creates it in DB
+    setEditingRuleId(rule.id.startsWith("tpl-") ? null : rule.id);
     setRlType(rule.ruleType);
     setRlTitle(rule.titleTh);
     setRlDiscountType(rule.discountType);
@@ -335,33 +506,108 @@ export function StudioGrowthTab({
     }
   };
 
-  const handleToggleRule = async (rule: HotelDiscountRuleDto) => {
-    const res = await fetch("/api/studio/discount-rules", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hotelSlug: hotel.slug,
-        id: rule.id,
-        isActive: !rule.isActive,
-      }),
-    });
-    if (res.ok) {
-      onNotify(!rule.isActive ? "เปิดใช้ส่วนลดอัตโนมัติแล้ว" : "ปิดใช้ชั่วคราวแล้ว");
+  const handleToggleRule = async (rule: AutoDiscountRowItem) => {
+    const nextActive = !rule.isActive;
+    const isUnsavedTemplate = rule.id.startsWith("tpl-");
+    setOptimisticRuleActive((prev) => ({ ...prev, [rule.id]: nextActive }));
+    setTogglingRuleId(rule.id);
+    try {
+      const res = isUnsavedTemplate
+        ? await fetch("/api/studio/discount-rules", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              hotelSlug: hotel.slug,
+              ruleType: rule.ruleType,
+              titleTh: rule.titleTh,
+              discountType: rule.discountType,
+              discountValue: rule.discountValue,
+              minNights: rule.minNights,
+              minAdvanceDays: rule.minAdvanceDays,
+              maxAdvanceDays: rule.maxAdvanceDays,
+              isActive: nextActive,
+            }),
+          })
+        : await fetch("/api/studio/discount-rules", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              hotelSlug: hotel.slug,
+              id: rule.id,
+              isActive: nextActive,
+            }),
+          });
+      if (!res.ok) {
+        setOptimisticRuleActive((prev) => ({
+          ...prev,
+          [rule.id]: rule.isActive,
+        }));
+        onNotify("เปลี่ยนสถานะส่วนลดไม่สำเร็จ");
+        return;
+      }
+      onNotify(
+        nextActive
+          ? `เปิดใช้งาน "${rule.titleTh}" แล้ว`
+          : `ปิดใช้งาน "${rule.titleTh}" ชั่วคราวแล้ว`
+      );
       await onReload();
+    } catch {
+      setOptimisticRuleActive((prev) => ({
+        ...prev,
+        [rule.id]: rule.isActive,
+      }));
+      onNotify("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+    } finally {
+      setTogglingRuleId(null);
+    }
+  };
+
+  const handleReorderRules = async (nextRules: AutoDiscountRowItem[]) => {
+    const nextIds = nextRules.map((r) => r.id);
+    setOrderedRuleIds(nextIds);
+    const persistedIds = nextIds.filter((id) => !id.startsWith("tpl-"));
+    if (persistedIds.length < 2) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/studio/discount-rules", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reorder",
+          hotelSlug: hotel.slug,
+          orderedIds: persistedIds,
+        }),
+      });
+      if (!res.ok) {
+        setOrderedRuleIds(null);
+        onNotify("บันทึกลำดับส่วนลดไม่สำเร็จ");
+        return;
+      }
+      onNotify("จัดลำดับส่วนลดอัตโนมัติเรียบร้อย");
+      await onReload();
+    } catch {
+      setOrderedRuleIds(null);
+      onNotify("ไม่สามารถเชื่อมต่อเพื่อบันทึกลำดับส่วนลดได้");
     }
   };
 
   const handleDeleteRule = async (id: string) => {
-    const res = await fetch(
-      `/api/studio/discount-rules?id=${encodeURIComponent(
-        id
-      )}&hotel=${encodeURIComponent(hotel.slug)}`,
-      { method: "DELETE" }
-    );
-    if (res.ok) {
-      setIsRuleModalOpen(false);
-      onNotify("ลบกฎส่วนลดแล้ว");
-      await onReload();
+    setDeletingRuleId(id);
+    try {
+      const res = await fetch(
+        `/api/studio/discount-rules?id=${encodeURIComponent(
+          id
+        )}&hotel=${encodeURIComponent(hotel.slug)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setIsRuleModalOpen(false);
+        onNotify("ลบกฎส่วนลดแล้ว");
+        await onReload();
+      }
+    } finally {
+      setDeletingRuleId(null);
     }
   };
 
@@ -421,9 +667,40 @@ export function StudioGrowthTab({
           },
         ];
 
+  const hotelThumb = hotel.coverImageUrl || hotel.logoUrl || "";
+
   return (
-    <div className="space-y-8">
-      {/* Clean Underline Sub-Tab Bar (hidden when single-focus promotions mode) */}
+    <div className="space-y-4">
+      {/* Unified Clean Header for Promotions Mode (1:1 Match with Rooms & Seasonal Pricing) */}
+      {mode === "promotions" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-[var(--color-border)]">
+          <h2 className="text-[24px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+            โปรโมชั่น & ส่วนลด
+          </h2>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => openCreateRuleModal()}
+              className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-medium inline-flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>เพิ่มส่วนลดอัตโนมัติ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openCreateCouponModal}
+              className="h-10 sm:h-11 px-4 sm:px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>สร้างคูปองใหม่</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Clean Underline Sub-Tab Bar (hidden in single-focus promotions mode) */}
       {visibleTabs.length > 0 && (
         <div className="border-b border-[var(--color-border)] flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar">
           {visibleTabs.map((tab) => {
@@ -453,232 +730,393 @@ export function StudioGrowthTab({
       )}
 
       {/* ===================================================================
-          SUB-TAB 1: AUTOMATIC STAY DISCOUNTS + PROMO CODE COUPONS
+          SUB-TAB 1: COUPON TICKET LIST + AUTOMATIC STAY DISCOUNTS
       ==================================================================== */}
       {effectiveSubTab === "discounts" && (
         <div className="divide-y divide-[var(--color-border)]">
-          {/* 1A. Automatic Discounts (Airbnb Pattern: Best Single Discount Applies) */}
-          <section className="pb-8 lg:pb-10 space-y-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-0.5">
-                <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
-                  ส่วนลดอัตโนมัติ (ไม่ต้องกรอกโค้ด)
-                </h2>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-                  ใช้กติกา Airbnb: หากลูกค้าเข้าเงื่อนไขหลายรายการหรือมีคูปอง ระบบจะเลือกใช้ส่วนลดที่คุ้มที่สุดเพียง 1 รายการ (ไม่ลดซ้อนกัน)
-                </p>
+          {/* 1A. Promo Code Coupons — Signature Ticket Card Visual + Toggle + Drag-to-Sort */}
+          <section className="py-6 first:pt-2 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                  คูปองโค้ดส่วนลด
+                </h3>
+                <span className="text-[13.5px] text-[var(--color-text-secondary)] tabular-nums">
+                  ({orderedCoupons.length})
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => openCreateRuleModal()}
-                className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>เพิ่มกฎส่วนลด</span>
-              </button>
+              {mode !== "promotions" && (
+                <button
+                  type="button"
+                  onClick={openCreateCouponModal}
+                  className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>สร้างคูปองใหม่</span>
+                </button>
+              )}
             </div>
 
-            {/* Active / Configured Rules */}
-            {discountRules.length > 0 && (
-              <div className="divide-y divide-[var(--color-border)]">
-                {discountRules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    className="py-4 first:pt-0 flex items-center justify-between gap-4"
+            {orderedCoupons.length === 0 ? (
+              <div className="rounded-[16px] bg-[var(--color-background-muted)] py-9 px-6 text-center space-y-3">
+                {/* Clean Signature Ticket Silhouette */}
+                <div className="relative mx-auto w-[148px] h-[64px] rounded-[12px] bg-[var(--color-background-card)] border border-dashed border-[var(--color-border-emphasized)] flex items-center overflow-hidden">
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-[1px] top-1/2 -translate-y-1/2 w-[8px] h-[16px] rounded-r-full bg-[var(--color-background-muted)] border-y border-r border-dashed border-[var(--color-border-emphasized)]"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-[1px] top-1/2 -translate-y-1/2 w-[8px] h-[16px] rounded-l-full bg-[var(--color-background-muted)] border-y border-l border-dashed border-[var(--color-border-emphasized)]"
+                  />
+                  <div className="w-[44px] h-full flex items-center justify-center border-r border-dashed border-[var(--color-border-emphasized)]">
+                    <Percent className="w-4 h-4 text-[var(--color-text-secondary)]" />
+                  </div>
+                  <div className="flex-1 text-center px-2">
+                    <p className="text-[12px] font-semibold text-[var(--color-text-primary)]">
+                      ลด ฿300
+                    </p>
+                    <p className="font-mono text-[10px] text-[var(--color-text-tertiary)]">
+                      DIRECT300
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                    ยังไม่มีคูปองส่วนลด
+                  </p>
+                  <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                    คูปองที่เปิดใช้งานจะแสดงบนหน้าร้านของคุณและหน้า /deal ฟรี
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openCreateCouponModal}
+                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>สร้างคูปองแรก</span>
+                </button>
+              </div>
+            ) : (
+              <SortableList
+                items={orderedCoupons}
+                getId={(c) => c.id}
+                onReorder={(nextCoupons) => void handleReorderCoupons(nextCoupons)}
+                renderItem={(c, { handle, isOverlay }) => {
+                  const isToggling = togglingCouponId === c.id;
+                  const discountText =
+                    c.discountType === "PERCENT"
+                      ? `ลด ${c.discountValue}%`
+                      : `ลด ฿${c.discountValue.toLocaleString()}`;
+                  const expiresDateStr = c.expiresAt
+                    ? c.expiresAt.slice(0, 10)
+                    : "";
+
+                  return (
+                    <article
+                      role="button"
+                      tabIndex={isOverlay ? -1 : 0}
+                      onClick={() => {
+                        if (!isOverlay) openEditCouponModal(c);
+                      }}
+                      onKeyDown={(e) => {
+                        if (!isOverlay && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          openEditCouponModal(c);
+                        }
+                      }}
+                      className={`group py-4 sm:py-5 rounded-[16px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#222222] dark:focus-visible:ring-[#f5f5f5] ${
+                        isOverlay
+                          ? "px-3 cursor-grabbing"
+                          : "first:pt-2 last:pb-2 -mx-3 px-3 hover:bg-[var(--color-background-muted)]/50 cursor-pointer"
+                      } ${!c.isActive ? "opacity-65" : ""}`}
+                    >
+                      <div className="flex items-center gap-2.5 sm:gap-4">
+                        {/* Drag Handle */}
+                        {handle}
+
+                        {/* Signature Miniature Coupon Ticket (Matches /deal HotelCouponTicketCard!) */}
+                        <div className="relative shrink-0 w-[132px] sm:w-[162px] h-[72px] sm:h-[78px] rounded-[12px] bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] flex items-center select-none">
+                          {/* Semicircular Ticket Cutouts */}
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none absolute -left-[1px] top-1/2 -translate-y-1/2 w-[7px] h-[14px] rounded-r-full border-y border-r border-[var(--color-border-emphasized)] z-10 transition-colors ${
+                              isOverlay
+                                ? "bg-[var(--color-background-card)]"
+                                : "bg-[var(--color-background-body)] group-hover:bg-[var(--color-background-muted)]"
+                            }`}
+                          />
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none absolute -right-[1px] top-1/2 -translate-y-1/2 w-[7px] h-[14px] rounded-l-full border-y border-l border-[var(--color-border-emphasized)] z-10 transition-colors ${
+                              isOverlay
+                                ? "bg-[var(--color-background-card)]"
+                                : "bg-[var(--color-background-body)] group-hover:bg-[var(--color-background-muted)]"
+                            }`}
+                          />
+
+                          {/* Left Property Photo Strip */}
+                          <div className="w-[38px] sm:w-[46px] h-full shrink-0 overflow-hidden rounded-l-[11px] bg-[var(--color-background-muted)]">
+                            {hotelThumb ? (
+                              <img
+                                src={hotelThumb}
+                                alt={hotel.nameTh}
+                                className={`h-full w-full object-cover ${
+                                  !c.isActive ? "grayscale opacity-60" : ""
+                                }`}
+                              />
+                            ) : (
+                              <span className="h-full w-full flex items-center justify-center text-[13px] font-bold text-[var(--color-text-primary)]">
+                                {hotel.nameTh[0] || "N"}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Vertical Dashed Perforation */}
+                          <div
+                            aria-hidden="true"
+                            className="h-full border-l border-dashed border-[var(--color-border-emphasized)] shrink-0"
+                          />
+
+                          {/* Ticket Value + Monospace Code */}
+                          <div className="flex-1 min-w-0 px-2.5 py-1.5 flex flex-col justify-center">
+                            <p className="text-[14px] sm:text-[15.5px] font-extrabold tracking-tight text-[var(--color-text-primary)] leading-tight truncate tabular-nums">
+                              {discountText}
+                            </p>
+                            <span className="mt-1 inline-block font-mono text-[10.5px] sm:text-[11px] font-semibold text-[var(--color-text-secondary)] truncate">
+                              {c.code}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Center: Title + Minimal Icon Metadata Row */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-baseline gap-2 min-w-0">
+                            <h4 className="text-[15.5px] sm:text-[16.5px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                              {c.titleTh}
+                            </h4>
+                            {c.isFeaturedDeal && (
+                              <span className="hidden sm:inline text-[12px] text-[var(--color-text-tertiary)] shrink-0">
+                                Featured
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[var(--color-text-secondary)] tabular-nums">
+                            <span>
+                              {c.minSpendThb > 0
+                                ? `ขั้นต่ำ ฿${c.minSpendThb.toLocaleString()}`
+                                : "ไม่มีขั้นต่ำ"}
+                            </span>
+
+                            <span className="inline-flex items-center gap-1">
+                              <TicketPercent className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
+                              <span>
+                                เก็บ {c.claimedCount}
+                                {c.totalQuota ? `/${c.totalQuota}` : ""} · ใช้{" "}
+                                {c.usedCount}
+                              </span>
+                            </span>
+
+                            {expiresDateStr && (
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarRange className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
+                                <span>
+                                  หมดอายุ {formatShortDate(expiresDateStr, "th")}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: 1-Click Toggle Switch (Delete safely lives inside Edit Modal) */}
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="flex items-center gap-2.5 shrink-0"
+                        >
+                          <span
+                            className={`hidden sm:inline text-[12.5px] font-medium ${
+                              c.isActive
+                                ? "text-[var(--color-text-primary)]"
+                                : "text-[var(--color-text-tertiary)]"
+                            }`}
+                          >
+                            {c.isActive ? "เปิดใช้" : "ปิดไว้"}
+                          </span>
+
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={c.isActive}
+                            aria-label={
+                              c.isActive
+                                ? `ปิดใช้งานคูปอง ${c.code}`
+                                : `เปิดใช้งานคูปอง ${c.code}`
+                            }
+                            disabled={isToggling}
+                            onClick={() => void handleToggleCoupon(c)}
+                            className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                              c.isActive
+                                ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                                : "bg-[var(--color-border-emphasized)]"
+                            }`}
+                          >
+                            <span
+                              className={`block h-5 w-5 rounded-full transition-transform ${
+                                c.isActive
+                                  ? "translate-x-5 bg-white dark:bg-[#222222]"
+                                  : "translate-x-0 bg-white"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                }}
+              />
+            )}
+          </section>
+
+          {/* 1B. Automatic Discounts — Built-in 1-Click Templates + Sortable + Toggle (1:1 with Seasonal Pricing!) */}
+          <section className="py-7 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                  ส่วนลดอัตโนมัติ (ไม่ต้องกรอกโค้ด)
+                </h3>
+                <span className="text-[13.5px] text-[var(--color-text-secondary)] tabular-nums">
+                  (เปิดใช้ {activeAutoDiscountsCount})
+                </span>
+              </div>
+              {mode !== "promotions" && (
+                <button
+                  type="button"
+                  onClick={() => openCreateRuleModal()}
+                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>เพิ่มกฎส่วนลด</span>
+                </button>
+              )}
+            </div>
+
+            <SortableList
+              items={orderedRules}
+              getId={(rule) => rule.id}
+              onReorder={(nextRules) => void handleReorderRules(nextRules)}
+              renderItem={(rule, { handle, isOverlay }) => {
+                const isToggling = togglingRuleId === rule.id;
+
+                return (
+                  <article
+                    role="button"
+                    tabIndex={isOverlay ? -1 : 0}
+                    onClick={() => {
+                      if (!isOverlay) openEditRuleModal(rule);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!isOverlay && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        openEditRuleModal(rule);
+                      }
+                    }}
+                    className={`group py-4 sm:py-5 rounded-[16px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#222222] dark:focus-visible:ring-[#f5f5f5] ${
+                      isOverlay
+                        ? "px-3 cursor-grabbing"
+                        : "first:pt-2 last:pb-2 -mx-3 px-3 hover:bg-[var(--color-background-muted)]/50 cursor-pointer"
+                    } ${!rule.isActive ? "opacity-70" : ""}`}
                   >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <span className="h-11 min-w-[60px] px-2.5 rounded-[12px] bg-[var(--color-background-muted)] text-[15px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 tabular-nums">
+                    <div className="flex items-center gap-2.5 sm:gap-4">
+                      {/* Drag Handle */}
+                      {handle}
+
+                      {/* Discount Value Badge */}
+                      <span
+                        className={`h-9 min-w-[56px] px-2.5 rounded-[10px] text-[14px] font-semibold inline-flex items-center justify-center shrink-0 tabular-nums transition-colors ${
+                          rule.isActive
+                            ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                            : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
+                        }`}
+                      >
                         {rule.discountType === "PERCENT"
                           ? `${rule.discountValue}%`
                           : `฿${rule.discountValue.toLocaleString()}`}
                       </span>
-                      <div className="min-w-0">
-                        <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
-                          {rule.titleTh}
-                        </p>
-                        <p className="text-[13px] text-[var(--color-text-secondary)]">
-                          {describeRuleCondition(rule)} ·{" "}
-                          {rule.isActive ? "กำลังใช้งาน" : "ปิดชั่วคราว"}
+
+                      {/* Center: Title + Template Tag + Condition Metadata */}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-baseline gap-2 min-w-0">
+                          <h4 className="text-[15.5px] sm:text-[16.5px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                            {rule.titleTh}
+                          </h4>
+                          {rule.isTemplate && (
+                            <span className="hidden sm:inline text-[12px] text-[var(--color-text-tertiary)] shrink-0">
+                              เทมเพลต
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[12.5px] text-[var(--color-text-secondary)] inline-flex items-center gap-1.5">
+                          {rule.ruleType === "LENGTH_OF_STAY" ? (
+                            <Moon className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
+                          )}
+                          <span>{describeRuleCondition(rule)}</span>
                         </p>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openEditRuleModal(rule)}
-                        className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
-                      >
-                        แก้ไข
-                      </button>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={rule.isActive}
-                        onClick={() => handleToggleRule(rule)}
-                        className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 ${
-                          rule.isActive
-                            ? "bg-[#222222] dark:bg-[#f5f5f5]"
-                            : "bg-[var(--color-border-emphasized)]"
-                        }`}
+                      {/* Right: 1-Click Toggle Switch (Delete safely lives inside Edit Modal) */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2.5 shrink-0"
                       >
                         <span
-                          className={`block h-5 w-5 rounded-full transition-transform ${
+                          className={`hidden sm:inline text-[12.5px] font-medium ${
                             rule.isActive
-                              ? "translate-x-5 bg-white dark:bg-[#222222]"
-                              : "translate-x-0 bg-white"
+                              ? "text-[var(--color-text-primary)]"
+                              : "text-[var(--color-text-tertiary)]"
                           }`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Quick Presets */}
-            <div className="space-y-2 pt-1">
-              <span className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] block">
-                สูตรส่วนลดยอดนิยมสำหรับโรงแรมและพูลวิลล่า (แตะเพื่อตั้งค่า):
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {QUICK_DISCOUNT_PRESETS.map((preset) => (
-                  <button
-                    key={preset.titleTh}
-                    type="button"
-                    onClick={() => openCreateRuleModal(preset)}
-                    className="p-3.5 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-left flex items-center gap-3.5 cursor-pointer transition-colors"
-                  >
-                    <span className="h-10 w-12 rounded-[10px] bg-[var(--color-background-card)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 tabular-nums">
-                      {preset.discountValue}%
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
-                        {preset.titleTh}
-                      </p>
-                      <p className="text-[12.5px] text-[var(--color-text-secondary)] line-clamp-1">
-                        {preset.descTh}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* 1B. Promo Code Coupons (Displayed on /{hotelSlug} & /deal Marketplace) */}
-          <section className="py-8 lg:py-10 space-y-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="space-y-0.5">
-                <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
-                  คูปองโค้ดส่วนลด ({coupons.length})
-                </h2>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-                  คูปองที่เปิดใช้งานจะแสดงบนหน้าร้านของคุณและศูนย์รวมดีล /deal ฟรี เพื่อดึงคนที่เซฟเข้า /board กลับมาจอง
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openCreateCouponModal}
-                className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>สร้างคูปองใหม่</span>
-              </button>
-            </div>
-
-            {coupons.length === 0 ? (
-              <div className="rounded-[16px] bg-[var(--color-background-muted)] py-10 px-6 text-center space-y-2">
-                <Percent className="w-7 h-7 mx-auto text-[var(--color-text-secondary)]" />
-                <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
-                  ยังไม่มีคูปองส่วนลด
-                </p>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-                  สร้างคูปองแรกเพื่อให้ที่พักของคุณปรากฏบนหน้า /deal ทั่วประเทศฟรี
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--color-border)]">
-                {coupons.map((c) => (
-                  <div
-                    key={c.id}
-                    className="py-4 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[14px] font-semibold px-2.5 py-0.5 rounded-[8px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)]">
-                          {c.code}
+                        >
+                          {rule.isActive ? "เปิดใช้" : "ปิดไว้"}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--color-text-primary)]">
+
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={rule.isActive}
+                          aria-label={
+                            rule.isActive
+                              ? `ปิดใช้งาน ${rule.titleTh}`
+                              : `เปิดใช้งาน ${rule.titleTh}`
+                          }
+                          disabled={isToggling}
+                          onClick={() => void handleToggleRule(rule)}
+                          className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                            rule.isActive
+                              ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                              : "bg-[var(--color-border-emphasized)]"
+                          }`}
+                        >
                           <span
-                            aria-hidden="true"
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              c.isActive
-                                ? "bg-[var(--color-success)]"
-                                : "bg-[var(--color-text-disabled)]"
+                            className={`block h-5 w-5 rounded-full transition-transform ${
+                              rule.isActive
+                                ? "translate-x-5 bg-white dark:bg-[#222222]"
+                                : "translate-x-0 bg-white"
                             }`}
                           />
-                          <span>{c.isActive ? "เปิดใช้งาน" : "พักชั่วคราว"}</span>
-                        </span>
-                        {c.isFeaturedDeal && (
-                          <span className="text-[12px] font-semibold text-[var(--color-text-secondary)]">
-                            · Featured Deal
-                          </span>
-                        )}
+                        </button>
                       </div>
-                      <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
-                        {c.titleTh}
-                      </p>
-                      <p className="text-[13px] text-[var(--color-text-secondary)] tabular-nums">
-                        ลด{" "}
-                        {c.discountType === "PERCENT"
-                          ? `${c.discountValue}%`
-                          : `฿${c.discountValue.toLocaleString()}`}{" "}
-                        · ขั้นต่ำ ฿{c.minSpendThb.toLocaleString()} · เก็บแล้ว{" "}
-                        {c.claimedCount} · ใช้แล้ว {c.usedCount} · หมดอายุ{" "}
-                        {new Date(c.expiresAt).toLocaleDateString("th-TH")}
-                      </p>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openEditCouponModal(c)}
-                        className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>แก้ไข</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleCoupon(c.id, !c.isActive)}
-                        className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-                      >
-                        {c.isActive ? (
-                          <>
-                            <PauseCircle className="w-3.5 h-3.5" />
-                            <span>พักใช้</span>
-                          </>
-                        ) : (
-                          <>
-                            <PlayCircle className="w-3.5 h-3.5" />
-                            <span>เปิดใช้</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCoupon(c.id)}
-                        aria-label="ลบคูปอง"
-                        className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-error)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  </article>
+                );
+              }}
+            />
           </section>
         </div>
       )}
@@ -719,10 +1157,13 @@ export function StudioGrowthTab({
             {editingCouponId ? (
               <button
                 type="button"
-                onClick={() => handleDeleteCoupon(editingCouponId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
+                disabled={deletingCouponId === editingCouponId}
+                onClick={() => void handleDeleteCoupon(editingCouponId)}
+                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
               >
-                ลบคูปองนี้
+                {deletingCouponId === editingCouponId
+                  ? "กำลังลบ..."
+                  : "ลบคูปองนี้"}
               </button>
             ) : (
               <span />
@@ -856,23 +1297,17 @@ export function StudioGrowthTab({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-              <StandardInput
-                grouped
-                label="วันที่เริ่มใช้ได้"
-                type="date"
-                value={cpStartsAt}
-                onChange={(e) => setCpStartsAt(e.target.value)}
-              />
-              <StandardInput
-                grouped
-                label="วันหมดอายุ"
-                optionalText="เว้นว่าง = 90 วัน"
-                type="date"
-                value={cpExpiresAt}
-                onChange={(e) => setCpExpiresAt(e.target.value)}
-              />
-            </div>
+            <StudioDateRangePicker
+              grouped
+              startLabel="วันที่เริ่มใช้ได้"
+              endLabel="วันหมดอายุ"
+              startDate={cpStartsAt || todayStr}
+              endDate={cpExpiresAt || addDaysToDate(todayStr, 90)}
+              onChange={(nextStart, nextEnd) => {
+                setCpStartsAt(nextStart);
+                setCpExpiresAt(nextEnd);
+              }}
+            />
           </StandardFieldGroup>
 
           <StandardInput
@@ -900,10 +1335,11 @@ export function StudioGrowthTab({
             {editingRuleId ? (
               <button
                 type="button"
-                onClick={() => handleDeleteRule(editingRuleId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
+                disabled={deletingRuleId === editingRuleId}
+                onClick={() => void handleDeleteRule(editingRuleId)}
+                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
               >
-                ลบกฎนี้
+                {deletingRuleId === editingRuleId ? "กำลังลบ..." : "ลบกฎนี้"}
               </button>
             ) : (
               <span />

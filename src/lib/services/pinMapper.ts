@@ -58,6 +58,16 @@ export interface RawPinWithRelations {
   stayStyles: string[];
   semanticTags: string[];
   sourcePlatform: "MANUAL" | "FACEBOOK" | "INSTAGRAM" | "TIKTOK";
+  dealSourceType?: "INTERNAL" | "EXTERNAL";
+  externalDealUrl?: string | null;
+  externalSourceName?: string | null;
+  promoHeadlineTh?: string | null;
+  promoHeadlineEn?: string | null;
+  promoCode?: string | null;
+  promoOriginalPriceThb?: number | null;
+  promoDealPriceThb?: number | null;
+  promoExpiresAt?: Date | null;
+  externalClickCount?: number;
   publishStatus: "PUBLISHED" | "PENDING_APPROVAL" | "DISCARDED";
   aiConfidenceScore: number | null;
   aiTriageNote: string | null;
@@ -75,6 +85,12 @@ export interface RawPinWithRelations {
     logoUrl: string | null;
     verificationStatus: "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
     ratingAvg: number;
+    latitude?: number | null;
+    longitude?: number | null;
+    districtTh?: string | null;
+    addressTh?: string | null;
+    googleMapsUrl?: string | null;
+    nearbySpotsJson?: unknown;
     rooms?: Array<{ weekdayPriceThb: number }>;
     coupons?: RawPinCoupon[];
   };
@@ -170,6 +186,36 @@ export function mapPinToDto(
   const activeCoupons = resolvedRawCoupons.map(toPinActiveCouponDto);
   const activeCoupon = activeCoupons[0] ?? null;
 
+  const rawNearby = Array.isArray(pin.hotel.nearbySpotsJson)
+    ? pin.hotel.nearbySpotsJson
+    : [];
+  const hotelNearbySpots = rawNearby
+    .filter(
+      (item): item is { nameTh: string; distTh?: string } =>
+        Boolean(item && typeof item === "object" && "nameTh" in item)
+    )
+    .map((item) => ({
+      nameTh: String(item.nameTh || ""),
+      distTh: String(item.distTh || ""),
+    }))
+    .filter((item) => item.nameTh.length > 0);
+
+  const dealSourceType = pin.dealSourceType ?? "INTERNAL";
+  const resolvedPromoHeadlineTh =
+    pin.promoHeadlineTh ||
+    (activeCoupon
+      ? activeCoupon.discountType === "PERCENT"
+        ? `ลด ${activeCoupon.discountValue}%`
+        : `ลด ฿${activeCoupon.discountValue.toLocaleString()}`
+      : null);
+  const resolvedPromoHeadlineEn =
+    pin.promoHeadlineEn ||
+    (activeCoupon
+      ? activeCoupon.discountType === "PERCENT"
+        ? `${activeCoupon.discountValue}% OFF`
+        : `฿${activeCoupon.discountValue.toLocaleString()} OFF`
+      : null);
+
   return {
     id: pin.id,
     hotelId: pin.hotelId,
@@ -179,14 +225,34 @@ export function mapPinToDto(
     hotelLogoUrl: pin.hotel.logoUrl,
     hotelVerificationStatus: pin.hotel.verificationStatus,
     hotelRatingAvg: pin.hotel.ratingAvg,
+    hotelLatitude:
+      typeof pin.hotel.latitude === "number" ? pin.hotel.latitude : null,
+    hotelLongitude:
+      typeof pin.hotel.longitude === "number" ? pin.hotel.longitude : null,
+    hotelDistrictTh: pin.hotel.districtTh ?? "",
+    hotelAddressTh: pin.hotel.addressTh ?? "",
+    hotelGoogleMapsUrl: pin.hotel.googleMapsUrl ?? null,
+    hotelNearbySpots,
     roomId: pin.roomId,
     roomCode: pin.room?.code ?? null,
     roomNameTh: pin.room?.nameTh ?? null,
     roomNameEn: pin.room?.nameEn ?? null,
     couponId: activeCoupon?.id ?? pin.couponId,
-    couponCode: activeCoupon?.code ?? pin.coupon?.code ?? null,
+    couponCode: activeCoupon?.code ?? pin.promoCode ?? pin.coupon?.code ?? null,
     activeCoupon,
     activeCoupons,
+    dealSourceType,
+    externalDealUrl: pin.externalDealUrl ?? null,
+    externalSourceName: pin.externalSourceName ?? null,
+    promoHeadlineTh: resolvedPromoHeadlineTh,
+    promoHeadlineEn: resolvedPromoHeadlineEn,
+    promoCode: pin.promoCode ?? activeCoupon?.code ?? null,
+    promoOriginalPriceThb: pin.promoOriginalPriceThb ?? null,
+    promoDealPriceThb: pin.promoDealPriceThb ?? null,
+    promoExpiresAt: pin.promoExpiresAt
+      ? pin.promoExpiresAt.toISOString()
+      : activeCoupon?.expiresAt ?? null,
+    externalClickCount: pin.externalClickCount ?? 0,
     mediaType: pin.mediaType,
     category: pin.category,
     titleTh: pin.titleTh,
@@ -211,7 +277,8 @@ export function mapPinToDto(
     aiTriageNote: pin.aiTriageNote,
     isSponsored: pin.isSponsored,
     sponsoredPriority: pin.sponsoredPriority,
-    nightlyPriceThb: pin.room?.weekdayPriceThb ?? hotelMinPrice,
+    nightlyPriceThb:
+      pin.promoDealPriceThb ?? pin.room?.weekdayPriceThb ?? hotelMinPrice,
     likesCount: pin.likesCount,
     savesCount: pin.savesCount,
     commentsCount: pin.commentsCount,

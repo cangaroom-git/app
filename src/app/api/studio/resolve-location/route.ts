@@ -151,13 +151,13 @@ async function geocodePlaceCandidates(
   const [nomRes, photonRes] = await Promise.allSettled([
     fetch(nomUrl.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(5000),
     }).then((r) => (r.ok ? r.json() : [])),
     fetch(photonUrl.toString(), {
       headers: {
-        "User-Agent": "CangaroomDirectStay/1.0 (+https://cangaroom.com)",
+        "User-Agent": "NondiiDirectStay/1.0 (+https://nondii.com)",
       },
       signal: AbortSignal.timeout(5000),
     }).then((r) => (r.ok ? r.json() : { features: [] })),

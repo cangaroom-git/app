@@ -142,7 +142,7 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
   if (isCheckingSession || (isLoading && !studioData)) {
     return (
       <div className="min-h-screen bg-[var(--color-background-body)] flex flex-col">
-        <div className="h-[78px] border-b border-[var(--color-border)] px-6 lg:px-10 flex items-center justify-between">
+        <div className="h-16 border-b border-[var(--color-border)] px-4 sm:px-8 lg:px-10 flex items-center justify-between">
           <div className="h-6 w-36 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
           <div className="hidden lg:flex items-center gap-6">
             <div className="h-5 w-14 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
@@ -207,7 +207,7 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
           <div className="space-y-2">
             <h1 className="text-[24px] font-semibold text-[var(--color-text-primary)]">
               {errorStatus === 404
-                ? "เริ่มต้นลงที่พักฟรีกับ Cangaroom"
+                ? "เริ่มต้นลงที่พักฟรีกับ Nondii"
                 : "ไม่สามารถเปิด Hotel Studio ได้"}
             </h1>
             <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">

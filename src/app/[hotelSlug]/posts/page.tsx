@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, BadgeCheck, Eye, MapPin } from "lucide-react";
+import { ArrowLeft, BadgeCheck, ChevronRight, Eye, MapPin } from "lucide-react";
 import { listPublishedHotelPostsBySlug } from "@/lib/services/hotelPostService";
 
 export const dynamic = "force-dynamic";
@@ -15,11 +15,11 @@ export async function generateMetadata({
   const { hotelSlug } = await params;
   const data = await listPublishedHotelPostsBySlug(hotelSlug);
   if (!data) {
-    return { title: "ไม่พบบทความที่พัก | Cangaroom" };
+    return { title: "ไม่พบบทความที่พัก | Nondii" };
   }
 
   return {
-    title: `บทความและคู่มือท่องเที่ยว ${data.hotel.nameTh} (${data.hotel.provinceNameTh}) | Cangaroom`,
+    title: `บทความและคู่มือท่องเที่ยว ${data.hotel.nameTh} (${data.hotel.provinceNameTh}) | Nondii`,
     description:
       data.hotel.taglineTh ||
       `รวมรีวิว คู่มือเที่ยว และเรื่องราวจาก ${data.hotel.nameTh} จ.${data.hotel.provinceNameTh} จองตรง 0% GP`,
@@ -27,7 +27,7 @@ export async function generateMetadata({
       canonical: `/${data.hotel.slug}/posts`,
     },
     openGraph: {
-      title: `บทความจาก ${data.hotel.nameTh} | Cangaroom`,
+      title: `บทความจาก ${data.hotel.nameTh} | Nondii`,
       description: data.hotel.taglineTh,
       images: data.hotel.coverImageUrl ? [data.hotel.coverImageUrl] : undefined,
     },
@@ -171,7 +171,7 @@ export default async function HotelBlogIndexPage({
                   className="ty-caption font-bold text-[var(--color-accent)] inline-flex items-center gap-1 hover:underline"
                 >
                   <span>อ่านบทความ</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </article>

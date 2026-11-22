@@ -4,7 +4,7 @@ export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
 
   return NextResponse.json({
-    name: "Cangaroom Thailand Direct Stays Agent",
+    name: "Nondii Thailand Direct Stays Agent",
     description:
       "Visual stay discovery and 0% GP direct hotel booking platform across all 77 provinces in Thailand (mountain villas, pool villas, beachfront resorts, glamping, onsen & rooftop hotels).",
     version: "1.0.0",
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         id: "get_hotel_details",
         name: "Get Hotel Storefront & Room Availability",
         description:
-          "Retrieve room rates, real-time availability, pet policies, active coupons, and verified guest reviews for any cangaroom/{hotelSlug} property.",
+          "Retrieve room rates, real-time availability, pet policies, active coupons, and verified guest reviews for any nondii.com/{hotelSlug} property.",
         tags: ["hotel", "availability", "rooms", "rates"],
       },
       {

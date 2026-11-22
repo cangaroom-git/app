@@ -1,24 +1,19 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BedDouble,
   Calendar,
   CalendarCheck,
-  Crown,
   ExternalLink,
-  Globe,
   Menu,
-  Moon,
-  Plus,
-  RefreshCw,
-  Star,
-  Sun,
 } from "lucide-react";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
+import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
+import { AirbnbMenuDrawer } from "@/components/navigation/AirbnbMenuDrawer";
 import {
   StudioProvider,
   useStudio,
@@ -26,32 +21,11 @@ import {
 
 function StudioShellFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/studio";
-  const { user, lang, setLang, theme, toggleTheme } = useHotelApp();
+  const { user, refreshMe, signOutUser, lang, setLang, theme, toggleTheme } =
+    useHotelApp();
   const { data, notice, reload, switchHotel, buildHref } = useStudio();
 
-  const [isDesktopMenuOpen, setIsDesktopMenuOpen] = useState(false);
-  const desktopMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isDesktopMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (
-        desktopMenuRef.current &&
-        !desktopMenuRef.current.contains(e.target as Node)
-      ) {
-        setIsDesktopMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsDesktopMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [isDesktopMenuOpen]);
+  const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
 
   const ownedHotels = user?.ownedHotels ?? [];
   const isTodayActive = pathname === "/studio" || pathname === "/studio/today";
@@ -99,28 +73,20 @@ function StudioShellFrame({ children }: { children: React.ReactNode }) {
       {/* =====================================================================
           FULL-BLEED AIRBNB HOSTING TOP BAR (3 Clean Centered Tabs)
       ====================================================================== */}
-      <header className="sticky top-0 z-40 h-[68px] lg:h-[78px] bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-8 lg:px-10">
+      <header className="fixed top-0 inset-x-0 z-40 h-16 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-8 lg:px-10">
         <div className="h-full max-w-[1360px] mx-auto w-full grid grid-cols-[1fr_auto] lg:grid-cols-[1fr_auto_1fr] items-center gap-4">
           {/* Left: Minimal Brand Mark + Soft Property Selector */}
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href={buildHref("/studio")}
               className="inline-flex items-center gap-2 text-[var(--color-text-primary)] shrink-0 hover:opacity-80 transition-opacity"
-              aria-label="Cangaroom Studio"
+              aria-label="Nondii Studio"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="w-[26px] h-[26px]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.05"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect width="18" height="18" x="3" y="3" rx="5.5" />
-                <path d="M8 15.5 12 8.5l4 7" />
-                <circle cx="16.5" cy="7.5" r="1.15" fill="currentColor" stroke="none" />
-              </svg>
+              <img
+                src="/brand/nondii-icon-square-black.svg"
+                alt="Nondii"
+                className="w-[34px] h-[34px] object-contain dark:invert"
+              />
             </Link>
 
             {ownedHotels.length > 1 ? (
@@ -179,122 +145,56 @@ function StudioShellFrame({ children }: { children: React.ReactNode }) {
               โหมดนักเดินทาง
             </Link>
 
-            <span
-              aria-hidden="true"
-              className="hidden sm:inline-flex h-9 w-9 rounded-full bg-[var(--color-background-muted)] text-[13.5px] font-semibold text-[var(--color-text-primary)] items-center justify-center shrink-0"
+            <button
+              type="button"
+              onClick={() => setIsMenuDrawerOpen(true)}
+              aria-label={lang === "th" ? "โปรไฟล์และเมนู" : "Profile and menu"}
+              className="hidden sm:inline-flex h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] items-center justify-center shrink-0 cursor-pointer transition-colors relative"
             >
-              {(user?.name || user?.email || "H").slice(0, 1).toUpperCase()}
-            </span>
+              <UserAvatarCircle
+                user={user}
+                sizeClass="h-9 w-9"
+                iconSizeClass="w-4 h-4"
+              />
+            </button>
 
-            {/* Desktop Secondary Menu Popover */}
-            <div ref={desktopMenuRef} className="hidden lg:block relative">
-              <button
-                type="button"
-                onClick={() => setIsDesktopMenuOpen((v) => !v)}
-                aria-label="เมนูเพิ่มเติม"
-                className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <Menu className="w-4 h-4" />
-              </button>
-
-              {isDesktopMenuOpen && (
-                <div className="absolute right-0 top-11 w-[264px] rounded-[16px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-2 space-y-0.5 z-50">
-                  <Link
-                    href={`/${data.hotel.slug}`}
-                    onClick={() => setIsDesktopMenuOpen(false)}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] font-medium"
-                  >
-                    <span className="inline-flex items-center gap-2.5">
-                      <ExternalLink className="w-4 h-4" />
-                      <span>ดูหน้าร้านจริง</span>
-                    </span>
-                    <span className="text-[11.5px] text-[var(--color-text-secondary)]">
-                      /{data.hotel.slug}
-                    </span>
-                  </Link>
-
-                  <Link
-                    href={buildHref("/studio/reviews")}
-                    onClick={() => setIsDesktopMenuOpen(false)}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] font-medium"
-                  >
-                    <span className="inline-flex items-center gap-2.5">
-                      <Star className="w-4 h-4" />
-                      <span>รีวิวผู้เข้าพัก ({data.reviews.length})</span>
-                    </span>
-                    <span className="text-[12px] text-[var(--color-text-secondary)]">
-                      ★ {data.hotel.ratingAvg.toFixed(1)}
-                    </span>
-                  </Link>
-
-                  <Link
-                    href="/register-hotel"
-                    onClick={() => setIsDesktopMenuOpen(false)}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>เพิ่มที่พักแห่งใหม่</span>
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsDesktopMenuOpen(false);
-                      void reload();
-                    }}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] font-medium cursor-pointer"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>รีเฟรชข้อมูลล่าสุด</span>
-                  </button>
-
-                  {user?.role === "SUPER_ADMIN" && (
-                    <Link
-                      href="/super-admin"
-                      onClick={() => setIsDesktopMenuOpen(false)}
-                      className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center gap-2.5 text-[14px] font-medium"
-                    >
-                      <Crown className="w-4 h-4" />
-                      <span>Super Admin Console</span>
-                    </Link>
-                  )}
-
-                  <div className="my-1 border-t border-[var(--color-border)]" />
-
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] font-medium cursor-pointer"
-                  >
-                    <span className="inline-flex items-center gap-2.5">
-                      {theme === "dark" ? (
-                        <Moon className="w-4 h-4" />
-                      ) : (
-                        <Sun className="w-4 h-4" />
-                      )}
-                      <span>โหมดสี</span>
-                    </span>
-                    <span className="text-[12px] text-[var(--color-text-secondary)]">
-                      {theme === "dark" ? "มืด" : "สว่าง"}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setLang(lang === "th" ? "en" : "th")}
-                    className="w-full h-10 px-3 rounded-[10px] hover:bg-[var(--color-background-muted)] flex items-center justify-between text-[14px] font-medium cursor-pointer"
-                  >
-                    <span className="inline-flex items-center gap-2.5">
-                      <Globe className="w-4 h-4" />
-                      <span>ภาษา</span>
-                    </span>
-                    <span className="text-[12px] text-[var(--color-text-secondary)]">
-                      {lang.toUpperCase()}
-                    </span>
-                  </button>
-                </div>
+            {/* Desktop Airbnb Slide-Over Menu Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsMenuDrawerOpen(true)}
+              aria-label={lang === "th" ? "เมนูเพิ่มเติม" : "Open menu"}
+              aria-expanded={isMenuDrawerOpen}
+              aria-haspopup="dialog"
+              className="hidden lg:inline-flex h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] items-center justify-center cursor-pointer transition-colors relative"
+            >
+              <Menu className="w-[18px] h-[18px]" strokeWidth={2} />
+              {data.stats.pendingBookingsCount > 0 && (
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
               )}
-            </div>
+            </button>
+
+            <AirbnbMenuDrawer
+              isOpen={isMenuDrawerOpen}
+              onClose={() => setIsMenuDrawerOpen(false)}
+              variant="studio"
+              user={user}
+              onRefreshProfile={refreshMe}
+              onSignOut={signOutUser}
+              language={lang}
+              onToggleLanguage={() => setLang(lang === "th" ? "en" : "th")}
+              isDarkTheme={theme === "dark"}
+              onToggleTheme={toggleTheme}
+              studio={{
+                hotelName: data.hotel.nameTh,
+                hotelSlug: data.hotel.slug,
+                ratingAvg: data.hotel.ratingAvg,
+                reviewsCount: data.reviews.length,
+                pendingBookingsCount: data.stats.pendingBookingsCount,
+                reviewsHref: buildHref("/studio/reviews"),
+                todayHref: buildHref("/studio"),
+                onReload: reload,
+              }}
+            />
 
             {/* Mobile quick link to storefront */}
             <Link
@@ -309,7 +209,7 @@ function StudioShellFrame({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Route Outlet */}
-      <div className="flex-1 w-full flex flex-col pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="flex-1 w-full flex flex-col pt-16 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
         {children}
       </div>
 

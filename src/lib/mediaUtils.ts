@@ -365,7 +365,7 @@ export const PIN_IMAGE_SIZES: Record<PinImageVariant, string> = {
   full: VARIANT_CONFIG.full.sizes,
 };
 
-function rewriteImageUrlForWidth(
+export function rewriteImageUrlForWidth(
   rawUrl: string,
   targetW: number,
   quality: number,

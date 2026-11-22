@@ -193,7 +193,7 @@ export default function SuperAdminConsolePage() {
       <div className="cgr-page-form py-8">
         <div className="app-card p-6 text-center space-y-3">
           <Crown className="w-10 h-10 text-[var(--color-text-primary)] mx-auto" />
-          <h1 className="ty-title">เฉพาะผู้ดูแลระบบ Cangaroom (Super Admin)</h1>
+          <h1 className="ty-title">เฉพาะผู้ดูแลระบบ Nondii (Super Admin)</h1>
           <p className="ty-caption">
             กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลแพลตฟอร์มเพื่อเข้าใช้งานหน้านี้
           </p>
@@ -230,7 +230,7 @@ export default function SuperAdminConsolePage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <Crown className="w-5 h-5 text-[var(--color-text-primary)] shrink-0" />
-          <h1 className="ty-display truncate">Cangaroom Super Admin</h1>
+          <h1 className="ty-display truncate">Nondii Super Admin</h1>
         </div>
 
         <div className="flex items-center gap-2">

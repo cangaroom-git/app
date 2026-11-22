@@ -26,11 +26,18 @@ export interface PersonalizationRequestHints {
 export interface SearchStaysParams extends PersonalizationRequestHints {
   style?: string | null;
   provinceId?: string | null;
+  sourceType?: "ALL" | "INTERNAL" | "EXTERNAL" | null;
   q?: string | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number | null;
   maxPriceThb?: number | null;
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null;
   limit?: number;
   userId?: string | null;
 }
@@ -230,8 +237,11 @@ export async function searchDiscoveryPins(
 ): Promise<PinFeedItemDto[]> {
   const {
     style,
+    provinceId,
+    sourceType,
     q,
     maxPriceThb,
+    bounds,
     limit = 60,
     userId,
     visitorId,
@@ -242,14 +252,37 @@ export async function searchDiscoveryPins(
   } = params;
 
   const trimmedQuery = q?.trim() || "";
+  const nowDate = new Date();
 
   const where: Prisma.PinWhereInput = {
     publishStatus: "PUBLISHED",
+    AND: [
+      {
+        OR: [{ promoExpiresAt: null }, { promoExpiresAt: { gt: nowDate } }],
+      },
+    ],
     hotel: {
       isPublished: true,
       verificationStatus: { not: "SUSPENDED" },
     },
   };
+
+  if (provinceId && provinceId !== "all") {
+    where.provinceId = provinceId;
+  }
+
+  if (sourceType === "INTERNAL" || sourceType === "EXTERNAL") {
+    where.dealSourceType = sourceType;
+  }
+
+  if (bounds) {
+    where.hotel = {
+      isPublished: true,
+      verificationStatus: { not: "SUSPENDED" },
+      latitude: { gte: bounds.south, lte: bounds.north },
+      longitude: { gte: bounds.west, lte: bounds.east },
+    };
+  }
 
   // Only apply hard style filter when browsing a specific category tab without a text search
   if (style && style !== "all" && !trimmedQuery) {
@@ -272,6 +305,11 @@ export async function searchDiscoveryPins(
           nameTh: true,
           nameEn: true,
           districtTh: true,
+          addressTh: true,
+          latitude: true,
+          longitude: true,
+          googleMapsUrl: true,
+          nearbySpotsJson: true,
           logoUrl: true,
           verificationStatus: true,
           ratingAvg: true,
@@ -284,7 +322,7 @@ export async function searchDiscoveryPins(
             },
           },
           coupons: {
-            where: { isActive: true, expiresAt: { gt: new Date() } },
+            where: { isActive: true, expiresAt: { gt: nowDate } },
             orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
             take: 6,
             select: PIN_COUPON_SELECT,
@@ -392,6 +430,12 @@ export async function getPinDetailById(
           slug: true,
           nameTh: true,
           nameEn: true,
+          districtTh: true,
+          addressTh: true,
+          latitude: true,
+          longitude: true,
+          googleMapsUrl: true,
+          nearbySpotsJson: true,
           logoUrl: true,
           verificationStatus: true,
           ratingAvg: true,
@@ -451,6 +495,12 @@ export async function getPinDetailById(
               slug: true,
               nameTh: true,
               nameEn: true,
+              districtTh: true,
+              addressTh: true,
+              latitude: true,
+              longitude: true,
+              googleMapsUrl: true,
+              nearbySpotsJson: true,
               logoUrl: true,
               verificationStatus: true,
               ratingAvg: true,
@@ -611,5 +661,147 @@ export async function getPinDetailById(
     comments: topLevelComments,
     relatedPins: rankedRelated,
   };
+}
+
+export async function getRecentViewedPinIdsForRequest(params: {
+  userId?: string | null;
+  visitorId?: string | null;
+  hasAnalyticsConsent?: boolean;
+  limit?: number;
+}): Promise<string[]> {
+  const { userId, visitorId, hasAnalyticsConsent = false, limit = 24 } = params;
+  if (!userId && !(hasAnalyticsConsent && visitorId)) return [];
+
+  const profile = await prisma.visitorTasteProfile
+    .findFirst({
+      where: userId
+        ? {
+            OR: [
+              { userId },
+              ...(hasAnalyticsConsent && visitorId ? [{ visitorId }] : []),
+            ],
+          }
+        : { visitorId: visitorId! },
+      select: { recentViewedPinIds: true },
+    })
+    .catch(() => null);
+
+  if (!profile?.recentViewedPinIds?.length) return [];
+
+  // recentViewedPinIds is appended oldest -> newest; reverse for most-recent-first
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (let i = profile.recentViewedPinIds.length - 1; i >= 0; i--) {
+    const id = profile.recentViewedPinIds[i]?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(id);
+    if (ordered.length >= limit) break;
+  }
+  return ordered;
+}
+
+export async function getPinsByIds(
+  pinIds: string[],
+  userId?: string | null
+): Promise<PinFeedItemDto[]> {
+  const cleanIds = Array.from(
+    new Set(pinIds.map((id) => id.trim()).filter(Boolean))
+  ).slice(0, 30);
+
+  if (cleanIds.length === 0) return [];
+
+  const nowDate = new Date();
+  const rawPins = await prisma.pin.findMany({
+    where: {
+      id: { in: cleanIds },
+      publishStatus: "PUBLISHED",
+      AND: [
+        {
+          OR: [{ promoExpiresAt: null }, { promoExpiresAt: { gt: nowDate } }],
+        },
+      ],
+      hotel: {
+        isPublished: true,
+        verificationStatus: { not: "SUSPENDED" },
+      },
+    },
+    include: {
+      hotel: {
+        select: {
+          slug: true,
+          nameTh: true,
+          nameEn: true,
+          districtTh: true,
+          addressTh: true,
+          latitude: true,
+          longitude: true,
+          googleMapsUrl: true,
+          nearbySpotsJson: true,
+          logoUrl: true,
+          verificationStatus: true,
+          ratingAvg: true,
+          rooms: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              weekdayPriceThb: true,
+              maxGuests: true,
+            },
+          },
+          coupons: {
+            where: { isActive: true, expiresAt: { gt: nowDate } },
+            orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+            take: 6,
+            select: PIN_COUPON_SELECT,
+          },
+        },
+      },
+      room: {
+        select: {
+          id: true,
+          code: true,
+          nameTh: true,
+          nameEn: true,
+          weekdayPriceThb: true,
+          maxGuests: true,
+        },
+      },
+      coupon: {
+        select: PIN_COUPON_SELECT,
+      },
+    },
+  });
+
+  let likedSet = new Set<string>();
+  let savedSet = new Set<string>();
+
+  if (userId && rawPins.length > 0) {
+    const foundIds = rawPins.map((p) => p.id);
+    const [likes, saves] = await Promise.all([
+      prisma.pinLike.findMany({
+        where: { userId, pinId: { in: foundIds } },
+        select: { pinId: true },
+      }),
+      prisma.savedBoardPin.findMany({
+        where: { userId, pinId: { in: foundIds } },
+        select: { pinId: true },
+      }),
+    ]);
+    likedSet = new Set(likes.map((l) => l.pinId));
+    savedSet = new Set(saves.map((s) => s.pinId));
+  }
+
+  const byId = new Map<string, PinFeedItemDto>();
+  for (const p of rawPins) {
+    byId.set(p.id, mapPinToDto(p, likedSet, savedSet));
+  }
+
+  const ordered: PinFeedItemDto[] = [];
+  for (const id of cleanIds) {
+    const dto = byId.get(id);
+    if (dto) ordered.push(dto);
+  }
+  return ordered;
 }
 

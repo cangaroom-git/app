@@ -22,12 +22,12 @@ import {
   PureMediaViewer,
   type PureMediaSlide,
 } from "@/components/media/PureMediaViewer";
-import { MasonryGrid } from "@/components/home/MasonryGrid";
 import {
   clearLastClickedPinOrigin,
-  PinterestPinCard,
   PinterestPinDetail,
 } from "@/components/home/PinterestPinDetail";
+import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { DealSlideRow } from "@/components/home/DealSlideRow";
 import {
   BoardFolderThumb,
   DeleteBoardConfirmModal,
@@ -331,7 +331,7 @@ export default function SavedBoardPage() {
         <>
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-[26px] sm:text-[30px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-              {isTh ? "บอร์ดของฉัน" : "Boards"}
+              {isTh ? "บอร์ดคูปอง & โปรของฉัน" : "Saved deal boards"}
             </h1>
 
             <button
@@ -567,7 +567,14 @@ export default function SavedBoardPage() {
               currentUser={currentUser}
               comments={activeBoardComments}
               savedPinIds={savedPinIds}
-              relatedPins={gridBoardEntries.map((e) => e.pin)}
+              relatedPins={gridBoardEntries
+                .map((e) => e.pin)
+                .filter(
+                  (p) =>
+                    p.id !== activeBoardPin.id &&
+                    p.hotelId !== activeBoardPin.hotelId &&
+                    p.hotelSlug !== activeBoardPin.hotelSlug
+                )}
               prevPinPreview={prevBoardPinPreview}
               nextPinPreview={nextBoardPinPreview}
               canStepBack={pinHistoryStack.length > 0}
@@ -608,89 +615,69 @@ export default function SavedBoardPage() {
             />
           )}
 
-          {/* Desktop Related Stays in This Board */}
+          {/* Desktop Related Deals in This Board (Card Slide Symmetry) */}
           {activeBoardPin && gridBoardEntries.length > 0 && (
-            <section className="hidden lg:block pt-8 lg:pt-10 border-t border-[var(--color-border)] space-y-4">
-              <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-                {isTh ? "ที่พักอื่นในบอร์ดนี้" : "More in this board"}
-              </h2>
-              <MasonryGrid
-                key={`board-related-${activeBoardPin.id}`}
-                items={gridBoardEntries.map((e) => ({
-                  ...e.pin,
-                  aspectClass: e.pin.aspectRatio,
-                  boardEntry: e,
-                }))}
-                columnWidth={184}
-                maxColumnWidth={235}
-                gutter={14}
-                fitContainer={true}
-                renderItem={(item, cardIdx) => (
-                  <PinterestPinCard
-                    pin={item}
-                    language={language}
-                    priority={cardIdx < 6}
-                    isSaved={true}
-                    onSelectPin={(p) => handleSelectBoardPin(p, true)}
-                    onToggleSave={(pinId) =>
-                      handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
-                    }
-                    onToggleLike={handleToggleLikeOnBoard}
-                    onSharePin={() => {}}
-                  />
-                )}
+            <div className="hidden lg:block mt-6 border-t border-[var(--color-border)]">
+              <DealSlideRow
+                title={
+                  isTh ? "คูปอง & โปรอื่นในบอร์ดนี้" : "More deals in this board"
+                }
+                deals={gridBoardEntries
+                  .map((e) => e.pin)
+                  .filter(
+                    (p) =>
+                      p.id !== activeBoardPin.id &&
+                      p.hotelId !== activeBoardPin.hotelId &&
+                      p.hotelSlug !== activeBoardPin.hotelSlug
+                  )}
+                language={language}
+                savedPinIds={savedPinIds}
+                onSelectDeal={(p) => handleSelectBoardPin(p, true)}
+                onToggleSave={(pinId) =>
+                  handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
+                }
               />
-            </section>
+            </div>
           )}
 
-          {/* Folder Masonry Grid */}
+          {/* Folder Uniform Vertical Coupon Grid */}
           {!activeBoardPin &&
             (visibleFolderEntries.length === 0 ? (
               <div className="rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
                 <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
                   {isTh
-                    ? "ยังไม่มีที่พักในบอร์ดนี้"
-                    : "No stays saved in this board yet"}
+                    ? "ยังไม่มีคูปองหรือโปรในบอร์ดนี้"
+                    : "No deals saved in this board yet"}
                 </p>
                 <p className="text-[14px] text-[var(--color-text-secondary)]">
                   {isTh
-                    ? "กลับไปหน้าสำรวจแล้วกดปักหมุดบนการ์ดที่พักที่ชอบได้เลย"
-                    : "Head back to explore and tap the pin button on stays you like."}
+                    ? "กลับไปหน้าแรกแล้วกดปุ่มบันทึกบนการ์ดคูปองที่ถูกใจได้เลย"
+                    : "Head back home and tap the bookmark button on stay deals you like."}
                 </p>
                 <Link
                   href="/"
                   className="h-10 px-5 rounded-[12px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center justify-center"
                 >
-                  {isTh ? "สำรวจที่พักทั่วไทย" : "Explore stays"}
+                  {isTh ? "ดูโปรที่พักทั้งหมด" : "Explore stay deals"}
                 </Link>
               </div>
             ) : (
-              <MasonryGrid
-                key={`folder-grid-${activeBoard.id}`}
-                items={visibleFolderEntries.map((e) => ({
-                  ...e.pin,
-                  aspectClass: e.pin.aspectRatio,
-                  boardEntry: e,
-                }))}
-                columnWidth={184}
-                maxColumnWidth={235}
-                gutter={14}
-                fitContainer={true}
-                renderItem={(item, cardIdx) => (
-                  <PinterestPinCard
-                    pin={item}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {visibleFolderEntries.map((entry, cardIdx) => (
+                  <VerticalCouponCard
+                    key={`folder-deal-${entry.boardPinId}`}
+                    pin={entry.pin}
                     language={language}
                     priority={cardIdx < 8}
                     isSaved={true}
-                    onSelectPin={(p) => handleSelectBoardPin(p, false)}
+                    enablePhotoSlide={true}
+                    onSelect={(p) => handleSelectBoardPin(p, false)}
                     onToggleSave={(pinId) =>
                       handleRemovePinFromCurrentBoard(pinId, activeBoard.id)
                     }
-                    onToggleLike={handleToggleLikeOnBoard}
-                    onSharePin={() => {}}
                   />
-                )}
-              />
+                ))}
+              </div>
             ))}
         </div>
       )}

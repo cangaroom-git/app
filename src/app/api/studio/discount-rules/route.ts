@@ -18,6 +18,12 @@ const CreateRuleSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const ReorderRulesSchema = z.object({
+  action: z.literal("reorder"),
+  hotelSlug: z.string().optional(),
+  orderedIds: z.array(z.string().trim().min(1)).min(1).max(100),
+});
+
 const PatchRuleSchema = CreateRuleSchema.partial().extend({
   id: z.string().trim().min(1),
 });
@@ -38,6 +44,9 @@ export async function POST(request: Request) {
       parsed.data.discountType === "PERCENT"
         ? Math.min(80, parsed.data.discountValue)
         : parsed.data.discountValue;
+    const currentCount = await prisma.hotelDiscountRule.count({
+      where: { hotelId: hotel.id },
+    });
 
     const rule = await prisma.hotelDiscountRule.create({
       data: {
@@ -61,6 +70,10 @@ export async function POST(request: Request) {
         isActive: parsed.data.isActive ?? true,
       },
     });
+    await prisma.$executeRaw`
+      UPDATE "HotelDiscountRule" SET "sortOrder" = ${currentCount}
+      WHERE "id" = ${rule.id} AND "hotelId" = ${hotel.id}
+    `;
 
     return NextResponse.json({ rule }, { status: 201 });
   } catch (err) {
@@ -74,6 +87,31 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const raw = await request.json();
+
+    if (raw && typeof raw === "object" && raw.action === "reorder") {
+      const reorderParsed = ReorderRulesSchema.safeParse(raw);
+      if (!reorderParsed.success) {
+        return NextResponse.json(
+          { error: "ลำดับกฎส่วนลดไม่ถูกต้อง" },
+          { status: 422 }
+        );
+      }
+      const { hotel } = await requireHotelStudioAccess(
+        reorderParsed.data.hotelSlug
+      );
+      const uniqueIds = Array.from(new Set(reorderParsed.data.orderedIds));
+      await prisma.$transaction(
+        uniqueIds.map(
+          (ruleId, idx) =>
+            prisma.$executeRaw`
+              UPDATE "HotelDiscountRule" SET "sortOrder" = ${idx}
+              WHERE "id" = ${ruleId} AND "hotelId" = ${hotel.id}
+            `
+        )
+      );
+      return NextResponse.json({ reordered: true, orderedIds: uniqueIds });
+    }
+
     const parsed = PatchRuleSchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json({ error: "ข้อมูลกฎส่วนลดไม่ถูกต้อง" }, { status: 422 });

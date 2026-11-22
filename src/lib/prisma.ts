@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const PRISMA_SCHEMA_VERSION = "2026-11-19-seasonal-rules-v2";
+const PRISMA_SCHEMA_VERSION = "2026-11-20-promo-sort-order-v1";
 
 const globalForPrisma = globalThis as unknown as {
   __cangaroomPrisma?: PrismaClient;

@@ -25,7 +25,7 @@ const MCP_TOOLS = [
   {
     name: "get_hotel_details",
     description:
-      "Fetch complete property profile, rooms, live unit availability, policies, reviews, and coupons for a Cangaroom hotelSlug.",
+      "Fetch complete property profile, rooms, live unit availability, policies, reviews, and coupons for a Nondii hotelSlug.",
     inputSchema: {
       type: "object",
       required: ["hotelSlug"],
@@ -69,7 +69,7 @@ const MCP_TOOLS = [
 export async function GET() {
   return NextResponse.json({
     protocol: "model-context-protocol",
-    server: "cangaroom-stays-mcp",
+    server: "nondii-stays-mcp",
     version: "1.0.0",
     tools: MCP_TOOLS,
   });
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         id: reqId,
         result: {
           protocolVersion: "2025-03-26",
-          serverInfo: { name: "cangaroom-stays-mcp", version: "1.0.0" },
+          serverInfo: { name: "nondii-stays-mcp", version: "1.0.0" },
           capabilities: { tools: {} },
         },
       });

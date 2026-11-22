@@ -922,7 +922,7 @@ export function StudioPropertyTab({
       ====================================================================== */}
       <nav
         aria-label="หมวดหมู่จัดการที่พัก"
-        className="lg:hidden sticky top-[68px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6"
+        className="lg:hidden sticky top-16 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6"
       >
         <div className="flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar">
           {flatNavItems.map((item) => {
@@ -961,7 +961,7 @@ export function StudioPropertyTab({
               DESKTOP LEFT AIRBNB BORDERLESS `divide-y` SIDE MENU (Exact Screenshot 1!)
               ZERO 4-sided borders — divided strictly by 1px horizontal hairlines
           ================================================================== */}
-          <aside className="hidden lg:block w-[300px] xl:w-[320px] shrink-0 lg:sticky lg:top-[104px] max-h-[calc(100vh-120px)] overflow-y-auto pr-4">
+          <aside className="hidden lg:block w-[300px] xl:w-[320px] shrink-0 lg:sticky lg:top-[90px] max-h-[calc(100vh-106px)] overflow-y-auto pr-4">
             <div className="space-y-8">
               <div className="space-y-1">
                 <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
@@ -1338,22 +1338,15 @@ export function StudioPropertyTab({
           )}
 
           {/* =================================================================
-              SECTION 1C: PROMOTIONS & AUTOMATIC DISCOUNTS (Merged from Promote)
+              SECTION 1C: PROMOTIONS & AUTOMATIC DISCOUNTS (Unified Header + DnD)
           ================================================================== */}
           {section === "promotions" && (
-            <div className="space-y-7">
-              <div className="pb-5 border-b border-[var(--color-border)]">
-                <h2 className="text-[24px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                  โปรโมชั่น & ส่วนลด
-                </h2>
-              </div>
-              <StudioGrowthTab
-                data={data}
-                mode="promotions"
-                onReload={onReload}
-                onNotify={onNotify}
-              />
-            </div>
+            <StudioGrowthTab
+              data={data}
+              mode="promotions"
+              onReload={onReload}
+              onNotify={onNotify}
+            />
           )}
 
           {/* =================================================================
@@ -2294,7 +2287,7 @@ export function StudioPropertyTab({
               <div className="pt-2 flex items-center justify-between gap-4 rounded-[14px] bg-[var(--color-background-muted)] p-4">
                 <div>
                   <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
-                    เผยแพร่หน้าร้านบน Cangaroom
+                    เผยแพร่หน้าร้านบน Nondii
                   </p>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
                     ปิดสวิตช์หากต้องการพักรับจองชั่วคราวโดยไม่ลบข้อมูล

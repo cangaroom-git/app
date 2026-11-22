@@ -21,7 +21,7 @@ export async function generateMetadata({
 
   if (!storefront) {
     return {
-      title: `ไม่พบที่พัก @${cleanSlug} | Cangaroom`,
+      title: `ไม่พบที่พัก @${cleanSlug} | Nondii`,
     };
   }
 
@@ -33,12 +33,12 @@ export async function generateMetadata({
 
   const title = `${hotel.nameTh} — ที่พัก${hotel.provinceNameTh}${
     minPrice > 0 ? ` เริ่มต้น ฿${minPrice.toLocaleString()}/คืน` : ""
-  } | จองตรง 0% GP · Cangaroom`;
+  } | จองตรง 0% GP · Nondii`;
 
   const description =
     hotel.descriptionTh ||
     hotel.taglineTh ||
-    `ดูรูปบรรยากาศ ห้องว่าง และจองตรงกับ ${hotel.nameTh} จ.${hotel.provinceNameTh} ฟรีค่า GP 0% ผ่านระบบ Cangaroom`;
+    `ดูรูปบรรยากาศ ห้องว่าง และจองตรงกับ ${hotel.nameTh} จ.${hotel.provinceNameTh} ฟรีค่า GP 0% ผ่านระบบ Nondii`;
 
   const ogImage = hotel.coverImageUrl || hotel.logoUrl || undefined;
 

@@ -9,8 +9,8 @@
 
 ## สรุปภาพรวม Cangaroom ใน 1 นาที (TL;DR for AI Agents)
 
-1. **Cangaroom คืออะไร?**
-   - แพลตฟอร์มค้นหาแรงบันดาลใจที่พักทั่วประเทศไทยสไตล์ **Pinterest Masonry** (ภูเขา & ทะเลหมอก, ทะเล & ชายหาด, พูลวิลล่า, บาร์ & รูฟท็อป, อ่างแช่น้ำ & ออนเซ็น, แกลมปิ้ง) ผสานเข้ากับ **ระบบหน้าร้านจองห้องพักและชำระเงินตรงแบบ Agoda (`cangaroom.com/{hotelSlug}`)**
+1. **Nondii (Cangaroom) คืออะไร?**
+   - **ศูนย์รวมคูปองและโปรโมชั่นที่พักสวยทั่วไทย** ที่รวบรวมทั้ง **โปรจองตรง 0% GP จากพาร์ทเนอร์บนเว็บเรา (`INTERNAL` -> `/{hotelSlug}`)** และ **ดีล/ส่วนลดคัดพิเศษจากเว็บภายนอก (`EXTERNAL` -> ไทยเที่ยวไทย, Megatix, Agoda, Klook, Trip.com, เว็บตรงโรงแรม)** ในรูปแบบ **การ์ดคูปองแนวตั้ง (Vertical Ticket Card)** บนโครงสร้างหน้าแรกแบบ Airbnb (`/` + แผนที่ซูมเปลี่ยนรายการ `/explore`) และระบบบันทึกคูปองเข้า `/board` (ยกเลิกหน้า `/deal` และกระเป๋าคูปองแยกซ้ำซ้อน)
 2. **โมเดลรายได้ (0% GP Forever -> Sponsored Ads)**:
    - **เปิดใช้ฟรีตลอดชีพ 0% GP**: เจ้าของที่พักเปิดโปรไฟล์ `cangaroom.com/{hotelSlug}` พร้อมระบบจองห้อง ปฏิทินห้องว่าง ระบบตรวจสลิปชำระเงินตรง และคูปองส่วนลดได้ **ฟรี ไม่มีวันหมดอายุ และไม่หักค่าคอมมิชชัน (0% GP)** เพื่อดึงที่พักทั่วไทยเข้ามาเป็น Supply หลักของแพลตฟอร์ม
    - **รายได้หลักมาจากค่าโฆษณา (Promoted Pins & Featured Deals)**: โรงแรมที่ต้องการดัน Pin รูป/วิดีโอขึ้นอันดับต้นๆ บนหน้าแรก (`/`), หน้าค้นหาตามจังหวัด/สไตล์, หน้าคูปอง (`/deal`), หรือติดอันดับแนะนำในระบบ AI Agent จะจ่ายเงินค่าโฆษณา (Sponsored Boost)
@@ -34,4 +34,5 @@
 | **[03-database-schema-and-zero-mock-rules.md](./03-database-schema-and-zero-mock-rules.md)** | โครงสร้างฐานข้อมูล PostgreSQL & กฎห้ามใช้ Mock Data | Relational Schema ครบทุกตารางบน Neon Postgres + Prisma, การทำ Indexing, การเชื่อม Pooled vs Direct URL และการยกเลิก `localStorage` Store |
 | **[04-facebook-sync-and-agentic-standards.md](./04-facebook-sync-and-agentic-standards.md)** | ระบบดึงโพสต์ Facebook อัตโนมัติ & มาตรฐาน AI Agent สากล | ระบบคัดกรองโพสต์ Facebook ด้วย AI 3 ระดับ (กันโพสต์ตลก/ข่าวไม่เกี่ยว) และสเปก `MCP Server` + `agent-card.json` สำหรับยุค Agent-to-Agent |
 | **[05-system-surgery-master-plan.md](./05-system-surgery-master-plan.md)** | แผนปฏิบัติการผ่าตัดระบบ เคลียร์โค้ดเก่า และผูก DB จริง | ลำดับขั้นการลบไฟล์ที่ไม่ได้ใช้ การรื้อระบบเก่าออกทีละส่วน การย้ายขึ้นฐานข้อมูลจริง และการตรวจสอบหาข้อผิดพลาดแบบ End-to-End |
+| **[06-ugc-trip-board-and-card-motion.md](./06-ugc-trip-board-and-card-motion.md)** | แผนพัฒนา UGC Trip Board, Smart Day Timeline & Card Motion UI *(Draft)* | แผนสร้างวงล้อ UGC (Place/Stay Cards อิสระ + Day Timeline คำนวณเวลาเดินทางจาก Google Maps & Weather) และสเปก Card Motion Animation 2 รูปแบบจาก Dribbble |
 

@@ -112,6 +112,7 @@ export interface StudioCouponRecord {
   expiresAt: string;
   isFeaturedDeal: boolean;
   isActive: boolean;
+  sortOrder?: number;
 }
 
 export interface StudioSocialConnectionRecord {

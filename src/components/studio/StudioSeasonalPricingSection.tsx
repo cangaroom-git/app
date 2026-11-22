@@ -13,7 +13,6 @@ import {
   Plus,
   Repeat,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { formatShortDate } from "@/lib/dateFormatters";
@@ -532,18 +531,18 @@ export function StudioSeasonalPricingSection({
 
                 {/* Left: Crisp Minimal Icon Badge */}
                   <div
-                    className={`h-14 w-14 sm:h-16 sm:w-16 rounded-[14px] flex items-center justify-center shrink-0 transition-colors ${
+                    className={`h-8 w-8 rounded-[10px] flex items-center justify-center shrink-0 transition-colors ${
                       rule.isActive
                         ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
                         : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
                     }`}
                   >
                     {isPromo ? (
-                      <Percent className="w-5 h-5 stroke-[1.8]" />
+                      <Percent className="w-4 h-4 stroke-[1.8]" />
                     ) : isTemplate ? (
-                      <Sparkles className="w-5 h-5 stroke-[1.8]" />
+                      <Sparkles className="w-4 h-4 stroke-[1.8]" />
                     ) : (
-                      <CalendarRange className="w-5 h-5 stroke-[1.8]" />
+                      <CalendarRange className="w-4 h-4 stroke-[1.8]" />
                     )}
                   </div>
 
@@ -619,24 +618,12 @@ export function StudioSeasonalPricingSection({
                     </div>
                   </div>
 
-                  {/* Right: 1-Click Toggle Switch + Delete (for custom rules) */}
+                  {/* Right: 1-Click Toggle Switch (Delete safely lives inside Edit Modal) */}
                   <div
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                     className="flex items-center gap-2.5 shrink-0"
                   >
-                    {!isTemplate && (
-                      <button
-                        type="button"
-                        disabled={deletingRuleId === rule.id}
-                        onClick={() => void handleDeleteRule(rule)}
-                        aria-label={`ลบ ${rule.name}`}
-                        className="h-8.5 w-8.5 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] inline-flex items-center justify-center cursor-pointer transition-colors disabled:opacity-40"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-
                     <span
                       className={`hidden sm:inline text-[12.5px] font-medium ${
                         rule.isActive
@@ -1008,22 +995,41 @@ export function StudioSeasonalPricingSection({
         title={editingRuleId ? `แก้ไข · ${seasonName}` : "สร้างช่วงราคาตามฤดูกาล"}
         maxWidthClass="md:max-w-[680px]"
         footer={
-          <div className="flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsEditorOpen(false)}
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="button"
-              disabled={isSaving}
-              onClick={() => void handleSaveRule()}
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
-            >
-              {isSaving ? "กำลังบันทึก..." : "บันทึกช่วงราคา"}
-            </button>
+          <div className="flex items-center justify-between gap-2.5">
+            {editingRuleId && !editingPresetKey ? (
+              <button
+                type="button"
+                disabled={deletingRuleId === editingRuleId}
+                onClick={async () => {
+                  const target = allRules.find((r) => r.id === editingRuleId);
+                  if (!target) return;
+                  await handleDeleteRule(target);
+                  setIsEditorOpen(false);
+                }}
+                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
+              >
+                {deletingRuleId === editingRuleId ? "กำลังลบ..." : "ลบช่วงราคานี้"}
+              </button>
+            ) : (
+              <span />
+            )}
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsEditorOpen(false)}
+                className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => void handleSaveRule()}
+                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {isSaving ? "กำลังบันทึก..." : "บันทึกช่วงราคา"}
+              </button>
+            </div>
           </div>
         }
       >
@@ -1113,18 +1119,23 @@ export function StudioSeasonalPricingSection({
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-7 gap-1.5">
+              <div
+                role="group"
+                aria-label="เลือกวันในสัปดาห์"
+                className="grid grid-cols-7 rounded-[12px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)] overflow-hidden"
+              >
                 {DAY_PILLS.map((dp) => {
                   const selected = daysOfWeek.includes(dp.dow);
                   return (
                     <button
                       key={dp.dow}
                       type="button"
+                      aria-pressed={selected}
                       onClick={() => toggleDayOfWeek(dp.dow)}
-                      className={`h-10 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-colors ${
+                      className={`h-11 first:rounded-l-[11px] last:rounded-r-[11px] text-[13.5px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-text-primary)] ${
                         selected
                           ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                          : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:bg-[var(--color-background-subtle)]"
+                          : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
                       }`}
                     >
                       {dp.label}
