@@ -208,7 +208,7 @@ export function DealTermsModal({
               ) : (
                 <p>
                   {isTh
-                    ? "ไม่ต้องกรอกโค้ดเอง — กด \"บันทึกโปร\" เพื่อเก็บสิทธิ์เข้าบอร์ด หรือกด \"จองตรง 0% GP\" เพื่อไปยังหน้าที่พัก ระบบจะนำส่วนลดไปหักให้อัตโนมัติตอนจอง"
+                    ? "ไม่ต้องกรอกโค้ดเอง — กด \"บันทึกโปร\" เพื่อเก็บสิทธิ์เข้าทริป หรือกด \"จองตรง 0% GP\" เพื่อไปยังหน้าที่พัก ระบบจะนำส่วนลดไปหักให้อัตโนมัติตอนจอง"
                     : "No code entry needed — save this deal to your board or tap \"Book direct 0% GP\" and your discount will apply automatically at checkout."}
                 </p>
               )}

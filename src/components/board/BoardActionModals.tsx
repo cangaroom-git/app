@@ -123,8 +123,8 @@ export function CreateBoardModal({
         err instanceof Error
           ? err.message
           : isTh
-          ? "สร้างบอร์ดไม่สำเร็จ"
-          : "Failed to create board"
+          ? "สร้างทริปไม่สำเร็จ"
+          : "Failed to create trip"
       );
     }
   };
@@ -133,7 +133,7 @@ export function CreateBoardModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "สร้างบอร์ดใหม่" : "Create board"}
+      aria-label={isTh ? "สร้างทริปใหม่" : "Create trip"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -150,7 +150,7 @@ export function CreateBoardModal({
         {/* Header */}
         <div className="relative px-6 py-4 flex items-center justify-center border-b border-[var(--color-border)]">
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "สร้างบอร์ดใหม่" : "Create board"}
+            {isTh ? "สร้างทริปใหม่" : "Create trip"}
           </h2>
           <button
             type="button"
@@ -166,7 +166,7 @@ export function CreateBoardModal({
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-6 space-y-2">
             <StandardInput
-              label={isTh ? "ชื่อบอร์ด" : "Board name"}
+              label={isTh ? "ชื่อทริป" : "Trip name"}
               optionalText={`${name.length}/50`}
               type="text"
               autoFocus
@@ -199,7 +199,7 @@ export function CreateBoardModal({
               className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>{isTh ? "สร้างบอร์ด" : "Create"}</span>
+              <span>{isTh ? "สร้างทริป" : "Create"}</span>
             </button>
           </div>
         </form>
@@ -249,7 +249,7 @@ export function ChooseBoardModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "เลือกบอร์ดที่ต้องการบันทึก" : "Save to board"}
+      aria-label={isTh ? "เลือกทริปที่ต้องการบันทึก" : "Save to trip"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -265,7 +265,7 @@ export function ChooseBoardModal({
 
         <div className="relative px-6 py-4 flex items-center justify-center border-b border-[var(--color-border)] shrink-0">
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "เลือกบอร์ดสำหรับบันทึก" : "Save to board"}
+            {isTh ? "เลือกทริปสำหรับบันทึก" : "Save to trip"}
           </h2>
           <button
             type="button"
@@ -322,7 +322,7 @@ export function ChooseBoardModal({
             className="w-full h-11 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>{isTh ? "สร้างบอร์ดใหม่" : "Create new board"}</span>
+            <span>{isTh ? "สร้างทริปใหม่" : "Create new trip"}</span>
           </button>
         </div>
       </div>
@@ -368,7 +368,7 @@ export function DeleteBoardConfirmModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "ยืนยันการลบบอร์ด" : "Delete board"}
+      aria-label={isTh ? "ยืนยันการลบทริป" : "Delete trip"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -393,7 +393,7 @@ export function DeleteBoardConfirmModal({
 
         <div className="px-6 pt-8 pb-6 text-center space-y-2">
           <h2 className="text-[19px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "ลบบอร์ดนี้หรือไม่?" : "Delete this board?"}
+            {isTh ? "ลบทริปนี้หรือไม่?" : "Delete this trip?"}
           </h2>
           <p className="text-[14px] text-[var(--color-text-secondary)]">
             {isTh

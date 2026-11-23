@@ -76,6 +76,44 @@ enum PropertyType {
   GLAMPING_HOMESTAY
 }
 
+enum PlaceCategory {
+  STAY
+  CAFE
+  RESTAURANT
+  ATTRACTION
+  WELLNESS
+}
+
+enum MerchantMode {
+  DIRECT_BOOKING
+  PROFILE_ONLY
+}
+
+enum PromoKind {
+  BOOKING_COUPON
+  ONSITE_PERK
+  EXTERNAL_LINK_DEAL
+}
+
+enum HotelPostKind {
+  FEED_POST
+  BLOG
+}
+
+enum PlaceReportReason {
+  DUPLICATE
+  FAKE_SCAM
+  CLOSED
+  WRONG_LOCATION
+  OTHER
+}
+
+enum PlaceReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
 enum DiscountRuleType {
   LENGTH_OF_STAY
   EARLY_BIRD
@@ -195,6 +233,14 @@ model Hotel {
   bankAccountNo        String              @default("")
   verificationStatus   VerificationStatus  @default(PENDING_REVIEW)
   propertyType         PropertyType        @default(BOUTIQUE_HOTEL)
+  placeCategory        PlaceCategory       @default(STAY)
+  merchantMode         MerchantMode        @default(DIRECT_BOOKING)
+  externalWebsiteUrl   String              @default("")
+  primaryCtaLabelTh    String              @default("")
+  openingHoursJson     Json?
+  googlePlaceId        String?
+  canonicalPinId       String?
+  featuredCouponId     String?
   isPublished          Boolean             @default(true)
   ratingAvg            Float               @default(4.9)
   reviewCount          Int                 @default(0)
@@ -211,10 +257,15 @@ model Hotel {
   socialConnections    SocialConnection[]
   campaigns            SponsoredCampaign[]
   posts                HotelPost[]
+  reports              PlaceReport[]
 
   @@index([provinceId])
   @@index([ownerId])
   @@index([verificationStatus, isPublished])
+  @@index([placeCategory, merchantMode, isPublished])
+  @@index([latitude, longitude])
+  @@index([googlePlaceId])
+  @@index([canonicalPinId])
 }
 
 model Room {
@@ -342,6 +393,7 @@ model Pin {
   externalClickCount Int               @default(0)
   externalPostId     String?
   externalPermalink  String?
+  isCanonicalCard    Boolean           @default(true)
   publishStatus      PinPublishStatus  @default(PUBLISHED)
   aiConfidenceScore Int?
   aiTriageNote      String?
@@ -362,6 +414,7 @@ model Pin {
 
   @@unique([hotelId, sourcePlatform, externalPostId])
   @@index([publishStatus, provinceId])
+  @@index([publishStatus, isCanonicalCard, provinceId])
   @@index([publishStatus, dealSourceType, promoExpiresAt])
   @@index([publishStatus, isSponsored, sponsoredPriority, createdAt])
 }
@@ -424,6 +477,8 @@ model SavedBoard {
   userId    String
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
+  shareSlug String?         @unique
+  isPublic  Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   pins      SavedBoardPin[]
@@ -439,11 +494,13 @@ model SavedBoardPin {
   pin                   Pin        @relation(fields: [pinId], references: [id], onDelete: Cascade)
   userId                String
   user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sortOrder             Int        @default(0)
   savedPriceSnapshotThb Int?
   createdAt             DateTime   @default(now())
 
   @@unique([boardId, pinId])
   @@index([userId, pinId])
+  @@index([boardId, sortOrder, createdAt])
 }
 
 model Coupon {
@@ -456,6 +513,10 @@ model Coupon {
   descriptionTh  String              @default("")
   descriptionEn  String              @default("")
   coverImageUrl  String?
+  promoKind      PromoKind           @default(BOOKING_COUPON)
+  badgeTextTh    String              @default("")
+  badgeTextEn    String              @default("")
+  externalUrl    String?
   discountType   DiscountType        @default(FIXED_THB)
   discountValue  Int
   minSpendThb    Int                 @default(0)
@@ -618,16 +679,35 @@ model HotelPost {
   contentTh     String            @db.Text
   coverImageUrl String
   galleryUrls   String[]          @default([])
-  categoryTh    String            @default("คู่มือเที่ยว & ที่พัก")
-  tags          String[]          @default([])
-  status        PostPublishStatus @default(PUBLISHED)
-  viewsCount    Int               @default(0)
-  publishedAt   DateTime          @default(now())
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  categoryTh     String            @default("คู่มือเที่ยว & ที่พัก")
+  postKind       HotelPostKind     @default(BLOG)
+  sourcePlatform SocialPlatform    @default(MANUAL)
+  externalPostId String?
+  tags           String[]          @default([])
+  status         PostPublishStatus @default(PUBLISHED)
+  viewsCount     Int               @default(0)
+  publishedAt    DateTime          @default(now())
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@unique([hotelId, slug])
   @@index([hotelId, status, publishedAt])
+  @@index([hotelId, postKind, status, publishedAt])
+}
+
+model PlaceReport {
+  id             String            @id @default(cuid())
+  hotelId        String
+  hotel          Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  reporterUserId String?
+  reason         PlaceReportReason @default(OTHER)
+  note           String            @default("")
+  status         PlaceReportStatus @default(OPEN)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([hotelId, status])
 }
 
 model VisitorTasteProfile {

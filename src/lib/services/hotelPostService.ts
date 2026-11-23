@@ -30,6 +30,7 @@ export interface HotelPostQueryRow {
   contentTh: string;
   coverImageUrl: string;
   galleryUrls: string[];
+  postKind?: "FEED_POST" | "BLOG";
   categoryTh: string;
   tags: string[];
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -71,6 +72,8 @@ export function mapHotelPostToSummaryDto(
       row.excerptTh.trim() ||
       row.contentTh.replace(/[#*`>\-\n]+/g, " ").trim().slice(0, 160),
     coverImageUrl: row.coverImageUrl,
+    galleryUrls: row.galleryUrls ?? [],
+    postKind: row.postKind ?? "BLOG",
     categoryTh: row.categoryTh,
     tags: row.tags,
     status: row.status,

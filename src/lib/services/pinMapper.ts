@@ -1,5 +1,11 @@
 import { getProvinceById } from "@/data/thailandProvinces";
-import type { PinActiveCouponDto, PinFeedItemDto } from "@/types/cangaroom";
+import type {
+  MerchantModeDto,
+  PinActiveCouponDto,
+  PinFeedItemDto,
+  PlaceCategoryDto,
+  PromoKindDto,
+} from "@/types/cangaroom";
 
 export const PIN_COUPON_SELECT = {
   id: true,
@@ -9,6 +15,11 @@ export const PIN_COUPON_SELECT = {
   descriptionTh: true,
   descriptionEn: true,
   coverImageUrl: true,
+  promoKind: true,
+  badgeTextTh: true,
+  badgeTextEn: true,
+  externalUrl: true,
+  isFeaturedDeal: true,
   discountType: true,
   discountValue: true,
   minSpendThb: true,
@@ -28,6 +39,11 @@ export interface RawPinCoupon {
   descriptionTh: string;
   descriptionEn: string;
   coverImageUrl: string | null;
+  promoKind?: PromoKindDto;
+  badgeTextTh?: string;
+  badgeTextEn?: string;
+  externalUrl?: string | null;
+  isFeaturedDeal?: boolean;
   discountType: "PERCENT" | "FIXED_THB";
   discountValue: number;
   minSpendThb: number;
@@ -85,6 +101,11 @@ export interface RawPinWithRelations {
     logoUrl: string | null;
     verificationStatus: "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
     ratingAvg: number;
+    placeCategory?: PlaceCategoryDto;
+    merchantMode?: MerchantModeDto;
+    externalWebsiteUrl?: string | null;
+    primaryCtaLabelTh?: string | null;
+    featuredCouponId?: string | null;
     latitude?: number | null;
     longitude?: number | null;
     districtTh?: string | null;
@@ -125,6 +146,11 @@ function toPinActiveCouponDto(c: RawPinCoupon): PinActiveCouponDto {
     descriptionTh: c.descriptionTh,
     descriptionEn: c.descriptionEn || c.descriptionTh,
     coverImageUrl: c.coverImageUrl,
+    promoKind: c.promoKind ?? "BOOKING_COUPON",
+    badgeTextTh: c.badgeTextTh ?? "",
+    badgeTextEn: c.badgeTextEn ?? "",
+    externalUrl: c.externalUrl ?? null,
+    isFeaturedDeal: c.isFeaturedDeal ?? false,
     discountType: c.discountType,
     discountValue: c.discountValue,
     minSpendThb: c.minSpendThb,
@@ -169,11 +195,30 @@ export function mapPinToDto(
   const nowMs = Date.now();
   const seenCouponIds = new Set<string>();
   const resolvedRawCoupons: RawPinCoupon[] = [];
+  const featuredCouponId = pin.hotel.featuredCouponId ?? null;
 
-  if (isFullCoupon(pin.coupon) && isCouponClaimable(pin.coupon, nowMs)) {
+  // 1. Highest priority: Owner's explicitly featured promo on the Place card
+  if (featuredCouponId && pin.hotel.coupons && pin.hotel.coupons.length > 0) {
+    const featured = pin.hotel.coupons.find(
+      (c) => c.id === featuredCouponId && isCouponClaimable(c, nowMs)
+    );
+    if (featured) {
+      seenCouponIds.add(featured.id);
+      resolvedRawCoupons.push(featured);
+    }
+  }
+
+  // 2. Pin-linked coupon
+  if (
+    isFullCoupon(pin.coupon) &&
+    !seenCouponIds.has(pin.coupon.id) &&
+    isCouponClaimable(pin.coupon, nowMs)
+  ) {
     seenCouponIds.add(pin.coupon.id);
     resolvedRawCoupons.push(pin.coupon);
   }
+
+  // 3. Remaining active promotions owned by this Place
   if (pin.hotel.coupons && pin.hotel.coupons.length > 0) {
     for (const c of pin.hotel.coupons) {
       if (!seenCouponIds.has(c.id) && isCouponClaimable(c, nowMs)) {
@@ -200,21 +245,40 @@ export function mapPinToDto(
     }))
     .filter((item) => item.nameTh.length > 0);
 
+  const placeCategory: PlaceCategoryDto = pin.hotel.placeCategory ?? "STAY";
+  const merchantMode: MerchantModeDto =
+    pin.hotel.merchantMode ??
+    (pin.dealSourceType === "EXTERNAL" ? "PROFILE_ONLY" : "DIRECT_BOOKING");
   const dealSourceType = pin.dealSourceType ?? "INTERNAL";
+
+  const couponHeadlineTh = activeCoupon
+    ? activeCoupon.badgeTextTh?.trim() ||
+      (activeCoupon.discountValue > 0
+        ? activeCoupon.discountType === "PERCENT"
+          ? `ลด ${activeCoupon.discountValue}%`
+          : `ลด ฿${activeCoupon.discountValue.toLocaleString()}`
+        : activeCoupon.titleTh.trim() || null)
+    : null;
+  const couponHeadlineEn = activeCoupon
+    ? activeCoupon.badgeTextEn?.trim() ||
+      (activeCoupon.discountValue > 0
+        ? activeCoupon.discountType === "PERCENT"
+          ? `${activeCoupon.discountValue}% OFF`
+          : `฿${activeCoupon.discountValue.toLocaleString()} OFF`
+        : activeCoupon.titleEn.trim() || null)
+    : null;
+
   const resolvedPromoHeadlineTh =
-    pin.promoHeadlineTh ||
-    (activeCoupon
-      ? activeCoupon.discountType === "PERCENT"
-        ? `ลด ${activeCoupon.discountValue}%`
-        : `ลด ฿${activeCoupon.discountValue.toLocaleString()}`
-      : null);
+    (featuredCouponId && couponHeadlineTh) ||
+    pin.promoHeadlineTh?.trim() ||
+    couponHeadlineTh ||
+    null;
   const resolvedPromoHeadlineEn =
-    pin.promoHeadlineEn ||
-    (activeCoupon
-      ? activeCoupon.discountType === "PERCENT"
-        ? `${activeCoupon.discountValue}% OFF`
-        : `฿${activeCoupon.discountValue.toLocaleString()} OFF`
-      : null);
+    (featuredCouponId && couponHeadlineEn) ||
+    pin.promoHeadlineEn?.trim() ||
+    couponHeadlineEn ||
+    null;
+  const hasActivePromo = Boolean(activeCoupon || resolvedPromoHeadlineTh);
 
   return {
     id: pin.id,
@@ -225,6 +289,12 @@ export function mapPinToDto(
     hotelLogoUrl: pin.hotel.logoUrl,
     hotelVerificationStatus: pin.hotel.verificationStatus,
     hotelRatingAvg: pin.hotel.ratingAvg,
+    placeCategory,
+    merchantMode,
+    externalWebsiteUrl: pin.hotel.externalWebsiteUrl ?? "",
+    primaryCtaLabelTh: pin.hotel.primaryCtaLabelTh ?? "",
+    featuredCouponId,
+    hasActivePromo,
     hotelLatitude:
       typeof pin.hotel.latitude === "number" ? pin.hotel.latitude : null,
     hotelLongitude:

@@ -6,10 +6,13 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { SeeAllCouponCard } from "@/components/home/SeeAllCouponCard";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
+// Mobile (< sm): 2 cards + gentle peek; Tablet (sm..lg-1): 3 cards + gentle peek;
+// Desktop lg (1024-1279px): EXACTLY 5 FULL 3:4 CARDS; Desktop xl (>= 1280px): EXACTLY 6 FULL 3:4 CARDS (ZERO clipped edge card!)
 export const COUPON_CARD_SLOT_WIDTH_CLASS =
-  "w-[calc((100%-36px)/2)] sm:w-[calc((100%-52px)/3)] lg:w-[252px] shrink-0 snap-start flex items-start";
+  "w-[calc((100%-36px)/2)] sm:w-[calc((100%-52px)/3)] lg:w-[calc((100%-64px)/5)] xl:w-[calc((100%-80px)/6)] shrink-0 snap-start flex items-start";
 
 export interface DealSlideRowProps {
   id?: string;
@@ -27,7 +30,11 @@ export interface DealSlideRowProps {
   compactHeader?: boolean;
   highlightedPinId?: string | null;
   trackEdgeClassName?: string;
-  onSelectDeal: (pin: PinFeedItemDto) => void;
+  onSelectDeal: (
+    pin: PinFeedItemDto,
+    originRect?: CardOriginRect | null,
+    event?: React.MouseEvent | React.KeyboardEvent
+  ) => void;
   onToggleSave: (pinId: string) => void;
   onHoverDeal?: (pin: PinFeedItemDto | null) => void;
 }
@@ -38,7 +45,7 @@ export const DealSlideRow = React.memo(function DealSlideRow({
   subtitle,
   seeAllHref,
   showSeeAllCard = true,
-  maxVisibleCards = 8,
+  maxVisibleCards = 11,
   deals,
   language,
   savedPinIds,
@@ -88,7 +95,13 @@ export const DealSlideRow = React.memo(function DealSlideRow({
   const scrollByStep = (direction: "prev" | "next") => {
     const el = trackRef.current;
     if (!el) return;
-    const step = Math.max(280, Math.round(el.clientWidth * 0.78));
+    // On Desktop (>= 1024px), slide by exact full 5-card page (`clientWidth + 16px gap`)
+    // so every stopped state shows 5 FULL cards with ZERO half-clipped card!
+    const isDesktop =
+      typeof window !== "undefined" && window.innerWidth >= 1024;
+    const step = isDesktop
+      ? el.clientWidth + 16
+      : Math.max(280, Math.round(el.clientWidth * 0.78));
     el.scrollBy({
       left: direction === "next" ? step : -step,
       behavior: "smooth",
@@ -210,7 +223,7 @@ export const DealSlideRow = React.memo(function DealSlideRow({
       <div
         ref={trackRef}
         data-swipe-ignore="true"
-        className={`${trackEdgeClassName} flex items-start gap-3 lg:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-proximity`}
+        className={`${trackEdgeClassName} flex items-start gap-3 lg:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-proximity lg:snap-mandatory`}
       >
         {visibleDeals.map((deal, idx) => (
           <div

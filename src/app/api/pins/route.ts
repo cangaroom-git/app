@@ -5,6 +5,7 @@ import {
   getPinsByIds,
   searchDiscoveryPins,
 } from "@/lib/services/stayDiscoveryService";
+import { isValidPlaceCategory } from "@/lib/placeCategories";
 import { inferCoarseContextFromHeaders } from "@/lib/telemetry/geoHeaders";
 import {
   CGR_CONSENT_COOKIE,
@@ -28,6 +29,10 @@ export async function GET(request: Request) {
     }
 
     const style = url.searchParams.get("style");
+    const placeCategoryRaw = url.searchParams.get("placeCategory")?.toUpperCase();
+    const placeCategory = isValidPlaceCategory(placeCategoryRaw)
+      ? placeCategoryRaw
+      : "ALL";
     const provinceId = url.searchParams.get("provinceId");
     const sourceTypeRaw = url.searchParams.get("sourceType")?.toUpperCase();
     const sourceType =
@@ -68,6 +73,7 @@ export async function GET(request: Request) {
 
     const pins = await searchDiscoveryPins({
       style,
+      placeCategory,
       provinceId,
       sourceType,
       q,

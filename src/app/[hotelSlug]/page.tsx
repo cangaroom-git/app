@@ -3,12 +3,38 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getServerSessionUser } from "@/lib/auth/session";
 import { getHotelStorefrontBySlug } from "@/lib/services/hotelStorefrontService";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import {
   HotelStorefrontClient,
   type HotelProfileTabId,
 } from "@/components/hotel/HotelStorefrontClient";
 
 export const dynamic = "force-dynamic";
+
+const SCHEMA_DAY_MAP: Record<string, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+function getSchemaOrgType(placeCategory?: string | null): string {
+  switch (placeCategory) {
+    case "CAFE":
+      return "CafeOrCoffeeShop";
+    case "RESTAURANT":
+      return "Restaurant";
+    case "ATTRACTION":
+      return "TouristAttraction";
+    case "WELLNESS":
+      return "HealthAndBeautyBusiness";
+    default:
+      return "LodgingBusiness";
+  }
+}
 
 export async function generateMetadata({
   params,
@@ -21,24 +47,31 @@ export async function generateMetadata({
 
   if (!storefront) {
     return {
-      title: `ไม่พบที่พัก @${cleanSlug} | Nondii`,
+      title: `ไม่พบสถานที่ @${cleanSlug} | Nondii`,
     };
   }
 
   const { hotel, rooms } = storefront;
+  const catMeta = getPlaceCategoryMeta(hotel.placeCategory);
+  const isDirectStay =
+    hotel.merchantMode !== "PROFILE_ONLY" && rooms.length > 0;
   const minPrice = rooms.reduce(
     (min, r) => (r.weekdayPriceThb < min ? r.weekdayPriceThb : min),
     rooms[0]?.weekdayPriceThb ?? 0
   );
 
-  const title = `${hotel.nameTh} — ที่พัก${hotel.provinceNameTh}${
-    minPrice > 0 ? ` เริ่มต้น ฿${minPrice.toLocaleString()}/คืน` : ""
-  } | จองตรง 0% GP · Nondii`;
+  const title = isDirectStay
+    ? `${hotel.nameTh} — ที่พัก${hotel.provinceNameTh}${
+        minPrice > 0 ? ` เริ่มต้น ฿${minPrice.toLocaleString()}/คืน` : ""
+      } | จองตรง 0% GP · Nondii`
+    : `${hotel.nameTh} — ${catMeta.labelTh}${hotel.provinceNameTh} | Nondii`;
 
   const description =
     hotel.descriptionTh ||
     hotel.taglineTh ||
-    `ดูรูปบรรยากาศ ห้องว่าง และจองตรงกับ ${hotel.nameTh} จ.${hotel.provinceNameTh} ฟรีค่า GP 0% ผ่านระบบ Nondii`;
+    (isDirectStay
+      ? `ดูรูปบรรยากาศ ห้องว่าง และจองตรงกับ ${hotel.nameTh} จ.${hotel.provinceNameTh} ฟรีค่า GP 0% ผ่านระบบ Nondii`
+      : `ดูบรรยากาศ โปรโมชั่น เวลาเปิด-ปิด พิกัด และรีวิวของ ${hotel.nameTh} จ.${hotel.provinceNameTh} บน Nondii`);
 
   const ogImage = hotel.coverImageUrl || hotel.logoUrl || undefined;
 
@@ -48,10 +81,10 @@ export async function generateMetadata({
     keywords: [
       hotel.nameTh,
       hotel.nameEn,
-      `ที่พัก${hotel.provinceNameTh}`,
+      `${catMeta.shortLabelTh}${hotel.provinceNameTh}`,
       hotel.districtTh,
       ...hotel.stayStyles,
-      "จองตรงโรงแรม",
+      isDirectStay ? "จองตรงโรงแรม" : catMeta.labelTh,
     ].filter(Boolean),
     alternates: {
       canonical: `/${hotel.slug}`,
@@ -86,18 +119,21 @@ export default async function HotelStorefrontPage({
   if (!storefront) {
     return (
       <div className="cgr-page-form py-12 text-center space-y-4">
-        <h1 className="ty-display">ไม่พบที่พัก @{cleanSlug}</h1>
+        <h1 className="ty-display">ไม่พบสถานที่ @{cleanSlug}</h1>
         <p className="ty-body text-[var(--color-text-secondary)]">
-          ลิงก์หน้าร้านนี้อาจถูกปิดใช้งานหรือไม่มีอยู่ในระบบ
+          ลิงก์โปรไฟล์นี้อาจถูกปิดใช้งานหรือไม่มีอยู่ในระบบ
         </p>
         <Link href="/" className="btn-round-solid inline-flex">
-          กลับหน้าแรกสำรวจที่พัก
+          กลับหน้าแรกสำรวจสถานที่
         </Link>
       </div>
     );
   }
 
   const { hotel, rooms, reviews } = storefront;
+  const isDirectStay =
+    hotel.merchantMode !== "PROFILE_ONLY" && rooms.length > 0;
+  const schemaType = getSchemaOrgType(hotel.placeCategory);
 
   const rawTab = sp?.tab;
   const initialTab: HotelProfileTabId =
@@ -129,9 +165,18 @@ export default async function HotelStorefrontPage({
     }))
   );
 
-  const lodgingJsonLd = {
+  const openingHoursSpecification = (hotel.openingHours ?? [])
+    .filter((oh) => !oh.closed && oh.open && oh.close)
+    .map((oh) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: SCHEMA_DAY_MAP[oh.day] ?? oh.day,
+      opens: oh.open,
+      closes: oh.close,
+    }));
+
+  const placeJsonLd = {
     "@context": "https://schema.org",
-    "@type": "LodgingBusiness",
+    "@type": schemaType,
     name: hotel.nameTh,
     alternateName: hotel.nameEn,
     description: hotel.descriptionTh || hotel.taglineTh,
@@ -144,10 +189,18 @@ export default async function HotelStorefrontPage({
             ...photoObjects.slice(0, 20),
           ]
         : hotel.coverImageUrl || hotel.logoUrl,
-    telephone: hotel.contactPhone,
-    checkinTime: hotel.checkInTime,
-    checkoutTime: hotel.checkOutTime,
-    petsAllowed: hotel.petsAllowed,
+    ...(hotel.contactPhone ? { telephone: hotel.contactPhone } : {}),
+    ...(hotel.externalWebsiteUrl ? { url: hotel.externalWebsiteUrl } : {}),
+    ...(isDirectStay
+      ? {
+          checkinTime: hotel.checkInTime,
+          checkoutTime: hotel.checkOutTime,
+          petsAllowed: hotel.petsAllowed,
+        }
+      : {}),
+    ...(openingHoursSpecification.length > 0
+      ? { openingHoursSpecification }
+      : {}),
     address: {
       "@type": "PostalAddress",
       streetAddress: hotel.addressTh,
@@ -184,18 +237,22 @@ export default async function HotelStorefrontPage({
           })),
         }
       : {}),
-    makesOffer: rooms.map((r) => ({
-      "@type": "Offer",
-      name: r.nameTh,
-      description: r.shortDescTh,
-      ...(r.galleryUrls.length > 0 ? { image: r.galleryUrls.slice(0, 8) } : {}),
-      price: r.weekdayPriceThb,
-      priceCurrency: "THB",
-      availability:
-        r.availableUnits > 0
-          ? "https://schema.org/InStock"
-          : "https://schema.org/SoldOut",
-    })),
+    ...(isDirectStay && rooms.length > 0
+      ? {
+          makesOffer: rooms.map((r) => ({
+            "@type": "Offer",
+            name: r.nameTh,
+            description: r.shortDescTh,
+            ...(r.galleryUrls.length > 0 ? { image: r.galleryUrls.slice(0, 8) } : {}),
+            price: r.weekdayPriceThb,
+            priceCurrency: "THB",
+            availability:
+              r.availableUnits > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/SoldOut",
+          })),
+        }
+      : {}),
   };
 
   const faqJsonLd =
@@ -218,7 +275,7 @@ export default async function HotelStorefrontPage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(lodgingJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(placeJsonLd) }}
       />
       {faqJsonLd && (
         <script
@@ -227,6 +284,7 @@ export default async function HotelStorefrontPage({
         />
       )}
       <HotelStorefrontClient
+        key={hotel.slug}
         initialStorefront={storefront}
         hotelSlug={hotel.slug}
         initialTab={initialTab}

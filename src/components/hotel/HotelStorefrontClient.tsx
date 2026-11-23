@@ -3,6 +3,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,8 +12,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   BadgeCheck,
   BedDouble,
+  Bookmark,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -20,11 +23,14 @@ import {
   Clock,
   ExternalLink,
   Eye,
+  Heart,
   Images,
   MessageCircle,
   Minus,
+  MoreHorizontal,
   Phone,
   Plus,
+  Share,
   Share2,
   ShieldCheck,
   Star,
@@ -66,6 +72,18 @@ import { DesktopDateRangePopover } from "@/components/booking/DesktopDateRangePo
 import { MobileDateRangeSheet } from "@/components/booking/MobileDateRangeSheet";
 import { HotelChooseRoomSection } from "@/components/hotel/HotelChooseRoomSection";
 import { HotelInfoBottomSheet } from "@/components/hotel/HotelInfoBottomSheet";
+import { PlaceCommentsModal } from "@/components/hotel/PlaceCommentsModal";
+import { PlaceOnlyProfileBody } from "@/components/hotel/PlaceOnlyProfileBody";
+import { PlaceCategoryCrest } from "@/components/shared/PlaceCategoryCrest";
+import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { syncPinLikeState } from "@/lib/placeLikeStore";
+import {
+  clearNearbyHopOrigin,
+  readNearbyHopOriginForSlug,
+  type PlaceNearbyHopOrigin,
+} from "@/lib/placeNavigationStore";
+import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
+import type { RouteHeroTargetRect } from "@/components/navigation/PlaceCardFlipOverlay";
 import {
   RoomBookingDrawer,
   selectBestEligibleCoupon,
@@ -163,7 +181,11 @@ export function HotelStorefrontClient({
     savedPinIds: globalSavedPinIds,
     hasLoadedBoardsOnce,
     triggerPinToBoard,
+    pinLikeOverrides,
     togglePinLikeInstant,
+    navigateToPlaceWithFlip,
+    signalPlaceHeroReady,
+    activeFlipTargetSlug,
   } = useHotelApp();
 
   const [storefront, setStorefront] =
@@ -231,13 +253,123 @@ export function HotelStorefrontClient({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [drawerRoom, setDrawerRoom] = useState<RoomAvailabilityDto | null>(null);
 
+  // Adaptive Place Profile + Cross-Route 3D Flip + Strict 1-Hop Nearby Lock state
+  const [nearbyHopOrigin, setNearbyHopOrigin] =
+    useState<PlaceNearbyHopOrigin | null>(null);
+  const [canonicalComments, setCanonicalComments] = useState<PinCommentDto[]>(
+    () => initialStorefront.pinComments ?? []
+  );
+  const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
+  const [isHeroMoreMenuOpen, setIsHeroMoreMenuOpen] = useState(false);
+  const heroMoreMenuRef = useRef<HTMLDivElement | null>(null);
+  const mosaicPrimaryHeroRef = useRef<HTMLElement | null>(null);
+  const mobileHeroStageRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setCanonicalComments(initialStorefront.pinComments ?? []);
+  }, [initialStorefront.pinComments, cleanSlug]);
+
+  useEffect(() => {
+    if (!isHeroMoreMenuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (
+        heroMoreMenuRef.current &&
+        !heroMoreMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsHeroMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [isHeroMoreMenuOpen]);
+
+  // Synchronize `nearbyHopOrigin` BEFORE measuring the Hero rect so the Depth-1 Back Bar
+  // ("← กลับไป ...") is already painted when we report `signalPlaceHeroReady` (ZERO 56px shift!).
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const expectedHop = readNearbyHopOriginForSlug(cleanSlug);
+    const currentFrom = nearbyHopOrigin?.fromSlug ?? null;
+    const expectedFrom = expectedHop?.fromSlug ?? null;
+    if (currentFrom !== expectedFrom) {
+      setNearbyHopOrigin(expectedHop);
+      return;
+    }
+
+    if (window.scrollY > 0) {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+    const targetEl =
+      window.innerWidth >= 640
+        ? mosaicPrimaryHeroRef.current
+        : mobileHeroStageRef.current;
+    if (!targetEl) return;
+    const r = targetEl.getBoundingClientRect();
+    if (r.width >= 40 && r.height >= 40) {
+      const isDesktop = window.innerWidth >= 1024;
+      const isTablet = window.innerWidth >= 640 && window.innerWidth < 1024;
+      signalPlaceHeroReady(cleanSlug, {
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+        radius: isDesktop ? 16 : isTablet ? 12 : 0,
+        borderRadiusCss: isDesktop
+          ? "16px 0px 0px 16px"
+          : isTablet
+          ? "12px 0px 0px 12px"
+          : "0px",
+      });
+    }
+  }, [cleanSlug, signalPlaceHeroReady, nearbyHopOrigin]);
+
+  const refreshCanonicalComments = useCallback(async (pinId: string) => {
+    try {
+      const res = await fetch(`/api/pins/${encodeURIComponent(pinId)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { comments?: PinCommentDto[] };
+      if (Array.isArray(data.comments)) {
+        setCanonicalComments(data.comments);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleProfileBack = useCallback(() => {
+    if (nearbyHopOrigin) {
+      const targetSlug = nearbyHopOrigin.fromSlug;
+      clearNearbyHopOrigin();
+      router.push(`/${encodeURIComponent(targetSlug)}`);
+      return;
+    }
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  }, [nearbyHopOrigin, router]);
+
+  const handleHeroStageMeasured = useCallback(
+    (rect: RouteHeroTargetRect) => {
+      signalPlaceHeroReady(cleanSlug, rect);
+    },
+    [cleanSlug, signalPlaceHeroReady]
+  );
+
   // Record this property's primary deal pin into Recently Viewed when visiting /{hotelSlug}
   useEffect(() => {
-    const primaryPinId = initialStorefront.pins[0]?.id;
+    const primaryPinId =
+      initialStorefront.canonicalPin?.id ?? initialStorefront.pins[0]?.id;
     if (primaryPinId) {
       recordRecentViewedPinId(primaryPinId);
     }
-  }, [initialStorefront.hotel.id, initialStorefront.pins]);
+  }, [
+    initialStorefront.hotel.id,
+    initialStorefront.canonicalPin?.id,
+    initialStorefront.pins,
+  ]);
   const [initialCouponCode, setInitialCouponCode] = useState<string | null>(
     null
   );
@@ -1285,18 +1417,208 @@ export function HotelStorefrontClient({
     },
   ];
 
+  const canonicalPin: PinFeedItemDto | null =
+    storefront.canonicalPin ?? storefront.pins[0] ?? null;
+  const isProfileOnlyPlace =
+    hotel.merchantMode === "PROFILE_ONLY" || rooms.length === 0;
+  const nearbyPlaces = storefront.nearbyPlaces ?? [];
+  const backTargetName = nearbyHopOrigin
+    ? language === "th"
+      ? nearbyHopOrigin.fromNameTh
+      : nearbyHopOrigin.fromNameEn
+    : null;
+  const isFlipHidingHero =
+    activeFlipTargetSlug !== null &&
+    activeFlipTargetSlug.toLowerCase() === cleanSlug;
+
+  const handleSelectNearbyPlace = useCallback(
+    (nextPlace: PinFeedItemDto, rect?: CardOriginRect | null) => {
+      // Strict 1-Hop Lock: only allow hopping from Depth 0 -> Depth 1!
+      if (nearbyHopOrigin) return;
+      navigateToPlaceWithFlip({
+        pin: nextPlace,
+        originRect: rect,
+        fromNearbyOf: {
+          fromSlug: hotel.slug,
+          fromNameTh: hotel.nameTh,
+          fromNameEn: hotel.nameEn,
+        },
+      });
+    },
+    [hotel.nameEn, hotel.nameTh, hotel.slug, navigateToPlaceWithFlip, nearbyHopOrigin]
+  );
+
+  const handleToggleSaveAnyPin = useCallback(
+    async (pinId: string) => {
+      const target =
+        (canonicalPin?.id === pinId ? canonicalPin : null) ??
+        nearbyPlaces.find((p) => p.id === pinId) ??
+        storefront.pins.find((p) => p.id === pinId);
+      if (!target) return;
+      const res = await triggerPinToBoard({
+        id: target.id,
+        coverImageUrl: target.coverImageUrl,
+        isSavedByMe: effectiveSavedPinIds.has(target.id),
+      });
+      if (res) {
+        setOptimisticSavedIds((prev) => {
+          const next = new Set(prev);
+          if (res.isSaved) next.add(pinId);
+          else next.delete(pinId);
+          return next;
+        });
+      }
+    },
+    [canonicalPin, effectiveSavedPinIds, nearbyPlaces, storefront.pins, triggerPinToBoard]
+  );
+
+  const heroLikeOverride = canonicalPin
+    ? pinLikeOverrides[canonicalPin.id]
+    : undefined;
+  const effectiveHeroIsLiked =
+    heroLikeOverride?.isLiked ?? canonicalPin?.isLikedByMe ?? false;
+  const effectiveHeroLikesCount =
+    heroLikeOverride?.likesCount ?? canonicalPin?.likesCount ?? 0;
+  const effectiveHeroIsSaved = Boolean(
+    canonicalPin && effectiveSavedPinIds.has(canonicalPin.id)
+  );
+  const totalHeroCommentsCount = useMemo(
+    () =>
+      canonicalComments.reduce(
+        (sum, c) => sum + 1 + (c.replies?.length ?? 0),
+        0
+      ),
+    [canonicalComments]
+  );
+
+  const handleHeroToggleLike = () => {
+    if (!canonicalPin) return;
+    const nextLiked = !effectiveHeroIsLiked;
+    const nextCount = Math.max(
+      0,
+      effectiveHeroLikesCount + (nextLiked ? 1 : -1)
+    );
+    syncPinLikeState(canonicalPin.id, nextLiked, nextCount);
+    togglePinLikeInstant({
+      id: canonicalPin.id,
+      isLikedByMe: effectiveHeroIsLiked,
+      likesCount: effectiveHeroLikesCount,
+    });
+  };
+
+  const handleHeroAddComment = async (
+    text: string,
+    parentId?: string | null
+  ) => {
+    if (!canonicalPin) return;
+    const runComment = async () => {
+      await fetch(
+        `/api/pins/${encodeURIComponent(canonicalPin.id)}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: text, parentId }),
+        }
+      );
+      await refreshCanonicalComments(canonicalPin.id);
+    };
+    if (!currentUser) {
+      openAuthModal({
+        reasonTh: "เข้าสู่ระบบเพื่อแสดงความคิดเห็น",
+        reasonEn: "Log in to post a comment",
+        onSuccess: runComment,
+      });
+      return;
+    }
+    await runComment();
+  };
+
+  const handleHeroDeleteComment = async (commentId: string) => {
+    if (!canonicalPin) return;
+    await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
+      method: "DELETE",
+    });
+    await refreshCanonicalComments(canonicalPin.id);
+  };
+
+  // Ensure the primary card cover image is ALWAYS Slide 0, followed by all canonicalPin.mediaUrls
+  // and room/storefront slides (deduplicated by Unsplash photo path so every mosaic slot is strictly unique!)
+  const heroMosaicSlides = useMemo<PureMediaSlide[]>(() => {
+    const seen = new Set<string>();
+    const out: PureMediaSlide[] = [];
+    const getPhotoKey = (raw: string) => {
+      try {
+        const u = new URL(raw);
+        if (u.hostname === "images.unsplash.com") {
+          return `${u.origin}${u.pathname}`;
+        }
+      } catch {
+        // ignore
+      }
+      return raw;
+    };
+    const pushUrl = (raw?: string | null, caption?: string) => {
+      const url = (raw || "").trim();
+      if (!url || url.includes("res.cloudinary.com/dxxb2gvyw/")) return;
+      const key = getPhotoKey(url);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ type: "image", url, caption: caption || hotel.nameTh });
+    };
+    pushUrl(canonicalPin?.coverImageUrl || coverBannerUrl, hotel.nameTh);
+    if (canonicalPin?.mediaUrls) {
+      for (const u of canonicalPin.mediaUrls) {
+        pushUrl(u, hotel.nameTh);
+      }
+    }
+    for (const s of allCoverSlides) {
+      pushUrl(s.url, s.caption);
+    }
+    return out;
+  }, [
+    allCoverSlides,
+    canonicalPin?.coverImageUrl,
+    canonicalPin?.mediaUrls,
+    coverBannerUrl,
+    hotel.nameTh,
+  ]);
+
   return (
     <div className="cgr-page-standard">
       {/* =====================================================================
-          ZONE 1 (TOP): AIRBNB TITLE BAR + 1:1 SQUARE BENTO PHOTO MOSAIC
+          ZONE 1 (TOP): FULL-WIDTH 1120PX AIRBNB 5-PHOTO MOSAIC + INSTAGRAM ACTION BAR
+          - Left 2×2 Primary Photo Slot (`data-place-hero-stage="true"`) is the exact 1:1 3D Flip landing zone!
+          - Directly underneath: clean `♡ 💬 ↗ •••` row opening the Instagram Comment Modal!
       ====================================================================== */}
       <header
         ref={heroHeaderRef}
         id="section-photos"
-        className="scroll-mt-24 space-y-5 pb-4"
+        className="scroll-mt-24 space-y-3.5 sm:space-y-4 pb-3"
       >
-        {/* Mobile Swipeable 1:1 Square Hero Carousel (< sm) */}
-        <div className="sm:hidden relative -mx-4 -mt-5 aspect-square overflow-hidden bg-[var(--color-background-muted)]">
+        {/* Depth-1 Back Bar (Shown cleanly when hopped here from a Nearby Place!) */}
+        {backTargetName && (
+          <div className="hidden sm:flex items-center justify-between pb-1">
+            <button
+              type="button"
+              onClick={handleProfileBack}
+              className="h-9 px-3.5 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 shrink-0" strokeWidth={2.2} />
+              <span className="truncate max-w-[420px]">
+                {language === "th"
+                  ? `กลับไป ${backTargetName}`
+                  : `Back to ${backTargetName}`}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Swipeable Top Hero Carousel (< sm) — 3D Flip Landing Zone on Mobile */}
+        <div
+          ref={mobileHeroStageRef}
+          data-place-hero-stage="true"
+          className="sm:hidden relative -mx-4 -mt-4 aspect-square overflow-hidden bg-[var(--color-background-muted)]"
+        >
           <div
             onScroll={(e) => {
               const el = e.currentTarget;
@@ -1304,18 +1626,18 @@ export function HotelStorefrontClient({
               if (width > 0) {
                 const idx = Math.round(el.scrollLeft / width);
                 setMobileHeroIndex(
-                  Math.max(0, Math.min(mobileHeroSlides.length - 1, idx))
+                  Math.max(0, Math.min(heroMosaicSlides.length - 1, idx))
                 );
               }
             }}
             className="flex h-full w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar"
           >
-            {mobileHeroSlides.map((slide, idx) => (
+            {heroMosaicSlides.slice(0, 12).map((slide, idx) => (
               <button
                 key={`${slide.url}-${idx}`}
                 type="button"
                 onClick={() =>
-                  setFullscreenMedia({ slides: mobileHeroSlides, index: idx })
+                  setFullscreenMedia({ slides: heroMosaicSlides, index: idx })
                 }
                 aria-label={`${hotel.nameTh} ${idx + 1}`}
                 className="w-full h-full shrink-0 snap-center relative cursor-pointer"
@@ -1336,15 +1658,17 @@ export function HotelStorefrontClient({
 
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== "undefined" && window.history.length > 1) {
-                router.back();
-              } else {
-                router.push("/");
-              }
-            }}
-            aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
-            className="absolute top-3 left-3 h-9 w-9 rounded-[10px] bg-white/90 dark:bg-[#222222]/90 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
+            onClick={handleProfileBack}
+            aria-label={
+              backTargetName
+                ? language === "th"
+                  ? `กลับไป ${backTargetName}`
+                  : `Back to ${backTargetName}`
+                : language === "th"
+                ? "ย้อนกลับ"
+                : "Back"
+            }
+            className="absolute top-3 left-3 z-10 h-9 w-9 rounded-[10px] bg-white/92 dark:bg-[#222222]/92 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -1352,103 +1676,126 @@ export function HotelStorefrontClient({
           <button
             type="button"
             onClick={handleShareProperty}
-            aria-label={language === "th" ? "แชร์ที่พัก" : "Share property"}
-            className="absolute top-3 right-3 h-9 w-9 rounded-[10px] bg-white/90 dark:bg-[#222222]/90 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
+            aria-label={language === "th" ? "แชร์สถานที่" : "Share place"}
+            className="absolute top-3 right-3 z-10 h-9 w-9 rounded-[10px] bg-white/92 dark:bg-[#222222]/92 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
           </button>
 
-          {mobileHeroSlides.length > 1 && (
-            <span className="pointer-events-none absolute bottom-3 right-3 h-7 px-2.5 rounded-[9px] bg-[#222222]/80 backdrop-blur-md !text-white text-[12px] font-medium inline-flex items-center gap-1.5">
-              <span>
-                {mobileHeroIndex + 1} / {mobileHeroSlides.length}
-              </span>
+          {heroMosaicSlides.length > 1 && (
+            <span className="pointer-events-none absolute bottom-3 right-3 h-7 px-2.5 rounded-[9px] bg-[#222222]/80 backdrop-blur-md !text-white text-[12px] font-medium inline-flex items-center tabular-nums">
+              {mobileHeroIndex + 1} / {Math.min(12, heroMosaicSlides.length)}
             </span>
           )}
         </div>
 
-        {/* Airbnb Title + Minimal Ghost Actions Row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 pt-1 sm:pt-0">
-          <h1 className="text-[23px] sm:text-[26px] font-semibold leading-tight tracking-[-0.016em] text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
-            <span className="truncate">
-              {language === "th" ? hotel.nameTh : hotel.nameEn}
-            </span>
-            {hotel.verificationStatus === "VERIFIED" && (
-              <BadgeCheck
-                aria-label="Verified Direct Stay"
-                className="w-5 h-5 text-[var(--color-text-primary)] shrink-0"
-              />
+        {/* Airbnb Full-Width Title + Minimal Share/Save Row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 pt-0.5 sm:pt-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {!backTargetName && (
+              <button
+                type="button"
+                onClick={handleProfileBack}
+                aria-label={language === "th" ? "ย้อนกลับ" : "Back"}
+                className="hidden sm:inline-flex h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] items-center justify-center shrink-0 cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" strokeWidth={2.2} />
+              </button>
             )}
-          </h1>
+            <h1 className="text-[22px] sm:text-[26px] font-semibold leading-tight tracking-[-0.018em] text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
+              <span className="truncate">
+                {language === "th" ? hotel.nameTh : hotel.nameEn}
+              </span>
+              {hotel.verificationStatus === "VERIFIED" && (
+                <BadgeCheck
+                  aria-label="Verified Place"
+                  className="w-5 h-5 text-[var(--color-text-primary)] shrink-0"
+                />
+              )}
+            </h1>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-1 shrink-0">
+          <div className="hidden sm:flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={handleShareProperty}
-              className="hidden sm:inline-flex h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
+              className="h-9 px-3 rounded-[10px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
             >
-              <Share2 className="w-4 h-4" />
+              <Share className="w-4 h-4" strokeWidth={2} />
               <span>{language === "th" ? "แชร์" : "Share"}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handlePrimaryContactClick}
-              className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>
-                {hotel.contactLine
-                  ? language === "th"
-                    ? "ทัก LINE"
-                    : "LINE"
-                  : language === "th"
-                  ? "ติดต่อที่พัก"
-                  : "Contact"}
-              </span>
-            </button>
-
-            {hotel.contactPhone && (
+            {canonicalPin && (
               <button
                 type="button"
-                onClick={() => handleContactClick("PHONE")}
-                className="h-9 px-3 rounded-[8px] bg-transparent hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)]"
+                onClick={() => void handleToggleSaveAnyPin(canonicalPin.id)}
+                className={`h-9 px-3 rounded-[10px] bg-transparent hover:bg-[var(--color-background-muted)] text-[14px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors underline underline-offset-4 decoration-[var(--color-border-emphasized)] ${
+                  effectiveHeroIsSaved
+                    ? "text-[var(--color-promo)]"
+                    : "text-[var(--color-text-primary)]"
+                }`}
               >
-                <Phone className="w-4 h-4" />
-                <span>{hotel.contactPhone}</span>
+                <Bookmark
+                  className={`w-4 h-4 ${effectiveHeroIsSaved ? "fill-current" : ""}`}
+                  strokeWidth={2}
+                />
+                <span>
+                  {effectiveHeroIsSaved
+                    ? language === "th"
+                      ? "บันทึกแล้ว"
+                      : "Saved"
+                    : language === "th"
+                    ? "บันทึก"
+                    : "Save"}
+                </span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Tablet / Desktop Airbnb Exact 1:1 Squares 5-Photo Grid (aspect-[2/1] · 4 cols x 2 rows) */}
-        {allCoverSlides.length >= 5 ? (
+        {/* Tablet / Desktop Full-Width 1120px Airbnb 5-Photo Mosaic (Photo-Only Standard!)
+            Left 2×2 Primary Photo Slot = Exact 1:1 3D Card Flip Landing Zone (ZERO post-flip blink!) */}
+        {heroMosaicSlides.length >= 5 ? (
           <div className="hidden sm:grid sm:grid-cols-4 sm:grid-rows-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
             <button
+              ref={(el) => {
+                mosaicPrimaryHeroRef.current = el;
+              }}
+              data-place-hero-stage="true"
               type="button"
               onClick={() =>
-                setFullscreenMedia({ slides: allCoverSlides, index: 0 })
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 })
               }
-              className="col-span-2 row-span-2 relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
+              className="col-span-2 row-span-2 relative w-full h-full overflow-hidden cursor-pointer transition"
             >
               <img
-                src={getOptimizedPinImageUrl(allCoverSlides[0].url, "hero")}
-                srcSet={getOptimizedPinImageSrcSet(allCoverSlides[0].url, "hero")}
+                src={getOptimizedPinImageUrl(heroMosaicSlides[0].url, "hero")}
+                srcSet={getOptimizedPinImageSrcSet(
+                  heroMosaicSlides[0].url,
+                  "hero"
+                )}
                 sizes={PIN_IMAGE_SIZES.hero}
-                alt={allCoverSlides[0].caption || hotel.nameTh}
+                alt={heroMosaicSlides[0].caption || hotel.nameTh}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
                 className="h-full w-full object-cover"
               />
+              <div className="absolute top-0 left-0 z-10 pointer-events-none">
+                <PlaceCategoryCrest
+                  category={hotel.placeCategory}
+                  language={language}
+                  corner="top-left"
+                />
+              </div>
             </button>
 
-            {allCoverSlides.slice(1, 5).map((slide, idx) => (
+            {heroMosaicSlides.slice(1, 5).map((slide, idx) => (
               <button
                 key={`${slide.url}-${idx}`}
                 type="button"
                 onClick={() =>
-                  setFullscreenMedia({ slides: allCoverSlides, index: idx + 1 })
+                  setFullscreenMedia({ slides: heroMosaicSlides, index: idx + 1 })
                 }
                 className="col-span-1 row-span-1 relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
               >
@@ -1467,26 +1814,111 @@ export function HotelStorefrontClient({
             <button
               type="button"
               onClick={() =>
-                setFullscreenMedia({ slides: allCoverSlides, index: 0 })
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 })
               }
               className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white/95 hover:bg-white text-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Images className="w-4 h-4" />
               <span>
                 {language === "th"
-                  ? `แสดงรูปภาพทั้งหมด (${allCoverSlides.length})`
-                  : `Show all photos (${allCoverSlides.length})`}
+                  ? `แสดงรูปภาพทั้งหมด (${heroMosaicSlides.length})`
+                  : `Show all photos (${heroMosaicSlides.length})`}
               </span>
             </button>
           </div>
-        ) : allCoverSlides.length >= 2 ? (
-          <div className="hidden sm:grid sm:grid-cols-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
-            {allCoverSlides.slice(0, 2).map((slide, idx) => (
+        ) : heroMosaicSlides.length >= 3 ? (
+          <div className="hidden sm:grid sm:grid-cols-4 sm:grid-rows-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
+            <button
+              ref={(el) => {
+                mosaicPrimaryHeroRef.current = el;
+              }}
+              data-place-hero-stage="true"
+              type="button"
+              onClick={() =>
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 })
+              }
+              className="col-span-2 row-span-2 relative w-full h-full overflow-hidden cursor-pointer transition"
+            >
+              <img
+                src={getOptimizedPinImageUrl(heroMosaicSlides[0].url, "hero")}
+                srcSet={getOptimizedPinImageSrcSet(
+                  heroMosaicSlides[0].url,
+                  "hero"
+                )}
+                sizes={PIN_IMAGE_SIZES.hero}
+                alt={heroMosaicSlides[0].caption || hotel.nameTh}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute top-0 left-0 z-10 pointer-events-none">
+                <PlaceCategoryCrest
+                  category={hotel.placeCategory}
+                  language={language}
+                  corner="top-left"
+                />
+              </div>
+            </button>
+
+            {heroMosaicSlides.slice(1, 4).map((slide, idx) => (
               <button
                 key={`${slide.url}-${idx}`}
                 type="button"
                 onClick={() =>
-                  setFullscreenMedia({ slides: allCoverSlides, index: idx })
+                  setFullscreenMedia({ slides: heroMosaicSlides, index: idx + 1 })
+                }
+                className={`${
+                  heroMosaicSlides.length === 3
+                    ? "col-span-2 row-span-1"
+                    : idx === 0
+                    ? "col-span-2 row-span-1"
+                    : "col-span-1 row-span-1"
+                } relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition`}
+              >
+                <img
+                  src={getOptimizedPinImageUrl(slide.url, "gallery")}
+                  srcSet={getOptimizedPinImageSrcSet(slide.url, "gallery")}
+                  sizes={PIN_IMAGE_SIZES.gallery}
+                  alt={slide.caption || `${hotel.nameTh} ${idx + 2}`}
+                  loading="eager"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 })
+              }
+              className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white/95 hover:bg-white text-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <Images className="w-4 h-4" />
+              <span>
+                {language === "th"
+                  ? `แสดงรูปภาพทั้งหมด (${heroMosaicSlides.length})`
+                  : `Show all photos (${heroMosaicSlides.length})`}
+              </span>
+            </button>
+          </div>
+        ) : heroMosaicSlides.length === 2 ? (
+          <div className="hidden sm:grid sm:grid-cols-2 gap-2 aspect-[2/1] w-full rounded-[12px] lg:rounded-[16px] overflow-hidden relative bg-[var(--color-background-muted)]">
+            {heroMosaicSlides.slice(0, 2).map((slide, idx) => (
+              <button
+                key={`${slide.url}-${idx}`}
+                ref={
+                  idx === 0
+                    ? (el) => {
+                        mosaicPrimaryHeroRef.current = el;
+                      }
+                    : undefined
+                }
+                data-place-hero-stage={idx === 0 ? "true" : undefined}
+                type="button"
+                onClick={() =>
+                  setFullscreenMedia({ slides: heroMosaicSlides, index: idx })
                 }
                 className="relative w-full h-full overflow-hidden cursor-pointer hover:brightness-95 transition"
               >
@@ -1500,47 +1932,66 @@ export function HotelStorefrontClient({
                   decoding="async"
                   className="h-full w-full object-cover"
                 />
+                {idx === 0 && (
+                  <div className="absolute top-0 left-0 z-10 pointer-events-none">
+                    <PlaceCategoryCrest
+                      category={hotel.placeCategory}
+                      language={language}
+                      corner="top-left"
+                    />
+                  </div>
+                )}
               </button>
             ))}
 
             <button
               type="button"
               onClick={() =>
-                setFullscreenMedia({ slides: allCoverSlides, index: 0 })
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 })
               }
               className="absolute bottom-4 right-4 h-9 px-3.5 rounded-[10px] bg-white/95 hover:bg-white text-[#222222] text-[13.5px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Images className="w-4 h-4" />
               <span>
                 {language === "th"
-                  ? `แสดงรูปภาพทั้งหมด (${allCoverSlides.length})`
-                  : `Show all photos (${allCoverSlides.length})`}
+                  ? `แสดงรูปภาพทั้งหมด (${heroMosaicSlides.length})`
+                  : `Show all photos (${heroMosaicSlides.length})`}
               </span>
             </button>
           </div>
         ) : (
           <div
+            ref={(el) => {
+              mosaicPrimaryHeroRef.current = el;
+            }}
+            data-place-hero-stage="true"
             role="button"
             tabIndex={0}
             onClick={() => {
-              if (allCoverSlides.length > 0) {
-                setFullscreenMedia({ slides: allCoverSlides, index: 0 });
+              if (heroMosaicSlides.length > 0) {
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 });
               }
             }}
             onKeyDown={(e) => {
               if (
                 (e.key === "Enter" || e.key === " ") &&
-                allCoverSlides.length > 0
+                heroMosaicSlides.length > 0
               ) {
                 e.preventDefault();
-                setFullscreenMedia({ slides: allCoverSlides, index: 0 });
+                setFullscreenMedia({ slides: heroMosaicSlides, index: 0 });
               }
             }}
             className="hidden sm:block relative w-full aspect-[2/1] rounded-[12px] lg:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer"
           >
             <img
-              src={getOptimizedPinImageUrl(coverBannerUrl, "hero")}
-              srcSet={getOptimizedPinImageSrcSet(coverBannerUrl, "hero")}
+              src={getOptimizedPinImageUrl(
+                heroMosaicSlides[0]?.url || coverBannerUrl,
+                "hero"
+              )}
+              srcSet={getOptimizedPinImageSrcSet(
+                heroMosaicSlides[0]?.url || coverBannerUrl,
+                "hero"
+              )}
               sizes={PIN_IMAGE_SIZES.hero}
               alt={hotel.nameTh}
               loading="eager"
@@ -1548,9 +1999,212 @@ export function HotelStorefrontClient({
               decoding="async"
               className="h-full w-full object-cover"
             />
+            <div className="absolute top-0 left-0 z-10 pointer-events-none">
+              <PlaceCategoryCrest
+                category={hotel.placeCategory}
+                language={language}
+                corner="top-left"
+              />
+            </div>
           </div>
         )}
+
+        {/* Clean Instagram-Style Social Action Row Directly Below Photo Mosaic (`♡ 143  💬 3  ↗  •••`) */}
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+          <div className="flex items-center gap-1 -ml-1.5">
+            {canonicalPin && (
+              <button
+                type="button"
+                onClick={handleHeroToggleLike}
+                aria-label={language === "th" ? "ถูกใจ" : "Like"}
+                className="h-10 px-2 rounded-[11px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Heart
+                  className={`w-[22px] h-[22px] ${
+                    effectiveHeroIsLiked
+                      ? "fill-[var(--color-promo)] text-[var(--color-promo)]"
+                      : ""
+                  }`}
+                  strokeWidth={2}
+                />
+                {effectiveHeroLikesCount > 0 && (
+                  <span className="text-[14.5px] font-semibold tabular-nums">
+                    {effectiveHeroLikesCount.toLocaleString()}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {canonicalPin && (
+              <button
+                type="button"
+                onClick={() => setIsCommentsModalOpen(true)}
+                aria-label={language === "th" ? "ความคิดเห็น" : "Comments"}
+                className="h-10 px-2 rounded-[11px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <MessageCircle className="w-[22px] h-[22px]" strokeWidth={2} />
+                {totalHeroCommentsCount > 0 && (
+                  <span className="text-[14.5px] font-semibold tabular-nums">
+                    {totalHeroCommentsCount.toLocaleString()}
+                  </span>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleShareProperty}
+              aria-label={language === "th" ? "แชร์" : "Share"}
+              className="h-10 w-10 rounded-[11px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+            >
+              <Share className="w-[20px] h-[20px]" strokeWidth={2} />
+            </button>
+
+            <div ref={heroMoreMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsHeroMoreMenuOpen((v) => !v)}
+                aria-label={language === "th" ? "ตัวเลือกเพิ่มเติม" : "More options"}
+                aria-expanded={isHeroMoreMenuOpen}
+                className="h-10 w-10 rounded-[11px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <MoreHorizontal className="w-[21px] h-[21px]" strokeWidth={2} />
+              </button>
+
+              {isHeroMoreMenuOpen && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-40 w-52 rounded-[14px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] p-1.5 divide-y divide-[var(--color-border)]">
+                  <div className="pb-1">
+                    {canonicalPin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsHeroMoreMenuOpen(false);
+                          void handleToggleSaveAnyPin(canonicalPin.id);
+                        }}
+                        className="w-full px-3 py-2 rounded-[9px] hover:bg-[var(--color-background-muted)] text-left text-[13.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                      >
+                        {effectiveHeroIsSaved
+                          ? language === "th"
+                            ? "นำออกจากทริป"
+                            : "Remove from trip"
+                          : language === "th"
+                          ? "บันทึกลงทริป"
+                          : "Save to trip"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHeroMoreMenuOpen(false);
+                        setIsCommentsModalOpen(true);
+                      }}
+                      className="w-full px-3 py-2 rounded-[9px] hover:bg-[var(--color-background-muted)] text-left text-[13.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                    >
+                      {language === "th"
+                        ? "ดูความคิดเห็นทั้งหมด"
+                        : "View all comments"}
+                    </button>
+                  </div>
+                  <div className="pt-1">
+                    {hotel.contactLine && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsHeroMoreMenuOpen(false);
+                          handleContactClick("LINE");
+                        }}
+                        className="w-full px-3 py-2 rounded-[9px] hover:bg-[var(--color-background-muted)] text-left text-[13.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                      >
+                        {language === "th" ? "ทัก LINE เจ้าของ" : "Message via LINE"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHeroMoreMenuOpen(false);
+                        handleShareProperty();
+                      }}
+                      className="w-full px-3 py-2 rounded-[9px] hover:bg-[var(--color-background-muted)] text-left text-[13.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                    >
+                      {language === "th" ? "คัดลอกลิงก์โปรไฟล์" : "Copy profile link"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Quick Save Pill on Right of Social Row */}
+          {canonicalPin && (
+            <button
+              type="button"
+              onClick={() => void handleToggleSaveAnyPin(canonicalPin.id)}
+              aria-label={
+                effectiveHeroIsSaved
+                  ? language === "th"
+                    ? "บันทึกแล้ว"
+                    : "Saved"
+                  : language === "th"
+                  ? "บันทึก"
+                  : "Save"
+              }
+              className={`sm:hidden h-9 px-3 rounded-[10px] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                effectiveHeroIsSaved
+                  ? "bg-[var(--color-promo)] !text-white"
+                  : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+              }`}
+            >
+              <Bookmark
+                className={`w-4 h-4 ${effectiveHeroIsSaved ? "fill-current" : ""}`}
+                strokeWidth={2}
+              />
+              <span>
+                {effectiveHeroIsSaved
+                  ? language === "th"
+                    ? "บันทึกแล้ว"
+                    : "Saved"
+                  : language === "th"
+                  ? "บันทึก"
+                  : "Save"}
+              </span>
+            </button>
+          )}
+        </div>
       </header>
+
+      {/* =====================================================================
+          ADAPTIVE BODY BRANCH:
+          - GROUP 2 (PROFILE_ONLY / CAFE / RESTAURANT / ATTRACTION / WELLNESS):
+            Clean Place Profile Body (NO room booking calendar or check-in noise!)
+          - GROUP 1 (DIRECT_BOOKING WITH ROOMS):
+            Full 0% GP Booking Storefront + Nearby Places (1-Hop Lock)
+      ====================================================================== */}
+      {isProfileOnlyPlace ? (
+        <PlaceOnlyProfileBody
+          storefront={storefront}
+          language={language}
+          isSaved={Boolean(
+            canonicalPin && effectiveSavedPinIds.has(canonicalPin.id)
+          )}
+          savedPinIds={effectiveSavedPinIds}
+          isNearbyHop={Boolean(nearbyHopOrigin)}
+          backTargetName={backTargetName}
+          onBack={handleProfileBack}
+          onToggleSaveCanonical={() => {
+            if (canonicalPin) void handleToggleSaveAnyPin(canonicalPin.id);
+          }}
+          onToggleSavePin={(pinId) => void handleToggleSaveAnyPin(pinId)}
+          onSelectNearbyPlace={handleSelectNearbyPlace}
+          onContactClick={(ch) => {
+            if (ch === "LINE" || ch === "PHONE") {
+              handleContactClick(ch);
+            } else if (ch === "FACEBOOK") {
+              handleContactClick("FACEBOOK_MESSENGER");
+            }
+          }}
+        />
+      ) : (
+        <>
 
       {/* =====================================================================
           ZONE 2 (NAV_DEFAULT): AIRBNB SCROLL-REVEAL ANCHOR BAR
@@ -2524,6 +3178,8 @@ export function HotelStorefrontClient({
             comments={activePinComments}
             savedPinIds={effectiveSavedPinIds}
             relatedPins={gridHotelPins}
+            detailFooterMode="property-only"
+            hotelPosts={storefront.posts}
             prevPinPreview={prevHotelPinPreview}
             nextPinPreview={nextHotelPinPreview}
             mobileOverlayMode={true}
@@ -2914,6 +3570,47 @@ export function HotelStorefrontClient({
                   </Link>
                 </div>
               </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 4D-2. NEARBY PLACES ON NONDII (STRICT 1-HOP LOCK + 3D CARD FLIP!) */}
+      {!nearbyHopOrigin && nearbyPlaces.length > 0 && (
+        <section
+          id="section-nearby"
+          className="py-10 border-t border-[var(--color-border)] space-y-4 scroll-mt-20 lg:scroll-mt-32"
+        >
+          <div className="space-y-0.5">
+            <h2 className="ty-title text-[var(--color-text-primary)]">
+              {language === "th"
+                ? `สถานที่ใกล้เคียงรอบ ${hotel.nameTh}`
+                : `Nearby places around ${hotel.nameEn}`}
+            </h2>
+            <p className="ty-caption text-[var(--color-text-secondary)]">
+              {language === "th"
+                ? "คาเฟ่ ร้านอาหาร ที่เที่ยว และที่พักจริงบน Nondii ปักหมุดเก็บเข้าทริปเดียวกันได้ทันที"
+                : "Real places nearby on Nondii — tap to flip in or save to your trip"}
+            </p>
+          </div>
+
+          <div className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1">
+            {nearbyPlaces.slice(0, 8).map((nearby) => (
+              <div
+                key={nearby.id}
+                className="w-[44vw] min-w-[154px] max-w-[186px] sm:w-[192px] shrink-0 snap-start"
+              >
+                <VerticalCouponCard
+                  pin={nearby}
+                  language={language}
+                  isSaved={effectiveSavedPinIds.has(nearby.id)}
+                  distanceKm={nearby.distanceKm}
+                  onSelect={(nextPlace, rect) =>
+                    handleSelectNearbyPlace(nextPlace, rect)
+                  }
+                  onToggleSave={(id) => void handleToggleSaveAnyPin(id)}
+                />
+              </div>
             ))}
           </div>
         </section>
@@ -3682,6 +4379,31 @@ export function HotelStorefrontClient({
           handleCommitStayDates(checkIn, addDaysToDate(checkIn, minNights))
         }
       />
+        </>
+      )}
+
+      {canonicalPin && (
+        <PlaceCommentsModal
+          isOpen={isCommentsModalOpen}
+          onClose={() => setIsCommentsModalOpen(false)}
+          pin={canonicalPin}
+          mediaUrls={heroMosaicSlides.map((s) => s.url)}
+          comments={canonicalComments}
+          language={language}
+          currentUser={currentUser}
+          isLiked={effectiveHeroIsLiked}
+          likesCount={effectiveHeroLikesCount}
+          isSaved={effectiveHeroIsSaved}
+          onToggleLike={handleHeroToggleLike}
+          onToggleSave={() => void handleToggleSaveAnyPin(canonicalPin.id)}
+          onShare={() => {
+            setIsCommentsModalOpen(false);
+            handleShareProperty();
+          }}
+          onAddComment={handleHeroAddComment}
+          onDeleteComment={handleHeroDeleteComment}
+        />
+      )}
 
       <PureMediaViewer
         slides={fullscreenMedia?.slides ?? null}

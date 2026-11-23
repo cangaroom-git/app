@@ -225,11 +225,15 @@ export function HotelLocationMap({
     setIsModalOpen(true);
   };
 
+  const [isPreviewMapMounted, setIsPreviewMapMounted] = useState(false);
+
+  // Mount MapLibre preview map ONCE per (latitude, longitude, isDark) — NEVER tear down mid-load when async curatedPlaces arrive!
   useEffect(() => {
     if (!hasCoords || !previewContainerRef.current) return;
 
     let cancelled = false;
     let mapInstance: maplibregl.Map | null = null;
+    let homeMarker: maplibregl.Marker | null = null;
 
     const initPreview = async () => {
       ensureMapLibreWorker();
@@ -248,6 +252,7 @@ export function HotelLocationMap({
       });
       configureThailandMapInteractions(mapInstance);
       previewMapRef.current = mapInstance;
+      setIsPreviewMapMounted(true);
 
       mapInstance.on("load", () => {
         if (cancelled || !mapInstance) return;
@@ -287,44 +292,68 @@ export function HotelLocationMap({
         });
       });
 
-      new maplibregl.Marker({
+      homeMarker = new maplibregl.Marker({
         element: createHomeHousePinElement(hotelName),
         anchor: "center",
       })
         .setLngLat([longitude!, latitude!])
         .addTo(mapInstance);
-
-      for (const spot of curatedPlaces.slice(0, 6)) {
-        const pinEl = createCategoryPinElement({
-          place: spot,
-          isSelected: false,
-          isHovered: false,
-          language,
-          isDark,
-          showLabel: false,
-          onClick: () =>
-            openExplorer({
-              category: spot.source === "host" ? "host" : null,
-              placeId: spot.id,
-            }),
-        });
-        const m = new maplibregl.Marker({ element: pinEl, anchor: "center" })
-          .setLngLat([spot.lng, spot.lat])
-          .addTo(mapInstance);
-        previewMarkersRef.current.push(m);
-      }
     };
 
-    void initPreview();
+    const rafId = window.requestAnimationFrame(() => {
+      if (!cancelled) void initPreview();
+    });
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(rafId);
+      setIsPreviewMapMounted(false);
       for (const m of previewMarkersRef.current) m.remove();
       previewMarkersRef.current = [];
-      if (mapInstance) mapInstance.remove();
+      if (homeMarker) homeMarker.remove();
+      if (mapInstance) {
+        try {
+          mapInstance.remove();
+        } catch {
+          // ignore abort errors during cleanup
+        }
+      }
       previewMapRef.current = null;
     };
-  }, [hasCoords, latitude, longitude, hotelName, curatedPlaces, isDark, language]);
+  }, [hasCoords, latitude, longitude, hotelName, isDark]);
+
+  // Sync curated nearby markers cleanly onto the already-mounted preview map (ZERO map teardown!)
+  useEffect(() => {
+    const mapInstance = previewMapRef.current;
+    if (!isPreviewMapMounted || !mapInstance) return;
+    for (const m of previewMarkersRef.current) m.remove();
+    previewMarkersRef.current = [];
+
+    for (const spot of curatedPlaces.slice(0, 6)) {
+      const pinEl = createCategoryPinElement({
+        place: spot,
+        isSelected: false,
+        isHovered: false,
+        language,
+        isDark,
+        showLabel: false,
+        onClick: () =>
+          openExplorer({
+            category: spot.source === "host" ? "host" : null,
+            placeId: spot.id,
+          }),
+      });
+      const m = new maplibregl.Marker({ element: pinEl, anchor: "center" })
+        .setLngLat([spot.lng, spot.lat])
+        .addTo(mapInstance);
+      previewMarkersRef.current.push(m);
+    }
+
+    return () => {
+      for (const m of previewMarkersRef.current) m.remove();
+      previewMarkersRef.current = [];
+    };
+  }, [isPreviewMapMounted, curatedPlaces, isDark, language]);
 
   const locationSubtitle = [districtText, provinceText]
     .filter(Boolean)

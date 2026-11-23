@@ -319,10 +319,16 @@ export function StudioPinsAndFacebookTab({
       return;
     }
     const normalizedCover = normalizeUrlToVerticalPortrait(pinCoverUrl);
-    const normalizedGallery = [
-      normalizedCover,
-      ...extraMediaUrls.map(normalizeUrlToVerticalPortrait),
-    ];
+    const normalizedGallery = Array.from(
+      new Set([
+        normalizedCover,
+        ...extraMediaUrls.map(normalizeUrlToVerticalPortrait),
+      ])
+    );
+    if (normalizedGallery.length < 5) {
+      onNotify("กรุณาอัปโหลดรูปภาพอย่างน้อย 5 รูป เพื่อให้หน้าโปรไฟล์แสดง 5-Photo Mosaic ได้สมบูรณ์");
+      return;
+    }
     setIsCreatingPin(true);
     try {
       const res = await fetch("/api/studio/pins", {
@@ -336,7 +342,7 @@ export function StudioPinsAndFacebookTab({
           descriptionTh: pinDesc.trim(),
           coverImageUrl: normalizedCover,
           mediaUrls: normalizedGallery,
-          videoUrl: pinVideoUrl.trim() || null,
+          videoUrl: null,
           aspectRatio: pinAspectRatio,
         }),
       });
@@ -708,7 +714,7 @@ export function StudioPinsAndFacebookTab({
         >
           <div className="space-y-2">
             <span className="ty-body font-semibold block">
-              อัปโหลดรูปภาพ (เลือกได้หลายรูป) *
+              อัปโหลดรูปภาพ (อย่างน้อย 5 รูป เพื่อแสดง 5-Photo Mosaic) *
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
               <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0">
@@ -792,18 +798,9 @@ export function StudioPinsAndFacebookTab({
                 })),
               ]}
             />
-            <StandardInput
-              grouped
-              label="ลิงก์วิดีโอแนวตั้ง MP4"
-              optionalText="ไม่บังคับ"
-              placeholder="https://.../tour.mp4"
-              value={pinVideoUrl}
-              onChange={(e) => setPinVideoUrl(e.target.value)}
-            />
           </StandardFieldGroup>
-          <p className="text-[12px] text-[var(--color-text-secondary)] inline-flex items-center gap-1">
-            <Video className="w-3.5 h-3.5" />
-            <span>หากใส่ลิงก์วิดีโอ ระบบจะแสดงเป็น Video Pin เล่นอัตโนมัติบนหน้าฟีด</span>
+          <p className="text-[12px] text-[var(--color-text-secondary)]">
+            ระบบรองรับเฉพาะภาพนิ่งความคมชัดสูง (ไม่รองรับวิดีโอ) เพื่อความเร็วและสัดส่วนภาพที่สวยงามบนทุกอุปกรณ์
           </p>
         </form>
       </StudioSheetModal>

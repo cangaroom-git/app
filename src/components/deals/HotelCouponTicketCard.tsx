@@ -177,18 +177,20 @@ export function HotelCouponTicketCard({
 
           {/* Left Property Photo Zone */}
           <div
-            className={`shrink-0 h-full overflow-hidden rounded-l-[15px] bg-[var(--color-background-muted)] ${
+            className={`relative shrink-0 h-full overflow-hidden rounded-l-[15px] bg-[var(--color-background-muted)] ${
               isCompact ? "w-[88px]" : "w-[106px] sm:w-[116px]"
             }`}
           >
             {heroImageSrc ? (
-              <img
-                src={heroImageSrc}
-                alt={hotelName}
-                className={`h-full w-full object-cover transition-opacity duration-200 ${
-                  isClaimed ? "grayscale-[35%] opacity-75" : ""
-                }`}
-              />
+              <>
+                <img
+                  src={heroImageSrc}
+                  alt={hotelName}
+                  className={`h-full w-full object-cover transition-opacity duration-200 ${
+                    isClaimed ? "grayscale-[35%] opacity-75" : ""
+                  }`}
+                />
+              </>
             ) : (
               <span className="h-full w-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] flex items-center justify-center ty-title font-bold">
                 {hotelName[0] || "C"}

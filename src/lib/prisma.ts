@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const PRISMA_SCHEMA_VERSION = "2026-11-20-promo-sort-order-v1";
+const PRISMA_SCHEMA_VERSION = "2026-11-23-place-profile-card-v4";
 
 const globalForPrisma = globalThis as unknown as {
   __cangaroomPrisma?: PrismaClient;
@@ -37,7 +37,8 @@ function getOrCreatePrismaClient(): PrismaClient {
     cachedPrisma &&
     globalForPrisma.__cangaroomPgPoolSslNormalized &&
     globalForPrisma.__cangaroomPrismaSchemaVersion === PRISMA_SCHEMA_VERSION &&
-    "hotelDiscountRule" in cachedPrisma
+    "hotelDiscountRule" in cachedPrisma &&
+    "placeReport" in cachedPrisma
   ) {
     return cachedPrisma;
   }

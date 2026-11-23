@@ -4,11 +4,13 @@ import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { getRoomsAvailabilityForRange } from "@/lib/services/availabilityService";
 import { mapHotelPostToSummaryDto } from "@/lib/services/hotelPostService";
 import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
+import { getPinDetailById } from "@/lib/services/stayDiscoveryService";
 import { normalizeRoomPhotos } from "@/lib/roomPhotoSpaces";
 import type {
   CouponDealDto,
   HotelProfileDto,
   HotelStorefrontDto,
+  PlaceOpeningHoursDayDto,
 } from "@/types/cangaroom";
 
 function parseJsonArray<T>(raw: unknown): T[] {
@@ -90,6 +92,12 @@ export async function getHotelStorefrontBySlug(
   const rangeEndStr = addDaysToDate(todayStr, 365);
   const rangeEnd = new Date(`${rangeEndStr}T00:00:00.000Z`);
 
+  const canonicalPinId =
+    hotel.canonicalPinId ??
+    hotel.pins.find((p) => p.isCanonicalCard)?.id ??
+    hotel.pins[0]?.id ??
+    null;
+
   const [
     availabilityMap,
     dateOverrides,
@@ -98,6 +106,7 @@ export async function getHotelStorefrontBySlug(
     userLikes,
     userSaves,
     userWallet,
+    canonicalPinDetail,
   ] = await Promise.all([
     getRoomsAvailabilityForRange({
       roomIds,
@@ -169,6 +178,11 @@ export async function getHotelStorefrontBySlug(
           select: { couponId: true, usedAt: true },
         })
       : Promise.resolve([]),
+    canonicalPinId
+      ? getPinDetailById(canonicalPinId, options?.userId ?? null).catch(
+          () => null
+        )
+      : Promise.resolve(null),
   ]);
 
   const bookedUnitsByRoomDate: Record<string, number> = {};
@@ -203,6 +217,16 @@ export async function getHotelStorefrontBySlug(
     id: hotel.id,
     slug: hotel.slug,
     ownerId: hotel.ownerId,
+    placeCategory: hotel.placeCategory,
+    merchantMode: hotel.merchantMode,
+    externalWebsiteUrl: hotel.externalWebsiteUrl,
+    primaryCtaLabelTh: hotel.primaryCtaLabelTh,
+    openingHours: parseJsonArray<PlaceOpeningHoursDayDto>(
+      hotel.openingHoursJson
+    ),
+    canonicalPinId: hotel.canonicalPinId,
+    featuredCouponId: hotel.featuredCouponId,
+    googlePlaceId: hotel.googlePlaceId,
     nameTh: hotel.nameTh,
     nameEn: hotel.nameEn || hotel.nameTh,
     taglineTh: hotel.taglineTh,
@@ -300,6 +324,10 @@ export async function getHotelStorefrontBySlug(
       descriptionTh: c.descriptionTh,
       descriptionEn: c.descriptionEn || c.descriptionTh,
       coverImageUrl: c.coverImageUrl,
+      promoKind: c.promoKind,
+      badgeTextTh: c.badgeTextTh,
+      badgeTextEn: c.badgeTextEn,
+      externalUrl: c.externalUrl,
       discountType: c.discountType,
       discountValue: c.discountValue,
       minSpendThb: c.minSpendThb,
@@ -327,6 +355,11 @@ export async function getHotelStorefrontBySlug(
           logoUrl: hotel.logoUrl,
           verificationStatus: hotel.verificationStatus,
           ratingAvg: hotel.ratingAvg,
+          placeCategory: hotel.placeCategory,
+          merchantMode: hotel.merchantMode,
+          externalWebsiteUrl: hotel.externalWebsiteUrl,
+          primaryCtaLabelTh: hotel.primaryCtaLabelTh,
+          featuredCouponId: hotel.featuredCouponId,
           districtTh: hotel.districtTh,
           addressTh: hotel.addressTh,
           latitude: hotel.latitude,
@@ -398,6 +431,19 @@ export async function getHotelStorefrontBySlug(
       createdAt: rv.createdAt.toISOString(),
     })),
     posts: hotel.posts.map((post) => mapHotelPostToSummaryDto(post, hotel)),
+    canonicalPin: canonicalPinDetail?.pin ?? pinsDto[0] ?? null,
+    pinComments: canonicalPinDetail?.comments ?? [],
+    ownerFeedPosts:
+      canonicalPinDetail?.ownerFeedPosts ??
+      hotel.posts
+        .filter((p) => p.postKind === "FEED_POST")
+        .map((post) => mapHotelPostToSummaryDto(post, hotel)),
+    ownerBlogs:
+      canonicalPinDetail?.ownerBlogs ??
+      hotel.posts
+        .filter((p) => p.postKind !== "FEED_POST")
+        .map((post) => mapHotelPostToSummaryDto(post, hotel)),
+    nearbyPlaces: canonicalPinDetail?.nearbyPlaces ?? [],
   };
 }
 

@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { VALID_STYLE_TAGS } from "@/data/thailandProvinces";
+import { isValidPlaceCategory } from "@/lib/placeCategories";
 import { getServerSessionUser } from "@/lib/auth/session";
 import {
   getPinsByIds,
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
 
 interface ExploreSearchParams {
   style?: string;
+  category?: string;
   source?: string;
   province?: string;
   recent?: string;
@@ -48,6 +50,8 @@ export default async function ExploreMapPage({
 
   const styleParam = (sp?.style || "").trim();
   const initialStyle = VALID_STYLE_TAGS.has(styleParam) ? styleParam : "all";
+  const catRaw = (sp?.category || "").trim().toUpperCase();
+  const initialCategory = isValidPlaceCategory(catRaw) ? catRaw : "ALL";
   const srcRaw = (sp?.source || "").trim().toUpperCase();
   const initialSource: "ALL" | "INTERNAL" | "EXTERNAL" =
     srcRaw === "INTERNAL" || srcRaw === "EXTERNAL" ? srcRaw : "ALL";
@@ -100,6 +104,7 @@ export default async function ExploreMapPage({
     <ExploreMapClient
       initialDeals={initialDeals}
       initialStyle={initialStyle}
+      initialCategory={initialCategory}
       initialSource={initialSource}
       initialProvince={initialProvince}
       initialRecentOnly={initialRecentOnly}

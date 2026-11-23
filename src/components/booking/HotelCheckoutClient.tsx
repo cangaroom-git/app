@@ -816,10 +816,10 @@ export function HotelCheckoutClient({
                   />
                   <div className="flex flex-wrap items-center gap-3">
                     <Link
-                      href="/trips"
+                      href="/bookings"
                       className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
                     >
-                      {isTh ? "ดูทริปการจองของฉัน" : "View my trips"}
+                      {isTh ? "ดูการจองของฉัน" : "View my bookings"}
                     </Link>
                     <button
                       type="button"

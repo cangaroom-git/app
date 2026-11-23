@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, Search, X } from "lucide-react";
+import { CircleUserRound, Menu, Search, X } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { recordRecentSearch } from "@/lib/telemetry/clientTelemetry";
 import type {
@@ -16,6 +16,7 @@ import {
 } from "@/components/navigation/SmartSearchDropdown";
 import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 import type { AuthenticatedMeDto } from "@/types/cangaroom";
 import {
   MOBILE_BOTTOM_TABS,
@@ -78,7 +79,11 @@ export function PrimaryNavigation({
   const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false);
 
   const shouldHideMobileBottomNav =
-    isMobileNavHidden && !isMobileProfileDrawerOpen && !isFloatingSearchOpen;
+    activeTab !== "explore" &&
+    activeTab !== "board" &&
+    isMobileNavHidden &&
+    !isMobileProfileDrawerOpen &&
+    !isFloatingSearchOpen;
   const isHotelBookingFlowPage =
     activeTab === "hotel" && !pathname.includes("/posts");
   const [isBottomNavRendered, setIsBottomNavRendered] = useState(
@@ -109,7 +114,8 @@ export function PrimaryNavigation({
   const lastScrollYRef = useRef<number>(0);
   const lastScrollTargetRef = useRef<EventTarget | null>(null);
 
-  useBodyScrollLock(isFloatingSearchOpen);
+  const floatingSearchPresence = useModalPresence(isFloatingSearchOpen, 220);
+  useBodyScrollLock(floatingSearchPresence.shouldRender);
 
   useEffect(() => {
     setIsMobileNavHidden(false);
@@ -358,11 +364,11 @@ export function PrimaryNavigation({
           aria-label="Main navigation"
           className="flex flex-col items-center gap-2.5"
         >
-          {/* 1) Home */}
+          {/* 1) เที่ยวอะไร (Home — Mood / Style Discovery) */}
           <Link
             href="/"
-            title={language === "th" ? "หน้าแรก" : "Home"}
-            aria-label="Home"
+            title={language === "th" ? "เที่ยวอะไร · รวมดีลตามสไตล์" : "Discover stays"}
+            aria-label={language === "th" ? "เที่ยวอะไร" : "Discover"}
             onClick={() => {
               if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
@@ -375,15 +381,15 @@ export function PrimaryNavigation({
             <PlatformNavIcon id="home" isActive={activeTab === "home"} />
           </Link>
 
-          {/* 2) Explore Map */}
+          {/* 2) เที่ยวไหน (Explore Map — Destination / Location Picker) */}
           <Link
             href="/explore"
             title={
               language === "th"
-                ? "แผนที่โปรที่พักทั่วไทย"
-                : "Explore deals on map"
+                ? "เที่ยวไหน · แผนที่ที่พักทั่วไทย"
+                : "Explore map"
             }
-            aria-label="Explore map"
+            aria-label={language === "th" ? "เที่ยวไหน" : "Map"}
             className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors relative ${
               activeTab === "explore"
                 ? "bg-[var(--color-background-muted)]/85"
@@ -393,15 +399,15 @@ export function PrimaryNavigation({
             <PlatformNavIcon id="explore" isActive={activeTab === "explore"} />
           </Link>
 
-          {/* 3) Board (Saved Coupons & Deals) */}
+          {/* 3) ทริป (Saved Trips & Shareable Route Boards) */}
           <Link
-            href="/board"
+            href="/trip"
             title={
               language === "th"
-                ? "บอร์ดคูปองที่บันทึกไว้"
-                : "Saved deal boards"
+                ? "ทริป · ที่พักที่บันทึกไว้"
+                : "Saved trips"
             }
-            aria-label="Saved Boards"
+            aria-label={language === "th" ? "ทริป" : "Trips"}
             className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors relative ${
               activeTab === "board" ? "bg-[var(--color-background-muted)]/85" : ""
             }`}
@@ -441,87 +447,13 @@ export function PrimaryNavigation({
       </aside>
 
       {/* =====================================================================
-          2. UNIFIED 64px TOP HEADER BAR
-             - Mobile/Tablet (< lg): Left = Cangaroom | Right = Search + More/Profile
-             - Desktop (>= lg): Pure Full-Width Search Bar + Coupon Bag + User Dropdown
+          2. DESKTOP 64px TOP HEADER BAR (>= lg ONLY — Hidden on Mobile/Tablet like Airbnb!)
+             Search + Profile live cleanly inside the 5-icon Mobile Bottom Bar (< lg).
       ====================================================================== */}
       <header
         aria-label="Top navigation bar"
-        className={`fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
-          isMobileNavHidden &&
-          !isMobileProfileDrawerOpen &&
-          !isFloatingSearchOpen
-            ? "max-lg:-translate-y-full"
-            : "translate-y-0"
-        } lg:translate-y-0`}
+        className="hidden lg:flex fixed top-0 inset-x-0 lg:left-[72px] z-40 h-16 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-8 items-center justify-between gap-3"
       >
-        {/* MOBILE / TABLET LEFT: CANGAROOM WORDMARK (< lg) */}
-        <div className="flex lg:hidden items-center gap-2 min-w-0">
-          <Link
-            href="/"
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
-              }
-            }}
-            className="inline-flex items-center text-[var(--color-text-primary)] select-none"
-          >
-            <img
-              src="/brand/nondi-icon-with-text-black.svg"
-              alt="Nondii"
-              className="h-[34px] w-auto object-contain dark:invert"
-            />
-          </Link>
-        </div>
-
-        {/* MOBILE / TABLET RIGHT: SEARCH ICON + MORE/PROFILE (< lg) */}
-        <div className="flex lg:hidden items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleOpenFloatingSearch}
-            aria-label={language === "th" ? "เปิดแถบค้นหา" : "Open search"}
-            className={`h-10 w-10 rounded-[12px] inline-flex items-center justify-center transition-colors relative cursor-pointer ${
-              isFloatingSearchOpen || searchQuery.trim().length > 0
-                ? "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-            }`}
-          >
-            <Search className="w-[20px] h-[20px]" strokeWidth={2.1} />
-            {searchQuery.trim().length > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            aria-label={
-              language === "th" ? "เมนูเพิ่มเติมและโปรไฟล์" : "More & Profile"
-            }
-            onClick={() => {
-              onRefreshProfile();
-              setIsFloatingSearchOpen(false);
-              setIsMobileProfileDrawerOpen((prev) => !prev);
-            }}
-            className="h-10 w-10 rounded-[12px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center relative cursor-pointer transition-colors"
-          >
-            {user ? (
-              <UserAvatarCircle
-                user={user}
-                sizeClass="h-7 w-7"
-                iconSizeClass="w-[20px] h-[20px]"
-              />
-            ) : (
-              <Menu
-                className="w-[21px] h-[21px] text-[var(--color-text-primary)]"
-                strokeWidth={2.1}
-              />
-            )}
-            {pendingStudioBookings > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
-            )}
-          </button>
-        </div>
-
         {/* DESKTOP PURE FULL-WIDTH SEARCH BAR (>= lg) */}
         {showSearchBar ? (
           <div
@@ -635,22 +567,27 @@ export function PrimaryNavigation({
       </header>
 
       {/* =====================================================================
-          3. FLOATING SEARCH BAR OVERLAY (< lg)
-             Triggered by Top Navbar "Search" icon OR Bottom Bar "Search" button
+          3. FLOATING SEARCH BAR OVERLAY (< lg) — Smooth Fade Slide-In / Slide-Out
+             Triggered directly from the 5-icon Mobile Bottom Bar "Search" tab
       ====================================================================== */}
-      {isFloatingSearchOpen && (
+      {floatingSearchPresence.shouldRender && (
         <div
           role="dialog"
           aria-modal="true"
           aria-label={language === "th" ? "ค้นหาที่พัก" : "Search stays"}
+          data-state={floatingSearchPresence.dataState}
           className="lg:hidden fixed inset-0 z-[82] overflow-hidden"
         >
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] animate-fade-in-backdrop"
+            data-state={floatingSearchPresence.dataState}
+            className="fixed inset-0 bg-black/42 backdrop-blur-[2px] cgr-modal-backdrop"
             onClick={() => setIsFloatingSearchOpen(false)}
           />
 
-          <div className="relative z-10 px-3 pt-[max(12px,env(safe-area-inset-top))]">
+          <div
+            data-state={floatingSearchPresence.dataState}
+            className="relative z-10 px-3 pt-[max(12px,env(safe-area-inset-top))] cgr-floating-card-motion"
+          >
             <div
               onClick={(e) => e.stopPropagation()}
               className="w-full max-h-[82dvh] flex flex-col rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3"
@@ -733,31 +670,22 @@ export function PrimaryNavigation({
       />
 
       {/* =====================================================================
-          5. HORIZONTAL ICON-ONLY MOBILE FLOATING BOTTOM BAR (< lg, z-[70])
-             Compact horizontal centered dock (Home / Explore Map / Saved Boards) — ZERO text labels
+          5. CLEAN AIRBNB-STYLE DOCKED 5-ICON MOBILE BOTTOM NAV BAR (< lg, z-[70])
+             5 crisp icon + label items: Coupon (/) · Explore (/explore) · Search · Trip (/trip) · Log in / Profile
       ====================================================================== */}
       <nav
         aria-label="Mobile navigation"
         aria-hidden={shouldHideMobileBottomNav}
         data-hide-on-hotel={isHotelBookingFlowPage ? "true" : undefined}
-        className={`fixed inset-x-3 max-w-fit mx-auto z-[70] lg:hidden pointer-events-none select-none transition-all duration-300 ease-in-out ${
+        className={`fixed bottom-0 inset-x-0 z-[70] lg:hidden pb-[var(--cgr-safe-bottom)] bg-[var(--color-background-body)]/96 backdrop-blur-md border-t border-[var(--color-border)] select-none transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
           shouldHideMobileBottomNav
-            ? "translate-y-3 opacity-0"
-            : "translate-y-0 opacity-100"
+            ? "translate-y-full opacity-0 pointer-events-none"
+            : "translate-y-0 opacity-100 pointer-events-auto"
         } ${!isBottomNavRendered && shouldHideMobileBottomNav ? "hidden" : ""}`}
-        style={{
-          bottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
-        }}
       >
-        <div
-          className={`${
-            shouldHideMobileBottomNav
-              ? "pointer-events-none"
-              : "pointer-events-auto"
-          } flex flex-row items-center gap-2 rounded-[18px] bg-[var(--color-background-card)]/92 backdrop-blur-xl border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-1.5`}
-        >
-          {MOBILE_BOTTOM_TABS.map((tab) => {
-            const activeCutoutColor = isDarkTheme ? "#222222" : "#ffffff";
+        <div className="h-[56px] max-w-lg mx-auto grid grid-cols-5 items-center px-1">
+          {/* Tabs 1 & 2: Coupon (/) and Explore (/explore) */}
+          {MOBILE_BOTTOM_TABS.slice(0, 2).map((tab) => {
             const isTabActive =
               activeTab === tab.id &&
               !isFloatingSearchOpen &&
@@ -767,7 +695,6 @@ export function PrimaryNavigation({
               <Link
                 key={tab.id}
                 href={tab.href}
-                title={language === "th" ? tab.labelTh : tab.labelEn}
                 aria-label={language === "th" ? tab.labelTh : tab.labelEn}
                 onClick={() => {
                   setIsFloatingSearchOpen(false);
@@ -775,25 +702,162 @@ export function PrimaryNavigation({
                     window.dispatchEvent(new CustomEvent("cgr:reset-home-pin"));
                   }
                 }}
-                className={`h-11 w-12 rounded-[12px] flex items-center justify-center transition-colors relative ${
+                className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
                   isTabActive
-                    ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]"
+                    ? "text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 }`}
               >
                 <PlatformNavIcon
                   id={tab.id}
                   isActive={isTabActive}
-                  cutoutColor={
-                    isTabActive
-                      ? activeCutoutColor
-                      : "var(--color-background-card)"
-                  }
                   className="w-[21px] h-[21px] shrink-0"
                 />
+                <span
+                  className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                    isTabActive ? "font-semibold" : "font-medium"
+                  }`}
+                >
+                  {language === "th" ? tab.labelTh : tab.labelEn}
+                </span>
               </Link>
             );
           })}
+
+          {/* Tab 3 (Center): Search (Opens Floating SmartSearch Overlay) */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsMobileProfileDrawerOpen(false);
+              handleOpenFloatingSearch();
+            }}
+            aria-label={language === "th" ? "ค้นหา" : "Search"}
+            className={`h-full flex flex-col items-center justify-center gap-0.5 cursor-pointer relative transition-colors ${
+              isFloatingSearchOpen
+                ? "text-[var(--color-text-primary)]"
+                : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            }`}
+          >
+            <span className="relative inline-flex items-center justify-center">
+              <Search
+                className="w-[21px] h-[21px] shrink-0"
+                strokeWidth={isFloatingSearchOpen ? 2.35 : 1.8}
+              />
+              {searchQuery.trim().length > 0 && (
+                <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-[var(--color-promo)] ring-1 ring-[var(--color-background-body)]" />
+              )}
+            </span>
+            <span
+              className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                isFloatingSearchOpen ? "font-semibold" : "font-medium"
+              }`}
+            >
+              {language === "th" ? "ค้นหา" : "Search"}
+            </span>
+          </button>
+
+          {/* Tab 4: Trip (/trip) */}
+          {MOBILE_BOTTOM_TABS.slice(2, 3).map((tab) => {
+            const isTabActive =
+              activeTab === tab.id &&
+              !isFloatingSearchOpen &&
+              !isMobileProfileDrawerOpen;
+
+            return (
+              <Link
+                key={tab.id}
+                href={tab.href}
+                aria-label={language === "th" ? tab.labelTh : tab.labelEn}
+                onClick={() => setIsFloatingSearchOpen(false)}
+                className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  isTabActive
+                    ? "text-[var(--color-text-primary)]"
+                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                <PlatformNavIcon
+                  id={tab.id}
+                  isActive={isTabActive}
+                  className="w-[21px] h-[21px] shrink-0"
+                />
+                <span
+                  className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                    isTabActive ? "font-semibold" : "font-medium"
+                  }`}
+                >
+                  {language === "th" ? tab.labelTh : tab.labelEn}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* Tab 5: Log in (when signed out) / Profile with Circular Avatar (when signed in) */}
+          {user ? (
+            <button
+              type="button"
+              onClick={() => {
+                onRefreshProfile();
+                setIsFloatingSearchOpen(false);
+                setIsMobileProfileDrawerOpen((prev) => !prev);
+              }}
+              aria-label={language === "th" ? "โปรไฟล์" : "Profile"}
+              className={`h-full flex flex-col items-center justify-center gap-0.5 cursor-pointer relative transition-colors ${
+                isMobileProfileDrawerOpen ||
+                activeTab === "trips" ||
+                activeTab === "studio" ||
+                activeTab === "super-admin"
+                  ? "text-[var(--color-text-primary)]"
+                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              <span
+                className={`relative inline-flex items-center justify-center rounded-full ${
+                  isMobileProfileDrawerOpen
+                    ? "ring-2 ring-[var(--color-text-primary)] ring-offset-1 ring-offset-[var(--color-background-body)]"
+                    : ""
+                }`}
+              >
+                <UserAvatarCircle
+                  user={user}
+                  sizeClass="h-[22px] w-[22px]"
+                  iconSizeClass="w-[14px] h-[14px]"
+                />
+                {pendingStudioBookings > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--color-promo)] ring-1 ring-[var(--color-background-body)]" />
+                )}
+              </span>
+              <span
+                className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                  isMobileProfileDrawerOpen ? "font-semibold" : "font-medium"
+                }`}
+              >
+                {language === "th" ? "โปรไฟล์" : "Profile"}
+              </span>
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              aria-label={language === "th" ? "เข้าสู่ระบบ" : "Log in"}
+              onClick={() => setIsFloatingSearchOpen(false)}
+              className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                activeTab === "login"
+                  ? "text-[var(--color-text-primary)]"
+                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              <CircleUserRound
+                className="w-[21px] h-[21px] shrink-0"
+                strokeWidth={activeTab === "login" ? 2.25 : 1.75}
+              />
+              <span
+                className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                  activeTab === "login" ? "font-semibold" : "font-medium"
+                }`}
+              >
+                {language === "th" ? "เข้าสู่ระบบ" : "Log in"}
+              </span>
+            </Link>
+          )}
         </div>
       </nav>
     </>

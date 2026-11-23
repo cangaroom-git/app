@@ -13,7 +13,14 @@ import {
   rankRelatedPinsForPin,
 } from "@/lib/services/recommendationEngine";
 import type { CompactSessionTasteSignal } from "@/lib/telemetry/tasteTypes";
-import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
+import { mapHotelPostToSummaryDto } from "@/lib/services/hotelPostService";
+import { computeHaversineKm } from "@/lib/placeCategories";
+import type {
+  HotelPostSummaryDto,
+  PinCommentDto,
+  PinFeedItemDto,
+  PlaceCategoryDto,
+} from "@/types/cangaroom";
 
 export interface PersonalizationRequestHints {
   visitorId?: string | null;
@@ -25,6 +32,7 @@ export interface PersonalizationRequestHints {
 
 export interface SearchStaysParams extends PersonalizationRequestHints {
   style?: string | null;
+  placeCategory?: PlaceCategoryDto | "ALL" | null;
   provinceId?: string | null;
   sourceType?: "ALL" | "INTERNAL" | "EXTERNAL" | null;
   q?: string | null;
@@ -239,6 +247,7 @@ export async function searchDiscoveryPins(
 ): Promise<PinFeedItemDto[]> {
   const {
     style,
+    placeCategory,
     provinceId,
     sourceType,
     q,
@@ -257,17 +266,27 @@ export async function searchDiscoveryPins(
   const trimmedQuery = q?.trim() || "";
   const nowDate = new Date();
 
+  const hotelFilter: Prisma.HotelWhereInput = {
+    isPublished: true,
+    verificationStatus: { not: "SUSPENDED" },
+  };
+  if (placeCategory && placeCategory !== "ALL") {
+    hotelFilter.placeCategory = placeCategory;
+  }
+  if (bounds) {
+    hotelFilter.latitude = { gte: bounds.south, lte: bounds.north };
+    hotelFilter.longitude = { gte: bounds.west, lte: bounds.east };
+  }
+
   const where: Prisma.PinWhereInput = {
     publishStatus: "PUBLISHED",
+    isCanonicalCard: true,
     AND: [
       {
         OR: [{ promoExpiresAt: null }, { promoExpiresAt: { gt: nowDate } }],
       },
     ],
-    hotel: {
-      isPublished: true,
-      verificationStatus: { not: "SUSPENDED" },
-    },
+    hotel: hotelFilter,
   };
 
   if (provinceId && provinceId !== "all") {
@@ -276,15 +295,6 @@ export async function searchDiscoveryPins(
 
   if (sourceType === "INTERNAL" || sourceType === "EXTERNAL") {
     where.dealSourceType = sourceType;
-  }
-
-  if (bounds) {
-    where.hotel = {
-      isPublished: true,
-      verificationStatus: { not: "SUSPENDED" },
-      latitude: { gte: bounds.south, lte: bounds.north },
-      longitude: { gte: bounds.west, lte: bounds.east },
-    };
   }
 
   // Only apply hard style filter when browsing a specific category tab without a text search
@@ -310,6 +320,11 @@ export async function searchDiscoveryPins(
             nameTh: true,
             nameEn: true,
             districtTh: true,
+            placeCategory: true,
+            merchantMode: true,
+            externalWebsiteUrl: true,
+            primaryCtaLabelTh: true,
+            featuredCouponId: true,
             ...(compact
               ? {}
               : {
@@ -333,7 +348,7 @@ export async function searchDiscoveryPins(
             coupons: {
               where: { isActive: true, expiresAt: { gt: nowDate } },
               orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
-              take: compact ? 1 : 6,
+              take: compact ? 3 : 8,
               select: PIN_COUPON_SELECT,
             },
           },
@@ -459,6 +474,10 @@ export async function getPinDetailById(
   pin: PinFeedItemDto;
   comments: PinCommentDto[];
   relatedPins: PinFeedItemDto[];
+  hotelPosts: HotelPostSummaryDto[];
+  ownerFeedPosts: HotelPostSummaryDto[];
+  ownerBlogs: HotelPostSummaryDto[];
+  nearbyPlaces: PinFeedItemDto[];
 } | null> {
   const rawPin = await prisma.pin.findUnique({
     where: { id: pinId },
@@ -470,6 +489,11 @@ export async function getPinDetailById(
           nameEn: true,
           districtTh: true,
           addressTh: true,
+          placeCategory: true,
+          merchantMode: true,
+          externalWebsiteUrl: true,
+          primaryCtaLabelTh: true,
+          featuredCouponId: true,
           latitude: true,
           longitude: true,
           googleMapsUrl: true,
@@ -484,7 +508,7 @@ export async function getPinDetailById(
           coupons: {
             where: { isActive: true, expiresAt: { gt: new Date() } },
             orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
-            take: 6,
+            take: 12,
             select: PIN_COUPON_SELECT,
           },
         },
@@ -505,8 +529,15 @@ export async function getPinDetailById(
     return null;
   }
 
-  const [rawComments, relatedRaw, anchorBoards, userLike, userSave, taste] =
-    await Promise.all([
+  const [
+    rawComments,
+    relatedRaw,
+    rawHotelPosts,
+    anchorBoards,
+    userLike,
+    userSave,
+    taste,
+  ] = await Promise.all([
       prisma.pinComment.findMany({
         where: { pinId, status: "VISIBLE" },
         orderBy: { createdAt: "asc" },
@@ -519,7 +550,9 @@ export async function getPinDetailById(
       prisma.pin.findMany({
         where: {
           id: { not: pinId },
+          hotelId: { not: rawPin.hotelId },
           publishStatus: "PUBLISHED",
+          isCanonicalCard: true,
           hotel: {
             isPublished: true,
             verificationStatus: { not: "SUSPENDED" },
@@ -535,6 +568,11 @@ export async function getPinDetailById(
               nameEn: true,
               districtTh: true,
               addressTh: true,
+              placeCategory: true,
+              merchantMode: true,
+              externalWebsiteUrl: true,
+              primaryCtaLabelTh: true,
+              featuredCouponId: true,
               latitude: true,
               longitude: true,
               googleMapsUrl: true,
@@ -565,6 +603,25 @@ export async function getPinDetailById(
           coupon: { select: PIN_COUPON_SELECT },
         },
       }),
+      prisma.hotelPost
+        .findMany({
+          where: {
+            hotelId: rawPin.hotelId,
+            status: "PUBLISHED",
+          },
+          orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+          take: 16,
+          include: {
+            room: {
+              select: {
+                code: true,
+                nameTh: true,
+                weekdayPriceThb: true,
+              },
+            },
+          },
+        })
+        .catch(() => []),
       prisma.savedBoardPin
         .findMany({
           where: {
@@ -694,10 +751,62 @@ export async function getPinDetailById(
     limit: 24,
   });
 
+  const hotelPosts = rawHotelPosts.map((post) =>
+    mapHotelPostToSummaryDto(post, {
+      slug: rawPin.hotel.slug,
+      nameTh: rawPin.hotel.nameTh,
+      logoUrl: rawPin.hotel.logoUrl,
+      verificationStatus: rawPin.hotel.verificationStatus,
+      provinceId: rawPin.provinceId,
+    })
+  );
+
+  const ownerFeedPosts = hotelPosts.filter((p) => p.postKind === "FEED_POST");
+  const ownerBlogs = hotelPosts.filter((p) => p.postKind !== "FEED_POST");
+
+  // Compute real Haversine nearby places from our platform's Canonical Place Cards
+  let nearbyPlaces: PinFeedItemDto[] = [];
+  if (
+    typeof anchorDto.hotelLatitude === "number" &&
+    typeof anchorDto.hotelLongitude === "number"
+  ) {
+    const withDist = candidateDtos
+      .filter(
+        (c) =>
+          typeof c.hotelLatitude === "number" &&
+          typeof c.hotelLongitude === "number"
+      )
+      .map((c) => {
+        const km = computeHaversineKm(
+          anchorDto.hotelLatitude!,
+          anchorDto.hotelLongitude!,
+          c.hotelLatitude!,
+          c.hotelLongitude!
+        );
+        return { ...c, distanceKm: Math.round(km * 10) / 10 };
+      })
+      .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+
+    const withinLocalRadius = withDist.filter(
+      (c) => (c.distanceKm ?? 9999) <= 85
+    );
+    nearbyPlaces = (
+      withinLocalRadius.length >= 3 ? withinLocalRadius : withDist
+    ).slice(0, 10);
+  } else {
+    nearbyPlaces = candidateDtos
+      .filter((c) => c.provinceId === anchorDto.provinceId)
+      .slice(0, 10);
+  }
+
   return {
     pin: anchorDto,
     comments: topLevelComments,
     relatedPins: rankedRelated,
+    hotelPosts,
+    ownerFeedPosts,
+    ownerBlogs,
+    nearbyPlaces,
   };
 }
 
@@ -772,6 +881,11 @@ export async function getPinsByIds(
           nameEn: true,
           districtTh: true,
           addressTh: true,
+          placeCategory: true,
+          merchantMode: true,
+          externalWebsiteUrl: true,
+          primaryCtaLabelTh: true,
+          featuredCouponId: true,
           latitude: true,
           longitude: true,
           googleMapsUrl: true,

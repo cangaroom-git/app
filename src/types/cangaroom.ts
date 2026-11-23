@@ -19,6 +19,24 @@ export type PropertyTypeDto =
   | "RESORT"
   | "POOL_VILLA"
   | "GLAMPING_HOMESTAY";
+export type PlaceCategoryDto =
+  | "STAY"
+  | "CAFE"
+  | "RESTAURANT"
+  | "ATTRACTION"
+  | "WELLNESS";
+export type MerchantModeDto = "DIRECT_BOOKING" | "PROFILE_ONLY";
+export type PromoKindDto =
+  | "BOOKING_COUPON"
+  | "ONSITE_PERK"
+  | "EXTERNAL_LINK_DEAL";
+export type HotelPostKindDto = "FEED_POST" | "BLOG";
+export type PlaceReportReasonDto =
+  | "DUPLICATE"
+  | "FAKE_SCAM"
+  | "CLOSED"
+  | "WRONG_LOCATION"
+  | "OTHER";
 export type DiscountRuleTypeDto =
   | "LENGTH_OF_STAY"
   | "EARLY_BIRD"
@@ -38,6 +56,11 @@ export interface PinActiveCouponDto {
   descriptionTh: string;
   descriptionEn: string;
   coverImageUrl: string | null;
+  promoKind?: PromoKindDto;
+  badgeTextTh?: string;
+  badgeTextEn?: string;
+  externalUrl?: string | null;
+  isFeaturedDeal?: boolean;
   discountType: DiscountTypeDto;
   discountValue: number;
   minSpendThb: number;
@@ -57,6 +80,13 @@ export interface PinFeedItemDto {
   hotelLogoUrl: string | null;
   hotelVerificationStatus: VerificationStatusDto;
   hotelRatingAvg: number;
+  placeCategory: PlaceCategoryDto;
+  merchantMode: MerchantModeDto;
+  externalWebsiteUrl?: string;
+  primaryCtaLabelTh?: string;
+  featuredCouponId?: string | null;
+  hasActivePromo?: boolean;
+  distanceKm?: number | null;
   hotelLatitude: number | null;
   hotelLongitude: number | null;
   hotelDistrictTh: string;
@@ -212,6 +242,10 @@ export interface CouponDealDto {
   descriptionTh: string;
   descriptionEn: string;
   coverImageUrl: string | null;
+  promoKind?: PromoKindDto;
+  badgeTextTh?: string;
+  badgeTextEn?: string;
+  externalUrl?: string | null;
   discountType: DiscountTypeDto;
   discountValue: number;
   minSpendThb: number;
@@ -261,6 +295,8 @@ export interface HotelPostSummaryDto {
   titleTh: string;
   excerptTh: string;
   coverImageUrl: string;
+  galleryUrls?: string[];
+  postKind?: HotelPostKindDto;
   categoryTh: string;
   tags: string[];
   status: PostPublishStatusDto;
@@ -273,10 +309,25 @@ export interface HotelPostDetailDto extends HotelPostSummaryDto {
   galleryUrls: string[];
 }
 
+export interface PlaceOpeningHoursDayDto {
+  day: string;
+  open: string;
+  close: string;
+  closed?: boolean;
+}
+
 export interface HotelProfileDto {
   id: string;
   slug: string;
   ownerId: string;
+  placeCategory?: PlaceCategoryDto;
+  merchantMode?: MerchantModeDto;
+  externalWebsiteUrl?: string;
+  primaryCtaLabelTh?: string;
+  openingHours?: PlaceOpeningHoursDayDto[];
+  canonicalPinId?: string | null;
+  featuredCouponId?: string | null;
+  googlePlaceId?: string | null;
   nameTh: string;
   nameEn: string;
   taglineTh: string;
@@ -327,12 +378,18 @@ export interface HotelStorefrontDto {
   pins: PinFeedItemDto[];
   reviews: GuestReviewDto[];
   posts: HotelPostSummaryDto[];
+  canonicalPin?: PinFeedItemDto | null;
+  pinComments?: PinCommentDto[];
+  ownerFeedPosts?: HotelPostSummaryDto[];
+  ownerBlogs?: HotelPostSummaryDto[];
+  nearbyPlaces?: PinFeedItemDto[];
 }
 
 export interface SavedBoardPinItemDto {
   boardPinId: string;
   boardId: string;
   boardName: string;
+  sortOrder: number;
   savedPriceSnapshotThb: number | null;
   currentMinPriceThb: number | null;
   priceDropThb: number;
@@ -345,9 +402,17 @@ export interface SavedBoardPinItemDto {
 export interface SavedBoardDto {
   id: string;
   name: string;
+  shareSlug: string;
+  isPublic: boolean;
   createdAt: string;
   pinCount: number;
   items: SavedBoardPinItemDto[];
+}
+
+export interface PublicTripDto extends SavedBoardDto {
+  isOwner: boolean;
+  ownerDisplayName: string;
+  ownerAvatarUrl: string | null;
 }
 
 export interface BookingSummaryDto {
@@ -393,6 +458,8 @@ export interface OwnedHotelSummaryDto {
   nameTh: string;
   nameEn: string;
   provinceId: string;
+  placeCategory?: PlaceCategoryDto;
+  merchantMode?: MerchantModeDto;
   verificationStatus: VerificationStatusDto;
   pendingBookingsCount: number;
 }

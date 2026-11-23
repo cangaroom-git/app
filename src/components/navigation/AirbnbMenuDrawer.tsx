@@ -511,7 +511,7 @@ export function AirbnbMenuDrawer({
             <nav aria-label={isTh ? "เมนูผู้ใช้" : "Account menu"}>
               <div className="space-y-0.5">
                 <Link
-                  href="/trips"
+                  href="/bookings"
                   onClick={onClose}
                   className={activeTab === "trips" ? activeRowClass : rowClass}
                 >
@@ -521,13 +521,13 @@ export function AirbnbMenuDrawer({
                       strokeWidth={1.7}
                     />
                     <span className="truncate">
-                      {isTh ? "การจอง & คูปองของฉัน" : "My trips & wallet"}
+                      {isTh ? "การจอง & คูปองของฉัน" : "My bookings & wallet"}
                     </span>
                   </span>
                 </Link>
 
                 <Link
-                  href="/board"
+                  href="/trip"
                   onClick={onClose}
                   className={activeTab === "board" ? activeRowClass : rowClass}
                 >
@@ -537,7 +537,7 @@ export function AirbnbMenuDrawer({
                       strokeWidth={1.7}
                     />
                     <span className="truncate">
-                      {isTh ? "บอร์ดคูปองที่บันทึกไว้" : "Saved deal boards"}
+                      {isTh ? "ทริป & คูปองที่บันทึกไว้" : "Saved trips"}
                     </span>
                   </span>
                   {savedPinsCount > 0 && (

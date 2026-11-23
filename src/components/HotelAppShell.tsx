@@ -10,8 +10,13 @@ import React, {
   useState,
 } from "react";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
+import {
+  clearNearbyHopOrigin,
+  saveNearbyHopOrigin,
+} from "@/lib/placeNavigationStore";
+import { recordRecentViewedPinId } from "@/lib/telemetry/clientTelemetry";
 import {
   readLastUsedBoardId,
   saveLastUsedBoardId,
@@ -20,8 +25,15 @@ import type { LanguageCode } from "@/lib/dateFormatters";
 import type {
   AuthenticatedMeDto,
   CouponDealDto,
+  PinFeedItemDto,
   SavedBoardDto,
 } from "@/types/cangaroom";
+import {
+  PlaceCardFlipOverlay,
+  type ActivePlaceFlipTransition,
+  type RouteHeroTargetRect,
+} from "@/components/navigation/PlaceCardFlipOverlay";
+import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import {
   getTabIdFromPathname,
   type PlatformNavTabId,
@@ -100,12 +112,29 @@ export interface PlatformAppContextValue {
   }) => Promise<{ isSaved: boolean; boardId: string | null } | null>;
   openCreateBoardModal: () => void;
   deleteSavedBoard: (boardId: string) => Promise<boolean>;
+  reorderSavedBoardPins: (
+    boardId: string,
+    orderedPinIds: string[]
+  ) => Promise<boolean>;
   pinLikeOverrides: Record<string, { isLiked: boolean; likesCount: number }>;
   togglePinLikeInstant: (pin: {
     id: string;
     isLikedByMe: boolean;
     likesCount: number;
   }) => void;
+  navigateToPlaceWithFlip: (params: {
+    pin: PinFeedItemDto;
+    originRect?: CardOriginRect | null;
+    href?: string;
+    fromNearbyOf?: {
+      fromSlug: string;
+      fromNameTh: string;
+      fromNameEn: string;
+    } | null;
+    openInNewTab?: boolean;
+  }) => void;
+  signalPlaceHeroReady: (slug: string, rect: RouteHeroTargetRect) => void;
+  activeFlipTargetSlug: string | null;
 }
 
 const PlatformAppContext = createContext<PlatformAppContextValue | null>(null);
@@ -120,7 +149,106 @@ export function useHotelApp(): PlatformAppContextValue {
 
 export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const activeTab: PlatformNavTabId = getTabIdFromPathname(pathname);
+
+  // Persistent Cross-Route 3D Card Flip state (survives Next.js route transitions at 120fps!)
+  const flipSeqRef = useRef(0);
+  const flipLaunchPathRef = useRef<string>("");
+  const [activeFlipTransition, setActiveFlipTransition] =
+    useState<ActivePlaceFlipTransition | null>(null);
+  const [readyRouteHero, setReadyRouteHero] = useState<{
+    slug: string;
+    rect: RouteHeroTargetRect;
+  } | null>(null);
+
+  const navigateToPlaceWithFlip = useCallback(
+    (params: {
+      pin: PinFeedItemDto;
+      originRect?: CardOriginRect | null;
+      href?: string;
+      fromNearbyOf?: {
+        fromSlug: string;
+        fromNameTh: string;
+        fromNameEn: string;
+      } | null;
+      openInNewTab?: boolean;
+    }) => {
+      const { pin, originRect, href, fromNearbyOf, openInNewTab } = params;
+      const targetSlug = (pin.hotelSlug || "").trim();
+      const targetHref = href || `/${encodeURIComponent(targetSlug)}`;
+      if (!targetSlug) return;
+
+      recordRecentViewedPinId(pin.id);
+
+      if (openInNewTab && typeof window !== "undefined") {
+        window.open(targetHref, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      if (fromNearbyOf) {
+        saveNearbyHopOrigin({
+          fromSlug: fromNearbyOf.fromSlug,
+          fromNameTh: fromNearbyOf.fromNameTh,
+          fromNameEn: fromNearbyOf.fromNameEn,
+          targetSlug,
+        });
+      } else {
+        clearNearbyHopOrigin();
+      }
+
+      const prefersReducedMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+      if (
+        originRect &&
+        originRect.width >= 30 &&
+        originRect.height >= 30 &&
+        !prefersReducedMotion &&
+        typeof window !== "undefined"
+      ) {
+        const nextId = ++flipSeqRef.current;
+        flipLaunchPathRef.current = pathname;
+        setReadyRouteHero(null);
+        setActiveFlipTransition({
+          id: nextId,
+          slug: targetSlug,
+          pin,
+          originRect,
+          hasNearbyBackBar: Boolean(fromNearbyOf),
+        });
+      }
+
+      router.push(targetHref);
+    },
+    [pathname, router]
+  );
+
+  // If the user clicks another route (or browser Back) while waiting on a slow network,
+  // dismiss the pending flip skeleton immediately so it never lingers on an unrelated page.
+  useEffect(() => {
+    if (!activeFlipTransition) return;
+    const expectedPath = `/${activeFlipTransition.slug.toLowerCase()}`;
+    const currentPath = decodeURIComponent(pathname).toLowerCase();
+    if (
+      pathname !== flipLaunchPathRef.current &&
+      currentPath !== expectedPath
+    ) {
+      setActiveFlipTransition(null);
+    }
+  }, [activeFlipTransition, pathname]);
+
+  const signalPlaceHeroReady = useCallback(
+    (slug: string, rect: RouteHeroTargetRect) => {
+      setReadyRouteHero({ slug, rect });
+    },
+    []
+  );
+
+  const handleCompleteFlipTransition = useCallback((id: number) => {
+    setActiveFlipTransition((prev) => (prev && prev.id === id ? null : prev));
+  }, []);
 
   const [lang, setLangState] = useState<Lang>("th");
   const [theme, setThemeState] = useState<ThemeMode>("light");
@@ -497,8 +625,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     }): Promise<{ isSaved: boolean; boardId: string | null } | null> => {
       if (!user) {
         openAuthModal({
-          reasonTh: "เข้าสู่ระบบเพื่อปักหมุดที่พักลงบอร์ดของคุณ",
-          reasonEn: "Log in to pin stays to your boards",
+          reasonTh: "เข้าสู่ระบบเพื่อปักหมุดที่พักลงทริปของคุณ",
+          reasonEn: "Log in to save stays to your trips",
           onSuccess: async () => {
             const loaded = await refreshSavedBoards();
             await executePinToBoardForAuthenticatedUser(pin, loaded);
@@ -530,7 +658,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           error?: string;
         };
         if (!res.ok || !data.board) {
-          throw new Error(data.error || "สร้างบอร์ดไม่สำเร็จ");
+          throw new Error(data.error || "สร้างทริปไม่สำเร็จ");
         }
 
         const newBoard = data.board;
@@ -625,11 +753,54 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     [refreshProfile, refreshSavedBoards]
   );
 
+  const reorderSavedBoardPins = useCallback(
+    async (boardId: string, orderedPinIds: string[]): Promise<boolean> => {
+      if (orderedPinIds.length === 0) return true;
+      // Instant optimistic reorder in context state
+      setSavedBoards((prev) =>
+        prev.map((b) => {
+          if (b.id !== boardId) return b;
+          const byPinId = new Map(b.items.map((it) => [it.pin.id, it]));
+          const reordered: typeof b.items = [];
+          orderedPinIds.forEach((pid, idx) => {
+            const found = byPinId.get(pid);
+            if (found) {
+              reordered.push({ ...found, sortOrder: idx });
+              byPinId.delete(pid);
+            }
+          });
+          // Preserve any untouched items at the end
+          for (const leftover of byPinId.values()) {
+            reordered.push({ ...leftover, sortOrder: reordered.length });
+          }
+          return { ...b, items: reordered };
+        })
+      );
+
+      try {
+        const res = await fetch(`/api/boards/${encodeURIComponent(boardId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderedPinIds }),
+        });
+        if (!res.ok) {
+          await refreshSavedBoards();
+          return false;
+        }
+        return true;
+      } catch {
+        await refreshSavedBoards();
+        return false;
+      }
+    },
+    [refreshSavedBoards]
+  );
+
   const openCreateBoardModal = useCallback(() => {
     if (!user) {
       openAuthModal({
-        reasonTh: "เข้าสู่ระบบเพื่อสร้างบอร์ดที่พักของคุณ",
-        reasonEn: "Log in to create a board",
+        reasonTh: "เข้าสู่ระบบเพื่อสร้างทริปที่พักของคุณ",
+        reasonEn: "Log in to create a trip",
         onSuccess: () => {
           pendingPinForCreateRef.current = null;
           setIsCreateBoardOpen(true);
@@ -669,9 +840,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       probe.style.cssText =
         "position:fixed;top:-9999px;left:-9999px;width:64px;height:64px;overflow:scroll;visibility:hidden;pointer-events:none;";
       document.body.appendChild(probe);
-      const hasClassicScrollbars = probe.offsetWidth - probe.clientWidth > 0;
+      const scrollbarWidth = Math.max(0, probe.offsetWidth - probe.clientWidth);
       probe.remove();
-      if (hasClassicScrollbars) {
+      html.dataset.scrollbarWidth = String(scrollbarWidth);
+      if (scrollbarWidth > 0) {
         html.dataset.classicScrollbars = "true";
       }
     };
@@ -916,8 +1088,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       triggerPinToBoard,
       openCreateBoardModal,
       deleteSavedBoard,
+      reorderSavedBoardPins,
       pinLikeOverrides,
       togglePinLikeInstant,
+      navigateToPlaceWithFlip,
+      signalPlaceHeroReady,
+      activeFlipTargetSlug: activeFlipTransition?.slug ?? null,
     }),
     [
       lang,
@@ -953,8 +1129,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       triggerPinToBoard,
       openCreateBoardModal,
       deleteSavedBoard,
+      reorderSavedBoardPins,
       pinLikeOverrides,
       togglePinLikeInstant,
+      navigateToPlaceWithFlip,
+      signalPlaceHeroReady,
+      activeFlipTransition?.slug,
     ]
   );
 
@@ -1027,8 +1207,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             data-cgr-app-main="true"
             className={
               isExploreFullBleed
-                ? "pt-16 pb-0 lg:pl-[72px]"
-                : "pt-16 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-[72px]"
+                ? "pt-0 lg:pt-16 pb-0 lg:pl-[72px]"
+                : "pt-[env(safe-area-inset-top,0px)] lg:pt-16 pb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:pb-12 lg:pl-[72px]"
             }
           >
             <div
@@ -1142,6 +1322,12 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           <CookieConsentBanner language={lang} theme={theme} />
         </div>
       )}
+      <PlaceCardFlipOverlay
+        transition={activeFlipTransition}
+        readyHero={readyRouteHero}
+        language={lang}
+        onComplete={handleCompleteFlipTransition}
+      />
     </PlatformAppContext.Provider>
   );
 }

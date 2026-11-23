@@ -36,7 +36,9 @@ export async function GET(request: Request) {
 
 ## Key Human URLs
 - Discovery Feed: ${origin}/
-- Saved Stay Boards: ${origin}/board
+- Saved Stay Trips: ${origin}/trip
+- Explore Map: ${origin}/explore
+- My Bookings & Coupon Wallet: ${origin}/bookings
 - Thailand Hotel Coupons Hub: ${origin}/deal
 - Hotel Storefronts: ${origin}/{hotelSlug}
 

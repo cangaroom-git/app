@@ -170,6 +170,11 @@ export async function GET(request: Request) {
               logoUrl: true,
               verificationStatus: true,
               ratingAvg: true,
+              placeCategory: true,
+              merchantMode: true,
+              externalWebsiteUrl: true,
+              primaryCtaLabelTh: true,
+              featuredCouponId: true,
               rooms: { select: { weekdayPriceThb: true } },
               coupons: {
                 where: { isActive: true, expiresAt: { gt: new Date() } },

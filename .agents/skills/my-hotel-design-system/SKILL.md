@@ -48,7 +48,8 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
 | `--color-border-emphasized` | `#dddddd` | `#4a4a4a` | Structural hairlines & dashed coupon splits |
 | `--color-text-primary` | `#222222` | `#f5f5f5` | Warm charcoal headings, prices, primary copy |
 | `--color-text-secondary` | `#6a6a6a` | `#a8a8a8` | Foggy slate captions, sublabels, metadata |
-| `--color-promo` | `#e60023` | `#e60023` | **ONLY** Save/Bookmark `'บันทึก'` (`Save`) button & nav notification dots |
+| `--color-promo` | `#e60023` | `#e60023` | **ONLY** Save/Bookmark `'บันทึก'` (`Save`), active Like heart & nav notification dots |
+| Category Crest Tokens | `STAY #2B3A67` · `CAFE #9A4D1C` · `RESTAURANT #B83B3B` · `ATTRACTION #1F6E50` · `WELLNESS #146373` | Same matte tokens | **ONLY** Top-Left Category Crest on `3:4` Collectible Place Cards & `/explore`/`/trip` Map Pins (never buttons/banners/gradients) |
 
 ### Typography (`Plus Jakarta Sans` + `Anuphan`)
 - Warm balanced semi-bold headings (`font-semibold` / `600`) paired with readable Thai line-heights:
@@ -89,9 +90,10 @@ Every modal, bottom sheet, drawer, dropdown, search transition, and interactive 
 | `--duration-morph` | `420ms` | Continuous multi-detent sheet expand/collapse (e.g. bottom search card -> full-height search sheet) |
 
 ### 5 Mandatory Motion Laws (บังคับใช้ทั้งเว็บ)
-1. **2-Frame Enter & Exit Presence Law (`useModalPresence` — ห้ามเปิด/ปิดแบบกระตุก)**:
-   - Every modal, bottom sheet, floating overlay, and popover MUST pair React `useModalPresence(isOpen, exitDurationMs)` (`src/lib/useModalPresence.ts`) with GPU-composited `data-state="open" | "closed"` CSS classes (`.cgr-modal-backdrop`, `.cgr-modal-surface-sm/md/lg`, `.cgr-modal-sheet-only`, `.cgr-floating-card-motion`, `.cgr-popover-motion`) so **both opening AND closing** animate smoothly without instant unmounting.
-   - Always pass `shouldRender` (not `isOpen`) to `useBodyScrollLock(shouldRender)` so scrollbars never jump mid-exit. When exiting a detail card bound to nullable state (e.g., `selectedPlace`), cache the last non-null item in a ref so its photo/text stays intact during the exit glide.
+1. **Smooth Fade Slide-In + Slide-Out Presence Law (`useModalPresence` — ห้ามเปิด/ปิดแบบตัดฉับ)**:
+   - Every modal, bottom sheet, right drawer, floating pill/card, and popover MUST animate smoothly with **Fade Slide-In AND Fade Slide-Out** (`opacity` + `translate3d(...)` via `useModalPresence(isOpen, exitDurationMs)` in `src/lib/useModalPresence.ts`) paired with GPU-composited `data-state="open" | "closed"` CSS classes (`.cgr-modal-backdrop`, `.cgr-modal-fade-slide`, `.cgr-modal-surface-sm/md/lg`, `.cgr-modal-sheet-only`, `.cgr-floating-card-motion`, `.cgr-popover-motion`, `.cgr-fade-slide-pill`).
+   - Exit duration is always ~25–30% faster than enter (`340–360ms` fade slide-in / `220–250ms` fade slide-out) so closing feels responsive without abrupt unmounting.
+   - Always pass `shouldRender` (not `isOpen`) to `useBodyScrollLock(shouldRender)` so scrollbars never jump mid-exit. When exiting a detail card bound to nullable state (e.g., `selectedPlace` or `focusedDeal`), cache the last non-null item in a ref/state so its photo/text stays intact during the fade slide-out glide.
 2. **Continuous Sheet Morphing Law (`ห้ามสลับกล่องตัดฉับ`)**:
    - Multi-state mobile sheets (e.g., Idle floating card <-> Full-height Search overlay <-> Collapsed / Half / Full Results sheet) MUST keep **ONE persistent sheet container** (`.cgr-map-mobile-sheet`) that smoothly morphs its height, edge insets, border-radius, and `transform` via `--ease-ios-sheet` (`420ms`) instead of unmounting one card and flashing another.
    - Inner content swaps inside an open sheet use subtle vertical rise-fade (`.cgr-sheet-content-in`, `10px`, `260ms var(--ease-out-expo)`).
@@ -108,12 +110,12 @@ Every modal, bottom sheet, drawer, dropdown, search transition, and interactive 
 ## 4. Unified App Shell, 3-Tier Grid & Mobile/Tablet UX
 
 ### Persistent Navigation Shell (`HotelAppShell.tsx` & `PrimaryNavigation.tsx`)
-- **Desktop Left Sidebar (`w-[72px]`, fixed)**: Persistent across **every** route except `/login` and full-screen modals (`z-[85]`). Center holds strictly **3 Traveller-First items (`Home /`, `Deal /deal`, `Board /board`)**; secondary routes (`/trips`, `/register-hotel`, `/studio`, `/super-admin`) live in **`More (≡)`**.
-- **Mobile/Tablet Top Bar (`< lg`)**: `Cangaroom` brand left + `Search` & `More/Profile` right. On `/{hotelSlug}`, scrolls out cleanly when the Scroll-Reveal Section Anchor Bar pins to `top-0` (`data-hotel-anchor-pinned="true"`).
-- **Mobile Floating Bottom Bar (`< lg`, `z-[70]`)**: 4 separated `48×48px` (`rounded-[16px]`) squircle buttons. Automatically hidden on `/{hotelSlug}` via `data-hide-on-hotel` so the **Sticky Bottom Booking CTA Footer** owns the mobile thumb zone cleanly.
+- **Desktop Left Sidebar (`w-[72px]`, fixed)**: Persistent across **every** route except `/login` and full-screen modals (`z-[85]`). Center holds strictly **3 Traveller-First items (`Coupon /`, `Explore /explore`, `Trip /trip`)**; secondary routes (`/bookings`, `/register-hotel`, `/studio`, `/super-admin`) live in **`More (≡)`**.
+- **Desktop Top Bar (`>= lg`, `64px`)**: Pure full-width search bar + user dropdown. On Mobile/Tablet (`< lg`), the top navbar is completely removed (Airbnb native-app standard) to maximize canvas & map viewport height.
+- **Mobile Clean Airbnb Docked 5-Icon Bottom Bar (`< lg`, `z-[70]`)**: Full-width pure-white docked bar (`bg-[var(--color-background-body)]/96 backdrop-blur-md border-t border-[var(--color-border)]`, safe-area bottom padding) with 5 clean icon+label tabs: **`Coupon` (`/`)**, **`Explore` (`/explore`)**, **`Search`** (opens floating SmartSearch overlay), **`Trip` (`/trip`)**, and **`Log in` / `Profile`** (circular profile photo when logged in). Automatically hidden on `/{hotelSlug}` via `data-hide-on-hotel` so the **Sticky Bottom Booking CTA Footer** owns the mobile thumb zone cleanly.
 - **Canonical Container Width Classes (`globals.css`)**:
-  1. `.cgr-page-fluid` (`w-full`): `/` and `/board` ONLY.
-  2. `.cgr-page-standard` (`w-full max-w-[1120px] mx-auto`): `/deal`, `/{hotelSlug}`, `/{hotelSlug}/book`, `/{hotelSlug}/posts`, `/trips`, `/studio`, `/super-admin`.
+  1. `.cgr-page-fluid` (`w-full`): `/` and `/trip` map stage.
+  2. `.cgr-page-standard` (`w-full max-w-[1120px] mx-auto`): `/deal`, `/{hotelSlug}`, `/{hotelSlug}/book`, `/{hotelSlug}/posts`, `/bookings`, `/studio`, `/super-admin`.
   3. `.cgr-page-reading` (`max-w-[760px] mx-auto`) & `.cgr-page-form` (`max-w-[640px] mx-auto`).
 
 ### Mobile & Tablet Interaction Standards

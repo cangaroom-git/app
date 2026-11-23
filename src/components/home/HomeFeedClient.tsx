@@ -11,7 +11,6 @@ import React, {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  getProvinceById,
   STAY_STYLE_TABS,
   VALID_STYLE_TAGS,
 } from "@/data/thailandProvinces";
@@ -27,7 +26,12 @@ import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
 import { useHotelApp } from "@/components/HotelAppShell";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import { DealSlideRow } from "@/components/home/DealSlideRow";
-import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
+import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
+import type {
+  HotelPostSummaryDto,
+  PinCommentDto,
+  PinFeedItemDto,
+} from "@/types/cangaroom";
 
 // Code-split heavy detail modal (3,950+ lines) & fullscreen media viewer out of the initial Home JS bundle!
 const PinterestPinDetail = dynamic(
@@ -61,6 +65,10 @@ export interface HomeFeedClientProps {
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
     relatedPins: PinFeedItemDto[];
+    hotelPosts?: HotelPostSummaryDto[];
+    ownerFeedPosts?: HotelPostSummaryDto[];
+    ownerBlogs?: HotelPostSummaryDto[];
+    nearbyPlaces?: PinFeedItemDto[];
   } | null;
 }
 
@@ -121,6 +129,7 @@ export function HomeFeedClient({
     hasLoadedBoardsOnce,
     triggerPinToBoard,
     togglePinLikeInstant,
+    navigateToPlaceWithFlip,
   } = useHotelApp();
 
   const isTh = language === "th";
@@ -164,6 +173,10 @@ export function HomeFeedClient({
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
     relatedPins: PinFeedItemDto[];
+    hotelPosts?: HotelPostSummaryDto[];
+    ownerFeedPosts?: HotelPostSummaryDto[];
+    ownerBlogs?: HotelPostSummaryDto[];
+    nearbyPlaces?: PinFeedItemDto[];
   } | null>(initialPinDetail);
   const latestPinReqRef = useRef<string | null>(initialStayId);
   const [optimisticSavedIds, setOptimisticSavedIds] = useState<Set<string>>(
@@ -405,10 +418,16 @@ export function HomeFeedClient({
   // Build pure horizontal Card Slide groups matching the top Anchor Tabs
   const slideGroups = useMemo(() => {
     const internalDeals = visibleCatalog.filter(
-      (p) => p.dealSourceType === "INTERNAL"
+      (p) => p.placeCategory === "STAY" && p.dealSourceType === "INTERNAL"
+    );
+    const cafeDiningPlaces = visibleCatalog.filter(
+      (p) => p.placeCategory === "CAFE" || p.placeCategory === "RESTAURANT"
+    );
+    const attractionWellnessPlaces = visibleCatalog.filter(
+      (p) => p.placeCategory === "ATTRACTION" || p.placeCategory === "WELLNESS"
     );
     const externalDeals = visibleCatalog.filter(
-      (p) => p.dealSourceType === "EXTERNAL"
+      (p) => p.placeCategory === "STAY" && p.dealSourceType === "EXTERNAL"
     );
 
     const styleGroups = STAY_STYLE_TABS.filter((t) => t.id !== "all").map(
@@ -422,9 +441,7 @@ export function HomeFeedClient({
           anchorDomId: `group-${tab.id}`,
           titleTh: titleMeta.th,
           titleEn: titleMeta.en,
-          seeAllHref: `/explore?style=${encodeURIComponent(tab.id)}${
-            sourceFilter !== "ALL" ? `&source=${sourceFilter}` : ""
-          }`,
+          seeAllHref: `/style/${encodeURIComponent(tab.id)}`,
           deals: visibleCatalog.filter((p) => p.stayStyles.includes(tab.id)),
         };
       }
@@ -432,10 +449,12 @@ export function HomeFeedClient({
 
     return {
       internalDeals,
+      cafeDiningPlaces,
+      attractionWellnessPlaces,
       externalDeals,
       styleGroups,
     };
-  }, [visibleCatalog, sourceFilter]);
+  }, [visibleCatalog]);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
     latestPinReqRef.current = pinId;
@@ -450,6 +469,10 @@ export function HomeFeedClient({
         pin: PinFeedItemDto;
         comments: PinCommentDto[];
         relatedPins: PinFeedItemDto[];
+        hotelPosts?: HotelPostSummaryDto[];
+        ownerFeedPosts?: HotelPostSummaryDto[];
+        ownerBlogs?: HotelPostSummaryDto[];
+        nearbyPlaces?: PinFeedItemDto[];
       };
       if (latestPinReqRef.current === pinId) {
         setPinDetail(data);
@@ -638,9 +661,22 @@ export function HomeFeedClient({
 
   const handleSelectPinRef = useRef(handleSelectPin);
   handleSelectPinRef.current = handleSelectPin;
-  const handleSelectFeedDeal = useCallback((p: PinFeedItemDto) => {
-    handleSelectPinRef.current(p, false);
-  }, []);
+  const handleSelectFeedDeal = useCallback(
+    (
+      p: PinFeedItemDto,
+      originRect?: CardOriginRect | null,
+      event?: React.MouseEvent | React.KeyboardEvent
+    ) => {
+      navigateToPlaceWithFlip({
+        pin: p,
+        originRect,
+        openInNewTab: Boolean(
+          event && "metaKey" in event && (event.metaKey || event.ctrlKey)
+        ),
+      });
+    },
+    [navigateToPlaceWithFlip]
+  );
 
   const effectiveSavedPinIds =
     currentUser && !hasLoadedBoardsOnce ? optimisticSavedIds : globalSavedPinIds;
@@ -780,38 +816,6 @@ export function HomeFeedClient({
       return true;
     });
   }, [activePin, masterPins, hiddenPinIds]);
-
-  const detailRelatedGroups = useMemo(() => {
-    if (!activePin) {
-      return { sameStyle: [], nearbyArea: [], directPicks: [] };
-    }
-    const anchorStyles = new Set(activePin.stayStyles);
-    const anchorRegion = getProvinceById(activePin.provinceId)?.region ?? null;
-
-    const sameStyle = allOtherDeals.filter((cand) =>
-      cand.stayStyles.some((st) => anchorStyles.has(st))
-    );
-
-    const nearbyArea = [...allOtherDeals]
-      .filter((cand) => {
-        if (cand.provinceId === activePin.provinceId) return true;
-        return (
-          Boolean(anchorRegion) &&
-          getProvinceById(cand.provinceId)?.region === anchorRegion
-        );
-      })
-      .sort((a, b) => {
-        const aExact = a.provinceId === activePin.provinceId ? 1 : 0;
-        const bExact = b.provinceId === activePin.provinceId ? 1 : 0;
-        return bExact - aExact;
-      });
-
-    const directPicks = allOtherDeals.filter(
-      (cand) => cand.dealSourceType === "INTERNAL"
-    );
-
-    return { sameStyle, nearbyArea, directPicks };
-  }, [activePin, allOtherDeals]);
 
   const prevPinPreview =
     pinHistoryStack.length > 0
@@ -983,7 +987,7 @@ export function HomeFeedClient({
   }, [activeAnchorId, sourceFilter, globalSearchQuery]);
 
   return (
-    <div className="cgr-page-standard pb-14 [overflow-anchor:none]">
+    <div className="cgr-page-wide pb-14 [overflow-anchor:none]">
       {/* Scroll-Reveal Sticky Anchor Tabs Bar */}
       {!activePin && (
         <nav
@@ -995,7 +999,7 @@ export function HomeFeedClient({
               : "opacity-0 -translate-y-2 pointer-events-none"
           }`}
         >
-          <div className="max-w-[1120px] mx-auto">
+          <div className="max-w-[1360px] mx-auto">
             <div
               ref={stickyTabsScrollRef}
               data-style-tabs-bar="true"
@@ -1026,11 +1030,24 @@ export function HomeFeedClient({
         </nav>
       )}
 
-      {/* Top Inline Anchor Tabs */}
+      {/* Top Editorial "เที่ยวอะไรดี" Prompt + Inline Anchor Tabs */}
       <div
         aria-hidden={Boolean(activePin)}
         className={activePin ? "hidden" : ""}
       >
+        <div className="pb-2.5 sm:pb-3 flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] leading-tight">
+              {isTh ? "เที่ยวอะไรดี" : "What kind of escape?"}
+            </h1>
+            <p className="text-[13px] sm:text-[14px] text-[var(--color-text-secondary)] mt-0.5 truncate">
+              {isTh
+                ? "สะสมการ์ดที่พัก คาเฟ่ ร้านอาหาร และที่เที่ยวสวยทั่วไทย พร้อมโปรโมชั่นและดีลจองตรง 0% GP"
+                : "Collect stays, cafes, dining, and attractions across Thailand with curated perks & 0% GP booking"}
+            </p>
+          </div>
+        </div>
+
         <div ref={inlineTabsSentinelRef}>
           <div
             ref={tabsScrollRef}
@@ -1061,7 +1078,7 @@ export function HomeFeedClient({
         </div>
       </div>
 
-      {/* Deal Detail Stage (Slide 0: Coupon -> Slide 1..N: Photos/Video -> Last Slide: Map) */}
+      {/* Shared 2-Layer Place Profile View (Identical Across /, /style, /explore, /trip!) */}
       {activePin && (
         <PinterestPinDetail
           pin={activePin}
@@ -1070,13 +1087,42 @@ export function HomeFeedClient({
           comments={activePinComments}
           savedPinIds={effectiveSavedPinIds}
           relatedPins={allOtherDeals}
+          hotelPosts={
+            pinDetail?.pin.id === activePin.id ? pinDetail.hotelPosts ?? [] : []
+          }
+          ownerFeedPosts={
+            pinDetail?.pin.id === activePin.id
+              ? pinDetail.ownerFeedPosts
+              : undefined
+          }
+          ownerBlogs={
+            pinDetail?.pin.id === activePin.id
+              ? pinDetail.ownerBlogs
+              : undefined
+          }
+          nearbyPlaces={
+            pinDetail?.pin.id === activePin.id
+              ? pinDetail.nearbyPlaces ?? []
+              : []
+          }
+          isNearbyHop={pinHistoryStack.length > 0}
+          backTargetName={
+            pinHistoryStack.length > 0
+              ? isTh
+                ? pinHistoryStack[pinHistoryStack.length - 1].pin.hotelNameTh
+                : pinHistoryStack[pinHistoryStack.length - 1].pin.hotelNameEn
+              : null
+          }
           prevPinPreview={prevPinPreview}
           nextPinPreview={nextPinPreview}
           canStepBack={pinHistoryStack.length > 0}
           restoreScrollY={detailRestoreScrollY}
           onBack={handleStepBackPin}
           onClose={handleClosePin}
-          onSelectPin={(next) => handleSelectPin(next, true)}
+          onSelectPin={(next) => {
+            if (pinHistoryStack.length >= 1) return;
+            handleSelectPin(next, true);
+          }}
           onNavigatePin={handleNavigatePin}
           onHidePin={handleHidePin}
           onToggleLike={handleToggleLike}
@@ -1091,55 +1137,6 @@ export function HomeFeedClient({
           onAddComment={handleAddComment}
           onDeleteComment={handleDeleteComment}
         />
-      )}
-
-      {/* Symmetrical Grouped Card Slide Rows Below Open Deal Detail (Desktop >= lg; Mobile renders inside PinterestPinDetail) */}
-      {activePin && allOtherDeals.length > 0 && (
-        <div className="hidden lg:block mt-8 border-t border-[var(--color-border)] divide-y divide-[var(--color-border)]">
-          {detailRelatedGroups.sameStyle.length > 0 && (
-            <DealSlideRow
-              title={isTh ? "โปรที่พักแนวเดียวกัน" : "Similar style deals"}
-              seeAllHref={
-                activePin.stayStyles[0]
-                  ? `/explore?style=${encodeURIComponent(activePin.stayStyles[0])}`
-                  : "/explore"
-              }
-              deals={detailRelatedGroups.sameStyle}
-              language={language}
-              savedPinIds={effectiveSavedPinIds}
-              onSelectDeal={(p) => handleSelectPin(p, true)}
-              onToggleSave={handleToggleSave}
-            />
-          )}
-
-          {detailRelatedGroups.nearbyArea.length > 0 && (
-            <DealSlideRow
-              title={
-                isTh
-                  ? `โปรที่พักใกล้เคียง (${activePin.provinceNameTh} & ภาคเดียวกัน)`
-                  : `Nearby deals (${activePin.provinceNameEn} & region)`
-              }
-              seeAllHref={`/explore?province=${encodeURIComponent(activePin.provinceId)}`}
-              deals={detailRelatedGroups.nearbyArea}
-              language={language}
-              savedPinIds={effectiveSavedPinIds}
-              onSelectDeal={(p) => handleSelectPin(p, true)}
-              onToggleSave={handleToggleSave}
-            />
-          )}
-
-          {detailRelatedGroups.directPicks.length > 0 && (
-            <DealSlideRow
-              title={isTh ? "โปรจองตรง 0% GP ที่น่าสนใจ" : "More direct 0% GP stays"}
-              seeAllHref="/explore?source=INTERNAL"
-              deals={detailRelatedGroups.directPicks}
-              language={language}
-              savedPinIds={effectiveSavedPinIds}
-              onSelectDeal={(p) => handleSelectPin(p, true)}
-              onToggleSave={handleToggleSave}
-            />
-          )}
-        </div>
       )}
 
       {/* Error State */}
@@ -1229,11 +1226,7 @@ export function HomeFeedClient({
                   <DealSlideRow
                     id="group-all"
                     title={isTh ? "ดูล่าสุด" : "Recently viewed"}
-                    seeAllHref={
-                      sourceFilter !== "ALL"
-                        ? `/explore?recent=1&source=${sourceFilter}`
-                        : "/explore?recent=1"
-                    }
+                    seeAllHref="/style/recent"
                     deals={recentViewedDeals}
                     language={language}
                     savedPinIds={effectiveSavedPinIds}
@@ -1248,14 +1241,46 @@ export function HomeFeedClient({
                     id={recentViewedDeals.length === 0 ? "group-all" : undefined}
                     title={
                       isTh
-                        ? "โปรจองตรง 0% GP แนะนำ"
-                        : "Direct 0% GP featured deals"
+                        ? "ที่พักจองตรง 0% GP แนะนำ"
+                        : "Direct 0% GP featured stays"
                     }
-                    seeAllHref="/explore?source=INTERNAL"
+                    seeAllHref="/style/direct"
                     deals={slideGroups.internalDeals}
                     language={language}
                     savedPinIds={effectiveSavedPinIds}
                     priorityRow={recentViewedDeals.length === 0}
+                    onSelectDeal={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
+                  />
+                )}
+
+                {slideGroups.cafeDiningPlaces.length > 0 && (
+                  <DealSlideRow
+                    title={
+                      isTh
+                        ? "คาเฟ่ & ร้านอาหารน่าสะสม"
+                        : "Curated cafes & dining"
+                    }
+                    seeAllHref="/explore?category=CAFE"
+                    deals={slideGroups.cafeDiningPlaces}
+                    language={language}
+                    savedPinIds={effectiveSavedPinIds}
+                    onSelectDeal={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
+                  />
+                )}
+
+                {slideGroups.attractionWellnessPlaces.length > 0 && (
+                  <DealSlideRow
+                    title={
+                      isTh
+                        ? "ที่เที่ยวธรรมชาติ & สปาแนะนำ"
+                        : "Attractions & wellness"
+                    }
+                    seeAllHref="/explore?category=ATTRACTION"
+                    deals={slideGroups.attractionWellnessPlaces}
+                    language={language}
+                    savedPinIds={effectiveSavedPinIds}
                     onSelectDeal={handleSelectFeedDeal}
                     onToggleSave={handleToggleSaveStable}
                   />
@@ -1271,10 +1296,10 @@ export function HomeFeedClient({
                     }
                     title={
                       isTh
-                        ? "รวมโปรเด็ดจากทุกแหล่งทั่วไทย"
-                        : "Curated deals from every source"
+                        ? "รวมโปรที่พักเด็ดจากทุกแหล่งทั่วไทย"
+                        : "Curated stay deals from every source"
                     }
-                    seeAllHref="/explore?source=EXTERNAL"
+                    seeAllHref="/style/curated"
                     deals={slideGroups.externalDeals}
                     language={language}
                     savedPinIds={effectiveSavedPinIds}

@@ -56,6 +56,7 @@ import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import type {
   AuthenticatedMeDto,
   CouponDealDto,
+  HotelPostSummaryDto,
   PinActiveCouponDto,
   PinCommentDto,
   PinFeedItemDto,
@@ -78,7 +79,10 @@ export { clearLastClickedPinOrigin };
 import { getDealDiscountHeadline } from "@/components/home/VerticalCouponCard";
 import { DealHeroCouponSlide } from "@/components/home/DealHeroCouponSlide";
 import { DealTermsModal } from "@/components/home/DealTermsModal";
-import { DealSlideRow } from "@/components/home/DealSlideRow";
+import { PlaceProfileHubSection } from "@/components/home/PlaceProfileHubSection";
+import { PlaceCategoryCrest } from "@/components/shared/PlaceCategoryCrest";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
+import { syncPinLikeState } from "@/lib/placeLikeStore";
 
 const DealDetailInlineMap = dynamic(
   () =>
@@ -394,11 +398,11 @@ function PinMoreOptionsControl({
             <span>
               {isSaved
                 ? language === "th"
-                  ? "นำออกจากบอร์ด"
+                  ? "นำออกจากทริป"
                   : "Remove from board"
                 : language === "th"
-                ? "บันทึกเข้าบอร์ด"
-                : "Save to board"}
+                ? "บันทึกเข้าทริป"
+                : "Save to trip"}
             </span>
           </button>
 
@@ -482,11 +486,11 @@ function PinMoreOptionsControl({
                   <span>
                     {isSaved
                       ? language === "th"
-                        ? "นำออกจากบอร์ด"
+                        ? "นำออกจากทริป"
                         : "Remove from board"
                       : language === "th"
-                      ? "บันทึกเข้าบอร์ด"
-                      : "Save to board"}
+                      ? "บันทึกเข้าทริป"
+                      : "Save to trip"}
                   </span>
                   <Bookmark
                     className={`w-4 h-4 shrink-0 ${isSaved ? "fill-[var(--color-promo)] text-[var(--color-promo)]" : ""}`}
@@ -1102,11 +1106,11 @@ export function PinterestPinCard({
           aria-label={
             isSaved
               ? isTh
-                ? "นำออกจากบอร์ด"
+                ? "นำออกจากทริป"
                 : "Remove from board"
               : isTh
-              ? "บันทึกเข้าบอร์ด"
-              : "Save to board"
+              ? "บันทึกเข้าทริป"
+              : "Save to trip"
           }
           title={
             isSaved
@@ -1175,7 +1179,7 @@ function MobileAdjacentPinPreview({
           loading="eager"
           decoding="sync"
           draggable={false}
-          className="relative z-10 w-full h-full object-cover select-none"
+          className="relative z-[1] w-full h-full object-cover select-none"
         />
 
         {/* Grouped Bottom-Right Coupon + Save + More Preview Badges */}
@@ -1275,6 +1279,35 @@ export interface PinterestPinDetailProps {
   comments: PinCommentDto[];
   savedPinIds: Set<string>;
   relatedPins?: PinFeedItemDto[];
+  /**
+   * Below-the-fold footer behavior:
+   * - `"discovery"` (`/` & `/style/[slug]`): Cascading 6-tier vertical grid (Mobile 2 cols inside overlay; Desktop 5 cols inline below)
+   * - `"property-only"` (`/explore`, `/trip`, `/{hotelSlug}`): NO cross-hotel rabbit hole; shows THIS stay's own blog posts/stories!
+   */
+  detailFooterMode?: "discovery" | "property-only";
+  hotelPosts?: HotelPostSummaryDto[];
+  ownerFeedPosts?: HotelPostSummaryDto[];
+  ownerBlogs?: HotelPostSummaryDto[];
+  nearbyPlaces?: PinFeedItemDto[];
+  /** Strict 1-Hop Lock: true when user opened a Nearby Place from another card -> hides Nearby row! */
+  isNearbyHop?: boolean;
+  /** Name of the previous root place for the prominent "← กลับไป [ชื่อเดิม]" back button */
+  backTargetName?: string | null;
+  /** True when mounted as the Top 3:4 Place Hero directly on `/{slug}` (no duplicate below-fold hub or mobile dock!) */
+  profileHeroMode?: boolean;
+  /** Optional smooth in-page primary CTA handler in profileHeroMode (e.g., scroll to #section-rooms) */
+  onPrimaryProfileAction?: () => void;
+  primaryProfileActionLabel?: string | null;
+  /** Hides the Hero stage while the cross-route 3D flip is flying into it */
+  hideHeroStageForFlip?: boolean;
+  /** Signals measured `[data-place-hero-stage="true"]` rect back to the root flip overlay */
+  onHeroStageMeasured?: (rect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    radius: number;
+  }) => void;
   prevPinPreview?: PinFeedItemDto | null;
   nextPinPreview?: PinFeedItemDto | null;
   mobileOverlayMode?: boolean;
@@ -1301,6 +1334,18 @@ export function PinterestPinDetail({
   comments,
   savedPinIds,
   relatedPins = [],
+  detailFooterMode = "discovery",
+  hotelPosts = [],
+  ownerFeedPosts,
+  ownerBlogs,
+  nearbyPlaces = [],
+  isNearbyHop = false,
+  backTargetName = null,
+  profileHeroMode = false,
+  onPrimaryProfileAction,
+  primaryProfileActionLabel = null,
+  hideHeroStageForFlip = false,
+  onHeroStageMeasured,
   prevPinPreview = null,
   nextPinPreview = null,
   mobileOverlayMode = false,
@@ -1391,14 +1436,36 @@ export function PinterestPinDetail({
   const useIsomorphicLayoutEffect =
     typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+  // Report exact Hero stage rect to the root 3D Flip overlay when mounted as `/{slug}` Top Hero
+  useIsomorphicLayoutEffect(() => {
+    if (!profileHeroMode || !onHeroStageMeasured) return;
+    const el = mediaStageRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width >= 40 && rect.height >= 40) {
+      const computedRadius = parseFloat(window.getComputedStyle(el).borderRadius);
+      onHeroStageMeasured({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        radius:
+          Number.isFinite(computedRadius) && computedRadius > 0
+            ? computedRadius
+            : 20,
+      });
+    }
+  }, [profileHeroMode, onHeroStageMeasured, pin.id]);
+
   // Toggle mobile/tablet edge-to-edge layout synchronously BEFORE paint so parent feed gutters never jump on dismiss
   useIsomorphicLayoutEffect(() => {
-    if (typeof document === "undefined" || mobileOverlayMode) return;
+    if (typeof document === "undefined" || mobileOverlayMode || profileHeroMode)
+      return;
     document.documentElement.dataset.mobilePinOpen = "true";
     return () => {
       delete document.documentElement.dataset.mobilePinOpen;
     };
-  }, [mobileOverlayMode]);
+  }, [mobileOverlayMode, profileHeroMode]);
 
   // Synchronously reset swipe & carousel tracks BEFORE browser paint whenever `pin.id` changes (Zero Flash!)
   useIsomorphicLayoutEffect(() => {
@@ -1442,7 +1509,13 @@ export function PinterestPinDetail({
 
     if (mobileOverlayMode) {
       if (overlayRef.current) overlayRef.current.scrollTop = targetScrollTop;
-    } else if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      const modalScroller = overlayRef.current?.closest(
+        ".overflow-y-auto"
+      ) as HTMLElement | null;
+      if (modalScroller && modalScroller !== overlayRef.current) {
+        modalScroller.scrollTop = targetScrollTop;
+      }
+    } else if (typeof window !== "undefined") {
       window.scrollTo({
         top: targetScrollTop,
         behavior: "instant" as ScrollBehavior,
@@ -1646,6 +1719,13 @@ export function PinterestPinDetail({
   }, [pin.id, pin.videoUrl, images]);
 
   const totalSlides = stageSlides.length;
+  const hasPlacePromo = Boolean(
+    pin.promoHeadlineTh?.trim() ||
+      pin.promoHeadlineEn?.trim() ||
+      pin.activeCoupons.length > 0 ||
+      pin.promoCode ||
+      pin.promoDealPriceThb
+  );
   const hasVideoSlide = Boolean(pin.videoUrl);
   const videoSlideIndex = hasVideoSlide ? 1 : -1;
   const firstPhotoSlideIndex = hasVideoSlide ? 2 : 1;
@@ -1960,7 +2040,10 @@ export function PinterestPinDetail({
       const insideMultiPhotoHero =
         imagesCount > 1 &&
         Boolean(mediaStageRef.current?.contains(target));
+      // Strict Left-Edge Back Swipe Guard (clientX <= 28px) so Part 2 horizontal slide rows NEVER collide!
+      const isLeftEdgeStart = t.clientX <= 28;
       const ignore =
+        !isLeftEdgeStart ||
         insideMultiPhotoHero ||
         Boolean(
           target?.closest(
@@ -2184,6 +2267,11 @@ export function PinterestPinDetail({
     : pin.likesCount;
 
   const handleInstantLike = () => {
+    const nextLiked = !effectiveIsLiked;
+    const nextCount = Math.max(0, effectiveLikesCount + (nextLiked ? 1 : -1));
+    if (currentUser) {
+      syncPinLikeState(pin.id, nextLiked, nextCount);
+    }
     togglePinLikeInstant({
       id: pin.id,
       isLikedByMe: pin.isLikedByMe,
@@ -2266,7 +2354,10 @@ export function PinterestPinDetail({
         currentUser.ownedHotels.some((h) => h.id === pin.hotelId))
   );
 
-  const isExternalDeal = pin.dealSourceType === "EXTERNAL";
+  const catMeta = getPlaceCategoryMeta(pin.placeCategory);
+  const isDirectBooking =
+    pin.merchantMode !== "PROFILE_ONLY" && pin.dealSourceType === "INTERNAL";
+  const isExternalDeal = !isDirectBooking;
   const effectivePromoCode = pin.promoCode || pin.activeCoupon?.code || null;
   const dealDiscountHeadline = getDealDiscountHeadline(pin, language);
   const dealPrice = pin.promoDealPriceThb ?? pin.nightlyPriceThb;
@@ -2284,7 +2375,41 @@ export function PinterestPinDetail({
   const internalHotelHref = effectivePromoCode
     ? `/${pin.hotelSlug}?coupon=${encodeURIComponent(effectivePromoCode)}`
     : `/${pin.hotelSlug}`;
-  const externalDealHref = pin.externalDealUrl || `/${pin.hotelSlug}`;
+  const externalDealHref =
+    pin.externalWebsiteUrl ||
+    pin.externalDealUrl ||
+    pin.hotelGoogleMapsUrl ||
+    `/${pin.hotelSlug}`;
+  const isOutboundExternalUrl = /^https?:\/\//i.test(externalDealHref);
+  const primaryCtaLabel = isDirectBooking
+    ? isTh
+      ? "จองตรง 0% GP"
+      : "Book direct 0% GP"
+    : pin.primaryCtaLabelTh?.trim() ||
+      (pin.externalSourceName
+        ? isTh
+          ? `ไปที่ ${pin.externalSourceName}`
+          : `Open ${pin.externalSourceName}`
+        : isTh
+        ? catMeta.defaultCtaTh
+        : catMeta.defaultCtaEn);
+
+  const resolvedOwnerFeedPosts = useMemo(
+    () =>
+      ownerFeedPosts ??
+      hotelPosts.filter((p) => p.postKind === "FEED_POST"),
+    [ownerFeedPosts, hotelPosts]
+  );
+  const resolvedOwnerBlogs = useMemo(
+    () =>
+      ownerBlogs ??
+      hotelPosts.filter((p) => p.postKind !== "FEED_POST"),
+    [ownerBlogs, hotelPosts]
+  );
+  const resolvedNearbyPlaces = useMemo(
+    () => (nearbyPlaces.length > 0 ? nearbyPlaces : relatedPins.slice(0, 8)),
+    [nearbyPlaces, relatedPins]
+  );
 
   const handleExternalDealClick = () => {
     fetch(`/api/pins/${encodeURIComponent(pin.id)}/click`, {
@@ -2392,6 +2517,30 @@ export function PinterestPinDetail({
           </div>
         )}
 
+      {/* DESKTOP DEPTH-1 BACK BAR (Shown prominently when viewing a Nearby Place hop!) */}
+      {canStepBack && backTargetName && (
+        <div className="hidden lg:flex items-center justify-between max-w-[1120px] mx-auto pb-3 mb-2 border-b border-[var(--color-border)]">
+          <button
+            type="button"
+            onClick={handleStepBack}
+            className="h-9 px-3.5 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" strokeWidth={2.2} />
+            <span className="truncate max-w-[420px]">
+              {isTh ? `กลับไป ${backTargetName}` : `Back to ${backTargetName}`}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={isTh ? "ปิดหน้าต่าง" : "Close"}
+            className="h-9 w-9 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* OPEN EDITORIAL SPLIT CLOSE-UP (Instagram-Clean Photo-First Layout) */}
       <div
         style={
@@ -2413,23 +2562,25 @@ export function PinterestPinDetail({
         className="max-w-[1120px] mx-auto lg:pt-2 lg:pb-4 lg:flex lg:items-start lg:gap-6 xl:gap-8"
       >
         {/* Dedicated Desktop Left Gutter Back Button — Flat Borderless Squircle, Never Overlaps Hero Photo */}
-        <button
-          type="button"
-          onClick={handleStepBack}
-          title={
-            canStepBack
-              ? isTh
-                ? "ย้อนกลับไปการ์ดก่อนหน้า"
-                : "Back to previous Pin"
-              : isTh
-              ? "กลับหน้าฟีด"
-              : "Back to feed"
-          }
-          aria-label={isTh ? "ย้อนกลับ" : "Back"}
-          className="hidden lg:inline-flex h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] items-center justify-center transition-colors cursor-pointer shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" strokeWidth={2.1} />
-        </button>
+        {!(canStepBack && backTargetName) && (
+          <button
+            type="button"
+            onClick={handleStepBack}
+            title={
+              canStepBack
+                ? isTh
+                  ? "ย้อนกลับไปการ์ดก่อนหน้า"
+                  : "Back to previous place"
+                : isTh
+                ? "กลับหน้าฟีด"
+                : "Back to feed"
+            }
+            aria-label={isTh ? "ย้อนกลับ" : "Back"}
+            className="hidden lg:inline-flex h-10 w-10 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] items-center justify-center transition-colors cursor-pointer shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.1} />
+          </button>
+        )}
 
         <div className="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-8 xl:gap-10 lg:h-[min(82vh,740px)] lg:min-h-[540px]">
         {/* =================================================================
@@ -2440,31 +2591,36 @@ export function PinterestPinDetail({
         <div className="lg:col-span-6 min-h-0 px-1.5 sm:px-3 pt-1.5 sm:pt-2.5 lg:p-0 flex flex-col gap-2.5 sm:gap-3 lg:h-full">
           <div
             ref={mediaStageRef}
+            data-pin-hero-stage="true"
+            data-place-hero-stage={profileHeroMode ? "true" : undefined}
             onPointerDown={handleMediaPointerDown}
             onPointerMove={handleMediaPointerMove}
             onPointerUp={handleMediaPointerUp}
             onPointerCancel={handleMediaPointerUp}
             style={
               {
-                "--pin-aspect": "4 / 5",
+                "--pin-aspect": "3 / 4",
                 touchAction: slideIndex === mapSlideIndex ? "none" : "pan-y",
+                visibility: hideHeroStageForFlip ? "hidden" : "visible",
               } as React.CSSProperties
             }
             className="relative w-full min-h-0 max-lg:[aspect-ratio:var(--pin-aspect)] max-h-[76svh] lg:max-h-none lg:flex-1 rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] bg-[var(--color-background-body)] flex items-center justify-center overflow-hidden"
           >
-            {/* Mobile Back (<) Top-Left */}
-            <button
-              type="button"
-              data-swipe-ignore="true"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStepBack();
-              }}
-              aria-label={isTh ? "ย้อนกลับ" : "Back"}
-              className="lg:hidden absolute top-3 left-3 z-30 h-10 w-10 rounded-[12px] bg-black/55 hover:bg-black/75 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
-            >
-              <ChevronLeft className="w-5 h-5" strokeWidth={2.4} />
-            </button>
+            {/* Mobile Secondary Top-Right Close Button (Hidden in profileHeroMode where page has its own Back Dock) */}
+            {!profileHeroMode && (
+              <button
+                type="button"
+                data-swipe-ignore="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                aria-label={isTh ? "ปิดหน้าต่าง" : "Close"}
+                className="lg:hidden absolute top-3 right-3 z-30 h-9 w-9 rounded-[11px] bg-black/52 hover:bg-black/70 text-white backdrop-blur-md inline-flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4.5 h-4.5" strokeWidth={2.3} />
+              </button>
+            )}
 
             {/* Vertical Airbnb Wishlist-Style Floating Icon Rail (Bottom-Right: Coupon > Video (if any) > Image > Map + Mobile Save & More) */}
             <div
@@ -2563,11 +2719,11 @@ export function PinterestPinDetail({
                   aria-label={
                     isSaved
                       ? isTh
-                        ? "นำคูปองออกจากบอร์ด"
+                        ? "นำคูปองออกจากทริป"
                         : "Remove from board"
                       : isTh
-                      ? "บันทึกคูปองเข้าบอร์ด"
-                      : "Save to board"
+                      ? "บันทึกคูปองเข้าทริป"
+                      : "Save to trip"
                   }
                   className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center transition-colors cursor-pointer ${
                     isSaved
@@ -2687,7 +2843,7 @@ export function PinterestPinDetail({
                 return (
                   <div
                     key={slide.id}
-                    className="relative w-full h-full shrink-0 flex items-center justify-center overflow-hidden"
+                    className="relative w-full h-full shrink-0 rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] flex items-center justify-center overflow-hidden"
                   >
                     {!isHeroLoaded && (
                       <img
@@ -2714,7 +2870,7 @@ export function PinterestPinDetail({
                       draggable={false}
                       onLoad={() => handleMarkHeroLoaded(slide.url)}
                       onError={() => handleMarkMediaError(slide.url)}
-                      className="relative z-10 w-full h-full object-cover select-none"
+                      className="relative z-[1] w-full h-full object-cover select-none"
                     />
                   </div>
                 );
@@ -2749,7 +2905,13 @@ export function PinterestPinDetail({
                     >
                       <TicketPercent className="w-4 h-4 shrink-0" strokeWidth={2} />
                       <span className="text-[10px] font-semibold leading-none">
-                        {isTh ? "คูปอง" : "Deal"}
+                        {hasPlacePromo
+                          ? isTh
+                            ? "คูปอง"
+                            : "Deal"
+                          : isTh
+                          ? "หน้าปก"
+                          : "Cover"}
                       </span>
                     </button>
                   );
@@ -2872,21 +3034,36 @@ export function PinterestPinDetail({
                     <BadgeCheck className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
                   )}
                 </p>
-                <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                  {provinceLabel}
-                  {pin.nightlyPriceThb
-                    ? ` · ${
-                        isTh
+                <p className="text-[12px] text-[var(--color-text-secondary)] truncate flex items-center gap-1.5">
+                  <span className="font-medium text-[var(--color-text-primary)]">
+                    {isTh ? catMeta.shortLabelTh : catMeta.shortLabelEn}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>{provinceLabel}</span>
+                  {pin.nightlyPriceThb && pin.placeCategory === "STAY" ? (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {isTh
                           ? `เริ่มต้น ฿${pin.nightlyPriceThb.toLocaleString()}/คืน`
-                          : `from ฿${pin.nightlyPriceThb.toLocaleString()}/night`
-                      }`
-                    : ""}
+                          : `from ฿${pin.nightlyPriceThb.toLocaleString()}/night`}
+                      </span>
+                    </>
+                  ) : null}
                 </p>
               </div>
             </Link>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {isExternalDeal ? (
+              {profileHeroMode && onPrimaryProfileAction ? (
+                <button
+                  type="button"
+                  onClick={onPrimaryProfileAction}
+                  className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 cursor-pointer"
+                >
+                  <span>{primaryProfileActionLabel || primaryCtaLabel}</span>
+                </button>
+              ) : isExternalDeal && isOutboundExternalUrl ? (
                 <a
                   href={externalDealHref}
                   target="_blank"
@@ -2894,11 +3071,7 @@ export function PinterestPinDetail({
                   onClick={handleExternalDealClick}
                   className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0"
                 >
-                  <span>
-                    {isTh
-                      ? `ไปที่ ${pin.externalSourceName || "หน้าโปร"}`
-                      : `Open ${pin.externalSourceName || "deal"}`}
-                  </span>
+                  <span>{primaryCtaLabel}</span>
                   <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
                 </a>
               ) : (
@@ -2911,7 +3084,7 @@ export function PinterestPinDetail({
                     isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
                   }`}
                 >
-                  <span>{isTh ? "จองตรง 0% GP" : "Book direct 0% GP"}</span>
+                  <span>{primaryCtaLabel}</span>
                   {isNavigatingToHotel ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                   ) : (
@@ -2978,41 +3151,19 @@ export function PinterestPinDetail({
                 </button>
               </div>
 
-              <div data-swipe-ignore="true" className="shrink-0">
-                {isExternalDeal ? (
-                  <a
-                    href={externalDealHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={handleExternalDealClick}
-                    className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0"
-                  >
-                    <span>
-                      {isTh
-                        ? `ไปที่ ${pin.externalSourceName || "หน้าโปร"}`
-                        : `Open ${pin.externalSourceName || "deal"}`}
-                    </span>
-                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                  </a>
-                ) : (
+              {!profileHeroMode && (
+                <div data-swipe-ignore="true" className="shrink-0">
                   <Link
-                    href={internalHotelHref}
-                    prefetch={true}
-                    onClick={handleVisitHotelClick}
-                    aria-busy={isNavigatingToHotel}
-                    className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0 ${
-                      isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
-                    }`}
+                    href={`/${pin.hotelSlug}`}
+                    target={mobileOverlayMode ? "_blank" : undefined}
+                    rel={mobileOverlayMode ? "noopener noreferrer" : undefined}
+                    className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap transition-colors shrink-0"
                   >
-                    <span>{isTh ? "จองตรง 0% GP" : "Book direct"}</span>
-                    {isNavigatingToHotel ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                    ) : (
-                      <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
-                    )}
+                    <span>{isTh ? "ดูโปรไฟล์ร้าน" : "Full profile"}</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
                   </Link>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {effectiveLikesCount > 0 && (
@@ -3038,9 +3189,11 @@ export function PinterestPinDetail({
                   className="h-7 w-7 rounded-full object-cover shrink-0 bg-[var(--color-background-muted)] ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
                 />
               ) : (
-                <span className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center text-[12px] font-semibold shrink-0">
-                  {hotelName[0] || "C"}
-                </span>
+                <PlaceCategoryCrest
+                  category={pin.placeCategory}
+                  language={language}
+                  size="sm"
+                />
               )}
               <div className="min-w-0">
                 <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate flex items-center gap-1">
@@ -3050,8 +3203,8 @@ export function PinterestPinDetail({
                   )}
                 </p>
                 <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                  {provinceLabel}
-                  {pin.nightlyPriceThb
+                  {isTh ? catMeta.shortLabelTh : catMeta.shortLabelEn} · {provinceLabel}
+                  {pin.nightlyPriceThb && pin.placeCategory === "STAY"
                     ? ` · ฿${pin.nightlyPriceThb.toLocaleString()}/${
                         isTh ? "คืน" : "night"
                       }`
@@ -3287,11 +3440,11 @@ export function PinterestPinDetail({
                   aria-label={
                     isSaved
                       ? isTh
-                        ? "นำคูปองออกจากบอร์ด"
+                        ? "นำคูปองออกจากทริป"
                         : "Remove from board"
                       : isTh
-                      ? "บันทึกคูปองเข้าบอร์ด"
-                      : "Save to board"
+                      ? "บันทึกคูปองเข้าทริป"
+                      : "Save to trip"
                   }
                   title={
                     isSaved
@@ -3299,7 +3452,7 @@ export function PinterestPinDetail({
                         ? "บันทึกโปรแล้ว"
                         : "Deal saved"
                       : isTh
-                      ? "บันทึกโปรเข้าบอร์ด"
+                      ? "บันทึกโปรเข้าทริป"
                       : "Save deal"
                   }
                   className={`h-9 px-3 rounded-[10px] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -3319,8 +3472,12 @@ export function PinterestPinDetail({
                       ? isTh
                         ? "บันทึกแล้ว"
                         : "Saved"
+                      : hasPlacePromo
+                      ? isTh
+                        ? "บันทึกโปร"
+                        : "Save deal"
                       : isTh
-                      ? "บันทึกโปร"
+                      ? "บันทึก"
                       : "Save"}
                   </span>
                 </button>
@@ -3425,101 +3582,115 @@ export function PinterestPinDetail({
         </div>
       </div>
 
-      {/* MOBILE / TABLET SYMMETRICAL GROUPED CARD SLIDE ROWS (Matches Home Airbnb Card Slide Standard!) */}
-      {relatedPins.length > 0 && (() => {
-        const seenHotelIds = new Set<string>();
-        const safeRelated = relatedPins.filter((cand) => {
-          if (
-            cand.id === pin.id ||
-            cand.hotelId === pin.hotelId ||
-            cand.hotelSlug === pin.hotelSlug
-          ) {
-            return false;
-          }
-          if (seenHotelIds.has(cand.hotelId)) return false;
-          seenHotelIds.add(cand.hotelId);
-          return true;
-        });
-        if (safeRelated.length === 0) return null;
-
-        const anchorStyles = new Set(pin.stayStyles);
-        const anchorRegion = getProvinceById(pin.provinceId)?.region ?? null;
-        const sameStyleDeals = safeRelated.filter((cand) =>
-          cand.stayStyles.some((st) => anchorStyles.has(st))
-        );
-        const nearbyDeals = [...safeRelated]
-          .filter((cand) => {
-            if (cand.provinceId === pin.provinceId) return true;
-            return (
-              Boolean(anchorRegion) &&
-              getProvinceById(cand.provinceId)?.region === anchorRegion
-            );
-          })
-          .sort(
-            (a, b) =>
-              (b.provinceId === pin.provinceId ? 1 : 0) -
-              (a.provinceId === pin.provinceId ? 1 : 0)
-          );
-        const directDeals = safeRelated.filter(
-          (cand) => cand.dealSourceType === "INTERNAL"
-        );
-
-        return (
-          <div className="lg:hidden px-4 sm:px-6 mt-2 border-t border-[var(--color-border)] pb-[calc(88px+env(safe-area-inset-bottom))] divide-y divide-[var(--color-border)] bg-[var(--color-background-body)]">
-            {sameStyleDeals.length > 0 && (
-              <DealSlideRow
-                title={isTh ? "โปรที่พักแนวเดียวกัน" : "Similar style deals"}
-                seeAllHref={
-                  pin.stayStyles[0]
-                    ? `/explore?style=${encodeURIComponent(pin.stayStyles[0])}`
-                    : "/explore"
-                }
-                deals={sameStyleDeals}
-                language={language}
-                savedPinIds={savedPinIds}
-                compactTop={true}
-                onSelectDeal={(next) => onSelectPin?.(next)}
-                onToggleSave={onToggleSave}
-              />
-            )}
-
-            {nearbyDeals.length > 0 && (
-              <DealSlideRow
-                title={
-                  isTh
-                    ? `โปรที่พักใกล้เคียง (${provinceLabel} & ภาคเดียวกัน)`
-                    : `Nearby stays (${provinceLabel} & region)`
-                }
-                seeAllHref={`/explore?province=${encodeURIComponent(pin.provinceId)}`}
-                deals={nearbyDeals}
-                language={language}
-                savedPinIds={savedPinIds}
-                compactTop={true}
-                onSelectDeal={(next) => onSelectPin?.(next)}
-                onToggleSave={onToggleSave}
-              />
-            )}
-
-            {directDeals.length > 0 && (
-              <DealSlideRow
-                title={
-                  isTh
-                    ? "โปรจองตรง 0% GP ที่น่าสนใจ"
-                    : "More direct 0% GP deals"
-                }
-                seeAllHref="/explore?source=INTERNAL"
-                deals={directDeals}
-                language={language}
-                savedPinIds={savedPinIds}
-                compactTop={true}
-                onSelectDeal={(next) => onSelectPin?.(next)}
-                onToggleSave={onToggleSave}
-              />
-            )}
-          </div>
-        );
-      })()}
+      {/* UNIFIED LAYER 2 PLACE PROFILE HUB (Omitted in profileHeroMode because `/{slug}` renders the full adaptive profile directly below!) */}
+      {!profileHeroMode && (
+        <PlaceProfileHubSection
+          pin={pin}
+          ownerFeedPosts={resolvedOwnerFeedPosts}
+          ownerBlogs={resolvedOwnerBlogs}
+          nearbyPlaces={resolvedNearbyPlaces}
+          savedPinIds={savedPinIds}
+          language={language}
+          isNearbyHop={isNearbyHop || canStepBack}
+          isModalContext={mobileOverlayMode || detailFooterMode === "property-only"}
+          onOpenPromoCoupon={() => {
+            if (activeCoupons.length > 0) {
+              setIsCouponPopoverOpen(true);
+            } else {
+              setIsTermsModalOpen(true);
+            }
+          }}
+          onSelectNearbyPlace={(nextPlace) => onSelectPin?.(nextPlace)}
+          onToggleSavePin={(id) => onToggleSave(id)}
+        />
+      )}
       </div>
+
+      {/* =====================================================================
+          MOBILE STICKY THUMB-ZONE BOTTOM DOCK (< lg ONLY, omitted in profileHeroMode!)
+      ====================================================================== */}
+      {!profileHeroMode &&
+        isMobileViewport &&
+        !isCommentsSheetOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            data-swipe-ignore="true"
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="lg:hidden fixed inset-x-0 bottom-0 z-[92] bg-[var(--color-background-body)]/96 backdrop-blur-md border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] px-3.5 pt-2.5 pb-[max(12px,var(--cgr-safe-bottom))]"
+          >
+            <div className="flex items-center justify-between gap-2.5 max-w-[680px] mx-auto">
+              {/* Left Thumb Zone: Back / Back to Origin Place */}
+              <button
+                type="button"
+                onClick={handleStepBack}
+                className="h-11 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 min-w-0 max-w-[46%] cursor-pointer transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 shrink-0" strokeWidth={2.2} />
+                <span className="truncate">
+                  {canStepBack && backTargetName
+                    ? isTh
+                      ? `กลับไป ${backTargetName}`
+                      : `Back to ${backTargetName}`
+                    : isTh
+                    ? "กลับ"
+                    : "Back"}
+                </span>
+              </button>
+
+              {/* Right Thumb Zone: Primary CTA + Save/Pin */}
+              <div className="flex items-center gap-2 shrink-0">
+                {isExternalDeal && isOutboundExternalUrl ? (
+                  <a
+                    href={externalDealHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleExternalDealClick}
+                    className="h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                  >
+                    <span className="max-w-[140px] truncate">{primaryCtaLabel}</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                  </a>
+                ) : (
+                  <Link
+                    href={internalHotelHref}
+                    prefetch={true}
+                    onClick={handleVisitHotelClick}
+                    aria-busy={isNavigatingToHotel}
+                    className={`h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors ${
+                      isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
+                    }`}
+                  >
+                    <span className="max-w-[140px] truncate">{primaryCtaLabel}</span>
+                    {isNavigatingToHotel ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+                    )}
+                  </Link>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onToggleSave(pin.id)}
+                  aria-label={isSaved ? (isTh ? "บันทึกแล้ว" : "Saved") : isTh ? "บันทึกลงทริป" : "Save to trip"}
+                  className={`h-11 w-11 rounded-[12px] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                    isSaved
+                      ? "bg-[var(--color-promo)] !text-white"
+                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <Bookmark
+                    className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
+                    strokeWidth={2.1}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* =====================================================================
           MOBILE / TABLET SLIDE-UP COMMENTS BOTTOM SHEET MODAL (< lg ONLY!)

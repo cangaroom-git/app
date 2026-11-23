@@ -238,7 +238,7 @@ export default function LoginPage() {
             />
             <p className="ty-body-muted">
               {lang === "th"
-                ? "บันทึกบอร์ดที่พัก เก็บคูปอง และจองตรง 0% GP"
+                ? "บันทึกทริปที่พัก เก็บคูปอง และจองตรง 0% GP"
                 : "Save stays, collect coupons & book direct 0% GP"}
             </p>
           </div>

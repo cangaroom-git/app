@@ -502,7 +502,7 @@ export default function SuperAdminConsolePage() {
                   </div>
                   <p className="ty-caption">
                     {u.email} · {u._count.ownedHotels} ที่พัก ·{" "}
-                    {u._count.bookings} การจอง · {u._count.boards} บอร์ด
+                    {u._count.bookings} การจอง · {u._count.boards} ทริป
                   </p>
                 </div>
 

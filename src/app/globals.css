@@ -83,6 +83,10 @@
   --right-drawer-tablet-width: 480px;
   --right-drawer-desktop-width: 540px;
   --cgr-sticky-header-offset: 4rem;
+  /* Capped mobile bottom safe-area prevents iOS 26 Safari's floating bottom toolbar
+     from double-counting ~84px of blank padding underneath fixed bottom nav bars */
+  --cgr-safe-bottom: clamp(0px, env(safe-area-inset-bottom, 0px), 20px);
+  --cgr-mobile-nav-h: calc(56px + var(--cgr-safe-bottom));
 
   /* Clean Architectural Squircle Radii (Airbnb DLS 8 / 12 / 16 / 20) */
   --radius-inner: 10px;
@@ -321,6 +325,13 @@ h1, h2, h3, h4, .font-serif {
 .cgr-page-standard {
   width: 100%;
   max-width: 1120px;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.cgr-page-wide {
+  width: 100%;
+  max-width: 1360px;
   min-width: 0;
   margin-inline: auto;
 }
@@ -1048,7 +1059,8 @@ html.dark .border-stone-300 {
   .cgr-modal-surface-md,
   .cgr-modal-surface-lg,
   .cgr-popover-motion,
-  .cgr-floating-card-motion {
+  .cgr-floating-card-motion,
+  .cgr-fade-slide-pill {
     transform: none !important;
     opacity: 0;
     transition: opacity 140ms ease !important;
@@ -1059,7 +1071,8 @@ html.dark .border-stone-300 {
   .cgr-modal-surface-md[data-state="open"],
   .cgr-modal-surface-lg[data-state="open"],
   .cgr-popover-motion[data-state="open"],
-  .cgr-floating-card-motion[data-state="open"] {
+  .cgr-floating-card-motion[data-state="open"],
+  .cgr-fade-slide-pill[data-state="open"] {
     opacity: 1;
   }
   .cgr-map-mobile-sheet {
@@ -1112,6 +1125,28 @@ html.dark .border-stone-300 {
   transition:
     transform var(--duration-sheet) var(--ease-ios-sheet),
     opacity 260ms var(--ease-out-expo);
+}
+
+/* Smooth Fade Slide-In + Slide-Out for Floating Pills & Toggle Controls (e.g. Map / List) */
+.cgr-fade-slide-pill {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  pointer-events: none;
+  transition:
+    transform 220ms var(--ease-ios-sheet),
+    opacity 180ms var(--ease-ios-sheet),
+    bottom var(--duration-morph) var(--ease-ios-sheet);
+}
+.cgr-fade-slide-pill[data-state="open"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  pointer-events: auto;
+  transition:
+    transform 300ms var(--ease-out-expo),
+    opacity 240ms var(--ease-out-expo),
+    bottom var(--duration-morph) var(--ease-ios-sheet);
 }
 
 /* Persistent Multi-Detent Mobile Map Sheet (Idle <-> Full Search <-> Collapsed/Half/Full Results) */
@@ -1683,6 +1718,11 @@ html[data-studio-vt]::view-transition-new(cgr-photo-active) {
 
 .cgr-coupon-stub {
   height: 96px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.035);
+}
+
+.dark .cgr-coupon-stub {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
 @media (min-width: 640px) {
@@ -1905,7 +1945,361 @@ html[data-studio-vt]::view-transition-new(cgr-photo-active) {
   animation-play-state: paused;
 }
 
+/* Trip Map Stage Smooth Fade Slide-In (Motion Constitution v3.0) */
+@keyframes cgrTripStageEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.cgr-trip-stage-enter {
+  animation: cgrTripStageEnter 340ms var(--ease-out-expo) both;
+  will-change: transform, opacity;
+}
+
+/* Trip Fanned Deck — Newly Entering Outermost Card Bottom-Up Bounce Along Its Tilted Fan Rail */
+@keyframes cgrFanOuterPopIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 145px, 0);
+  }
+  58% {
+    opacity: 1;
+    transform: translate3d(0, -18px, 0);
+  }
+  80% {
+    opacity: 1;
+    transform: translate3d(0, 5px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.cgr-fan-outer-pop-in {
+  animation: cgrFanOuterPopIn 500ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
+  will-change: transform, opacity;
+}
+
+/* Trip Shared-Element 3D Hero Flip: Hide underlying hero slot while floating 3D Hero Photo flies into/out of it */
+[data-flip-hero-hidden="true"] [data-pin-hero-stage="true"] {
+  visibility: hidden !important;
+}
+
+/* Fanned Photo Deck — Signature Nondii Semicircular Coupon Cutouts (Left & Right Edges at 58%) */
+.cgr-fanned-coupon-wrap {
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.17));
+}
+
+/* Subtle Contour-Hugging Separation Shadow ONLY for Stacked Folder Cards on /trip */
+.cgr-trip-stack-shadow {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+}
+
+/* Mini Fanned "See All" Full-Bleed Sculpted Photo Coupon Cutouts (Left & Right Edges at 58%) */
+.cgr-mini-fanned-coupon-mask {
+  -webkit-mask-image:
+    radial-gradient(circle 5.5px at 0px 58%, transparent 96%, #000 100%),
+    radial-gradient(circle 5.5px at 100% 58%, transparent 96%, #000 100%);
+  mask-image:
+    radial-gradient(circle 5.5px at 0px 58%, transparent 96%, #000 100%),
+    radial-gradient(circle 5.5px at 100% 58%, transparent 96%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+@media (min-width: 640px) {
+  .cgr-mini-fanned-coupon-mask {
+    -webkit-mask-image:
+      radial-gradient(circle 6.5px at 0px 58%, transparent 96%, #000 100%),
+      radial-gradient(circle 6.5px at 100% 58%, transparent 96%, #000 100%);
+    mask-image:
+      radial-gradient(circle 6.5px at 0px 58%, transparent 96%, #000 100%),
+      radial-gradient(circle 6.5px at 100% 58%, transparent 96%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+}
+
+.cgr-fanned-coupon-mask {
+  -webkit-mask-image:
+    radial-gradient(circle 7.5px at 0px 58%, transparent 96%, #000 100%),
+    radial-gradient(circle 7.5px at 100% 58%, transparent 96%, #000 100%);
+  mask-image:
+    radial-gradient(circle 7.5px at 0px 58%, transparent 96%, #000 100%),
+    radial-gradient(circle 7.5px at 100% 58%, transparent 96%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+@media (min-width: 640px) {
+  .cgr-fanned-coupon-mask {
+    -webkit-mask-image:
+      radial-gradient(circle 8.5px at 0px 58%, transparent 96%, #000 100%),
+      radial-gradient(circle 8.5px at 100% 58%, transparent 96%, #000 100%);
+    mask-image:
+      radial-gradient(circle 8.5px at 0px 58%, transparent 96%, #000 100%),
+      radial-gradient(circle 8.5px at 100% 58%, transparent 96%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+}
+
+/* Trip Fanned Deck — Adaptive Translucent Photo-Through Bevel Rim
+   (Preserves full underlying photo texture & hue inside the 5px rim while varying corner depth organically) */
+.cgr-trip-card-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  padding: 5px;
+  background: conic-gradient(
+    from 215deg at 50% 50%,
+    rgba(0, 0, 0, 0.34) 0deg,
+    rgba(0, 0, 0, 0.13) 78deg,
+    rgba(0, 0, 0, 0.42) 165deg,
+    rgba(0, 0, 0, 0.18) 252deg,
+    rgba(0, 0, 0, 0.38) 322deg,
+    rgba(0, 0, 0, 0.34) 360deg
+  );
+  mix-blend-mode: multiply;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Trip Fanned Deck — Subtle Tactile Physical Card Sheen & Inner Bevel Catch-Light (Preserves 100% True Photo Color) */
+.cgr-trip-card-lighting {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    138deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.025) 34%,
+    rgba(0, 0, 0, 0) 58%,
+    rgba(0, 0, 0, 0.13) 100%
+  );
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.32),
+    inset 1px 0 0.5px rgba(255, 255, 255, 0.16),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.24),
+    inset -1px 0 1.5px rgba(0, 0, 0, 0.16),
+    inset 0 0 10px rgba(0, 0, 0, 0.08);
+}
+
+/* Clean Bg-Less Cartographic Text Halo Floating Above Center Fanned Map Card */
+.cgr-map-floating-label {
+  color: #181818;
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.98),
+    0 0 7px rgba(255, 255, 255, 0.95),
+    0 1px 10px rgba(255, 255, 255, 0.88),
+    0 0 1px #ffffff;
+}
+
+html.dark .cgr-map-floating-label {
+  color: #ffffff;
+  text-shadow:
+    0 0 3px rgba(14, 14, 14, 0.98),
+    0 0 7px rgba(14, 14, 14, 0.95),
+    0 1px 10px rgba(14, 14, 14, 0.9),
+    0 0 1px #0d0d0d;
+}
+
+/* ============================================================================
+   UNIFIED ADAPTIVE PHOTO-THROUGH BEVEL RIM FOR ALL COUPON CARDS
+   (Home Feed VerticalCouponCard, /?stay=... DealHeroCouponSlide, /trip Folders,
+    SeeAllCouponCard Fanned Mini Tickets, and Horizontal HotelCouponTicketCard)
+   ============================================================================ */
+
+/* Full-Bleed Hero Coupon Card (`/?stay=...` DealHeroCouponSlide) — 5.5px self-tinted multiply rim */
+.cgr-coupon-hero-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  padding: 5.5px;
+  background: conic-gradient(
+    from 215deg at 50% 50%,
+    rgba(0, 0, 0, 0.34) 0deg,
+    rgba(0, 0, 0, 0.13) 78deg,
+    rgba(0, 0, 0, 0.42) 165deg,
+    rgba(0, 0, 0, 0.18) 252deg,
+    rgba(0, 0, 0, 0.38) 322deg,
+    rgba(0, 0, 0, 0.34) 360deg
+  );
+  mix-blend-mode: multiply;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Top Photo Zone of Vertical Ticket Coupon Cards (`/` & `/explore` & `/trip` Folders)
+   Hugs top, left & right edges (4.5px) with curved top corners, flowing cleanly into the tear seam */
+.cgr-coupon-photo-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 15px 15px 0 0;
+  pointer-events: none;
+  z-index: 5;
+  padding: 4.5px 4.5px 0 4.5px;
+  background: conic-gradient(
+    from 215deg at 50% 50%,
+    rgba(0, 0, 0, 0.32) 0deg,
+    rgba(0, 0, 0, 0.12) 78deg,
+    rgba(0, 0, 0, 0.38) 165deg,
+    rgba(0, 0, 0, 0.16) 252deg,
+    rgba(0, 0, 0, 0.36) 322deg,
+    rgba(0, 0, 0, 0.32) 360deg
+  );
+  mix-blend-mode: multiply;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Delicate Directional Surface Light & Top Bevel Catch-Light for Coupon Photos */
+.cgr-coupon-photo-lighting {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 6;
+  background: linear-gradient(
+    138deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.02) 34%,
+    rgba(0, 0, 0, 0) 60%,
+    rgba(0, 0, 0, 0.10) 100%
+  );
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.32),
+    inset 1px 0 0.5px rgba(255, 255, 255, 0.15),
+    inset -1px 0 1.5px rgba(0, 0, 0, 0.14);
+}
+
+/* Mini Fanned "See All" Tickets Photo Rim (3.5px curved top) */
+.cgr-mini-ticket-photo-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 12.5px 12.5px 0 0;
+  pointer-events: none;
+  z-index: 5;
+  padding: 3.5px 3.5px 0 3.5px;
+  background: conic-gradient(
+    from 215deg at 50% 50%,
+    rgba(0, 0, 0, 0.32) 0deg,
+    rgba(0, 0, 0, 0.12) 78deg,
+    rgba(0, 0, 0, 0.38) 165deg,
+    rgba(0, 0, 0, 0.16) 252deg,
+    rgba(0, 0, 0, 0.36) 322deg,
+    rgba(0, 0, 0, 0.32) 360deg
+  );
+  mix-blend-mode: multiply;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+@media (min-width: 640px) {
+  .cgr-mini-ticket-photo-rim {
+    border-radius: 14.5px 14.5px 0 0;
+  }
+}
+
+/* Horizontal Claimable Coupon Ticket Left Photo Rim (3.5px on top, left, bottom) */
+.cgr-ticket-thumb-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 15px 0 0 15px;
+  pointer-events: none;
+  z-index: 5;
+  padding: 3.5px 0 3.5px 3.5px;
+  background: conic-gradient(
+    from 215deg at 50% 50%,
+    rgba(0, 0, 0, 0.32) 0deg,
+    rgba(0, 0, 0, 0.12) 78deg,
+    rgba(0, 0, 0, 0.38) 165deg,
+    rgba(0, 0, 0, 0.16) 252deg,
+    rgba(0, 0, 0, 0.36) 322deg,
+    rgba(0, 0, 0, 0.32) 360deg
+  );
+  mix-blend-mode: multiply;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Trip 3D Flip Modal — Clean Opacity Reveal (Zero transform so Mobile/Tablet fixed children never collapse!) */
+@keyframes cgrFlipModalContentIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.cgr-flip-modal-content-in {
+  animation: cgrFlipModalContentIn 200ms var(--ease-out-expo) both;
+}
+
+/* Calm Airbnb Warm Monochrome Skeleton Pulse (Zero gradients, pure surface breath) */
+@keyframes cgrSkeletonBreathe {
+  0%,
+  100% {
+    background-color: var(--color-background-muted);
+  }
+  50% {
+    background-color: var(--color-background-subtle);
+  }
+}
+
+.cgr-skeleton-block {
+  background-color: var(--color-background-muted);
+  animation: cgrSkeletonBreathe 1.55s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .cgr-skeleton-block {
+    animation: none !important;
+  }
   ::view-transition-old(*),
   ::view-transition-new(*),
   ::view-transition-group(*) {
@@ -1915,6 +2309,13 @@ html[data-studio-vt]::view-transition-new(cgr-photo-active) {
   .animate-studio-panel-forward,
   .animate-studio-panel-back {
     animation-duration: 0s !important;
+  }
+  .cgr-trip-stage-enter,
+  .cgr-fan-outer-pop-in,
+  .cgr-flip-modal-content-in {
+    animation-duration: 120ms !important;
+    animation-delay: 0ms !important;
+    transform: none !important;
   }
   .cgr-fan-ticket {
     transition: none !important;

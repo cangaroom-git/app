@@ -96,6 +96,8 @@ export async function getAuthenticatedMeProfile(): Promise<AuthenticatedMeDto | 
           nameTh: true,
           nameEn: true,
           provinceId: true,
+          placeCategory: true,
+          merchantMode: true,
           verificationStatus: true,
           _count: {
             select: {
@@ -124,6 +126,8 @@ export async function getAuthenticatedMeProfile(): Promise<AuthenticatedMeDto | 
       nameTh: h.nameTh,
       nameEn: h.nameEn,
       provinceId: h.provinceId,
+      placeCategory: h.placeCategory,
+      merchantMode: h.merchantMode,
       verificationStatus: h.verificationStatus,
       pendingBookingsCount: h._count.bookings,
     })),

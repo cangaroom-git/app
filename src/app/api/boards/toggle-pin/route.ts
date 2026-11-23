@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const sessionUser = await getServerSessionUser();
     if (!sessionUser) {
       return NextResponse.json(
-        { error: "กรุณาเข้าสู่ระบบเพื่อบันทึกที่พักเข้าบอร์ด" },
+        { error: "กรุณาเข้าสู่ระบบเพื่อบันทึกที่พักเข้าทริป" },
         { status: 401 }
       );
     }

@@ -15,7 +15,11 @@ import {
   CGR_VISITOR_COOKIE,
 } from "@/lib/telemetry/tasteTypes";
 import { HomeFeedClient } from "@/components/home/HomeFeedClient";
-import type { PinCommentDto, PinFeedItemDto } from "@/types/cangaroom";
+import type {
+  HotelPostSummaryDto,
+  PinCommentDto,
+  PinFeedItemDto,
+} from "@/types/cangaroom";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +127,10 @@ export default async function HomePage({
     pin: PinFeedItemDto;
     comments: PinCommentDto[];
     relatedPins: PinFeedItemDto[];
+    hotelPosts?: HotelPostSummaryDto[];
+    ownerFeedPosts?: HotelPostSummaryDto[];
+    ownerBlogs?: HotelPostSummaryDto[];
+    nearbyPlaces?: PinFeedItemDto[];
   } | null = null;
 
   try {

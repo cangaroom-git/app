@@ -301,7 +301,7 @@ export async function toggleSavePinToBoard(params: {
         select: { id: true, name: true },
       });
       if (!targetBoard) {
-        throw new Error("ไม่พบบอร์ดปลายทาง");
+        throw new Error("ไม่พบทริปปลายทาง");
       }
 
       if (fromBoardId && fromBoardId !== targetBoard.id) {
@@ -319,14 +319,23 @@ export async function toggleSavePinToBoard(params: {
         const hadAny = await tx.savedBoardPin.count({
           where: { userId, pinId },
         });
-        await tx.savedBoardPin.create({
+        const created = await tx.savedBoardPin.create({
           data: {
             boardId: targetBoard.id,
             pinId,
             userId,
             savedPriceSnapshotThb: priceSnapshot,
           },
+          select: { id: true },
         });
+        await tx.$executeRaw`
+          UPDATE "SavedBoardPin"
+          SET "sortOrder" = COALESCE(
+            (SELECT MAX("sortOrder") FROM "SavedBoardPin" WHERE "boardId" = ${targetBoard.id} AND "id" <> ${created.id}),
+            -1
+          ) + 1
+          WHERE "id" = ${created.id}
+        `;
         if (hadAny === 0) {
           await tx.pin.update({
             where: { id: pinId },
@@ -416,14 +425,23 @@ export async function toggleSavePinToBoard(params: {
         where: { userId, pinId },
       });
 
-      await tx.savedBoardPin.create({
+      const created = await tx.savedBoardPin.create({
         data: {
           boardId: targetBoard.id,
           pinId,
           userId,
           savedPriceSnapshotThb: priceSnapshot,
         },
+        select: { id: true },
       });
+      await tx.$executeRaw`
+        UPDATE "SavedBoardPin"
+        SET "sortOrder" = COALESCE(
+          (SELECT MAX("sortOrder") FROM "SavedBoardPin" WHERE "boardId" = ${targetBoard.id} AND "id" <> ${created.id}),
+          -1
+        ) + 1
+        WHERE "id" = ${created.id}
+      `;
 
       if (existingAnyForUser === 0) {
         await tx.pin.update({

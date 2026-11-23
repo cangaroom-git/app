@@ -8,6 +8,9 @@ import {
   getOptimizedPinImageUrl,
   PIN_IMAGE_SIZES,
 } from "@/lib/mediaUtils";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
+import { getDealPromoOnlyHeadline } from "@/components/home/VerticalCouponCard";
+import { PlaceCategoryCrest } from "@/components/shared/PlaceCategoryCrest";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
 export interface DealHeroCouponSlideProps {
@@ -28,11 +31,6 @@ const OUTER_HERO_MASK = [
   `radial-gradient(circle 11px at 100% ${NOTCH_PERCENT_Y}, transparent 96%, #000 100%)`,
 ].join(", ");
 
-const INNER_HERO_MASK = [
-  `radial-gradient(circle 12.5px at -1.5px ${NOTCH_PERCENT_Y}, transparent 96%, #000 100%)`,
-  `radial-gradient(circle 12.5px at calc(100% + 1.5px) ${NOTCH_PERCENT_Y}, transparent 96%, #000 100%)`,
-].join(", ");
-
 export function DealHeroCouponSlide({
   pin,
   language,
@@ -45,15 +43,24 @@ export function DealHeroCouponSlide({
   onOpenTerms,
 }: DealHeroCouponSlideProps) {
   const isTh = language === "th";
-  const isExternal = pin.dealSourceType === "EXTERNAL";
+  const isDirectBooking =
+    pin.merchantMode !== "PROFILE_ONLY" && pin.dealSourceType === "INTERNAL";
+  const isExternal = !isDirectBooking;
+  const catMeta = getPlaceCategoryMeta(pin.placeCategory);
+  const realPromoHeadline = getDealPromoOnlyHeadline(pin, language);
+  const hasRealPromo = Boolean(realPromoHeadline);
   const heroUrl = getOptimizedPinImageUrl(pin.coverImageUrl, "hero");
   const heroSrcSet = getOptimizedPinImageSrcSet(pin.coverImageUrl, "hero");
 
-  const sourceLabel = isExternal
-    ? pin.externalSourceName || (isTh ? "ดีลภายนอก" : "Partner deal")
-    : isTh
-    ? "จองตรง 0% GP"
-    : "Direct 0% GP";
+  const sourceLabel = isDirectBooking
+    ? isTh
+      ? "ที่พัก · จองตรง 0% GP"
+      : "Stay · Direct 0% GP"
+    : pin.placeCategory !== "STAY"
+    ? isTh
+      ? catMeta.labelTh
+      : catMeta.labelEn
+    : pin.externalSourceName || (isTh ? "ดีลภายนอก" : "Partner deal");
 
   const minSpendText =
     pin.activeCoupon && pin.activeCoupon.minSpendThb > 0
@@ -61,71 +68,72 @@ export function DealHeroCouponSlide({
         ? `ขั้นต่ำ ฿${pin.activeCoupon.minSpendThb.toLocaleString()}`
         : `Min spend ฿${pin.activeCoupon.minSpendThb.toLocaleString()}`
       : isTh
-      ? "ไม่มีขั้นต่ำในการจอง"
+      ? "ไม่มีขั้นต่ำในการใช้สิทธิ์"
       : "No minimum spend";
-
-  const outerFrameBg = "var(--color-border-emphasized)";
 
   return (
     <div
-      style={{
-        background: outerFrameBg,
-        padding: "1.5px",
-        WebkitMaskImage: OUTER_HERO_MASK,
-        maskImage: OUTER_HERO_MASK,
-        WebkitMaskComposite: "source-in",
-        maskComposite: "intersect",
-      }}
-      className="relative w-full h-full rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] select-none"
+      style={
+        hasRealPromo
+          ? {
+              WebkitMaskImage: OUTER_HERO_MASK,
+              maskImage: OUTER_HERO_MASK,
+              WebkitMaskComposite: "source-in",
+              maskComposite: "intersect",
+            }
+          : undefined
+      }
+      className="relative w-full h-full rounded-[24px] sm:rounded-[26px] lg:rounded-[20px] overflow-hidden bg-[#181818] select-none"
     >
+      {/* Full-Bleed Edge-to-Edge Place Photography */}
+      <img
+        src={heroUrl}
+        srcSet={heroSrcSet}
+        sizes={PIN_IMAGE_SIZES.hero}
+        alt={hotelName}
+        loading="eager"
+        fetchPriority="high"
+        decoding="sync"
+        draggable={false}
+        className="absolute inset-0 h-full w-full object-cover object-center"
+      />
+
+      {/* Soft Editorial Legibility Veil Over Bottom Section Only */}
       <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[54%]"
         style={{
-          WebkitMaskImage: INNER_HERO_MASK,
-          maskImage: INNER_HERO_MASK,
-          WebkitMaskComposite: "source-in",
-          maskComposite: "intersect",
+          background:
+            "linear-gradient(to top, rgba(14,14,14,0.92) 0%, rgba(14,14,14,0.68) 52%, rgba(14,14,14,0.0) 100%)",
         }}
-        className="relative w-full h-full rounded-[22.5px] sm:rounded-[24.5px] lg:rounded-[18.5px] overflow-hidden bg-[#181818]"
-      >
-        {/* Full-Bleed Edge-to-Edge Stay Photography */}
-        <img
-          src={heroUrl}
-          srcSet={heroSrcSet}
-          sizes={PIN_IMAGE_SIZES.hero}
-          alt={hotelName}
-          loading="eager"
-          fetchPriority="high"
-          decoding="sync"
-          draggable={false}
-          className="absolute inset-0 h-full w-full object-cover object-center"
-        />
+      />
 
-        {/* Soft Editorial Legibility Veil Over Bottom Coupon Section Only */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[56%]"
-          style={{
-            background:
-              "linear-gradient(to top, rgba(14,14,14,0.92) 0%, rgba(14,14,14,0.72) 52%, rgba(14,14,14,0.0) 100%)",
-          }}
+      {/* Top-Left Category Crest + Label (No longer blocked by Mobile top-left back button!) */}
+      <div className="absolute top-3.5 left-3.5 lg:left-4 z-10 inline-flex items-center gap-1.5">
+        <PlaceCategoryCrest
+          category={pin.placeCategory}
+          language={language}
+          size="sm"
         />
-
-        {/* Top-Left Clean Frosted Source Tag (Clears Mobile Back Button) */}
-        <span className="absolute top-3.5 left-16 lg:left-4 z-10 h-7 px-2.5 rounded-[8px] bg-white/92 dark:bg-[#1e1e1e]/92 backdrop-blur-md text-[11.5px] font-semibold text-[#222222] dark:text-[#f5f5f5] inline-flex items-center gap-1 leading-none">
+        <span className="h-7 px-2.5 rounded-[8px] bg-white/92 dark:bg-[#1e1e1e]/92 backdrop-blur-md text-[11.5px] font-semibold text-[#222222] dark:text-[#f5f5f5] inline-flex items-center gap-1 leading-none">
           <span>{sourceLabel}</span>
-          {isExternal && (
+          {isExternal && pin.placeCategory === "STAY" && (
             <ArrowUpRight className="w-3 h-3 shrink-0" strokeWidth={2.2} />
           )}
         </span>
+      </div>
 
-        {/* Crisp Dashed Perforation Line Aligned Dead-Center With The 62% Side Notches */}
+      {/* Crisp Dashed Perforation Line ONLY When Place Has an Active Promo */}
+      {hasRealPromo && (
         <div
           aria-hidden="true"
           style={{ top: NOTCH_PERCENT_Y }}
           className="pointer-events-none absolute inset-x-4 z-10 -translate-y-1/2 border-t border-dashed border-white/40"
         />
+      )}
 
-        {/* Bottom 38% Full-Bleed Editorial Coupon Details (Right Padding Clears Vertical Icon Rail!) */}
+      {/* Bottom Full-Bleed Details (Promo Ticket View OR Clean Editorial Place Hero View) */}
+      {hasRealPromo ? (
         <div
           style={{ top: NOTCH_PERCENT_Y }}
           className="absolute inset-x-0 bottom-0 z-10 px-5 sm:px-6 pr-16 sm:pr-20 pt-4 pb-5 flex flex-col justify-between text-white"
@@ -143,10 +151,10 @@ export function DealHeroCouponSlide({
             </p>
 
             <div className="flex items-baseline gap-2.5 flex-wrap">
-              <span className="text-[30px] sm:text-[36px] font-bold tracking-[-0.025em] leading-none text-white tabular-nums">
-                {discountHeadline}
+              <span className="text-[28px] sm:text-[34px] font-bold tracking-[-0.025em] leading-none text-white tabular-nums">
+                {realPromoHeadline || discountHeadline}
               </span>
-              {dealPrice && (
+              {dealPrice && pin.placeCategory === "STAY" && (
                 <span className="text-[15.5px] font-semibold text-white/95 tabular-nums">
                   ฿{dealPrice.toLocaleString()}
                   <span className="text-[12.5px] font-normal text-white/75">
@@ -198,7 +206,30 @@ export function DealHeroCouponSlide({
             </button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="absolute inset-x-0 bottom-0 z-10 px-5 sm:px-6 pr-16 sm:pr-20 pb-5 pt-8 flex flex-col justify-end text-white space-y-1.5">
+          <p className="text-[12.5px] font-medium text-white/80 flex items-center gap-1.5 truncate">
+            <span>{isTh ? catMeta.shortLabelTh : catMeta.shortLabelEn}</span>
+            <span aria-hidden="true">·</span>
+            <span className="truncate">
+              {pin.hotelDistrictTh
+                ? `${pin.hotelDistrictTh}, ${provinceLabel}`
+                : provinceLabel}
+            </span>
+          </p>
+          <h2 className="text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] leading-tight text-white flex items-center gap-1.5">
+            <span className="line-clamp-2">{hotelName}</span>
+            {pin.hotelVerificationStatus === "VERIFIED" && (
+              <BadgeCheck className="w-4 h-4 text-white shrink-0" />
+            )}
+          </h2>
+          {(isTh ? pin.titleTh : pin.titleEn) && (
+            <p className="text-[13px] leading-relaxed text-white/85 line-clamp-2">
+              {isTh ? pin.titleTh : pin.titleEn}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -25,8 +25,7 @@ export function configureThailandMapInteractions(map: MapLibreMap): void {
 
 let workerConfigured = false;
 let rawLibertyPromise: Promise<StyleSpecification> | null = null;
-const cachedBuiltStyles: Partial<Record<"light" | "dark", StyleSpecification>> =
-  {};
+const cachedBuiltStyles: Partial<Record<string, StyleSpecification>> = {};
 
 /**
  * Configure MapLibre GL to load our self-contained static worker from /public/maplibre-gl-worker.js
@@ -81,10 +80,14 @@ function fetchBaseLibertyStyle(): Promise<StyleSpecification> {
  * so zooming and panning across any scale renders seamlessly on a single WebGL <canvas>.
  */
 export async function getAirbnbVectorMapStyle(
-  isDark: boolean
+  isDark: boolean,
+  options?: { hideCommercialPois?: boolean }
 ): Promise<StyleSpecification> {
-  const themeKey = isDark ? "dark" : "light";
-  const cached = cachedBuiltStyles[themeKey];
+  const hideCommercialPois = Boolean(options?.hideCommercialPois);
+  const cacheKey = `${isDark ? "dark" : "light"}:${
+    hideCommercialPois ? "clean" : "full"
+  }`;
+  const cached = cachedBuiltStyles[cacheKey];
   if (cached) return cached;
 
   const base = await fetchBaseLibertyStyle();
@@ -237,8 +240,18 @@ export async function getAirbnbVectorMapStyle(
           ];
         }
 
-        // Progressive Airbnb-style POI density: calm overview at z13-14, detail reveals cleanly as user zooms in!
+        // Progressive Airbnb-style POI density:
+        // In Explore/Trip discovery mode (`hideCommercialPois`), hide base-map commercial POIs
+        // (poi_r20/r7/r1) completely so Nondii's 5-Category Place Pins NEVER collide with OSM labels,
+        // while keeping transit, provinces, districts, roads, parks, rivers & mountains!
         if (id.startsWith("poi_")) {
+          if (
+            hideCommercialPois &&
+            (id === "poi_r20" || id === "poi_r7" || id === "poi_r1")
+          ) {
+            layout.visibility = "none";
+            return layer;
+          }
           if (id === "poi_r20") (layer as { minzoom?: number }).minzoom = 12.2;
           if (id === "poi_r7") (layer as { minzoom?: number }).minzoom = 14.8;
           if (id === "poi_r1") (layer as { minzoom?: number }).minzoom = 16.2;
@@ -265,6 +278,6 @@ export async function getAirbnbVectorMapStyle(
       return layer;
     });
 
-  cachedBuiltStyles[themeKey] = style;
+  cachedBuiltStyles[cacheKey] = style;
   return style;
 }
