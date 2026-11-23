@@ -4,6 +4,7 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 import {
   runFacebookPageSyncBatch,
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
       posts: postsToProcess,
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({
       connection,
       syncedCount: syncedPins.length,

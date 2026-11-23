@@ -12,7 +12,10 @@ import {
   MapPin,
   Tag,
 } from "lucide-react";
-import { getPublishedHotelPostDetail } from "@/lib/services/hotelPostService";
+import {
+  getPublishedHotelPostDetail,
+  incrementHotelPostViews,
+} from "@/lib/services/hotelPostService";
 
 export const dynamic = "force-dynamic";
 
@@ -148,6 +151,8 @@ export default async function HotelPostDetailPage({
   }
 
   const { hotel, post, linkedRoom, relatedPosts } = detail;
+  // Non-blocking view increment strictly on page render (not inside generateMetadata!)
+  incrementHotelPostViews(post.id);
 
   const blogPostingJsonLd = {
     "@context": "https://schema.org",

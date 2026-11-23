@@ -28,10 +28,9 @@ import type {
   PinFeedItemDto,
   SavedBoardDto,
 } from "@/types/cangaroom";
-import {
-  PlaceCardFlipOverlay,
-  type ActivePlaceFlipTransition,
-  type RouteHeroTargetRect,
+import type {
+  ActivePlaceFlipTransition,
+  RouteHeroTargetRect,
 } from "@/components/navigation/PlaceCardFlipOverlay";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import {
@@ -41,14 +40,55 @@ import {
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
 import { RouteProgressBar } from "@/components/navigation/RouteProgressBar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
-import { CookieConsentBanner } from "@/components/privacy/CookieConsentBanner";
-import { AuthPromptModal } from "@/components/auth/AuthPromptModal";
-import {
-  BoardSaveToast,
-  ChooseBoardModal,
-  CreateBoardModal,
-  type BoardSaveToastState,
-} from "@/components/board/BoardActionModals";
+import type { BoardSaveToastState } from "@/components/board/BoardActionModals";
+
+const PlaceCardFlipOverlay = dynamic(
+  () =>
+    import("@/components/navigation/PlaceCardFlipOverlay").then(
+      (mod) => mod.PlaceCardFlipOverlay
+    ),
+  { ssr: false }
+);
+
+const CookieConsentBanner = dynamic(
+  () =>
+    import("@/components/privacy/CookieConsentBanner").then(
+      (mod) => mod.CookieConsentBanner
+    ),
+  { ssr: false }
+);
+
+const AuthPromptModal = dynamic(
+  () =>
+    import("@/components/auth/AuthPromptModal").then(
+      (mod) => mod.AuthPromptModal
+    ),
+  { ssr: false }
+);
+
+const BoardSaveToast = dynamic(
+  () =>
+    import("@/components/board/BoardActionModals").then(
+      (mod) => mod.BoardSaveToast
+    ),
+  { ssr: false }
+);
+
+const ChooseBoardModal = dynamic(
+  () =>
+    import("@/components/board/BoardActionModals").then(
+      (mod) => mod.ChooseBoardModal
+    ),
+  { ssr: false }
+);
+
+const CreateBoardModal = dynamic(
+  () =>
+    import("@/components/board/BoardActionModals").then(
+      (mod) => mod.CreateBoardModal
+    ),
+  { ssr: false }
+);
 
 const CouponWalletDrawer = dynamic(
   () =>
@@ -1141,35 +1181,67 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const todayFormatted = formatDateStr(today);
   void todayFormatted;
 
+  // Sticky mount flags so dynamic modal/overlay chunks stay 0 KB on initial load
+  // while preserving smooth Fade Slide-Out animations (`useModalPresence`) once opened.
+  const [hasMountedAuth, setHasMountedAuth] = useState(false);
+  const [hasMountedCreateBoard, setHasMountedCreateBoard] = useState(false);
+  const [hasMountedChooseBoard, setHasMountedChooseBoard] = useState(false);
+  const [hasMountedBoardToast, setHasMountedBoardToast] = useState(false);
+  const [hasMountedFlip, setHasMountedFlip] = useState(false);
+
+  useEffect(() => {
+    if (isAuthModalOpen && !hasMountedAuth) setHasMountedAuth(true);
+  }, [isAuthModalOpen, hasMountedAuth]);
+
+  useEffect(() => {
+    if (isCreateBoardOpen && !hasMountedCreateBoard)
+      setHasMountedCreateBoard(true);
+  }, [isCreateBoardOpen, hasMountedCreateBoard]);
+
+  useEffect(() => {
+    if (chooseBoardContext && !hasMountedChooseBoard)
+      setHasMountedChooseBoard(true);
+  }, [chooseBoardContext, hasMountedChooseBoard]);
+
+  useEffect(() => {
+    if (boardToast && !hasMountedBoardToast) setHasMountedBoardToast(true);
+  }, [boardToast, hasMountedBoardToast]);
+
+  useEffect(() => {
+    if (activeFlipTransition && !hasMountedFlip) setHasMountedFlip(true);
+  }, [activeFlipTransition, hasMountedFlip]);
+
   return (
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
       {isDedicatedShellPage ? (
         <main className="flex min-h-screen flex-col">
           {children}
-          <AuthPromptModal
-            isOpen={isAuthModalOpen}
-            language={lang}
-            reasonText={
-              authModalReason
-                ? lang === "th"
-                  ? authModalReason.th
-                  : authModalReason.en
-                : null
-            }
-            onClose={() => {
-              setIsAuthModalOpen(false);
-              pendingAuthCallbackRef.current = null;
-            }}
-            onAuthenticated={async () => {
-              await refreshProfile();
-              const cb = pendingAuthCallbackRef.current;
-              pendingAuthCallbackRef.current = null;
-              if (cb) {
-                await cb();
+          {(hasMountedAuth || isAuthModalOpen) && (
+            <AuthPromptModal
+              isOpen={isAuthModalOpen}
+              language={lang}
+              reasonText={
+                authModalReason
+                  ? lang === "th"
+                    ? authModalReason.th
+                    : authModalReason.en
+                  : null
               }
-            }}
-          />
+              onClose={() => {
+                setIsAuthModalOpen(false);
+                pendingAuthCallbackRef.current = null;
+              }}
+              onAuthenticated={async () => {
+                await refreshProfile();
+                const cb = pendingAuthCallbackRef.current;
+                pendingAuthCallbackRef.current = null;
+                if (cb) {
+                  await cb();
+                }
+              }}
+            />
+          )}
           <CookieConsentBanner language={lang} theme={theme} />
         </main>
       ) : (
@@ -1238,96 +1310,106 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             />
           )}
 
-          <AuthPromptModal
-            isOpen={isAuthModalOpen}
-            language={lang}
-            reasonText={
-              authModalReason
-                ? lang === "th"
-                  ? authModalReason.th
-                  : authModalReason.en
-                : null
-            }
-            onClose={() => {
-              setIsAuthModalOpen(false);
-              pendingAuthCallbackRef.current = null;
-            }}
-            onAuthenticated={async () => {
-              await refreshProfile();
-              const cb = pendingAuthCallbackRef.current;
-              pendingAuthCallbackRef.current = null;
-              if (cb) {
-                await cb();
+          {(hasMountedAuth || isAuthModalOpen) && (
+            <AuthPromptModal
+              isOpen={isAuthModalOpen}
+              language={lang}
+              reasonText={
+                authModalReason
+                  ? lang === "th"
+                    ? authModalReason.th
+                    : authModalReason.en
+                  : null
               }
-            }}
-          />
+              onClose={() => {
+                setIsAuthModalOpen(false);
+                pendingAuthCallbackRef.current = null;
+              }}
+              onAuthenticated={async () => {
+                await refreshProfile();
+                const cb = pendingAuthCallbackRef.current;
+                pendingAuthCallbackRef.current = null;
+                if (cb) {
+                  await cb();
+                }
+              }}
+            />
+          )}
 
-          <CreateBoardModal
-            isOpen={isCreateBoardOpen}
-            language={lang}
-            isSubmitting={isCreatingBoardSubmit}
-            onClose={() => {
-              setIsCreateBoardOpen(false);
-              pendingPinForCreateRef.current = null;
-            }}
-            onCreate={handleCreateBoardSubmit}
-          />
+          {(hasMountedCreateBoard || isCreateBoardOpen) && (
+            <CreateBoardModal
+              isOpen={isCreateBoardOpen}
+              language={lang}
+              isSubmitting={isCreatingBoardSubmit}
+              onClose={() => {
+                setIsCreateBoardOpen(false);
+                pendingPinForCreateRef.current = null;
+              }}
+              onCreate={handleCreateBoardSubmit}
+            />
+          )}
 
-          <ChooseBoardModal
-            isOpen={Boolean(chooseBoardContext)}
-            language={lang}
-            boards={savedBoards}
-            currentBoardId={chooseBoardContext?.currentBoardId ?? null}
-            isBusy={isMovingBoard}
-            onClose={() => setChooseBoardContext(null)}
-            onSelectBoard={handleMovePinToChosenBoard}
-            onOpenCreateNew={() => {
-              if (chooseBoardContext) {
-                pendingPinForCreateRef.current = {
-                  id: chooseBoardContext.pinId,
-                  coverImageUrl: chooseBoardContext.coverImageUrl,
-                  moveFromBoardId: chooseBoardContext.currentBoardId,
-                };
-              }
-              setChooseBoardContext(null);
-              setIsCreateBoardOpen(true);
-            }}
-          />
+          {(hasMountedChooseBoard || Boolean(chooseBoardContext)) && (
+            <ChooseBoardModal
+              isOpen={Boolean(chooseBoardContext)}
+              language={lang}
+              boards={savedBoards}
+              currentBoardId={chooseBoardContext?.currentBoardId ?? null}
+              isBusy={isMovingBoard}
+              onClose={() => setChooseBoardContext(null)}
+              onSelectBoard={handleMovePinToChosenBoard}
+              onOpenCreateNew={() => {
+                if (chooseBoardContext) {
+                  pendingPinForCreateRef.current = {
+                    id: chooseBoardContext.pinId,
+                    coverImageUrl: chooseBoardContext.coverImageUrl,
+                    moveFromBoardId: chooseBoardContext.currentBoardId,
+                  };
+                }
+                setChooseBoardContext(null);
+                setIsCreateBoardOpen(true);
+              }}
+            />
+          )}
 
-          <BoardSaveToast
-            toast={boardToast}
-            language={lang}
-            onChangeBoard={() => {
-              if (!boardToast) return;
-              if (boardToastTimerRef.current !== null) {
-                window.clearTimeout(boardToastTimerRef.current);
-                boardToastTimerRef.current = null;
-              }
-              setChooseBoardContext({
-                pinId: boardToast.pinId,
-                coverImageUrl: boardToast.thumbnailUrl,
-                currentBoardId: boardToast.boardId,
-              });
-              setBoardToast(null);
-            }}
-            onDismiss={() => {
-              if (boardToastTimerRef.current !== null) {
-                window.clearTimeout(boardToastTimerRef.current);
-                boardToastTimerRef.current = null;
-              }
-              setBoardToast(null);
-            }}
-          />
+          {(hasMountedBoardToast || Boolean(boardToast)) && (
+            <BoardSaveToast
+              toast={boardToast}
+              language={lang}
+              onChangeBoard={() => {
+                if (!boardToast) return;
+                if (boardToastTimerRef.current !== null) {
+                  window.clearTimeout(boardToastTimerRef.current);
+                  boardToastTimerRef.current = null;
+                }
+                setChooseBoardContext({
+                  pinId: boardToast.pinId,
+                  coverImageUrl: boardToast.thumbnailUrl,
+                  currentBoardId: boardToast.boardId,
+                });
+                setBoardToast(null);
+              }}
+              onDismiss={() => {
+                if (boardToastTimerRef.current !== null) {
+                  window.clearTimeout(boardToastTimerRef.current);
+                  boardToastTimerRef.current = null;
+                }
+                setBoardToast(null);
+              }}
+            />
+          )}
 
           <CookieConsentBanner language={lang} theme={theme} />
         </div>
       )}
-      <PlaceCardFlipOverlay
-        transition={activeFlipTransition}
-        readyHero={readyRouteHero}
-        language={lang}
-        onComplete={handleCompleteFlipTransition}
-      />
+      {(hasMountedFlip || Boolean(activeFlipTransition)) && (
+        <PlaceCardFlipOverlay
+          transition={activeFlipTransition}
+          readyHero={readyRouteHero}
+          language={lang}
+          onComplete={handleCompleteFlipTransition}
+        />
+      )}
     </PlatformAppContext.Provider>
   );
 }

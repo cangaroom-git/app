@@ -65,47 +65,55 @@ export interface FannedPhotoCardDeckProps {
   onSwapActiveStop?: (delta: -1 | 1) => Promise<void> | void;
   onInterruptStory?: () => void;
   onReorderModeChange?: (isReorderMode: boolean) => void;
+  /** Optional 1:1 vertical pull-down gesture handoff so dragging DOWN anywhere on the fan cards collapses the parent dock sheet */
+  onSheetPullMove?: (dy: number) => void;
+  onSheetPullEnd?: (dy: number, velocityY: number) => void;
 }
 
 /**
- * Exact 5-card symmetric fanned arc geometry (cloned 1:1 from TripMapPlannerView):
- * - Center card (`rel = 0`): upright `0deg`, `ty = 0`, anchored flush bottom showing ~85-90%
- * - Inner pair (`rel = ±1`): `±19deg`, gentle drop
- * - Outer pair (`rel = ±2`): `±35deg`, deeper arc drop
+ * Exact 5-card symmetric fanned arc geometry with heroic larger center card:
+ * - Center card (`rel = 0`): upright `0deg`, `scale = 1.0`, `ty = 0`, anchored flush bottom
+ * - Inner pair (`rel = ±1`): `±18deg`, `scale = 0.85`, recessed behind center
+ * - Outer pair (`rel = ±2`): `±34deg`, `scale = 0.75`, deeper receding arc
  * - Beyond `±2.2`: smoothly sinks below bottom edge
  */
 function computeFanSlotPose(
   rel: number,
   cardW: number,
   cardH: number
-): { tx: number; ty: number; rot: number } {
+): { tx: number; ty: number; rot: number; scale: number } {
   const sign = rel < 0 ? -1 : 1;
   const a = Math.abs(rel);
 
   let xRatio: number;
   let yRatio: number;
   let deg: number;
+  let scale: number;
 
   if (a <= 1) {
-    xRatio = a * 0.57;
-    yRatio = a * 0.145;
-    deg = a * 19;
+    xRatio = a * 0.61;
+    yRatio = a * 0.165;
+    deg = a * 18;
+    scale = 1 - a * 0.15; // 1.0 -> 0.85
   } else if (a <= 2) {
     const t = a - 1;
-    xRatio = 0.57 + t * 0.47;
-    yRatio = 0.145 + t * 0.22;
-    deg = 19 + t * 16;
+    xRatio = 0.61 + t * 0.45;
+    yRatio = 0.165 + t * 0.195;
+    deg = 18 + t * 16;
+    scale = 0.85 - t * 0.1; // 0.85 -> 0.75
   } else {
     const t = a - 2;
-    xRatio = 1.04 + t * 0.34;
-    yRatio = 0.365 + t * 0.52;
-    deg = 35 + t * 14;
+    xRatio = 1.06 + t * 0.32;
+    yRatio = 0.36 + t * 0.52;
+    deg = 34 + t * 14;
+    scale = Math.max(0.68, 0.75 - t * 0.06);
   }
 
   return {
     tx: sign * xRatio * cardW,
     ty: yRatio * cardH,
     rot: sign * deg,
+    scale,
   };
 }
 
@@ -161,6 +169,8 @@ export function FannedPhotoCardDeck({
   onSwapActiveStop,
   onInterruptStory,
   onReorderModeChange,
+  onSheetPullMove,
+  onSheetPullEnd,
 }: FannedPhotoCardDeckProps) {
   const isTh = language === "th";
   const isModalActive = Boolean(modalOpenPinId);
@@ -201,6 +211,7 @@ export function FannedPhotoCardDeck({
     startX: number;
     startY: number;
     axis: "horizontal" | "vertical" | null;
+    samples: Array<{ x: number; y: number; t: number }>;
   } | null>(null);
   const suppressDeckClickRef = useRef(false);
 
@@ -522,10 +533,10 @@ export function FannedPhotoCardDeck({
 
   const isDesktop = viewportWidth >= 1024;
   const isCompactMobile = viewportWidth < 640;
-  // Unified exact 3:4 portrait ratio across the entire platform (180x240 mobile · 216x288 desktop!)
-  const cardW = isCompactMobile ? 180 : 216;
-  const cardH = isCompactMobile ? 240 : 288;
-  const stepX = Math.round(cardW * 0.57);
+  // Heroic larger center card with exact 3:4 portrait ratio (198x264 mobile · 236x314 tablet/desktop!)
+  const cardW = isCompactMobile ? 198 : 236;
+  const cardH = isCompactMobile ? 264 : 314;
+  const stepX = Math.round(cardW * 0.61);
   const clampedVisibleRatio = Math.max(0.45, Math.min(1, centerVisibleRatio));
   const bottomOffsetPx =
     clampedVisibleRatio < 1
@@ -539,9 +550,11 @@ export function FannedPhotoCardDeck({
       : Math.max(0, Math.min(renderedItems.length - 1, displayActiveIdx));
   const activeItem = renderedItems[safeActiveIdx] ?? null;
 
-  // Dual-Mode Deck Gesture Handler (1:1 Swipe browse OR live drag reorder in Move Mode!)
+  // Dual-Axis Ultra-Smooth Deck Gesture Handler:
+  // - Horizontal -> Continuous 1:1 multi-card swipe with velocity projection (zero snap-back glitch!)
+  // - Vertical Downward -> Seamless 1:1 pull-down collapse of parent white dock sheet (zero pull-to-refresh!)
   const handleDeckPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (renderedItems.length <= 1 || isModalActive) return;
+    if (isModalActive) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (isPlayingStory) {
       onInterruptStory?.();
@@ -551,6 +564,7 @@ export function FannedPhotoCardDeck({
       startX: e.clientX,
       startY: e.clientY,
       axis: null,
+      samples: [{ x: e.clientX, y: e.clientY, t: performance.now() }],
     };
   };
 
@@ -559,9 +573,19 @@ export function FannedPhotoCardDeck({
     if (!g || g.pointerId !== e.pointerId) return;
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
+    const now = performance.now();
+
+    g.samples.push({ x: e.clientX, y: e.clientY, t: now });
+    while (g.samples.length > 2 && now - g.samples[0].t > 105) {
+      g.samples.shift();
+    }
 
     if (g.axis === null) {
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+      if (
+        renderedItems.length > 1 &&
+        Math.abs(dx) > 6 &&
+        Math.abs(dx) >= Math.abs(dy) * 0.9
+      ) {
         g.axis = "horizontal";
         setIsDraggingDeck(true);
         try {
@@ -569,15 +593,33 @@ export function FannedPhotoCardDeck({
         } catch {
           // ignore
         }
-      } else if (Math.abs(dy) > 10) {
+      } else if (
+        !isReorderMode &&
+        onSheetPullMove &&
+        Math.abs(dy) > 7 &&
+        Math.abs(dy) > Math.abs(dx) * 1.15
+      ) {
         g.axis = "vertical";
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
       }
+    }
+
+    if (g.axis === "vertical") {
+      if (onSheetPullMove) {
+        const resisted = dy < 0 ? dy * 0.28 : Math.min(280, dy);
+        onSheetPullMove(resisted);
+      }
+      return;
     }
 
     if (g.axis !== "horizontal") return;
 
     if (isReorderMode && enableReorder && onSwapActiveStop) {
-      const swapThreshold = Math.max(62, Math.round(stepX * 0.6));
+      const swapThreshold = Math.max(62, Math.round(stepX * 0.58));
       if (dx > swapThreshold && safeActiveIdx < renderedItems.length - 1) {
         g.startX = e.clientX;
         setReorderDragX(0);
@@ -602,10 +644,18 @@ export function FannedPhotoCardDeck({
       return;
     }
 
-    const atStart = safeActiveIdx === 0 && dx > 0;
-    const atEnd = safeActiveIdx === renderedItems.length - 1 && dx < 0;
-    const resisted = atStart || atEnd ? dx * 0.28 : dx;
-    setDragDx(Math.max(-stepX * 1.45, Math.min(stepX * 1.45, resisted)));
+    // Continuous multi-card 1:1 horizontal tracking with soft rubber-band ONLY past first/last card!
+    const maxPositiveDx = safeActiveIdx * stepX;
+    const maxNegativeDx = -(renderedItems.length - 1 - safeActiveIdx) * stepX;
+    let effectiveDx = dx;
+    if (dx > maxPositiveDx) {
+      effectiveDx = maxPositiveDx + (dx - maxPositiveDx) * 0.28;
+    } else if (dx < maxNegativeDx) {
+      effectiveDx = maxNegativeDx + (dx - maxNegativeDx) * 0.28;
+    }
+    // Keep within smooth ±3.2 card live glide range so cards never clip out of the pre-mounted buffer
+    const maxLiveGlide = stepX * 3.2;
+    setDragDx(Math.max(-maxLiveGlide, Math.min(maxLiveGlide, effectiveDx)));
   };
 
   const handleDeckPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -613,18 +663,73 @@ export function FannedPhotoCardDeck({
     deckGestureRef.current = null;
     if (!g || g.pointerId !== e.pointerId) return;
 
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // ignore
+    }
+
+    const now = performance.now();
+    const samples = g.samples;
+    let vx = 0;
+    let vy = 0;
+    if (samples.length >= 2) {
+      const newest = samples[samples.length - 1];
+      if (now - newest.t < 90) {
+        const oldest = samples[0];
+        const dt = newest.t - oldest.t;
+        if (dt > 6) {
+          vx = (newest.x - oldest.x) / dt;
+          vy = (newest.y - oldest.y) / dt;
+        }
+      }
+    }
+
+    if (g.axis === "vertical") {
+      suppressDeckClickRef.current = true;
+      window.setTimeout(() => {
+        suppressDeckClickRef.current = false;
+      }, 220);
+      const dy = e.clientY - g.startY;
+      onSheetPullEnd?.(dy, vy);
+      return;
+    }
+
     if (g.axis === "horizontal") {
       suppressDeckClickRef.current = true;
       window.setTimeout(() => {
         suppressDeckClickRef.current = false;
       }, 220);
 
-      if (!isReorderMode) {
+      if (!isReorderMode && renderedItems.length > 1) {
         const dx = e.clientX - g.startX;
-        if (dx <= -38 && safeActiveIdx < renderedItems.length - 1) {
-          onSelectIndex(safeActiveIdx + 1);
-        } else if (dx >= 38 && safeActiveIdx > 0) {
-          onSelectIndex(safeActiveIdx - 1);
+        // Combine finger displacement + flick momentum for effortless iOS-grade 1..3 card glides!
+        const displacementCards = -dx / stepX;
+        const momentumCards = -(vx * 220) / stepX;
+        let deltaSlots = Math.round(displacementCards + momentumCards);
+
+        // Quick light flick (> 0.24 px/ms) with modest travel (>= 14px) always advances 1 card cleanly
+        if (deltaSlots === 0 && Math.abs(dx) >= 14 && Math.abs(vx) >= 0.24) {
+          deltaSlots = vx < 0 ? 1 : -1;
+        }
+        // Deliberate slow drag past 34% of card step always commits to next/prev (NEVER snaps back!)
+        if (deltaSlots === 0 && Math.abs(dx) >= stepX * 0.34) {
+          deltaSlots = dx < 0 ? 1 : -1;
+        }
+
+        // Clamp single flick to ±3 cards so all entering cards glide smoothly from the pre-mounted buffer
+        deltaSlots = Math.max(-3, Math.min(3, deltaSlots));
+
+        const targetIdx = Math.max(
+          0,
+          Math.min(renderedItems.length - 1, safeActiveIdx + deltaSlots)
+        );
+        if (targetIdx !== safeActiveIdx) {
+          // Update displayActiveIdx synchronously in same batch as dragDx=0 so the spring glides forward with ZERO jump!
+          setDisplayActiveIdx(targetIdx);
+          onSelectIndex(targetIdx);
         }
       }
     }
@@ -648,9 +753,9 @@ export function FannedPhotoCardDeck({
         onPointerCancel={handleDeckPointerUp}
         className={`absolute inset-x-0 bottom-0 z-10 ${
           clampedVisibleRatio < 1
-            ? "h-[260px] sm:h-[300px] lg:h-[300px]"
-            : "h-[250px] sm:h-[300px] lg:h-[324px] z-30"
-        } pointer-events-none flex items-end justify-center touch-pan-y`}
+            ? "h-[278px] sm:h-[322px] lg:h-[322px]"
+            : "h-[268px] sm:h-[322px] lg:h-[344px] z-30"
+        } pointer-events-none flex items-end justify-center touch-none overscroll-none`}
       >
         {/* Transparent swipe capture layer over parent-rendered mobile white backdrop */}
         {captureMobileBackdropSwipe && !isDeckTuckedByMap && !isModalActive && (
@@ -701,6 +806,7 @@ export function FannedPhotoCardDeck({
           let tx = pose.tx;
           let ty = pose.ty;
           let rot = pose.rot;
+          let cardScale = pose.scale;
           let opacity =
             absRel <= 2.25 ? 1 : Math.max(0, 1 - (absRel - 2.25) * 1.4);
           const isHiddenForFlip = isModalActive && pin.id === modalOpenPinId;
@@ -712,6 +818,7 @@ export function FannedPhotoCardDeck({
             tx = reorderDragX;
             ty = isDesktop ? -92 : -88;
             rot = reorderDragX * 0.055;
+            cardScale = 1.02;
             opacity = 1;
           } else if (isReorderMode && !isCenter) {
             opacity = absRel <= 2.25 ? 0.78 : 0;
@@ -721,14 +828,15 @@ export function FannedPhotoCardDeck({
             ? 50
             : Math.max(10, 45 - Math.round(absRel * 10));
 
-          // Progressive opacity fade for non-center fanned cards over an opaque canvas base
-          // (center = 100% vivid, adjacent = 58%, outer = 34% — zero bleed-through between overlapping cards!)
+          // Non-center cards smoothly desaturate to crisp warm grayscale + softer opacity so the vivid full-color larger center card commands 100% focus!
+          const grayscaleAmount =
+            absRel <= 0.05 ? 0 : Math.min(1, absRel * 1.15);
           const cardContentOpacity =
             absRel <= 0.05
               ? 1
               : absRel <= 1
-              ? 1 - absRel * 0.42
-              : Math.max(0.34, 0.58 - (absRel - 1) * 0.24);
+              ? 1 - absRel * 0.34
+              : Math.max(0.42, 0.66 - (absRel - 1) * 0.22);
 
           // Center-Out Staggered Spring Entry Delay (0ms -> 85ms -> 170ms)
           const entryDelayMs =
@@ -748,15 +856,16 @@ export function FannedPhotoCardDeck({
           } else if (!hasEntered) {
             transitionCss = "none";
           } else if (!entrySettled) {
-            transitionCss = `transform 540ms cubic-bezier(0.34, 1.38, 0.64, 1) ${entryDelayMs}ms, opacity 240ms ease ${entryDelayMs}ms`;
+            transitionCss = `transform 520ms cubic-bezier(0.22, 1, 0.36, 1) ${entryDelayMs}ms, opacity 240ms ease ${entryDelayMs}ms`;
           } else if (isHiddenForFlip) {
             transitionCss = "none";
           } else if (absRel > 2.25) {
             transitionCss =
               "transform 260ms var(--ease-ios-sheet), opacity 220ms ease";
           } else {
+            // Critically-damped ultra-smooth iOS deceleration (zero ugly rubber snap-back!)
             transitionCss =
-              "transform 460ms cubic-bezier(0.32, 1.22, 0.6, 1), opacity 240ms ease";
+              "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease";
           }
 
           const shouldPopInOuter =
@@ -791,7 +900,11 @@ export function FannedPhotoCardDeck({
                 ...(bottomOffsetPx !== null
                   ? { bottom: `${bottomOffsetPx}px` }
                   : {}),
-                transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${rot}deg)`,
+                transform: `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(
+                  2
+                )}px, 0) rotate(${rot.toFixed(2)}deg) scale(${cardScale.toFixed(
+                  3
+                )})`,
                 opacity,
                 visibility: isHiddenForFlip ? "hidden" : "visible",
                 zIndex,
@@ -843,7 +956,6 @@ export function FannedPhotoCardDeck({
               )}
 
               <article
-                key={shouldPopInOuter ? `pop-${outerPopIn.seq}` : "steady"}
                 role="button"
                 tabIndex={isCenter && !isModalActive ? 0 : -1}
                 aria-label={
@@ -899,7 +1011,7 @@ export function FannedPhotoCardDeck({
                     : ""
                 }`}
               >
-                {/* 100% Full-Bleed Borderless Place Photography */}
+                {/* 100% Full-Bleed Borderless Place Photography (Center = Vivid Color | Non-Center = Smooth Grayscale) */}
                 <img
                   src={getOptimizedPinImageUrl(pin.coverImageUrl, "card")}
                   srcSet={getOptimizedPinImageSrcSet(
@@ -913,16 +1025,28 @@ export function FannedPhotoCardDeck({
                   draggable={false}
                   style={{
                     opacity: cardContentOpacity,
-                    transition: isDraggingDeck ? "none" : "opacity 260ms ease",
+                    filter:
+                      grayscaleAmount > 0.01
+                        ? `grayscale(${grayscaleAmount.toFixed(2)})`
+                        : "none",
+                    transition: isDraggingDeck
+                      ? "none"
+                      : "opacity 280ms ease, filter 280ms ease",
                   }}
                   className="absolute inset-0 w-full h-full object-cover object-center"
                 />
 
-                {/* Top-Left Flush Corner Category Crest (+ Trip Stop #) */}
+                {/* Top-Left Flush Corner Category Crest (+ Trip Stop #) — Grayscale on Non-Center Cards */}
                 <div
                   style={{
                     opacity: cardContentOpacity,
-                    transition: isDraggingDeck ? "none" : "opacity 260ms ease",
+                    filter:
+                      grayscaleAmount > 0.01
+                        ? `grayscale(${grayscaleAmount.toFixed(2)})`
+                        : "none",
+                    transition: isDraggingDeck
+                      ? "none"
+                      : "opacity 280ms ease, filter 280ms ease",
                   }}
                   className="absolute top-0 left-0 z-10 inline-flex items-start pointer-events-none"
                 >

@@ -4,6 +4,7 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 import {
   mapHotelPostToDetailDto,
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json(
       { post: mapHotelPostToDetailDto(created, fullHotel) },
       { status: 201 }
@@ -150,6 +152,7 @@ export async function PATCH(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({
       post: mapHotelPostToDetailDto(updated, fullHotel),
     });
@@ -175,6 +178,7 @@ export async function DELETE(request: Request) {
       where: { id, hotelId: hotel.id },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ deleted: true });
   } catch (err) {
     if (err instanceof StudioAuthError) {

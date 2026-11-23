@@ -1,5 +1,6 @@
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
-import type { DiscountTypeDto } from "@/types/cangaroom";
+import { computeCouponDiscount } from "@/lib/bookingMath";
+import type { CouponDealDto, DiscountTypeDto } from "@/types/cangaroom";
 
 export function formatCouponDiscountHeadline(
   coupon: {
@@ -127,4 +128,20 @@ export function getCouponTimeInfo(
         ? `ใช้ได้ถึง ${formatShortDate(expiresAtIso, language)}`
         : `Valid until ${formatShortDate(expiresAtIso, language)}`,
   };
+}
+
+export function selectBestEligibleCoupon(
+  coupons: ReadonlyArray<CouponDealDto>,
+  subtotalThb: number
+): { coupon: CouponDealDto; discountThb: number } | null {
+  let best: { coupon: CouponDealDto; discountThb: number } | null = null;
+  for (const coupon of coupons) {
+    const res = computeCouponDiscount(coupon, subtotalThb);
+    if (!res.error && res.discountThb > 0) {
+      if (!best || res.discountThb > best.discountThb) {
+        best = { coupon, discountThb: res.discountThb };
+      }
+    }
+  }
+  return best;
 }

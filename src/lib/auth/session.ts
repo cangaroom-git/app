@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import type { AppRole, AuthenticatedMeDto } from "@/types/cangaroom";
@@ -17,55 +18,88 @@ export interface ServerAuthUser {
   role: AppRole;
 }
 
-export async function getServerSessionUser(): Promise<ServerAuthUser | null> {
-  try {
-    const sessionRes = await auth.getSession();
-    const rawUser = sessionRes?.data?.user;
-    if (!rawUser?.email) {
+const USER_SESSION_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  avatarUrl: true,
+  role: true,
+} as const;
+
+/**
+ * Per-request memoized session lookup via React.cache().
+ * Uses a fast read-only `findUnique` on the hot path and writes to Postgres
+ * ONLY when creating a new user or syncing changed avatar/bootstrap-admin role.
+ */
+export const getServerSessionUser = cache(
+  async (): Promise<ServerAuthUser | null> => {
+    try {
+      const sessionRes = await auth.getSession();
+      const rawUser = sessionRes?.data?.user;
+      if (!rawUser?.email) {
+        return null;
+      }
+
+      const email = rawUser.email.trim().toLowerCase();
+      const isBootstrapAdmin =
+        SUPER_ADMIN_EMAILS.has(email) ||
+        email.endsWith("@cangaroom.com") ||
+        email.endsWith("@nondii.com");
+
+      let dbUser = await prisma.user.findUnique({
+        where: { email },
+        select: USER_SESSION_SELECT,
+      });
+
+      if (!dbUser) {
+        dbUser = await prisma.user.upsert({
+          where: { email },
+          update: {
+            ...(rawUser.image ? { avatarUrl: rawUser.image } : {}),
+            ...(isBootstrapAdmin ? { role: "SUPER_ADMIN" } : {}),
+          },
+          create: {
+            email,
+            name: rawUser.name?.trim() || email.split("@")[0] || "ผู้ใช้งาน",
+            avatarUrl: rawUser.image || null,
+            role: isBootstrapAdmin ? "SUPER_ADMIN" : "TRAVELLER",
+          },
+          select: USER_SESSION_SELECT,
+        });
+      } else {
+        const needsAvatarSync =
+          Boolean(rawUser.image) && dbUser.avatarUrl !== rawUser.image;
+        const needsRoleUpgrade =
+          isBootstrapAdmin && dbUser.role !== "SUPER_ADMIN";
+
+        if (needsAvatarSync || needsRoleUpgrade) {
+          dbUser = await prisma.user.update({
+            where: { id: dbUser.id },
+            data: {
+              ...(needsAvatarSync ? { avatarUrl: rawUser.image } : {}),
+              ...(needsRoleUpgrade ? { role: "SUPER_ADMIN" } : {}),
+            },
+            select: USER_SESSION_SELECT,
+          });
+        }
+      }
+
+      return {
+        id: dbUser.id,
+        email: dbUser.email,
+        name:
+          dbUser.name || rawUser.name || email.split("@")[0] || "ผู้ใช้งาน",
+        phone: dbUser.phone,
+        avatarUrl: dbUser.avatarUrl,
+        role: dbUser.role,
+      };
+    } catch (err) {
+      console.error("[getServerSessionUser] failed:", err);
       return null;
     }
-
-    const email = rawUser.email.trim().toLowerCase();
-    const isBootstrapAdmin =
-      SUPER_ADMIN_EMAILS.has(email) ||
-      email.endsWith("@cangaroom.com") ||
-      email.endsWith("@nondii.com");
-
-    const dbUser = await prisma.user.upsert({
-      where: { email },
-      update: {
-        ...(rawUser.image ? { avatarUrl: rawUser.image } : {}),
-        ...(isBootstrapAdmin ? { role: "SUPER_ADMIN" } : {}),
-      },
-      create: {
-        email,
-        name: rawUser.name?.trim() || email.split("@")[0] || "ผู้ใช้งาน",
-        avatarUrl: rawUser.image || null,
-        role: isBootstrapAdmin ? "SUPER_ADMIN" : "TRAVELLER",
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        avatarUrl: true,
-        role: true,
-      },
-    });
-
-    return {
-      id: dbUser.id,
-      email: dbUser.email,
-      name: dbUser.name || rawUser.name || email.split("@")[0] || "ผู้ใช้งาน",
-      phone: dbUser.phone,
-      avatarUrl: dbUser.avatarUrl,
-      role: dbUser.role,
-    };
-  } catch (err) {
-    console.error("[getServerSessionUser] failed:", err);
-    return null;
   }
-}
+);
 
 export async function getAuthenticatedMeProfile(): Promise<AuthenticatedMeDto | null> {
   const user = await getServerSessionUser();
@@ -84,10 +118,7 @@ export async function getAuthenticatedMeProfile(): Promise<AuthenticatedMeDto | 
         },
       }),
       prisma.hotel.findMany({
-        where:
-          user.role === "SUPER_ADMIN"
-            ? {}
-            : { ownerId: user.id },
+        where: user.role === "SUPER_ADMIN" ? {} : { ownerId: user.id },
         orderBy: { createdAt: "asc" },
         take: 25,
         select: {
@@ -133,4 +164,3 @@ export async function getAuthenticatedMeProfile(): Promise<AuthenticatedMeDto | 
     })),
   };
 }
-

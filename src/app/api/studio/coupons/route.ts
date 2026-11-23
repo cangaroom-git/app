@@ -4,6 +4,7 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 
 const CouponCreateSchema = z.object({
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
       WHERE "id" = ${coupon.id} AND "hotelId" = ${hotel.id}
     `;
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ coupon }, { status: 201 });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -122,6 +124,7 @@ export async function PATCH(request: Request) {
             `
         )
       );
+      revalidatePlaceCatalog({ slug: hotel.slug });
       return NextResponse.json({ reordered: true, orderedIds: uniqueIds });
     }
 
@@ -152,6 +155,7 @@ export async function PATCH(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ coupon });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -173,6 +177,7 @@ export async function DELETE(request: Request) {
       where: { id, hotelId: hotel.id },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ deleted: true });
   } catch (err) {
     if (err instanceof StudioAuthError) {

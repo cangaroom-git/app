@@ -8,12 +8,20 @@ export const THAILAND_DEFAULT_CENTER: [number, number] = [100.52, 13.4];
 export const THAILAND_DEFAULT_ZOOM = 5.4;
 
 /**
- * Enable standard mobile/tablet 1-finger pan and 2-finger pinch-to-zoom while disabling
- * accidental map rotation or 3D pitch.
+ * Enable ultra-smooth Apple-Maps-grade 1-finger pan inertia, smooth wheel/trackpad zoom,
+ * and 2-finger pinch-to-zoom while disabling accidental map rotation or 3D pitch.
  */
 export function configureThailandMapInteractions(map: MapLibreMap): void {
   try {
-    map.dragPan?.enable();
+    map.dragPan?.enable({
+      linearity: 0.12,
+      easing: (t: number) => 1 - Math.pow(1 - t, 4),
+      maxSpeed: 2200,
+      deceleration: 1650,
+    });
+    map.scrollZoom?.enable();
+    map.scrollZoom?.setWheelZoomRate(1 / 320);
+    map.scrollZoom?.setZoomRate(1 / 85);
     map.touchZoomRotate?.enable();
     map.touchZoomRotate?.disableRotation();
     map.dragRotate?.disable();

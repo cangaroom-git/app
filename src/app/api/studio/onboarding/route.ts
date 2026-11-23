@@ -5,6 +5,7 @@ import {
   normalizeHotelSlug,
   RESERVED_HOTEL_SLUGS,
 } from "@/lib/bookingMath";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 
@@ -256,6 +257,7 @@ export async function POST(request: Request) {
       );
     }
 
+    revalidatePlaceCatalog({ slug: created.slug });
     return NextResponse.json({ hotel: created }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/studio/onboarding]", err);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import {
@@ -51,6 +51,9 @@ function getEffectiveDealScore(pin: PinFeedItemDto): number {
  *   5. Same region ("ที่พักในภาคเหนือ")
  *   6. Nationwide ("ที่พักทั่วประเทศ")
  */
+const INITIAL_VISIBLE_DEALS = 12;
+const DEALS_PAGE_INCREMENT = 12;
+
 export function StayCascadingRecommendationsGrid({
   anchorPin,
   candidates,
@@ -63,13 +66,16 @@ export function StayCascadingRecommendationsGrid({
 }: StayCascadingRecommendationsGridProps) {
   const isTh = language === "th";
   const [activeTier, setActiveTier] = useState<TierId>("all");
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_DEALS);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Reset active filter tab whenever anchor stay changes
+  // Reset active filter tab & viewport page count whenever anchor stay changes
   const anchorKey = anchorPin.id;
   const [lastAnchorKey, setLastAnchorKey] = useState(anchorKey);
   if (lastAnchorKey !== anchorKey) {
     setLastAnchorKey(anchorKey);
     setActiveTier("all");
+    setVisibleCount(INITIAL_VISIBLE_DEALS);
   }
 
   const primaryStyle = anchorPin.stayStyles[0] ?? null;
@@ -172,10 +178,32 @@ export function StayCascadingRecommendationsGrid({
     };
   }, [anchorPin, anchorProvince?.region, candidates, primaryStyle]);
 
-  if (orderedAll.length === 0) return null;
-
   const displayedDeals =
     activeTier === "all" ? orderedAll : buckets[activeTier] ?? orderedAll;
+  const renderedDeals = displayedDeals.slice(0, visibleCount);
+  const remainingDealsCount = Math.max(0, displayedDeals.length - renderedDeals.length);
+
+  // Progressive Viewport Pagination: reveal +12 cards as user scrolls near bottom sentinel
+  useEffect(() => {
+    if (remainingDealsCount <= 0) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((prev) =>
+            Math.min(displayedDeals.length, prev + DEALS_PAGE_INCREMENT)
+          );
+        }
+      },
+      { rootMargin: "420px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [displayedDeals.length, remainingDealsCount]);
+
+  if (orderedAll.length === 0) return null;
 
   const tierPills: Array<{ id: TierId; label: string; count: number }> = [
     {
@@ -280,7 +308,10 @@ export function StayCascadingRecommendationsGrid({
                 key={pill.id}
                 type="button"
                 aria-pressed={isActive}
-                onClick={() => setActiveTier(pill.id)}
+                onClick={() => {
+                  setActiveTier(pill.id);
+                  setVisibleCount(INITIAL_VISIBLE_DEALS);
+                }}
                 className={`h-9 px-3.5 rounded-[11px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors tabular-nums ${
                   isActive
                     ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
@@ -303,7 +334,7 @@ export function StayCascadingRecommendationsGrid({
 
       {/* Pure Vertical Grid: Mobile 2 cols -> Tablet 3-4 cols -> Desktop 5-6 cols matching Home 3:4 card width! */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
-        {displayedDeals.map((deal) => (
+        {renderedDeals.map((deal) => (
           <VerticalCouponCard
             key={`rec-${anchorPin.id}-${deal.id}`}
             pin={deal}
@@ -316,6 +347,27 @@ export function StayCascadingRecommendationsGrid({
           />
         ))}
       </div>
+
+      {remainingDealsCount > 0 && (
+        <div
+          ref={loadMoreSentinelRef}
+          className="pt-2 flex justify-center"
+        >
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((prev) =>
+                Math.min(displayedDeals.length, prev + DEALS_PAGE_INCREMENT)
+              )
+            }
+            className="h-10 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold cursor-pointer transition-colors tabular-nums"
+          >
+            {isTh
+              ? `ดูเพิ่มเติม (เหลืออีก ${remainingDealsCount} แห่ง)`
+              : `Load more (${remainingDealsCount} more)`}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

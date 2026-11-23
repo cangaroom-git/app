@@ -46,6 +46,8 @@ export async function GET(request: Request) {
     const maxPriceRaw = url.searchParams.get("maxPrice");
     const limitRaw = url.searchParams.get("limit");
     const tasteParam = url.searchParams.get("taste");
+    const compactRaw = url.searchParams.get("compact");
+    const compact = compactRaw === "1" || compactRaw === "true";
 
     const north = Number(url.searchParams.get("north"));
     const south = Number(url.searchParams.get("south"));
@@ -83,6 +85,7 @@ export async function GET(request: Request) {
       maxPriceThb: maxPriceRaw ? Number(maxPriceRaw) : null,
       bounds: hasBounds ? { north, south, east, west } : null,
       limit: limitRaw ? Math.min(Number(limitRaw) || 60, 100) : 60,
+      compact,
       userId: sessionUser?.id ?? null,
       visitorId,
       hasAnalyticsConsent: consent === "analytics",

@@ -4,6 +4,7 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 
 const CreatePinSchema = z.object({
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug, pinId: pin.id });
     return NextResponse.json({ pin }, { status: 201 });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -115,6 +117,7 @@ export async function PATCH(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug, pinId: updated.id });
     return NextResponse.json({ pin: updated });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -136,6 +139,7 @@ export async function DELETE(request: Request) {
       where: { id, hotelId: hotel.id },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug, pinId: id });
     return NextResponse.json({ deleted: true });
   } catch (err) {
     if (err instanceof StudioAuthError) {

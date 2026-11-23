@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const PRISMA_SCHEMA_VERSION = "2026-11-23-place-profile-card-v4";
+const PRISMA_SCHEMA_VERSION = "2026-11-23-location-configs-v5";
 
 const globalForPrisma = globalThis as unknown as {
   __cangaroomPrisma?: PrismaClient;
@@ -38,7 +38,8 @@ function getOrCreatePrismaClient(): PrismaClient {
     globalForPrisma.__cangaroomPgPoolSslNormalized &&
     globalForPrisma.__cangaroomPrismaSchemaVersion === PRISMA_SCHEMA_VERSION &&
     "hotelDiscountRule" in cachedPrisma &&
-    "placeReport" in cachedPrisma
+    "placeReport" in cachedPrisma &&
+    "provinceConfig" in cachedPrisma
   ) {
     return cachedPrisma;
   }
@@ -54,17 +55,27 @@ function getOrCreatePrismaClient(): PrismaClient {
 
   const connectionString = normalizePgConnectionString(rawConnectionString);
 
-  const pool =
+  let pool =
     globalForPrisma.__cangaroomPgPool &&
     globalForPrisma.__cangaroomPgPoolSslNormalized
       ? globalForPrisma.__cangaroomPgPool
-      : new Pool({
-          connectionString,
-          max: 8,
-          connectionTimeoutMillis: 8000,
-        });
+      : undefined;
 
-  if (process.env.NODE_ENV !== "production") {
+  if (!pool) {
+    pool = new Pool({
+      connectionString,
+      max: 20, // Supports parallel Promise.all RSC queries without pool starvation
+      connectionTimeoutMillis: 20000,
+      idleTimeoutMillis: 30000,
+      allowExitOnIdle: true,
+    });
+
+    // Prevent unexpected idle pg client disconnects from crashing serverless workers
+    pool.on("error", (err) => {
+      console.error("[pg.Pool] Unexpected error on idle pg client:", err);
+    });
+
+    // Cache unconditionally in BOTH dev and production so warm serverless workers reuse the pool
     globalForPrisma.__cangaroomPgPool = pool;
     globalForPrisma.__cangaroomPgPoolSslNormalized = true;
   }
@@ -72,10 +83,9 @@ function getOrCreatePrismaClient(): PrismaClient {
   const adapter = new PrismaPg(pool);
   const client = new PrismaClient({ adapter });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.__cangaroomPrisma = client;
-    globalForPrisma.__cangaroomPrismaSchemaVersion = PRISMA_SCHEMA_VERSION;
-  }
+  // Cache unconditionally in BOTH dev and production (fixes production per-query pool leak)
+  globalForPrisma.__cangaroomPrisma = client;
+  globalForPrisma.__cangaroomPrismaSchemaVersion = PRISMA_SCHEMA_VERSION;
 
   return client;
 }
@@ -87,3 +97,5 @@ export const prisma = new Proxy({} as PrismaClient, {
     return typeof value === "function" ? value.bind(instance) : value;
   },
 });
+
+export default prisma;

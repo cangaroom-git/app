@@ -15,7 +15,13 @@ export interface ExploreHorizontalCardStripProps {
   onSelectPin: (pin: PinFeedItemDto, originRect: CardOriginRect | null) => void;
   onHoverIndex?: (idx: number) => void;
   onToggleSavePin: (pin: PinFeedItemDto) => void;
+  /** Optional 1:1 vertical pull-down collapse handoff when dragging DOWN anywhere on cards in list mode */
+  onSheetPullMove?: (dy: number) => void;
+  onSheetPullEnd?: (dy: number, velocityY: number) => void;
 }
+
+const INITIAL_STRIP_CARDS = 16;
+const STRIP_CARDS_INCREMENT = 12;
 
 export function ExploreHorizontalCardStrip({
   deals,
@@ -25,6 +31,8 @@ export function ExploreHorizontalCardStrip({
   onSelectPin,
   onHoverIndex,
   onToggleSavePin,
+  onSheetPullMove,
+  onSheetPullEnd,
 }: ExploreHorizontalCardStripProps) {
   const isTh = language === "th";
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -37,14 +45,42 @@ export function ExploreHorizontalCardStrip({
 
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
+  const [visibleCount, setVisibleCount] = useState<number>(() =>
+    Math.max(INITIAL_STRIP_CARDS, activeIdx + 6)
+  );
+
+  // Ensure active card (e.g. from map pin click) is always within rendered window
+  useEffect(() => {
+    if (activeIdx + 4 > visibleCount) {
+      setVisibleCount((prev) =>
+        Math.min(deals.length, Math.max(prev, activeIdx + 8))
+      );
+    }
+  }, [activeIdx, deals.length, visibleCount]);
+
+  // Reset rendered window cleanly when deal set changes
+  useEffect(() => {
+    setVisibleCount(Math.min(deals.length, Math.max(INITIAL_STRIP_CARDS, activeIdx + 6)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealsKey]);
 
   const syncScrollButtons = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
     setCanScrollPrev(el.scrollLeft > 6);
-    setCanScrollNext(maxScroll > 6 && el.scrollLeft < maxScroll - 6);
-  }, []);
+    setCanScrollNext(
+      (maxScroll > 6 && el.scrollLeft < maxScroll - 6) ||
+        visibleCount < deals.length
+    );
+
+    // Progressive horizontal lazy reveal when user nears the right edge of rendered cards
+    if (visibleCount < deals.length && maxScroll - el.scrollLeft < 480) {
+      setVisibleCount((prev) =>
+        Math.min(deals.length, prev + STRIP_CARDS_INCREMENT)
+      );
+    }
+  }, [deals.length, visibleCount]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -119,6 +155,101 @@ export function ExploreHorizontalCardStrip({
     return () => window.clearTimeout(timer);
   }, [activeIdx, deals, dealsKey, syncScrollButtons]);
 
+  const onSheetPullMoveRef = useRef(onSheetPullMove);
+  onSheetPullMoveRef.current = onSheetPullMove;
+  const onSheetPullEndRef = useRef(onSheetPullEnd);
+  onSheetPullEndRef.current = onSheetPullEnd;
+
+  // Dual-axis native touch arbitrator on horizontal card track:
+  // - Horizontal swipe -> 100% locked native horizontal scroll (zero vertical wobble!)
+  // - Vertical downward drag -> prevents browser pull-to-refresh & collapses parent white dock sheet 1:1!
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let state: {
+      startX: number;
+      startY: number;
+      axis: "horizontal" | "vertical" | null;
+      samples: Array<{ y: number; t: number }>;
+    } | null = null;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (!t) return;
+      state = {
+        startX: t.clientX,
+        startY: t.clientY,
+        axis: null,
+        samples: [{ y: t.clientY, t: performance.now() }],
+      };
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!state || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (!t) return;
+
+      const dx = t.clientX - state.startX;
+      const dy = t.clientY - state.startY;
+      const now = performance.now();
+
+      if (state.axis === null) {
+        if (Math.abs(dx) > 6 && Math.abs(dx) >= Math.abs(dy) * 0.9) {
+          state.axis = "horizontal";
+        } else if (Math.abs(dy) > 7 && Math.abs(dy) > Math.abs(dx) * 1.15) {
+          state.axis = "vertical";
+        }
+      }
+
+      if (state.axis === "vertical") {
+        // Strictly block browser pull-to-refresh & vertical bounce!
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        state.samples.push({ y: t.clientY, t: now });
+        while (state.samples.length > 2 && now - state.samples[0].t > 105) {
+          state.samples.shift();
+        }
+        const resisted = dy < 0 ? dy * 0.28 : Math.min(280, dy);
+        onSheetPullMoveRef.current?.(resisted);
+      }
+    };
+
+    const finishTouch = (e: TouchEvent) => {
+      if (!state) return;
+      const st = state;
+      state = null;
+      if (st.axis !== "vertical") return;
+
+      const t = e.changedTouches[0];
+      const dy = t ? t.clientY - st.startY : 0;
+      const now = performance.now();
+      let vy = 0;
+      if (st.samples.length >= 2) {
+        const newest = st.samples[st.samples.length - 1];
+        if (now - newest.t < 90) {
+          const oldest = st.samples[0];
+          const dt = newest.t - oldest.t;
+          if (dt > 6) vy = (newest.y - oldest.y) / dt;
+        }
+      }
+      onSheetPullEndRef.current?.(dy, vy);
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", finishTouch, { passive: true });
+    el.addEventListener("touchcancel", finishTouch, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", finishTouch);
+      el.removeEventListener("touchcancel", finishTouch);
+    };
+  }, []);
+
   const handleStepScroll = useCallback((direction: -1 | 1) => {
     const el = scrollRef.current;
     if (!el) return;
@@ -146,15 +277,15 @@ export function ExploreHorizontalCardStrip({
           </button>
         )}
 
-        {/* Single-Row Horizontally Scrollable Card Track (Cleanly below rounded-t-[26px] header!) */}
+        {/* Single-Row Horizontally Scrollable Card Track (Strictly X-Locked: ZERO Vertical Wobble!) */}
         <div
           ref={scrollRef}
           onScroll={syncScrollButtons}
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          className="flex flex-nowrap items-start gap-3 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory w-full h-full px-4 sm:px-5 lg:px-5 scroll-px-4 sm:scroll-px-5 lg:scroll-px-5 pt-1 pb-3 sm:pt-1.5 sm:pb-3.5"
+          className="flex flex-nowrap items-start gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none touch-pan-x no-scrollbar snap-x snap-proximity lg:snap-mandatory w-full h-full px-4 sm:px-5 lg:px-5 scroll-px-4 sm:scroll-px-5 lg:scroll-px-5 pt-1 pb-2.5 sm:pt-1.5 sm:pb-3"
         >
-          {deals.map((deal, idx) => (
+          {deals.slice(0, visibleCount).map((deal, idx) => (
             <div
               key={deal.id}
               ref={(el) => {
@@ -171,7 +302,7 @@ export function ExploreHorizontalCardStrip({
                 language={language}
                 isSaved={savedPinIds.has(deal.id)}
                 isHighlighted={idx === activeIdx}
-                priority={idx < 7}
+                priority={idx < 2}
                 enablePhotoSlide={false}
                 onSelect={(p, rect) => onSelectPin(p, rect ?? null)}
                 onToggleSave={() => onToggleSavePin(deal)}

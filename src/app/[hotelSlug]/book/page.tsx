@@ -3,7 +3,10 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { addDaysToDate, formatDateStr } from "@/lib/bookingMath";
 import { getServerSessionUser } from "@/lib/auth/session";
-import { getHotelStorefrontBySlug } from "@/lib/services/hotelStorefrontService";
+import {
+  getHotelStorefrontBySlug,
+  getPlaceMetadataBySlug,
+} from "@/lib/services/hotelStorefrontService";
 import { HotelCheckoutClient } from "@/components/booking/HotelCheckoutClient";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +18,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { hotelSlug } = await params;
   const cleanSlug = (hotelSlug || "").trim().toLowerCase();
-  const storefront = await getHotelStorefrontBySlug(cleanSlug);
+  const hotel = await getPlaceMetadataBySlug(cleanSlug);
 
-  if (!storefront) {
+  if (!hotel) {
     return {
       title: "ยืนยันและชำระเงิน | Nondii",
       robots: { index: false, follow: false },
@@ -25,7 +28,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `ยืนยันการจอง · ${storefront.hotel.nameTh} | Nondii`,
+    title: `ยืนยันการจอง · ${hotel.nameTh} | Nondii`,
     robots: { index: false, follow: false },
   };
 }

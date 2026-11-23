@@ -1,13 +1,21 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Bookmark, FolderPlus, LogIn } from "lucide-react";
 import { useHotelApp } from "@/components/HotelAppShell";
-import { DeleteBoardConfirmModal } from "@/components/board/BoardActionModals";
 import { TripStackedCardFolder } from "@/components/trip/TripStackedCardFolder";
 import type { SavedBoardDto } from "@/types/cangaroom";
+
+const DeleteBoardConfirmModal = dynamic(
+  () =>
+    import("@/components/board/BoardActionModals").then(
+      (mod) => mod.DeleteBoardConfirmModal
+    ),
+  { ssr: false }
+);
 
 export default function TripPlannerPage() {
   const router = useRouter();
@@ -27,7 +35,12 @@ export default function TripPlannerPage() {
   const isTh = language === "th";
 
   const [tripToDelete, setTripToDelete] = useState<SavedBoardDto | null>(null);
+  const [hasMountedDeleteModal, setHasMountedDeleteModal] = useState(false);
   const [isDeletingTrip, setIsDeletingTrip] = useState(false);
+
+  useEffect(() => {
+    if (tripToDelete) setHasMountedDeleteModal(true);
+  }, [tripToDelete]);
 
   // Filter visible trips in View 1 if global search is active
   const visibleTrips = useMemo(() => {
@@ -202,7 +215,7 @@ export default function TripPlannerPage() {
               key={trip.id}
               board={trip}
               language={language}
-              priority={idx < 4}
+              priority={idx < 2}
               onOpenTrip={handleOpenTripFolder}
               onDeleteTrip={(b) => setTripToDelete(b)}
             />
@@ -210,13 +223,15 @@ export default function TripPlannerPage() {
         </div>
       )}
 
-      <DeleteBoardConfirmModal
-        board={tripToDelete}
-        language={language}
-        isDeleting={isDeletingTrip}
-        onClose={() => setTripToDelete(null)}
-        onConfirmDelete={handleConfirmDeleteTrip}
-      />
+      {(hasMountedDeleteModal || tripToDelete) && (
+        <DeleteBoardConfirmModal
+          board={tripToDelete}
+          language={language}
+          isDeleting={isDeletingTrip}
+          onClose={() => setTripToDelete(null)}
+          onConfirmDelete={handleConfirmDeleteTrip}
+        />
+      )}
     </div>
   );
 }

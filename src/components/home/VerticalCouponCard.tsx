@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import {
@@ -120,17 +119,9 @@ export const VerticalCouponCard = React.memo(function VerticalCouponCard({
   onMouseEnter,
   onMouseLeave,
 }: VerticalCouponCardProps) {
-  const router = useRouter();
   const cardMediaRef = useRef<HTMLDivElement | null>(null);
-  const prefetchedSlugRef = useRef<string | null>(null);
+  const [hasInteractedWithSlides, setHasInteractedWithSlides] = useState(false);
   const isTh = language === "th";
-
-  const triggerPrefetch = () => {
-    const slug = (pin.hotelSlug || "").trim();
-    if (!slug || prefetchedSlugRef.current === slug) return;
-    prefetchedSlugRef.current = slug;
-    router.prefetch(`/${encodeURIComponent(slug)}`);
-  };
 
   const measureMediaRect = (): CardOriginRect | null => {
     const el = cardMediaRef.current;
@@ -259,10 +250,12 @@ export const VerticalCouponCard = React.memo(function VerticalCouponCard({
         }
       }}
       onMouseEnter={() => {
-        triggerPrefetch();
+        if (!hasInteractedWithSlides) setHasInteractedWithSlides(true);
         onMouseEnter?.(pin);
       }}
-      onTouchStart={triggerPrefetch}
+      onTouchStart={() => {
+        if (!hasInteractedWithSlides) setHasInteractedWithSlides(true);
+      }}
       onMouseLeave={() => onMouseLeave?.()}
       aria-label={promoHeadline ? `${promoHeadline} — ${hotelName}` : hotelName}
       className="group relative flex flex-col w-full cursor-pointer select-none text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[20px]"
@@ -288,20 +281,29 @@ export const VerticalCouponCard = React.memo(function VerticalCouponCard({
             style={{ transform: `translate3d(-${slideIdx * 100}%, 0, 0)` }}
             className="flex h-full w-full transition-transform duration-300 ease-out"
           >
-            {photoSlides.map((url, idx) => (
-              <img
-                key={`${pin.id}-slide-${idx}`}
-                src={getOptimizedPinImageUrl(url, "card")}
-                srcSet={getOptimizedPinImageSrcSet(url, "card")}
-                sizes={PIN_IMAGE_SIZES.card}
-                alt={idx === 0 ? hotelName : `${hotelName} ${idx + 1}`}
-                loading={priority && idx === 0 ? "eager" : "lazy"}
-                fetchPriority={priority && idx === 0 ? "high" : "auto"}
-                decoding="async"
-                draggable={false}
-                className="h-full w-full shrink-0 object-cover object-center"
-              />
-            ))}
+            {photoSlides.map((url, idx) => {
+              const shouldRenderSlide =
+                idx === slideIdx || hasInteractedWithSlides;
+              return shouldRenderSlide ? (
+                <img
+                  key={`${pin.id}-slide-${idx}`}
+                  src={getOptimizedPinImageUrl(url, "card")}
+                  srcSet={getOptimizedPinImageSrcSet(url, "card")}
+                  sizes={PIN_IMAGE_SIZES.card}
+                  alt={idx === 0 ? hotelName : `${hotelName} ${idx + 1}`}
+                  loading={priority && idx === 0 ? "eager" : "lazy"}
+                  fetchPriority={priority && idx === 0 ? "high" : "auto"}
+                  decoding="async"
+                  draggable={false}
+                  className="h-full w-full shrink-0 object-cover object-center"
+                />
+              ) : (
+                <div
+                  key={`${pin.id}-slide-${idx}`}
+                  className="h-full w-full shrink-0 bg-[var(--color-background-muted)]"
+                />
+              );
+            })}
           </div>
         ) : (
           <img

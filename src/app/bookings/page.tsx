@@ -11,7 +11,6 @@ import {
   UserCheck,
 } from "lucide-react";
 import { formatShortDate } from "@/lib/dateFormatters";
-import { scanSlipQrFromFile, uploadMediaFile } from "@/lib/slipScanner";
 import { useHotelApp } from "@/components/HotelAppShell";
 import {
   BookingDigitalVoucherCard,
@@ -94,6 +93,10 @@ export default function BookingsAndAccountPage() {
   }, []);
 
   useEffect(() => {
+    if (!user?.id) {
+      setIsLoadingBookings(false);
+      return;
+    }
     loadBookings();
   }, [user?.id, loadBookings]);
 
@@ -129,6 +132,9 @@ export default function BookingsAndAccountPage() {
     setUploadingBookingId(bookingId);
     setSlipError(null);
     try {
+      const { scanSlipQrFromFile, uploadMediaFile } = await import(
+        "@/lib/slipScanner"
+      );
       const [qr, url] = await Promise.all([
         scanSlipQrFromFile(file),
         uploadMediaFile(file, "slips"),

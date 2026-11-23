@@ -807,3 +807,49 @@ model ThailandPlace {
   @@index([category, lat, lng])
   @@index([provinceId, category, popularityScore])
 }
+
+model RegionConfig {
+  id          String           @id
+  labelTh     String
+  labelEn     String
+  sortOrder   Int              @default(0)
+  centerLat   Float
+  centerLng   Float
+  southLat    Float
+  westLng     Float
+  northLat    Float
+  eastLng     Float
+  defaultZoom Float            @default(7.2)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  provinces   ProvinceConfig[]
+
+  @@index([isActive, sortOrder])
+}
+
+model ProvinceConfig {
+  id                String       @id
+  regionId          String
+  region            RegionConfig @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  nameTh            String
+  nameEn            String
+  shortNameTh       String
+  shortNameEn       String
+  isTouristHub      Boolean      @default(false)
+  regionSortOrder   Int          @default(0)
+  nationalSortOrder Int          @default(0)
+  centerLat         Float
+  centerLng         Float
+  southLat          Float
+  westLng           Float
+  northLat          Float
+  eastLng           Float
+  defaultZoom       Float        @default(9.6)
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([regionId, isActive, regionSortOrder])
+  @@index([isActive, nationalSortOrder])
+}

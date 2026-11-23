@@ -73,6 +73,7 @@ export default async function StyleCollectionPage({
   const [allCatalogPins, recentIds] = await Promise.all([
     searchDiscoveryPins({
       limit: 120,
+      compact: true,
       userId: sessionUser?.id ?? null,
       ...hints,
     }),

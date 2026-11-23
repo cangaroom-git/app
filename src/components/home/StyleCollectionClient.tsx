@@ -101,6 +101,9 @@ export interface StyleCollectionClientProps {
  *   Mobile = 2 columns (`grid-cols-2`) · Desktop = up to 5 columns (`lg:grid-cols-4 xl:grid-cols-5`)
  *   matching Home's exact warm minimal aesthetic & `cgr-page-wide` width!
  */
+const INITIAL_STYLE_CARDS = 18;
+const STYLE_CARDS_INCREMENT = 18;
+
 export function StyleCollectionClient({
   meta,
   initialCollectionPins,
@@ -127,6 +130,8 @@ export function StyleCollectionClient({
     meta.slug === "direct"
   );
   const [sortBy, setSortBy] = useState<SortOption>("recommended");
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_STYLE_CARDS);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // In-page Pin Detail state (preserves scroll position cleanly on back!)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
@@ -254,6 +259,39 @@ export function StyleCollectionClient({
     }
     return sorted;
   }, [baseCollectionDeals, directOnly, meta.slug, selectedProvince, sortBy]);
+
+  const renderedDeals = useMemo(
+    () => filteredDeals.slice(0, visibleCount),
+    [filteredDeals, visibleCount]
+  );
+  const remainingDealsCount = Math.max(
+    0,
+    filteredDeals.length - renderedDeals.length
+  );
+
+  // Reset pagination whenever filters/sort change
+  useEffect(() => {
+    setVisibleCount(INITIAL_STYLE_CARDS);
+  }, [meta.slug, selectedProvince, directOnly, sortBy]);
+
+  // Progressive Viewport Pagination via IntersectionObserver
+  useEffect(() => {
+    if (remainingDealsCount <= 0) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleCount((prev) =>
+            Math.min(filteredDeals.length, prev + STYLE_CARDS_INCREMENT)
+          );
+        }
+      },
+      { rootMargin: "420px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filteredDeals.length, remainingDealsCount]);
 
   // Contextual bridge href to "เที่ยวไหน" (/explore) carrying active style/province/source!
   const mapBridgeHref = useMemo(() => {
@@ -677,27 +715,53 @@ export function StyleCollectionClient({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4 pt-1">
-            {filteredDeals.map((deal, idx) => (
-              <VerticalCouponCard
-                key={deal.id}
-                pin={deal}
-                language={language}
-                priority={idx < 10}
-                isSaved={globalSavedPinIds.has(deal.id)}
-                enablePhotoSlide={true}
-                onSelect={(p, rect, ev) =>
-                  navigateToPlaceWithFlip({
-                    pin: p,
-                    originRect: rect,
-                    openInNewTab: Boolean(
-                      ev && "metaKey" in ev && (ev.metaKey || ev.ctrlKey)
-                    ),
-                  })
-                }
-                onToggleSave={handleToggleSave}
-              />
-            ))}
+          <div className="space-y-6 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
+              {renderedDeals.map((deal, idx) => (
+                <VerticalCouponCard
+                  key={deal.id}
+                  pin={deal}
+                  language={language}
+                  priority={idx < 4}
+                  isSaved={globalSavedPinIds.has(deal.id)}
+                  enablePhotoSlide={true}
+                  onSelect={(p, rect, ev) =>
+                    navigateToPlaceWithFlip({
+                      pin: p,
+                      originRect: rect,
+                      openInNewTab: Boolean(
+                        ev && "metaKey" in ev && (ev.metaKey || ev.ctrlKey)
+                      ),
+                    })
+                  }
+                  onToggleSave={handleToggleSave}
+                />
+              ))}
+            </div>
+
+            {remainingDealsCount > 0 && (
+              <div
+                ref={loadMoreSentinelRef}
+                className="flex justify-center pt-1"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVisibleCount((prev) =>
+                      Math.min(
+                        filteredDeals.length,
+                        prev + STYLE_CARDS_INCREMENT
+                      )
+                    )
+                  }
+                  className="h-10 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold cursor-pointer transition-colors tabular-nums"
+                >
+                  {isTh
+                    ? `ดูเพิ่มเติม (เหลืออีก ${remainingDealsCount} แห่ง)`
+                    : `Load more (${remainingDealsCount} more)`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

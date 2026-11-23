@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSessionUser } from "@/lib/auth/session";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 
 const PatchHotelStatusSchema = z.object({
@@ -80,6 +81,7 @@ export async function PATCH(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: updated.slug });
     return NextResponse.json({ hotel: updated });
   } catch (err) {
     console.error("[PATCH /api/super-admin/hotels]", err);

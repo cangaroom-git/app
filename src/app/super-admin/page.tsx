@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   BadgeCheck,
   Ban,
@@ -10,6 +11,7 @@ import {
   ExternalLink,
   Flame,
   LayoutDashboard,
+  MapPin,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -20,7 +22,22 @@ import { useHotelApp } from "@/components/HotelAppShell";
 import { StatusPill } from "@/components/ui/standards";
 import type { AppRole, VerificationStatusDto } from "@/types/cangaroom";
 
-type SuperTab = "hotels" | "ads" | "users";
+const SuperAdminLocationsManager = dynamic(
+  () =>
+    import("@/components/super-admin/SuperAdminLocationsManager").then(
+      (mod) => mod.SuperAdminLocationsManager
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-12 flex items-center justify-center">
+        <RefreshCw className="w-5 h-5 animate-spin text-[var(--color-text-secondary)]" />
+      </div>
+    ),
+  }
+);
+
+type SuperTab = "hotels" | "ads" | "users" | "locations";
 
 interface AdminHotelItem {
   id: string;
@@ -297,18 +314,33 @@ export default function SuperAdminConsolePage() {
               <Users className="w-4 h-4" />
               <span>ผู้ใช้งาน ({users.length})</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("locations")}
+              className={`py-3 -mb-px border-b-2 ty-body inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors ${
+                activeTab === "locations"
+                  ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                  : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              <span>จังหวัด &amp; ภาค (77)</span>
+            </button>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-[var(--color-text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาชื่อที่พัก / slug / email..."
-              className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] pl-9 pr-4 ty-body focus:outline-none"
-            />
-          </div>
+          {activeTab !== "locations" && (
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-[var(--color-text-secondary)] absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="ค้นหาชื่อที่พัก / slug / email..."
+                className="w-full h-10 rounded-[12px] bg-[var(--color-background-muted)] pl-9 pr-4 ty-body focus:outline-none"
+              />
+            </div>
+          )}
         </div>
 
         {/* TAB 1: HOTELS & VERIFIED KYC */}
@@ -521,6 +553,10 @@ export default function SuperAdminConsolePage() {
               </div>
             ))}
           </div>
+        )}
+        {/* TAB 4: REGIONS & 77 PROVINCES SORT / MAP BOUNDS */}
+        {activeTab === "locations" && (
+          <SuperAdminLocationsManager onNotice={showNotice} />
         )}
       </div>
     </div>

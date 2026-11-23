@@ -14,8 +14,10 @@ export async function generateMetadata({
 }: {
   params: Promise<{ tripId: string }>;
 }): Promise<Metadata> {
-  const { tripId } = await params;
-  const sessionUser = await getServerSessionUser();
+  const [{ tripId }, sessionUser] = await Promise.all([
+    params,
+    getServerSessionUser(),
+  ]);
   const lookup = await getTripBySlugOrId(tripId, sessionUser?.id ?? null);
 
   if (lookup.status !== "ok") {
@@ -57,8 +59,10 @@ export default async function PublicTripDetailPage({
 }: {
   params: Promise<{ tripId: string }>;
 }) {
-  const { tripId } = await params;
-  const sessionUser = await getServerSessionUser();
+  const [{ tripId }, sessionUser] = await Promise.all([
+    params,
+    getServerSessionUser(),
+  ]);
   const lookup = await getTripBySlugOrId(tripId, sessionUser?.id ?? null);
 
   if (lookup.status === "private") {

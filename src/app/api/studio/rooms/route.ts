@@ -6,6 +6,7 @@ import {
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
 import { normalizeHotelSlug } from "@/lib/bookingMath";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 import {
   MAX_PHOTOS_PER_ROOM,
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ room }, { status: 201 });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -160,6 +162,7 @@ export async function PATCH(request: Request) {
           })
         )
       );
+      revalidatePlaceCatalog({ slug: hotel.slug });
       return NextResponse.json({ reordered: true, orderedIds: uniqueIds });
     }
 
@@ -208,6 +211,7 @@ export async function PATCH(request: Request) {
       data: updateData,
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ room });
   } catch (err) {
     if (err instanceof StudioAuthError) {
@@ -231,6 +235,7 @@ export async function DELETE(request: Request) {
       where: { id, hotelId: hotel.id },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ deleted: true });
   } catch (err) {
     if (err instanceof StudioAuthError) {

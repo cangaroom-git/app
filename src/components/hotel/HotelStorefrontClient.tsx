@@ -56,23 +56,13 @@ import {
 import { useHotelApp } from "@/components/HotelAppShell";
 import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { MasonryGrid } from "@/components/home/MasonryGrid";
-import {
-  clearLastClickedPinOrigin,
-  PinterestPinCard,
-  PinterestPinDetail,
-} from "@/components/home/PinterestPinDetail";
+import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
 import { getRoomPhotoSpaceDef } from "@/lib/roomPhotoSpaces";
-import {
-  PureMediaViewer,
-  type PureMediaSlide,
-} from "@/components/media/PureMediaViewer";
+import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import { AirbnbStayCalendar } from "@/components/booking/AirbnbStayCalendar";
-import { ChooseRoomBottomSheet } from "@/components/booking/ChooseRoomBottomSheet";
 import { DesktopDateRangePopover } from "@/components/booking/DesktopDateRangePopover";
-import { MobileDateRangeSheet } from "@/components/booking/MobileDateRangeSheet";
 import { HotelChooseRoomSection } from "@/components/hotel/HotelChooseRoomSection";
 import { HotelInfoBottomSheet } from "@/components/hotel/HotelInfoBottomSheet";
-import { PlaceCommentsModal } from "@/components/hotel/PlaceCommentsModal";
 import { PlaceOnlyProfileBody } from "@/components/hotel/PlaceOnlyProfileBody";
 import { PlaceCategoryCrest } from "@/components/shared/PlaceCategoryCrest";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
@@ -84,13 +74,11 @@ import {
 } from "@/lib/placeNavigationStore";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import type { RouteHeroTargetRect } from "@/components/navigation/PlaceCardFlipOverlay";
-import {
-  RoomBookingDrawer,
-  selectBestEligibleCoupon,
-} from "@/components/drawers/RoomBookingDrawer";
 import { HotelCouponTicketCard } from "@/components/deals/HotelCouponTicketCard";
-import { ShareStayModal } from "@/components/shared/ShareStayModal";
-import { formatCouponDiscountHeadline } from "@/lib/couponHelpers";
+import {
+  formatCouponDiscountHeadline,
+  selectBestEligibleCoupon,
+} from "@/lib/couponHelpers";
 import { launchCouponFlyAnimation } from "@/lib/couponClaimAnimation";
 import { computeCouponDiscount } from "@/lib/bookingMath";
 import type {
@@ -101,6 +89,7 @@ import type {
   RoomAvailabilityDto,
 } from "@/types/cangaroom";
 
+// Code-split heavy on-demand storefront modals & MapLibre out of the initial /{hotelSlug} JS bundle!
 const HotelLocationMap = dynamic(
   () =>
     import("@/components/hotel/HotelLocationMap").then(
@@ -110,6 +99,87 @@ const HotelLocationMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full aspect-square sm:aspect-[16/9] lg:aspect-auto lg:h-[400px] rounded-[16px] bg-[var(--color-background-muted)]" />
+    ),
+  }
+);
+
+const MobileDateRangeSheet = dynamic(
+  () =>
+    import("@/components/booking/MobileDateRangeSheet").then(
+      (mod) => mod.MobileDateRangeSheet
+    ),
+  { ssr: false }
+);
+
+const ChooseRoomBottomSheet = dynamic(
+  () =>
+    import("@/components/booking/ChooseRoomBottomSheet").then(
+      (mod) => mod.ChooseRoomBottomSheet
+    ),
+  { ssr: false }
+);
+
+const RoomBookingDrawer = dynamic(
+  () =>
+    import("@/components/drawers/RoomBookingDrawer").then(
+      (mod) => mod.RoomBookingDrawer
+    ),
+  { ssr: false }
+);
+
+const PlaceCommentsModal = dynamic(
+  () =>
+    import("@/components/hotel/PlaceCommentsModal").then(
+      (mod) => mod.PlaceCommentsModal
+    ),
+  { ssr: false }
+);
+
+const PureMediaViewer = dynamic(
+  () =>
+    import("@/components/media/PureMediaViewer").then(
+      (mod) => mod.PureMediaViewer
+    ),
+  { ssr: false }
+);
+
+const ShareStayModal = dynamic(
+  () =>
+    import("@/components/shared/ShareStayModal").then(
+      (mod) => mod.ShareStayModal
+    ),
+  { ssr: false }
+);
+
+// Code-split 4,116-line PinterestPinDetail + Card out of initial /{hotelSlug} JS bundle (viewport-gated to #section-posts!)
+const PinterestPinCard = dynamic(
+  () =>
+    import("@/components/home/PinterestPinDetail").then(
+      (mod) => mod.PinterestPinCard
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full aspect-[3/4] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse" />
+    ),
+  }
+);
+
+const PinterestPinDetail = dynamic(
+  () =>
+    import("@/components/home/PinterestPinDetail").then(
+      (mod) => mod.PinterestPinDetail
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full min-h-[320px] flex items-center justify-center rounded-[16px] bg-[var(--color-background-muted)]">
+        <img
+          src="/brand/nondi-icon-with-text-black.svg"
+          alt="Nondii"
+          className="h-[30px] w-auto object-contain opacity-80 animate-pulse dark:invert"
+        />
+      </div>
     ),
   }
 );
@@ -264,6 +334,72 @@ export function HotelStorefrontClient({
   const heroMoreMenuRef = useRef<HTMLDivElement | null>(null);
   const mosaicPrimaryHeroRef = useRef<HTMLElement | null>(null);
   const mobileHeroStageRef = useRef<HTMLDivElement | null>(null);
+
+  // Viewport-gated MapLibre & Posts Masonry boot + Sticky lazy-mount flags for heavy on-demand modals (0 KB until needed!)
+  const locationSectionRef = useRef<HTMLElement | null>(null);
+  const [shouldMountLocationMap, setShouldMountLocationMap] = useState(false);
+  const [shouldMountPostsMasonry, setShouldMountPostsMasonry] = useState(false);
+  const [hasMountedBookingDrawer, setHasMountedBookingDrawer] = useState(false);
+  const [hasMountedChooseRoom, setHasMountedChooseRoom] = useState(false);
+  const [hasMountedMobileDate, setHasMountedMobileDate] = useState(false);
+  const [hasMountedCommentsModal, setHasMountedCommentsModal] = useState(false);
+  const [hasMountedShareModal, setHasMountedShareModal] = useState(false);
+
+  useEffect(() => {
+    if (shouldMountLocationMap) return;
+    const el = locationSectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setShouldMountLocationMap(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldMountLocationMap(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "520px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldMountLocationMap]);
+
+  useEffect(() => {
+    if (shouldMountPostsMasonry) return;
+    const el = postsMasonrySectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setShouldMountPostsMasonry(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldMountPostsMasonry(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "480px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldMountPostsMasonry]);
+
+  useEffect(() => {
+    if (isMobileDateSheetOpen) setHasMountedMobileDate(true);
+  }, [isMobileDateSheetOpen]);
+  useEffect(() => {
+    if (isChooseRoomSheetOpen) setHasMountedChooseRoom(true);
+  }, [isChooseRoomSheetOpen]);
+  useEffect(() => {
+    if (isBookingDrawerOpen) setHasMountedBookingDrawer(true);
+  }, [isBookingDrawerOpen]);
+  useEffect(() => {
+    if (isCommentsModalOpen) setHasMountedCommentsModal(true);
+  }, [isCommentsModalOpen]);
+  useEffect(() => {
+    if (isShareModalOpen) setHasMountedShareModal(true);
+  }, [isShareModalOpen]);
 
   useEffect(() => {
     setCanonicalComments(initialStorefront.pinComments ?? []);
@@ -1804,7 +1940,8 @@ export function HotelStorefrontClient({
                   srcSet={getOptimizedPinImageSrcSet(slide.url, "gallery")}
                   sizes={PIN_IMAGE_SIZES.gallery}
                   alt={slide.caption || `${hotel.nameTh} ${idx + 2}`}
-                  loading="eager"
+                  loading="lazy"
+                  fetchPriority="low"
                   decoding="async"
                   className="h-full w-full object-cover"
                 />
@@ -1881,7 +2018,8 @@ export function HotelStorefrontClient({
                   srcSet={getOptimizedPinImageSrcSet(slide.url, "gallery")}
                   sizes={PIN_IMAGE_SIZES.gallery}
                   alt={slide.caption || `${hotel.nameTh} ${idx + 2}`}
-                  loading="eager"
+                  loading="lazy"
+                  fetchPriority="low"
                   decoding="async"
                   className="h-full w-full object-cover"
                 />
@@ -1927,8 +2065,8 @@ export function HotelStorefrontClient({
                   srcSet={getOptimizedPinImageSrcSet(slide.url, "hero")}
                   sizes={PIN_IMAGE_SIZES.hero}
                   alt={slide.caption || `${hotel.nameTh} ${idx + 1}`}
-                  loading="eager"
-                  fetchPriority={idx === 0 ? "high" : "auto"}
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  fetchPriority={idx === 0 ? "high" : "low"}
                   decoding="async"
                   className="h-full w-full object-cover"
                 />
@@ -3153,7 +3291,7 @@ export function HotelStorefrontClient({
       <section
         ref={postsMasonrySectionRef}
         id="section-posts"
-        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [overflow-anchor:none]"
+        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [overflow-anchor:none] [content-visibility:auto] [contain-intrinsic-size:auto_560px]"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
@@ -3263,50 +3401,63 @@ export function HotelStorefrontClient({
         ) : (
           visibleGridPins.length > 0 && (
             <div className="space-y-6">
-              <MasonryGrid
-                items={visibleGridPins.map((p) => ({
-                  ...p,
-                  aspectClass: p.aspectRatio,
-                }))}
-                columnWidth={208}
-                gutter={16}
-                fitContainer={true}
-                renderItem={(pin) => (
-                  <PinterestPinCard
-                    pin={pin}
-                    language={language}
-                    isSaved={effectiveSavedPinIds.has(pin.id)}
-                    onSelectPin={handleSelectPinFromMasonry}
-                    onToggleSave={async (pinId) => {
-                      const target =
-                        storefront.pins.find((p) => p.id === pinId) ?? pin;
-                      const res = await triggerPinToBoard({
-                        id: target.id,
-                        coverImageUrl: target.coverImageUrl,
-                        isSavedByMe: effectiveSavedPinIds.has(target.id),
-                      });
-                      if (res) {
-                        setOptimisticSavedIds((prev) => {
-                          const next = new Set(prev);
-                          if (res.isSaved) next.add(pinId);
-                          else next.delete(pinId);
-                          return next;
+              {shouldMountPostsMasonry ? (
+                <MasonryGrid
+                  items={visibleGridPins.map((p) => ({
+                    ...p,
+                    aspectClass: p.aspectRatio,
+                  }))}
+                  columnWidth={208}
+                  gutter={16}
+                  fitContainer={true}
+                  renderItem={(pin) => (
+                    <PinterestPinCard
+                      pin={pin}
+                      language={language}
+                      isSaved={effectiveSavedPinIds.has(pin.id)}
+                      onSelectPin={handleSelectPinFromMasonry}
+                      onToggleSave={async (pinId) => {
+                        const target =
+                          storefront.pins.find((p) => p.id === pinId) ?? pin;
+                        const res = await triggerPinToBoard({
+                          id: target.id,
+                          coverImageUrl: target.coverImageUrl,
+                          isSavedByMe: effectiveSavedPinIds.has(target.id),
                         });
-                      }
-                    }}
-                    onToggleLike={(pinId) => {
-                      const target =
-                        storefront.pins.find((p) => p.id === pinId) ?? pin;
-                      togglePinLikeInstant({
-                        id: target.id,
-                        isLikedByMe: target.isLikedByMe,
-                        likesCount: target.likesCount,
-                      });
-                    }}
-                    onSharePin={handleSharePin}
-                  />
-                )}
-              />
+                        if (res) {
+                          setOptimisticSavedIds((prev) => {
+                            const next = new Set(prev);
+                            if (res.isSaved) next.add(pinId);
+                            else next.delete(pinId);
+                            return next;
+                          });
+                        }
+                      }}
+                      onToggleLike={(pinId) => {
+                        const target =
+                          storefront.pins.find((p) => p.id === pinId) ?? pin;
+                        togglePinLikeInstant({
+                          id: target.id,
+                          isLikedByMe: target.isLikedByMe,
+                          likesCount: target.likesCount,
+                        });
+                      }}
+                      onSharePin={handleSharePin}
+                    />
+                  )}
+                />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {Array.from({ length: Math.min(4, visibleGridPins.length) }).map(
+                    (_, i) => (
+                      <div
+                        key={i}
+                        className="aspect-[3/4] rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+                      />
+                    )
+                  )}
+                </div>
+              )}
 
               {masonrySectionPins.length > 6 && (
                 <div>
@@ -3333,7 +3484,7 @@ export function HotelStorefrontClient({
       {/* 4B. GUEST REVIEWS (#section-reviews — Mobile Horizontal Carousel / Desktop 2-Col Editorial Grid) */}
       <section
         id="section-reviews"
-        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
+        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [content-visibility:auto] [contain-intrinsic-size:auto_420px]"
       >
         <div className="flex items-center gap-2.5">
           <Star className="w-6 h-6 fill-current text-[var(--color-text-primary)]" />
@@ -3452,8 +3603,9 @@ export function HotelStorefrontClient({
         )}
       </section>
 
-      {/* 4C. LOCATION & INTERACTIVE EXPLORER MAP (#section-location — Square Mobile + Fullscreen Modal) */}
+      {/* 4C. LOCATION & INTERACTIVE EXPLORER MAP (#section-location — Viewport-Gated MapLibre Boot!) */}
       <section
+        ref={locationSectionRef}
         id="section-location"
         className="py-12 border-t border-[var(--color-border)] space-y-5 scroll-mt-20 lg:scroll-mt-32"
       >
@@ -3468,24 +3620,28 @@ export function HotelStorefrontClient({
           </div>
         </div>
 
-        <HotelLocationMap
-          hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
-          addressText={hotel.addressTh}
-          districtText={hotel.districtTh}
-          provinceText={hotel.provinceNameTh}
-          latitude={hotel.latitude}
-          longitude={hotel.longitude}
-          googleMapsUrl={hotel.googleMapsUrl}
-          nearbySpots={hotel.nearbySpots}
-          language={language}
-        />
+        {shouldMountLocationMap ? (
+          <HotelLocationMap
+            hotelName={language === "th" ? hotel.nameTh : hotel.nameEn}
+            addressText={hotel.addressTh}
+            districtText={hotel.districtTh}
+            provinceText={hotel.provinceNameTh}
+            latitude={hotel.latitude}
+            longitude={hotel.longitude}
+            googleMapsUrl={hotel.googleMapsUrl}
+            nearbySpots={hotel.nearbySpots}
+            language={language}
+          />
+        ) : (
+          <div className="w-full aspect-square sm:aspect-[16/9] lg:aspect-auto lg:h-[400px] rounded-[16px] bg-[var(--color-background-muted)]" />
+        )}
       </section>
 
       {/* 4D. HOTEL GUIDES / BLOG (#section-blog — Mobile Snap Carousel / Desktop 3-Col Grid) */}
       {posts.length > 0 && (
         <section
           id="section-blog"
-          className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
+          className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [content-visibility:auto] [contain-intrinsic-size:auto_480px]"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="ty-title text-[var(--color-text-primary)]">
@@ -3579,7 +3735,7 @@ export function HotelStorefrontClient({
       {!nearbyHopOrigin && nearbyPlaces.length > 0 && (
         <section
           id="section-nearby"
-          className="py-10 border-t border-[var(--color-border)] space-y-4 scroll-mt-20 lg:scroll-mt-32"
+          className="py-10 border-t border-[var(--color-border)] space-y-4 scroll-mt-20 lg:scroll-mt-32 [content-visibility:auto] [contain-intrinsic-size:auto_400px]"
         >
           <div className="space-y-0.5">
             <h2 className="ty-title text-[var(--color-text-primary)]">
@@ -3619,7 +3775,7 @@ export function HotelStorefrontClient({
       {/* 4E. THINGS TO KNOW / POLICIES & FAQS (#section-policies — Mobile Tappable Rows + Bottom Sheets / Desktop 3-Column) */}
       <section
         id="section-policies"
-        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32"
+        className="py-12 border-t border-[var(--color-border)] space-y-6 scroll-mt-20 lg:scroll-mt-32 [content-visibility:auto] [contain-intrinsic-size:auto_320px]"
       >
         <h2 className="ty-title text-[var(--color-text-primary)]">
           {language === "th" ? "ข้อควรรู้ก่อนเข้าพัก" : "Things to know"}
@@ -4288,30 +4444,34 @@ export function HotelStorefrontClient({
         </div>
       )}
 
-      {/* Mobile Vertical Multi-Month Date Picker Sheet with "Load more dates" (Airbnb Screenshot 4) */}
-      <MobileDateRangeSheet
-        isOpen={isMobileDateSheetOpen}
-        onClose={() => setIsMobileDateSheetOpen(false)}
-        language={language}
-        todayDate={today}
-        initialCheckIn={checkIn}
-        initialCheckOut={checkOut}
-        hasConfirmedDates={hasConfirmedDates}
-        guests={guests}
-        rooms={rooms}
-        bookedUnitsByRoomDate={bookedUnitsByRoomDate}
-        dateOverrides={dateOverrides}
-        minPriceThb={minRoomPrice}
-        ratingAvg={hotel.ratingAvg}
-        specificRoomId={
-          !isMultiRoomHotel ? singleUnitRoom?.id ?? null : datePickerScopeRoomId
-        }
-        onSaveDates={handleCommitStayDates}
-        onClearDates={handleClearStayDates}
-      />
+      {/* Mobile Vertical Multi-Month Date Picker Sheet with "Load more dates" (Lazy-mounted on first open) */}
+      {(hasMountedMobileDate || isMobileDateSheetOpen) && (
+        <MobileDateRangeSheet
+          isOpen={isMobileDateSheetOpen}
+          onClose={() => setIsMobileDateSheetOpen(false)}
+          language={language}
+          todayDate={today}
+          initialCheckIn={checkIn}
+          initialCheckOut={checkOut}
+          hasConfirmedDates={hasConfirmedDates}
+          guests={guests}
+          rooms={rooms}
+          bookedUnitsByRoomDate={bookedUnitsByRoomDate}
+          dateOverrides={dateOverrides}
+          minPriceThb={minRoomPrice}
+          ratingAvg={hotel.ratingAvg}
+          specificRoomId={
+            !isMultiRoomHotel
+              ? singleUnitRoom?.id ?? null
+              : datePickerScopeRoomId
+          }
+          onSaveDates={handleCommitStayDates}
+          onClearDates={handleClearStayDates}
+        />
+      )}
 
-      {/* Multi-Room Hotel "Choose your room" Slide-Up Bottom Sheet / Desktop Modal (Airbnb Screenshot 6) */}
-      {isMultiRoomHotel && (
+      {/* Multi-Room Hotel "Choose your room" Slide-Up Bottom Sheet / Desktop Modal (Lazy-mounted on first open) */}
+      {isMultiRoomHotel && (hasMountedChooseRoom || isChooseRoomSheetOpen) && (
         <ChooseRoomBottomSheet
           isOpen={isChooseRoomSheetOpen}
           onClose={() => setIsChooseRoomSheetOpen(false)}
@@ -4335,54 +4495,56 @@ export function HotelStorefrontClient({
         />
       )}
 
-      {/* Airbnb-Grade Centered Split Room Modal (Desktop Left Switcher Rail / Mobile Bottom Sheet) */}
-      <RoomBookingDrawer
-        isOpen={isBookingDrawerOpen}
-        onClose={() => setIsBookingDrawerOpen(false)}
-        hotel={hotel}
-        rooms={rooms}
-        selectedRoom={drawerRoom || rooms[0] || null}
-        onSelectRoom={(rm) => {
-          setDrawerRoom(rm);
-          setSelectedRoomId(rm.id);
-        }}
-        dateOverrides={dateOverrides}
-        coupons={coupons}
-        discountRules={discountRules}
-        language={language}
-        checkInDate={checkIn}
-        checkOutDate={checkOut}
-        guests={guests}
-        hasConfirmedDates={hasConfirmedDates}
-        fallbackCoverUrl={coverBannerUrl}
-        onExpandPhotos={(urls, idx) =>
-          setFullscreenMedia({
-            slides: urls.map((u) => ({ type: "image", url: u })),
-            index: idx,
-          })
-        }
-        onProceedToCheckout={(rm) => {
-          setIsBookingDrawerOpen(false);
-          setIsChooseRoomSheetOpen(false);
-          navigateToCheckout(rm);
-        }}
-        onCheckRoomDates={(rm) => {
-          setSelectedRoomId(rm.id);
-          setCalendarRoomFilterId(rm.id);
-          if (!isMultiRoomHotel && isDesktopViewport) {
-            scrollToCalendarSection();
-          } else {
-            openDatePicker("checkin", isMultiRoomHotel ? null : rm.id);
+      {/* Airbnb-Grade Centered Split Room Modal (Lazy-mounted on first open) */}
+      {(hasMountedBookingDrawer || isBookingDrawerOpen) && (
+        <RoomBookingDrawer
+          isOpen={isBookingDrawerOpen}
+          onClose={() => setIsBookingDrawerOpen(false)}
+          hotel={hotel}
+          rooms={rooms}
+          selectedRoom={drawerRoom || rooms[0] || null}
+          onSelectRoom={(rm) => {
+            setDrawerRoom(rm);
+            setSelectedRoomId(rm.id);
+          }}
+          dateOverrides={dateOverrides}
+          coupons={coupons}
+          discountRules={discountRules}
+          language={language}
+          checkInDate={checkIn}
+          checkOutDate={checkOut}
+          guests={guests}
+          hasConfirmedDates={hasConfirmedDates}
+          fallbackCoverUrl={coverBannerUrl}
+          onExpandPhotos={(urls, idx) =>
+            setFullscreenMedia({
+              slides: urls.map((u) => ({ type: "image", url: u })),
+              index: idx,
+            })
           }
-        }}
-        onAutoExtendMinNights={(minNights) =>
-          handleCommitStayDates(checkIn, addDaysToDate(checkIn, minNights))
-        }
-      />
+          onProceedToCheckout={(rm) => {
+            setIsBookingDrawerOpen(false);
+            setIsChooseRoomSheetOpen(false);
+            navigateToCheckout(rm);
+          }}
+          onCheckRoomDates={(rm) => {
+            setSelectedRoomId(rm.id);
+            setCalendarRoomFilterId(rm.id);
+            if (!isMultiRoomHotel && isDesktopViewport) {
+              scrollToCalendarSection();
+            } else {
+              openDatePicker("checkin", isMultiRoomHotel ? null : rm.id);
+            }
+          }}
+          onAutoExtendMinNights={(minNights) =>
+            handleCommitStayDates(checkIn, addDaysToDate(checkIn, minNights))
+          }
+        />
+      )}
         </>
       )}
 
-      {canonicalPin && (
+      {canonicalPin && (hasMountedCommentsModal || isCommentsModalOpen) && (
         <PlaceCommentsModal
           isOpen={isCommentsModalOpen}
           onClose={() => setIsCommentsModalOpen(false)}
@@ -4405,35 +4567,39 @@ export function HotelStorefrontClient({
         />
       )}
 
-      <PureMediaViewer
-        slides={fullscreenMedia?.slides ?? null}
-        initialIndex={fullscreenMedia?.index ?? 0}
-        onClose={() => setFullscreenMedia(null)}
-      />
+      {fullscreenMedia && (
+        <PureMediaViewer
+          slides={fullscreenMedia.slides}
+          initialIndex={fullscreenMedia.index}
+          onClose={() => setFullscreenMedia(null)}
+        />
+      )}
 
-      <ShareStayModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        language={language}
-        shareUrl={
-          typeof window !== "undefined"
-            ? `${window.location.origin}/${encodeURIComponent(hotel.slug)}`
-            : `/${encodeURIComponent(hotel.slug)}`
-        }
-        title={language === "th" ? hotel.nameTh : hotel.nameEn}
-        subtitle={[
-          language === "th" ? hotel.provinceNameTh : hotel.provinceNameEn,
-          hotel.ratingAvg > 0 ? `★ ${hotel.ratingAvg.toFixed(1)}` : null,
-          minRoomPrice > 0
-            ? language === "th"
-              ? `เริ่มต้น ฿${minRoomPrice.toLocaleString()}/คืน`
-              : `from ฿${minRoomPrice.toLocaleString()}/night`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-        imageUrl={getOptimizedPinImageUrl(coverBannerUrl, "card")}
-      />
+      {(hasMountedShareModal || isShareModalOpen) && (
+        <ShareStayModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          language={language}
+          shareUrl={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/${encodeURIComponent(hotel.slug)}`
+              : `/${encodeURIComponent(hotel.slug)}`
+          }
+          title={language === "th" ? hotel.nameTh : hotel.nameEn}
+          subtitle={[
+            language === "th" ? hotel.provinceNameTh : hotel.provinceNameEn,
+            hotel.ratingAvg > 0 ? `★ ${hotel.ratingAvg.toFixed(1)}` : null,
+            minRoomPrice > 0
+              ? language === "th"
+                ? `เริ่มต้น ฿${minRoomPrice.toLocaleString()}/คืน`
+                : `from ฿${minRoomPrice.toLocaleString()}/night`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          imageUrl={getOptimizedPinImageUrl(coverBannerUrl, "card")}
+        />
+      )}
     </div>
   );
 }

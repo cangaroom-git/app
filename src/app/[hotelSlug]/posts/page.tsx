@@ -112,7 +112,7 @@ export default async function HotelBlogIndexPage({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
-          {posts.map((post) => (
+          {posts.map((post, idx) => (
             <article
               key={post.id}
               className="h-full rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col justify-between"
@@ -120,11 +120,14 @@ export default async function HotelBlogIndexPage({
               <div>
                 <Link
                   href={`/${hotel.slug}/posts/${post.slug}`}
+                  prefetch={false}
                   className="block relative h-48 bg-[var(--color-background-muted)] overflow-hidden"
                 >
                   <img
                     src={post.coverImageUrl}
                     alt={post.titleTh}
+                    loading={idx < 3 ? "eager" : "lazy"}
+                    decoding="async"
                     className="h-full w-full object-cover"
                   />
                   <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold">

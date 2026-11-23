@@ -6,6 +6,7 @@ import {
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
 import { addDaysToDate, formatDateStr, listDatesInRange } from "@/lib/bookingMath";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 import {
   compareSeasonalRulePriority,
@@ -306,6 +307,7 @@ export async function POST(request: Request) {
         }
       }
       await writeHotelSeasonalRulesJson(hotel.id, reordered);
+      revalidatePlaceCatalog({ slug: hotel.slug });
       return NextResponse.json({
         rules: reordered,
         reordered: true,
@@ -320,6 +322,7 @@ export async function POST(request: Request) {
       nextRules,
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({
       rules: nextRules,
       synced: true,

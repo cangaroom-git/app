@@ -4,6 +4,7 @@ import {
   requireHotelStudioAccess,
   StudioAuthError,
 } from "@/lib/auth/studioAccess";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 
 const ReplySchema = z.object({
@@ -38,6 +39,7 @@ export async function PATCH(request: Request) {
       },
     });
 
+    revalidatePlaceCatalog({ slug: hotel.slug });
     return NextResponse.json({ review: updated });
   } catch (err) {
     if (err instanceof StudioAuthError) {

@@ -13,20 +13,25 @@ import dynamic from "next/dynamic";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
+  ChevronDown,
   ChevronUp,
   Crosshair,
   Globe,
   Layers,
   LayoutGrid,
   Loader2,
+  MapPin,
   Minus,
   Plus,
   Shuffle,
   SlidersHorizontal,
-  Sparkles,
   X,
 } from "lucide-react";
 import { STAY_STYLE_TABS } from "@/data/thailandProvinces";
+import {
+  DEFAULT_PROVINCE_CONFIGS,
+  DEFAULT_REGION_CONFIGS,
+} from "@/data/thailandProvinceBounds";
 import { StandardCheckbox } from "@/components/ui/standards";
 import {
   getRecentViewedPinIds,
@@ -79,6 +84,19 @@ import type {
   PinFeedItemDto,
   PlaceCategoryDto,
 } from "@/types/cangaroom";
+import type { LocationCatalogDto } from "@/lib/services/locationConfigService";
+import type {
+  LocationScopeId,
+  ProvincePickerSelection,
+} from "@/components/explore/ProvinceWheelPickerModal";
+
+const ProvinceWheelPickerModal = dynamic(
+  () =>
+    import("@/components/explore/ProvinceWheelPickerModal").then(
+      (mod) => mod.ProvinceWheelPickerModal
+    ),
+  { ssr: false }
+);
 
 const PinterestPinDetail = dynamic(
   () =>
@@ -255,7 +273,9 @@ export interface ExploreMapClientProps {
   initialStyle?: string;
   initialCategory?: PlaceCategoryDto | "ALL";
   initialSource?: DealSourceFilter;
+  initialRegion?: LocationScopeId;
   initialProvince?: string | null;
+  locationCatalog?: LocationCatalogDto;
   initialRecentOnly?: boolean;
   initialRecentPinIds?: string[];
   initialQuery?: string;
@@ -267,7 +287,9 @@ export function ExploreMapClient({
   initialStyle = "all",
   initialCategory = "ALL",
   initialSource = "ALL",
+  initialRegion = "all",
   initialProvince = null,
+  locationCatalog,
   initialRecentOnly = false,
   initialRecentPinIds = [],
   initialQuery = "",
@@ -288,6 +310,29 @@ export function ExploreMapClient({
   const isTh = language === "th";
   const isDark = theme === "dark";
 
+  const resolvedLocationCatalog = useMemo<LocationCatalogDto>(
+    () =>
+      locationCatalog ?? {
+        regions: DEFAULT_REGION_CONFIGS.map((r) => ({ ...r, isActive: true })),
+        provinces: DEFAULT_PROVINCE_CONFIGS.map((p) => ({
+          ...p,
+          isActive: true,
+          placeCount: 0,
+        })),
+      },
+    [locationCatalog]
+  );
+
+  const provinceById = useMemo(
+    () => new Map(resolvedLocationCatalog.provinces.map((p) => [p.id, p])),
+    [resolvedLocationCatalog.provinces]
+  );
+
+  const regionById = useMemo(
+    () => new Map(resolvedLocationCatalog.regions.map((r) => [r.id, r])),
+    [resolvedLocationCatalog.regions]
+  );
+
   const [allDeals, setAllDeals] = useState<PinFeedItemDto[]>(() =>
     dedupeDealsByHotel(initialDeals)
   );
@@ -300,6 +345,28 @@ export function ExploreMapClient({
   const [provinceFilter, setProvinceFilter] = useState<string | null>(
     initialProvince
   );
+  const [regionFilter, setRegionFilter] = useState<LocationScopeId>(() => {
+    if (initialRegion === "tourist") return "tourist";
+    if (initialProvince) {
+      const matched = resolvedLocationCatalog.provinces.find(
+        (p) => p.id === initialProvince
+      );
+      if (matched) {
+        return initialRegion !== "all" ? initialRegion : matched.regionId;
+      }
+    }
+    return initialRegion;
+  });
+  const [isProvincePickerOpen, setIsProvincePickerOpen] = useState(false);
+  const [hasMountedProvincePicker, setHasMountedProvincePicker] =
+    useState(false);
+  const fetchedProvincesRef = useRef<Set<string>>(
+    new Set(initialProvince ? [initialProvince] : [])
+  );
+  const handleOpenProvincePicker = useCallback(() => {
+    setHasMountedProvincePicker(true);
+    setIsProvincePickerOpen(true);
+  }, []);
   const [recentOnly, setRecentOnly] = useState<boolean>(initialRecentOnly);
   const [recentPinIds, setRecentPinIds] =
     useState<string[]>(initialRecentPinIds);
@@ -395,6 +462,7 @@ export function ExploreMapClient({
     >
   >(new Map());
   const lodRafRef = useRef<number | null>(null);
+  const lastLodSyncMsRef = useRef<number>(0);
   const syncMarkersLodRef = useRef<() => void>(() => {});
   const userLocationMarkerRef = useRef<maplibregl.Marker | null>(null);
   const isProgrammaticCameraRef = useRef(false);
@@ -438,7 +506,7 @@ export function ExploreMapClient({
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (fullscreenMedia) return;
+      if (fullscreenMedia || isProvincePickerOpen) return;
       if (isFilterModalOpen) {
         e.preventDefault();
         setIsFilterModalOpen(false);
@@ -452,15 +520,13 @@ export function ExploreMapClient({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [detailOpenSource, fullscreenMedia, isFilterModalOpen, selectedPinId]);
-
-  // Preload PinterestPinDetail chunk silently so tapping any card flips instantaneously!
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void import("@/components/home/PinterestPinDetail");
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, []);
+  }, [
+    detailOpenSource,
+    fullscreenMedia,
+    isFilterModalOpen,
+    isProvincePickerOpen,
+    selectedPinId,
+  ]);
 
   // Synchronously restore exact view mode, hidden state, active card & 1:1 card order BEFORE first paint on Back!
   useLayoutEffect(() => {
@@ -527,6 +593,34 @@ export function ExploreMapClient({
       setDeckViewMode(savedMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Lock root viewport overscroll while on /explore so pulling cards down NEVER triggers browser pull-to-refresh or page bounce!
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overscrollBehavior;
+    const prevBody = body.style.overscrollBehavior;
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      html.style.overscrollBehavior = prevHtml;
+      body.style.overscrollBehavior = prevBody;
+    };
+  }, []);
+
+  const handleSheetPullMove = useCallback((dy: number) => {
+    setIsDraggingSheet(true);
+    setSheetDragDy(dy);
+  }, []);
+
+  const handleSheetPullEnd = useCallback((dy: number, vy: number) => {
+    setIsDraggingSheet(false);
+    setSheetDragDy(0);
+    if (dy >= 48 || (dy >= 20 && vy > 0.32)) {
+      setIsDeckHidden(true);
+    }
   }, []);
 
   // Persist user's chosen Fan <-> Horizontal Row mode across navigations
@@ -650,6 +744,13 @@ export function ExploreMapClient({
         return false;
       }
       if (provinceFilter && d.provinceId !== provinceFilter) return false;
+      if (!provinceFilter && regionFilter === "tourist") {
+        const provMeta = provinceById.get(d.provinceId);
+        if (!provMeta || !provMeta.isTouristHub) return false;
+      } else if (!provinceFilter && regionFilter !== "all") {
+        const provMeta = provinceById.get(d.provinceId);
+        if (!provMeta || provMeta.regionId !== regionFilter) return false;
+      }
       if (q) {
         const hay =
           `${d.hotelNameTh} ${d.hotelNameEn} ${d.provinceNameTh} ${d.provinceNameEn} ${d.hotelDistrictTh} ${d.titleTh} ${d.externalSourceName || ""} ${d.promoHeadlineTh || ""}`.toLowerCase();
@@ -675,6 +776,8 @@ export function ExploreMapClient({
     sourceFilter,
     activeStyle,
     provinceFilter,
+    regionFilter,
+    provinceById,
     globalSearchQuery,
   ]);
 
@@ -824,9 +927,6 @@ export function ExploreMapClient({
   const attributeFilteredDealsRef = useRef(attributeFilteredDeals);
   attributeFilteredDealsRef.current = attributeFilteredDeals;
 
-  const isEmptyMapZone = visibleDeals.length === 0;
-  const emptyZonePresence = useModalPresence(isEmptyMapZone, 240);
-
   const getMapCameraPadding = useCallback(() => {
     const containerH = mapContainerRef.current?.clientHeight ?? 540;
     const isDesktop =
@@ -837,7 +937,7 @@ export function ExploreMapClient({
         right: 84,
         bottom: isDeckHiddenRef.current
           ? 56
-          : Math.min(Math.round(containerH * 0.48), 276),
+          : Math.min(Math.round(containerH * 0.49), 296),
         left: 64,
       };
     }
@@ -845,7 +945,7 @@ export function ExploreMapClient({
       typeof window !== "undefined" ? window.innerWidth >= 640 : false;
     const mobileBottom = isDeckHiddenRef.current
       ? 92
-      : Math.min(Math.round(containerH * 0.52), isTablet ? 348 : 308);
+      : Math.min(Math.round(containerH * 0.54), isTablet ? 370 : 326);
     return {
       top: 72,
       right: 56,
@@ -962,6 +1062,167 @@ export function ExploreMapClient({
     [getMapCameraPadding]
   );
 
+  // Smooth Camera Focus to Selected Province or Region (ZERO setMaxBounds -> user can pan freely anywhere!)
+  const flyMapToLocation = useCallback(
+    (selection: ProvincePickerSelection, animate = true) => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      const padding = getMapCameraPadding();
+      userGestureActiveRef.current = false;
+      isProgrammaticCameraRef.current = true;
+
+      if (selection.provinceId) {
+        const prov = provinceById.get(selection.provinceId);
+        if (prov) {
+          const bounds = new maplibregl.LngLatBounds(
+            [prov.westLng, prov.southLat],
+            [prov.eastLng, prov.northLat]
+          );
+          const cam = map.cameraForBounds(bounds, {
+            padding,
+            maxZoom: Math.max(prov.defaultZoom, 12.2),
+          });
+          if (cam && cam.center && typeof cam.zoom === "number") {
+            map.easeTo({
+              center: cam.center,
+              zoom: Math.max(7.0, Math.min(13.2, cam.zoom)),
+              padding: { top: 0, right: 0, bottom: 0, left: 0 },
+              duration: animate ? 740 : 0,
+              easing: easeOutCubic,
+              essential: true,
+            });
+            return;
+          }
+          map.easeTo({
+            center: [prov.centerLng, prov.centerLat],
+            zoom: prov.defaultZoom,
+            padding: { top: 0, right: 0, bottom: 0, left: 0 },
+            offset: [0, -Math.round((padding.bottom - padding.top) * 0.42)],
+            duration: animate ? 740 : 0,
+            easing: easeOutCubic,
+            essential: true,
+          });
+          return;
+        }
+      }
+
+      if (selection.regionId !== "all" && selection.regionId !== "tourist") {
+        const reg = regionById.get(selection.regionId);
+        if (reg) {
+          const bounds = new maplibregl.LngLatBounds(
+            [reg.westLng, reg.southLat],
+            [reg.eastLng, reg.northLat]
+          );
+          const cam = map.cameraForBounds(bounds, {
+            padding,
+            maxZoom: Math.max(reg.defaultZoom, 9.2),
+          });
+          if (cam && cam.center && typeof cam.zoom === "number") {
+            map.easeTo({
+              center: cam.center,
+              zoom: Math.max(5.4, Math.min(9.5, cam.zoom)),
+              padding: { top: 0, right: 0, bottom: 0, left: 0 },
+              duration: animate ? 740 : 0,
+              easing: easeOutCubic,
+              essential: true,
+            });
+            return;
+          }
+          map.easeTo({
+            center: [reg.centerLng, reg.centerLat],
+            zoom: reg.defaultZoom,
+            padding: { top: 0, right: 0, bottom: 0, left: 0 },
+            duration: animate ? 740 : 0,
+            easing: easeOutCubic,
+            essential: true,
+          });
+          return;
+        }
+      }
+
+      map.easeTo({
+        center: THAILAND_DEFAULT_CENTER,
+        zoom: THAILAND_DEFAULT_ZOOM,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        duration: animate ? 720 : 0,
+        easing: easeOutCubic,
+        essential: true,
+      });
+    },
+    [getMapCameraPadding, provinceById, regionById]
+  );
+
+  const syncLocationQueryToUrl = useCallback(
+    (selection: ProvincePickerSelection) => {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      if (selection.provinceId) {
+        url.searchParams.set("province", selection.provinceId);
+        url.searchParams.delete("region");
+      } else if (selection.regionId !== "all") {
+        url.searchParams.set("region", selection.regionId);
+        url.searchParams.delete("province");
+      } else {
+        url.searchParams.delete("province");
+        url.searchParams.delete("region");
+      }
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+      );
+    },
+    []
+  );
+
+  const handleConfirmProvinceSelection = useCallback(
+    (selection: ProvincePickerSelection) => {
+      const resolvedRegion: LocationScopeId =
+        selection.regionId === "tourist"
+          ? "tourist"
+          : selection.provinceId
+          ? provinceById.get(selection.provinceId)?.regionId ??
+            selection.regionId
+          : selection.regionId;
+
+      setProvinceFilter(selection.provinceId);
+      setRegionFilter(resolvedRegion);
+      setIsProvincePickerOpen(false);
+      setHasUserMovedMap(false);
+      setRestoredDealIds(null);
+      setManualShuffleOrder(null);
+      setPinnedOutsideDealId(null);
+      syncLocationQueryToUrl({
+        regionId: resolvedRegion,
+        provinceId: selection.provinceId,
+      });
+      flyMapToLocation(
+        { regionId: resolvedRegion, provinceId: selection.provinceId },
+        true
+      );
+
+      // Hydrate all places in the chosen province even if outside the initial nationwide top 100
+      if (
+        selection.provinceId &&
+        !fetchedProvincesRef.current.has(selection.provinceId)
+      ) {
+        const targetProvId = selection.provinceId;
+        fetchedProvincesRef.current.add(targetProvId);
+        fetch(`/api/pins?provinceId=${encodeURIComponent(targetProvId)}&limit=80&compact=1`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: { pins?: PinFeedItemDto[] } | null) => {
+            if (!data?.pins?.length) return;
+            setAllDeals((prev) => dedupeDealsByHotel([...prev, ...data.pins!]));
+          })
+          .catch(() => {
+            fetchedProvincesRef.current.delete(targetProvId);
+          });
+      }
+    },
+    [flyMapToLocation, provinceById, syncLocationQueryToUrl]
+  );
+
   const clearSettleTimer = useCallback(() => {
     if (settleTimerRef.current !== null) {
       window.clearTimeout(settleTimerRef.current);
@@ -1021,7 +1282,7 @@ export function ExploreMapClient({
       userGestureActiveRef.current = true;
       pendingUserGestureRef.current = true;
       isProgrammaticCameraRef.current = false;
-      setIsMapMoving(true);
+      React.startTransition(() => setIsMapMoving(true));
     }
   };
 
@@ -1110,6 +1371,8 @@ export function ExploreMapClient({
         zoom: startZoom,
         minZoom: WORLD_MIN_ZOOM,
         maxZoom: THAILAND_MAX_ZOOM,
+        fadeDuration: 120,
+        maxTileCacheSize: 64,
         dragRotate: false,
         touchPitch: false,
         attributionControl: false,
@@ -1124,12 +1387,15 @@ export function ExploreMapClient({
           skipNextDeckSignatureRef.current = true;
         }
         setMapBounds(readEffectiveBounds(mapInstance));
-        if (
-          !restoredCam &&
-          !initialCenter &&
-          (initialProvince || initialStyle !== "all" || initialQuery)
-        ) {
-          fitMapToDeals(attributeFilteredDeals, false);
+        if (!restoredCam && !initialCenter) {
+          if (initialProvince || initialRegion !== "all") {
+            flyMapToLocation(
+              { regionId: regionFilter, provinceId: initialProvince },
+              false
+            );
+          } else if (initialStyle !== "all" || initialQuery) {
+            fitMapToDeals(attributeFilteredDeals, false);
+          }
         }
       });
 
@@ -1137,9 +1403,12 @@ export function ExploreMapClient({
       mapInstance.on("zoomstart", (e) => onMapUserStartRef.current(e));
       mapInstance.on("movestart", (e) => onMapMoveStartRef.current(e));
       mapInstance.on("zoom", () => {
+        const now = performance.now();
+        if (now - lastLodSyncMsRef.current < 110) return;
         if (lodRafRef.current !== null) return;
         lodRafRef.current = window.requestAnimationFrame(() => {
           lodRafRef.current = null;
+          lastLodSyncMsRef.current = performance.now();
           syncMarkersLodRef.current();
         });
       });
@@ -1613,30 +1882,46 @@ export function ExploreMapClient({
     );
   }, [isTh]);
 
-  // Reset to All Thailand / All Filtered Deals
+  // Reset to All Thailand (clears province/region lock & fits nationwide map cleanly)
   const handleResetMapArea = useCallback(() => {
+    setProvinceFilter(null);
+    setRegionFilter("all");
     setHasUserMovedMap(false);
     setRestoredDealIds(null);
     setManualShuffleOrder(null);
     setPinnedOutsideDealId(null);
-    setActiveIdx(getExploreSymmetricStartIdx(attributeFilteredDeals.length));
-    fitMapToDeals(attributeFilteredDeals, true);
-  }, [attributeFilteredDeals, fitMapToDeals]);
+    syncLocationQueryToUrl({ regionId: "all", provinceId: null });
+    setActiveIdx(getExploreSymmetricStartIdx(allDeals.length));
+    flyMapToLocation({ regionId: "all", provinceId: null }, true);
+  }, [allDeals.length, flyMapToLocation, syncLocationQueryToUrl]);
+
+  const handleRecenterSelectedLocation = useCallback(() => {
+    setHasUserMovedMap(false);
+    setRestoredDealIds(null);
+    setManualShuffleOrder(null);
+    setPinnedOutsideDealId(null);
+    flyMapToLocation(
+      { regionId: regionFilter, provinceId: provinceFilter },
+      true
+    );
+  }, [flyMapToLocation, provinceFilter, regionFilter]);
 
   const handleClearAllFilters = useCallback(() => {
     setPlaceCategoryFilter("ALL");
     setActiveStyle("all");
     setSourceFilter("ALL");
     setProvinceFilter(null);
+    setRegionFilter("all");
     setRecentOnly(false);
     setGlobalSearchQuery("");
     setHasUserMovedMap(false);
     setRestoredDealIds(null);
     setManualShuffleOrder(null);
     setPinnedOutsideDealId(null);
+    syncLocationQueryToUrl({ regionId: "all", provinceId: null });
     setActiveIdx(getExploreSymmetricStartIdx(allDeals.length));
-    fitMapToDeals(allDeals, true);
-  }, [allDeals, fitMapToDeals, setGlobalSearchQuery]);
+    flyMapToLocation({ regionId: "all", provinceId: null }, true);
+  }, [allDeals.length, flyMapToLocation, setGlobalSearchQuery, syncLocationQueryToUrl]);
 
   // Pin Detail Fetching & Shared-Element 3D Hero Flip Handlers
   const loadPinDetail = useCallback(async (pinId: string) => {
@@ -1842,11 +2127,38 @@ export function ExploreMapClient({
     [activeModalPin, allDeals, togglePinLikeInstant]
   );
 
+  const activeProvinceObj = provinceFilter
+    ? provinceById.get(provinceFilter) ?? null
+    : null;
+  const activeRegionObj =
+    regionFilter !== "all" && regionFilter !== "tourist"
+      ? regionById.get(regionFilter) ?? null
+      : null;
+  const isTouristScopeOnly = !activeProvinceObj && regionFilter === "tourist";
+  const isLocationFiltered = Boolean(
+    activeProvinceObj || activeRegionObj || isTouristScopeOnly
+  );
+  const bookTabLabel = activeProvinceObj
+    ? isTh
+      ? activeProvinceObj.shortNameTh
+      : activeProvinceObj.shortNameEn
+    : isTouristScopeOnly
+    ? isTh
+      ? "เมืองท่องเที่ยว"
+      : "Top destinations"
+    : activeRegionObj
+    ? isTh
+      ? activeRegionObj.labelTh
+      : activeRegionObj.labelEn
+    : isTh
+    ? "ทั่วประเทศ"
+    : "All Thailand";
+
   const activeFilterCount =
     (placeCategoryFilter !== "ALL" ? 1 : 0) +
     (activeStyle !== "all" ? 1 : 0) +
     (sourceFilter !== "ALL" ? 1 : 0) +
-    (provinceFilter ? 1 : 0) +
+    (isLocationFiltered ? 1 : 0) +
     (recentOnly ? 1 : 0);
 
   const modalPin = activeModalPin ?? selectedPinSnapshot;
@@ -1921,7 +2233,7 @@ export function ExploreMapClient({
           + FLUSH-BOTTOM AUTO-SHUFFLE FANNED PHOTO DECK (EXACT /trip CLONE!)
       ====================================================================== */}
       {/* Static Map Stage Height (ZERO MapLibre canvas resize or WebGL flicker on hide/show!) */}
-      <div className="cgr-trip-stage-enter fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 overflow-clip bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[74px] select-none">
+      <div className="cgr-trip-stage-enter fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 overflow-clip overscroll-none bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[74px] select-none">
         <div className="relative w-full h-full lg:max-w-[1220px] lg:mx-auto lg:rounded-[26px] overflow-hidden lg:border lg:border-[var(--color-border)] bg-[var(--color-background-muted)]">
           {/* 1. ISOLATED MAPLIBRE VECTOR MAP LAYER */}
           <div
@@ -1946,7 +2258,7 @@ export function ExploreMapClient({
                 });
               }
             }}
-            className="absolute inset-0 z-0 isolate w-full h-full"
+            className="absolute inset-0 z-0 isolate w-full h-full touch-none [transform:translateZ(0)]"
             aria-label={isTh ? "แผนที่สำรวจโปรที่พัก" : "Explore stay deals map"}
           />
 
@@ -2011,7 +2323,7 @@ export function ExploreMapClient({
             )}
 
             {/* Reset to All Thailand */}
-            {hasUserMovedMap && (
+            {(hasUserMovedMap || isLocationFiltered) && (
               <button
                 type="button"
                 onClick={handleResetMapArea}
@@ -2034,11 +2346,11 @@ export function ExploreMapClient({
               transitionTimingFunction: "var(--ease-ios-sheet)",
             }}
             className={`absolute right-3 sm:right-4 lg:right-4 z-30 flex flex-col items-end gap-2.5 ${
-              isDeckHidden && visibleDeals.length > 0
+              visibleDeals.length === 0
+                ? "bottom-[150px] sm:bottom-[142px] lg:bottom-[64px]"
+                : isDeckHidden
                 ? "bottom-[90px] sm:bottom-[90px] lg:bottom-5"
-                : visibleDeals.length > 0
-                ? "bottom-[308px] sm:bottom-[348px] lg:bottom-[276px]"
-                : "bottom-[164px] sm:bottom-[164px] lg:bottom-5"
+                : "bottom-[326px] sm:bottom-[370px] lg:bottom-[298px]"
             }`}
           >
             {/* Filter Icon Button */}
@@ -2110,130 +2422,185 @@ export function ExploreMapClient({
               </div>
             </div>
           )}
+        </div>
 
-          {/* 5. EMPTY MAP ZONE: Compact Floating Bar (Desktop) + Slide-Up Bottom Sheet (Mobile/Tablet) */}
-          {emptyZonePresence.shouldRender && (
-            <>
-              {/* Desktop (>= lg): Ultra-Compact Single-Row Floating Bar */}
-              <div className="hidden lg:flex pointer-events-none absolute inset-x-0 bottom-5 z-30 justify-center px-4">
-                <div
-                  data-state={emptyZonePresence.dataState}
-                  className="cgr-floating-card-motion pointer-events-auto inline-flex items-center gap-3 max-w-[560px] rounded-[14px] bg-[var(--color-background-popover)]/96 backdrop-blur-md border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] pl-3.5 pr-2.5 py-2"
-                >
-                  <Sparkles
-                    className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0"
-                    strokeWidth={2}
-                  />
-                  <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] whitespace-nowrap">
-                    {isTh
-                      ? "ยังไม่มีโปรที่พักในโซนนี้"
-                      : "No stay deals in this area"}
-                  </p>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {hasUserMovedMap && attributeFilteredDeals.length > 0 && (
+        {/* 6. PERSISTENT AIRBNB WHITE BOTTOM SHEET + PROTRUDING BOOK INDEX TAB (YEAR-ROUND PROVINCE / REGION PICKER) */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 lg:px-[104px] flex justify-center">
+          <div
+            data-tucked={
+              !isDeckHidden &&
+              visibleDeals.length > 0 &&
+              isMapMoving &&
+              !selectedPinId
+                ? "true"
+                : "false"
+            }
+            data-dragging={isDraggingSheet ? "true" : "false"}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={
+              isDraggingSheet
+                ? {
+                    transform: `translate3d(0, ${sheetDragDy}px, 0)`,
+                  }
+                : undefined
+            }
+            className={`cgr-explore-dock-sheet relative w-full lg:max-w-[1160px] flex flex-col overflow-visible ${
+              visibleDeals.length === 0
+                ? "h-[136px] sm:h-[128px] lg:h-[124px]"
+                : isDeckHidden
+                ? "h-[76px] lg:h-[74px]"
+                : "h-[314px] sm:h-[358px] lg:h-[358px]"
+            }`}
+          >
+            {/* PROTRUDING BOOK INDEX TAB ("ปีกสมุดยื่นออกมา") — OPENS iPHONE HH:MM WHEEL PICKER */}
+            <button
+              type="button"
+              onClick={handleOpenProvincePicker}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              aria-haspopup="dialog"
+              aria-expanded={isProvincePickerOpen}
+              aria-label={
+                isTh
+                  ? `เลือกจังหวัดหรือภาค (กำลังดู: ${bookTabLabel})`
+                  : `Select province or region (current: ${bookTabLabel})`
+              }
+              className="group pointer-events-auto absolute bottom-full left-0 -mb-[1px] z-20 inline-flex items-center h-[38px] sm:h-[40px] pl-2 pr-2 sm:pl-2.5 sm:pr-2.5 rounded-tr-[14px] lg:rounded-tl-[16px] bg-[var(--color-background-body)] border-t border-r lg:border-l border-[var(--color-border)] text-[var(--color-text-primary)] cursor-pointer"
+            >
+              {/* Seamless bottom bridge masking sheet top border directly beneath the tab */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-[2px] left-0 right-0 h-[3px] bg-[var(--color-background-body)]"
+              />
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[8px] group-hover:bg-[var(--color-background-muted)] transition-colors">
+                <MapPin
+                  className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                    isLocationFiltered
+                      ? "text-[var(--color-text-primary)]"
+                      : "text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]"
+                  }`}
+                  strokeWidth={2.2}
+                />
+                <span className="max-w-[164px] sm:max-w-[220px] truncate text-[13.5px] sm:text-[14px] font-semibold tracking-[-0.01em] text-[var(--color-text-primary)]">
+                  {bookTabLabel}
+                </span>
+                {isLocationFiltered && (
+                  <span className="text-[11.5px] font-semibold tabular-nums text-[var(--color-text-secondary)]">
+                    ({attributeFilteredDeals.length})
+                  </span>
+                )}
+                <ChevronDown
+                  className="w-3.5 h-3.5 shrink-0 text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors"
+                  strokeWidth={2.2}
+                />
+              </span>
+              {/* Crisp Concave Right-Shoulder Fillet smoothly fusing tab into top edge of bottom sheet */}
+              <svg
+                aria-hidden="true"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                className="pointer-events-none absolute bottom-0 -right-[13px] w-[14px] h-[14px] text-[var(--color-background-body)]"
+              >
+                <path
+                  d="M0 0 L0 14 L14 14 A14 14 0 0 1 0 0 Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M0.5 0 A13.5 13.5 0 0 0 14 13.5"
+                  stroke="var(--color-border)"
+                  strokeWidth="1"
+                />
+              </svg>
+            </button>
+
+            {/* INNER WHITE SHEET BODY (rounded-tl-none so left edge flows seamlessly from the Book Tab!) */}
+            <div
+              className={`relative z-10 w-full h-full flex flex-col overflow-hidden bg-[var(--color-background-body)] ${
+                visibleDeals.length === 0
+                  ? "rounded-tl-none rounded-tr-[24px] lg:rounded-tr-[26px] border-t lg:border-x border-[var(--color-border)] shadow-[var(--shadow-popover)]"
+                  : isDeckHidden
+                  ? "rounded-tl-none rounded-tr-[24px] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] lg:rounded-none lg:border-0 lg:shadow-none"
+                  : "rounded-tl-none rounded-tr-[24px] lg:rounded-tr-[26px] border-t lg:border-x border-[var(--color-border)] shadow-[var(--shadow-popover)]"
+              }`}
+            >
+              {visibleDeals.length === 0 ? (
+                /* COMPACT EMPTY STATE DIRECTLY BELOW THE BOOK TAB (never traps user in an empty province!) */
+                <div className="cgr-sheet-content-in w-full h-full px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[14.5px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                      {activeProvinceObj
+                        ? hasUserMovedMap && attributeFilteredDeals.length > 0
+                          ? isTh
+                            ? `เลื่อนออกนอกโซนที่พักใน${activeProvinceObj.nameTh}`
+                            : `Moved outside places in ${activeProvinceObj.nameEn}`
+                          : isTh
+                          ? `ยังไม่มีสถานที่ใน${activeProvinceObj.nameTh}`
+                          : `No places in ${activeProvinceObj.nameEn} yet`
+                        : activeRegionObj
+                        ? isTh
+                          ? `ยังไม่มีสถานที่ใน${activeRegionObj.labelTh}บริเวณนี้`
+                          : `No places in ${activeRegionObj.labelEn} here`
+                        : isTh
+                        ? "ยังไม่มีโปรที่พักในโซนแผนที่นี้"
+                        : "No places in this map area"}
+                    </p>
+                    <p className="text-[12.5px] text-[var(--color-text-secondary)] mt-0.5 truncate">
+                      {isTh
+                        ? "เลือกจังหวัดอื่นจากปีกสมุดด้านซ้าย หรือดูทั้งหมดทั่วประเทศ"
+                        : "Pick another province from the tab or view all Thailand."}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isLocationFiltered &&
+                    hasUserMovedMap &&
+                    attributeFilteredDeals.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={handleRecenterSelectedLocation}
+                        className="h-9 sm:h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                      >
+                        {isTh ? `กลับไป${bookTabLabel}` : `Back to ${bookTabLabel}`}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleOpenProvincePicker}
+                        className="h-9 sm:h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                      >
+                        {isTh ? "เปลี่ยนจังหวัด" : "Change province"}
+                      </button>
+                    )}
+
+                    {(hasUserMovedMap || isLocationFiltered) && (
                       <button
                         type="button"
                         onClick={handleResetMapArea}
-                        className="h-8 px-3 rounded-[9px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                        className="h-9 sm:h-10 px-3.5 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                       >
-                        {isTh ? "ดูโปรทั่วไทย" : "All Thailand"}
+                        {isTh ? "ดูทั่วประเทศ" : "All Thailand"}
                       </button>
                     )}
-                    {(activeFilterCount > 0 || globalSearchQuery) && (
+
+                    {(placeCategoryFilter !== "ALL" ||
+                      activeStyle !== "all" ||
+                      sourceFilter !== "ALL" ||
+                      recentOnly ||
+                      globalSearchQuery.trim()) && (
                       <button
                         type="button"
                         onClick={handleClearAllFilters}
-                        className="h-8 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                        className="h-9 sm:h-10 px-3.5 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                       >
                         {isTh ? "ล้างตัวกรอง" : "Reset"}
                       </button>
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* Mobile / Tablet (< lg): Standard Non-Blocking Slide-Up Bottom Sheet */}
-              <div className="lg:hidden pointer-events-none absolute inset-x-0 bottom-0 z-40 flex items-end justify-center">
-                <div
-                  data-state={emptyZonePresence.dataState}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  className="cgr-modal-surface-md pointer-events-auto w-full rounded-t-[24px] bg-[var(--color-background-popover)] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] px-5 pt-2.5 pb-4"
-                >
-                  <div className="flex justify-center pb-2.5">
-                    <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] leading-snug">
-                        {isTh
-                          ? "ยังไม่มีโปรที่พักในโซนนี้"
-                          : "No stay deals in this area"}
-                      </p>
-                      <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5 leading-snug">
-                        {isTh
-                          ? "ลองซูมออก เลื่อนแผนที่ หรือดูโปรทั่วไทย"
-                          : "Zoom out, pan the map, or view all deals."}
-                      </p>
-                    </div>
-                  </div>
-                  {(hasUserMovedMap && attributeFilteredDeals.length > 0) ||
-                  activeFilterCount > 0 ||
-                  globalSearchQuery ? (
-                    <div className="flex items-center gap-2 mt-3.5">
-                      {hasUserMovedMap && attributeFilteredDeals.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleResetMapArea}
-                          className="flex-1 h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold cursor-pointer transition-colors"
-                        >
-                          {isTh ? "ดูโปรทั่วไทย" : "Show all Thailand"}
-                        </button>
-                      )}
-                      {(activeFilterCount > 0 || globalSearchQuery) && (
-                        <button
-                          type="button"
-                          onClick={handleClearAllFilters}
-                          className="flex-1 h-10 px-4 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
-                        >
-                          {isTh ? "ล้างตัวกรอง" : "Reset filters"}
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* 6. PERSISTENT AIRBNB WHITE BOTTOM SHEET (CANGAROOM MOTION CONSTITUTION: 120FPS GPU FADE SLIDE-IN/OUT + 420MS MORPH + 1:1 LIVE DRAG) */}
-        {visibleDeals.length > 0 && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 lg:px-[104px] flex justify-center">
-            <div
-              data-tucked={
-                !isDeckHidden && isMapMoving && !selectedPinId
-                  ? "true"
-                  : "false"
-              }
-              data-dragging={isDraggingSheet ? "true" : "false"}
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              style={
-                isDraggingSheet
-                  ? {
-                      transform: `translate3d(0, ${sheetDragDy}px, 0)`,
-                    }
-                  : undefined
-              }
-              className={`cgr-explore-dock-sheet w-full lg:max-w-[1160px] flex flex-col overflow-hidden bg-[var(--color-background-body)] ${
-                isDeckHidden
-                  ? "h-[76px] lg:h-[74px] rounded-t-[26px] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] lg:rounded-none lg:border-0 lg:shadow-none"
-                  : "h-[296px] sm:h-[336px] lg:h-[336px] rounded-t-[26px] border-t lg:border-x border-[var(--color-border)] shadow-[var(--shadow-popover)]"
-              }`}
-            >
-              {isDeckHidden ? (
+              ) : isDeckHidden ? (
                 /* AIRBNB COLLAPSED PEEK BAR: Stays hidden permanently until user taps or drags up! */
                 <button
                   type="button"
@@ -2389,6 +2756,8 @@ export function ExploreMapClient({
                           handleOpenCardFlip(pin, stopNum, badgeText, originRect)
                         }
                         onToggleSavePin={handleToggleSavePin}
+                        onSheetPullMove={handleSheetPullMove}
+                        onSheetPullEnd={handleSheetPullEnd}
                       />
                     </div>
                   ) : (
@@ -2402,13 +2771,15 @@ export function ExploreMapClient({
                       }
                       onHoverIndex={(idx) => setActiveIdx(idx)}
                       onToggleSavePin={handleToggleSavePin}
+                      onSheetPullMove={handleSheetPullMove}
+                      onSheetPullEnd={handleSheetPullEnd}
                     />
                   )}
                 </>
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* =====================================================================
@@ -2618,7 +2989,7 @@ export function ExploreMapClient({
                           : "Recently viewed stays only"
                       }
                     />
-                    {(provinceFilter || globalSearchQuery.trim()) && (
+                    {(isLocationFiltered || globalSearchQuery.trim()) && (
                       <div className="flex items-center justify-between gap-2 pt-1 text-[13px] text-[var(--color-text-secondary)]">
                         <span className="truncate">
                           {globalSearchQuery.trim()
@@ -2626,20 +2997,25 @@ export function ExploreMapClient({
                               ? `คำค้นหา: “${globalSearchQuery.trim()}”`
                               : `Search: "${globalSearchQuery.trim()}"`
                             : isTh
-                            ? "กำลังกรองตามจังหวัดที่เลือก"
-                            : "Filtered by selected province"}
+                            ? `พื้นที่ที่เลือก: ${bookTabLabel}`
+                            : `Selected area: ${bookTabLabel}`}
                         </span>
                         <button
                           type="button"
                           onClick={() => {
                             setProvinceFilter(null);
+                            setRegionFilter("all");
                             setGlobalSearchQuery("");
                             setRestoredDealIds(null);
                             setManualShuffleOrder(null);
+                            syncLocationQueryToUrl({
+                              regionId: "all",
+                              provinceId: null,
+                            });
                           }}
                           className="text-[12.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 shrink-0 cursor-pointer"
                         >
-                          {isTh ? "ล้างคำค้น" : "Clear"}
+                          {isTh ? "ล้างตัวกรอง" : "Clear"}
                         </button>
                       </div>
                     )}
@@ -2719,6 +3095,18 @@ export function ExploreMapClient({
           </div>,
           document.body
         )}
+
+      {hasMountedProvincePicker && (
+        <ProvinceWheelPickerModal
+          isOpen={isProvincePickerOpen}
+          language={language}
+          catalog={resolvedLocationCatalog}
+          selectedRegionId={regionFilter}
+          selectedProvinceId={provinceFilter}
+          onClose={() => setIsProvincePickerOpen(false)}
+          onConfirm={handleConfirmProvinceSelection}
+        />
+      )}
 
       {fullscreenMedia && (
         <PureMediaViewer

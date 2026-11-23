@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSessionUser } from "@/lib/auth/session";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { prisma } from "@/lib/prisma";
 
 const TogglePinSponsorSchema = z.object({
@@ -99,7 +100,9 @@ export async function PATCH(request: Request) {
           isSponsored: parsed.data.isSponsored ?? false,
           sponsoredPriority: parsed.data.sponsoredPriority ?? 50,
         },
+        include: { hotel: { select: { slug: true } } },
       });
+      revalidatePlaceCatalog({ slug: pin.hotel?.slug, pinId: pin.id });
       return NextResponse.json({ pin });
     }
 
@@ -109,7 +112,9 @@ export async function PATCH(request: Request) {
         data: {
           isFeaturedDeal: parsed.data.isFeaturedDeal ?? false,
         },
+        include: { hotel: { select: { slug: true } } },
       });
+      revalidatePlaceCatalog({ slug: coupon.hotel?.slug });
       return NextResponse.json({ coupon });
     }
 
@@ -118,7 +123,9 @@ export async function PATCH(request: Request) {
       data: {
         status: parsed.data.campaignStatus ?? "ACTIVE",
       },
+      include: { hotel: { select: { slug: true } } },
     });
+    revalidatePlaceCatalog({ slug: campaign.hotel?.slug });
     return NextResponse.json({ campaign });
   } catch (err) {
     console.error("[PATCH /api/super-admin/campaigns]", err);

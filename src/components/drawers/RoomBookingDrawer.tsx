@@ -16,10 +16,10 @@ import {
 } from "lucide-react";
 import {
   calculateStayPricing,
-  computeCouponDiscount,
   computeNightsBetween,
   getRequiredMinNightsForStay,
 } from "@/lib/bookingMath";
+import { selectBestEligibleCoupon } from "@/lib/couponHelpers";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import { getFacilityIconMeta } from "@/lib/facilityIcons";
 import {
@@ -36,21 +36,7 @@ import type {
   RoomDateOverrideDto,
 } from "@/types/cangaroom";
 
-export function selectBestEligibleCoupon(
-  coupons: ReadonlyArray<CouponDealDto>,
-  subtotalThb: number
-): { coupon: CouponDealDto; discountThb: number } | null {
-  let best: { coupon: CouponDealDto; discountThb: number } | null = null;
-  for (const coupon of coupons) {
-    const res = computeCouponDiscount(coupon, subtotalThb);
-    if (!res.error && res.discountThb > 0) {
-      if (!best || res.discountThb > best.discountThb) {
-        best = { coupon, discountThb: res.discountThb };
-      }
-    }
-  }
-  return best;
-}
+export { selectBestEligibleCoupon };
 
 const INITIAL_VISIBLE_AMENITIES = 6;
 

@@ -231,6 +231,7 @@ export function HomeFeedClient({
     try {
       const qs = new URLSearchParams();
       qs.set("limit", "100");
+      qs.set("compact", "1");
       const tasteParam = getEncodedSessionTasteParam();
       if (tasteParam) qs.set("taste", tasteParam);
       const res = await fetch(`/api/pins?${qs.toString()}`, {

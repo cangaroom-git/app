@@ -1,5 +1,7 @@
+import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { NONDII_CACHE_TAGS } from "@/lib/cache/revalidateNondii";
 import {
   getProvinceById,
   STAY_STYLE_TABS,
@@ -242,35 +244,35 @@ function rankPinsByZeroDeadEndSearch(params: {
   return scored.map((s) => s.dto);
 }
 
-export async function searchDiscoveryPins(
-  params: SearchStaysParams
-): Promise<PinFeedItemDto[]> {
-  const {
-    style,
-    placeCategory,
-    provinceId,
-    sourceType,
-    q,
-    maxPriceThb,
-    bounds,
-    limit = 60,
-    userId,
-    visitorId,
-    hasAnalyticsConsent,
-    sessionSignal,
-    originProvinceId,
-    deviceType,
-    compact = false,
-  } = params;
+interface PublicDiscoveryCandidate {
+  dto: PinFeedItemDto;
+  districtTh: string;
+  referencePrice: number | null;
+}
 
-  const trimmedQuery = q?.trim() || "";
+async function fetchPublicDiscoveryCandidatesFromDb(params: {
+  style: string | null;
+  placeCategory: PlaceCategoryDto | "ALL";
+  provinceId: string | null;
+  sourceType: "ALL" | "INTERNAL" | "EXTERNAL";
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null;
+  take: number;
+  compact: boolean;
+}): Promise<PublicDiscoveryCandidate[]> {
+  const { style, placeCategory, provinceId, sourceType, bounds, take, compact } =
+    params;
   const nowDate = new Date();
 
   const hotelFilter: Prisma.HotelWhereInput = {
     isPublished: true,
     verificationStatus: { not: "SUSPENDED" },
   };
-  if (placeCategory && placeCategory !== "ALL") {
+  if (placeCategory !== "ALL") {
     hotelFilter.placeCategory = placeCategory;
   }
   if (bounds) {
@@ -297,77 +299,250 @@ export async function searchDiscoveryPins(
     where.dealSourceType = sourceType;
   }
 
-  // Only apply hard style filter when browsing a specific category tab without a text search
-  if (style && style !== "all" && !trimmedQuery) {
+  if (style && style !== "all") {
     where.stayStyles = { has: style };
   }
 
-  // Parallelize primary pins query + user taste profile lookup (eliminates sequential Neon DB waterfall!)
-  const [rawPins, taste] = await Promise.all([
-    prisma.pin.findMany({
-      where,
-      orderBy: [
-        { isSponsored: "desc" },
-        { sponsoredPriority: "desc" },
-        { likesCount: "desc" },
-        { createdAt: "desc" },
-      ],
-      take: compact ? Math.min(limit, 80) : Math.min(limit * 2, 120),
-      include: {
-        hotel: {
-          select: {
-            slug: true,
-            nameTh: true,
-            nameEn: true,
-            districtTh: true,
-            placeCategory: true,
-            merchantMode: true,
-            externalWebsiteUrl: true,
-            primaryCtaLabelTh: true,
-            featuredCouponId: true,
-            ...(compact
-              ? {}
-              : {
-                  addressTh: true,
-                  googleMapsUrl: true,
-                  nearbySpotsJson: true,
-                  logoUrl: true,
-                }),
-            latitude: true,
-            longitude: true,
-            verificationStatus: true,
-            ratingAvg: true,
-            rooms: {
-              where: { isActive: true },
-              select: {
-                id: true,
-                weekdayPriceThb: true,
-                maxGuests: true,
-              },
-            },
-            coupons: {
-              where: { isActive: true, expiresAt: { gt: nowDate } },
-              orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
-              take: compact ? 3 : 8,
-              select: PIN_COUPON_SELECT,
+  const rawPins = await prisma.pin.findMany({
+    where,
+    orderBy: [
+      { isSponsored: "desc" },
+      { sponsoredPriority: "desc" },
+      { likesCount: "desc" },
+      { createdAt: "desc" },
+    ],
+    take,
+    select: {
+      id: true,
+      hotelId: true,
+      roomId: true,
+      couponId: true,
+      mediaType: true,
+      category: true,
+      titleTh: true,
+      titleEn: true,
+      coverImageUrl: true,
+      videoUrl: true,
+      aspectRatio: true,
+      provinceId: true,
+      stayStyles: true,
+      sourcePlatform: true,
+      dealSourceType: true,
+      externalDealUrl: true,
+      externalSourceName: true,
+      promoHeadlineTh: true,
+      promoHeadlineEn: true,
+      promoCode: true,
+      promoOriginalPriceThb: true,
+      promoDealPriceThb: true,
+      promoExpiresAt: true,
+      externalClickCount: true,
+      publishStatus: true,
+      aiConfidenceScore: true,
+      isSponsored: true,
+      sponsoredPriority: true,
+      likesCount: true,
+      savesCount: true,
+      commentsCount: true,
+      sharesCount: true,
+      createdAt: true,
+      ...(compact
+        ? {}
+        : {
+            descriptionTh: true,
+            descriptionEn: true,
+            mediaUrls: true,
+            semanticTags: true,
+            aiTriageNote: true,
+          }),
+      hotel: {
+        select: {
+          slug: true,
+          nameTh: true,
+          nameEn: true,
+          districtTh: true,
+          placeCategory: true,
+          merchantMode: true,
+          externalWebsiteUrl: true,
+          primaryCtaLabelTh: true,
+          featuredCouponId: true,
+          ...(compact
+            ? {}
+            : {
+                addressTh: true,
+                googleMapsUrl: true,
+                nearbySpotsJson: true,
+                logoUrl: true,
+              }),
+          latitude: true,
+          longitude: true,
+          verificationStatus: true,
+          ratingAvg: true,
+          rooms: {
+            where: { isActive: true },
+            select: {
+              weekdayPriceThb: true,
             },
           },
-        },
-        room: {
-          select: {
-            id: true,
-            code: true,
-            nameTh: true,
-            nameEn: true,
-            weekdayPriceThb: true,
-            maxGuests: true,
+          coupons: {
+            where: { isActive: true, expiresAt: { gt: nowDate } },
+            orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+            take: compact ? 2 : 8,
+            select: PIN_COUPON_SELECT,
           },
-        },
-        coupon: {
-          select: PIN_COUPON_SELECT,
         },
       },
-    }),
+      room: {
+        select: {
+          code: true,
+          nameTh: true,
+          nameEn: true,
+          weekdayPriceThb: true,
+        },
+      },
+      coupon: {
+        select: PIN_COUPON_SELECT,
+      },
+    },
+  });
+
+  const emptySet = new Set<string>();
+  return rawPins.map((p) => {
+    const referencePrice =
+      p.room?.weekdayPriceThb ??
+      (p.hotel.rooms.length > 0
+        ? Math.min(...p.hotel.rooms.map((r) => r.weekdayPriceThb))
+        : null);
+
+    const mapped = mapPinToDto(
+      {
+        ...p,
+        descriptionTh: "descriptionTh" in p && typeof p.descriptionTh === "string" ? p.descriptionTh : "",
+        descriptionEn: "descriptionEn" in p && typeof p.descriptionEn === "string" ? p.descriptionEn : "",
+        mediaUrls: "mediaUrls" in p && Array.isArray(p.mediaUrls) ? p.mediaUrls : [p.coverImageUrl],
+        semanticTags: "semanticTags" in p && Array.isArray(p.semanticTags) ? p.semanticTags : [],
+        aiTriageNote: "aiTriageNote" in p && typeof p.aiTriageNote === "string" ? p.aiTriageNote : null,
+        hotel: {
+          ...p.hotel,
+          logoUrl: "logoUrl" in p.hotel ? p.hotel.logoUrl : null,
+          addressTh: "addressTh" in p.hotel ? p.hotel.addressTh : null,
+          googleMapsUrl:
+            "googleMapsUrl" in p.hotel ? p.hotel.googleMapsUrl : null,
+          nearbySpotsJson:
+            "nearbySpotsJson" in p.hotel ? p.hotel.nearbySpotsJson : null,
+        },
+      },
+      emptySet,
+      emptySet
+    );
+
+    const dto = compact
+      ? {
+          ...mapped,
+          descriptionTh: "",
+          descriptionEn: "",
+          mediaUrls: [mapped.coverImageUrl],
+          hotelAddressTh: "",
+          hotelGoogleMapsUrl: null,
+          hotelNearbySpots: [],
+          activeCoupons: mapped.activeCoupon ? [mapped.activeCoupon] : [],
+          semanticTags: [],
+          aiTriageNote: null,
+        }
+      : mapped;
+
+    return {
+      dto,
+      districtTh: p.hotel.districtTh || "",
+      referencePrice,
+    };
+  });
+}
+
+function getCachedPublicDiscoveryCandidates(params: {
+  style: string | null;
+  placeCategory: PlaceCategoryDto | "ALL";
+  provinceId: string | null;
+  sourceType: "ALL" | "INTERNAL" | "EXTERNAL";
+  take: number;
+  compact: boolean;
+}): Promise<PublicDiscoveryCandidate[]> {
+  const normalizedKey = JSON.stringify({
+    c: params.compact ? 1 : 0,
+    cat: params.placeCategory,
+    p: params.provinceId ?? "all",
+    src: params.sourceType,
+    st: params.style ?? "all",
+    t: params.take,
+  });
+
+  return unstable_cache(
+    async () => fetchPublicDiscoveryCandidatesFromDb(params),
+    ["nondii-discovery-pins-v1", normalizedKey],
+    {
+      revalidate: 300, // 5m server cache; immediately purged on host/admin mutations
+      tags: [
+        NONDII_CACHE_TAGS.places,
+        NONDII_CACHE_TAGS.placeList,
+        NONDII_CACHE_TAGS.homeFeed,
+        NONDII_CACHE_TAGS.exploreFeed,
+      ],
+    }
+  )();
+}
+
+export async function searchDiscoveryPins(
+  params: SearchStaysParams
+): Promise<PinFeedItemDto[]> {
+  const {
+    style,
+    placeCategory,
+    provinceId,
+    sourceType,
+    q,
+    maxPriceThb,
+    bounds,
+    limit = 60,
+    userId,
+    visitorId,
+    hasAnalyticsConsent,
+    sessionSignal,
+    originProvinceId,
+    deviceType,
+    compact = false,
+  } = params;
+
+  const trimmedQuery = q?.trim() || "";
+  const effectiveStyle =
+    style && style !== "all" && !trimmedQuery ? style : null;
+  const effectiveCategory: PlaceCategoryDto | "ALL" =
+    placeCategory && placeCategory !== "ALL" ? placeCategory : "ALL";
+  const effectiveProvince =
+    provinceId && provinceId !== "all" ? provinceId : null;
+  const effectiveSource: "ALL" | "INTERNAL" | "EXTERNAL" =
+    sourceType === "INTERNAL" || sourceType === "EXTERNAL" ? sourceType : "ALL";
+  const take = compact ? Math.min(limit, 80) : Math.min(limit * 2, 120);
+
+  // Parallelize cached public candidates + per-user taste profile (zero personalization leakage)
+  const [publicCandidates, taste] = await Promise.all([
+    bounds
+      ? fetchPublicDiscoveryCandidatesFromDb({
+          style: effectiveStyle,
+          placeCategory: effectiveCategory,
+          provinceId: effectiveProvince,
+          sourceType: effectiveSource,
+          bounds,
+          take,
+          compact,
+        })
+      : getCachedPublicDiscoveryCandidates({
+          style: effectiveStyle,
+          placeCategory: effectiveCategory,
+          provinceId: effectiveProvince,
+          sourceType: effectiveSource,
+          take,
+          compact,
+        }),
     loadMergedTasteContext({
       userId,
       visitorId,
@@ -378,14 +553,12 @@ export async function searchDiscoveryPins(
     }),
   ]);
 
-  const filteredPins = rawPins.filter((pin) => {
-    const referencePrice =
-      pin.room?.weekdayPriceThb ??
-      (pin.hotel.rooms.length > 0
-        ? Math.min(...pin.hotel.rooms.map((r) => r.weekdayPriceThb))
-        : null);
-
-    if (maxPriceThb && referencePrice && referencePrice > maxPriceThb) {
+  const filteredCandidates = publicCandidates.filter((item) => {
+    if (
+      maxPriceThb &&
+      item.referencePrice !== null &&
+      item.referencePrice > maxPriceThb
+    ) {
       return false;
     }
     return true;
@@ -394,8 +567,8 @@ export async function searchDiscoveryPins(
   let likedSet = new Set<string>();
   let savedSet = new Set<string>();
 
-  if (userId && filteredPins.length > 0) {
-    const pinIds = filteredPins.map((p) => p.id);
+  if (userId && filteredCandidates.length > 0) {
+    const pinIds = filteredCandidates.map((item) => item.dto.id);
     const [likes, saves] = await Promise.all([
       prisma.pinLike.findMany({
         where: { userId, pinId: { in: pinIds } },
@@ -411,37 +584,13 @@ export async function searchDiscoveryPins(
   }
 
   const districtByPinId = new Map<string, string>();
-  const candidateDtos = filteredPins.map((p) => {
-    districtByPinId.set(p.id, p.hotel.districtTh || "");
-    const dto = mapPinToDto(
-      {
-        ...p,
-        hotel: {
-          ...p.hotel,
-          logoUrl: "logoUrl" in p.hotel ? p.hotel.logoUrl : null,
-          addressTh: "addressTh" in p.hotel ? p.hotel.addressTh : null,
-          googleMapsUrl:
-            "googleMapsUrl" in p.hotel ? p.hotel.googleMapsUrl : null,
-          nearbySpotsJson:
-            "nearbySpotsJson" in p.hotel ? p.hotel.nearbySpotsJson : null,
-        },
-      },
-      likedSet,
-      savedSet
-    );
-    if (!compact) return dto;
-    // Strip heavy detail-only fields from Home SSR payload (loaded on-demand via /api/pins/[id] when clicked!)
+  const candidateDtos = filteredCandidates.map((item) => {
+    districtByPinId.set(item.dto.id, item.districtTh);
+    if (!userId) return item.dto;
     return {
-      ...dto,
-      descriptionTh: "",
-      descriptionEn: "",
-      mediaUrls: [dto.coverImageUrl],
-      hotelAddressTh: "",
-      hotelGoogleMapsUrl: null,
-      hotelNearbySpots: [],
-      activeCoupons: dto.activeCoupon ? [dto.activeCoupon] : [],
-      semanticTags: [],
-      aiTriageNote: null,
+      ...item.dto,
+      isLikedByMe: likedSet.has(item.dto.id),
+      isSavedByMe: savedSet.has(item.dto.id),
     };
   });
 
@@ -466,19 +615,20 @@ export async function searchDiscoveryPins(
   return personalizedBase.slice(0, limit);
 }
 
-export async function getPinDetailById(
-  pinId: string,
-  userId?: string | null,
-  hints?: PersonalizationRequestHints
-): Promise<{
-  pin: PinFeedItemDto;
-  comments: PinCommentDto[];
-  relatedPins: PinFeedItemDto[];
+interface CachedPinDetailBase {
+  anchorDto: PinFeedItemDto;
+  candidateDtos: PinFeedItemDto[];
   hotelPosts: HotelPostSummaryDto[];
   ownerFeedPosts: HotelPostSummaryDto[];
   ownerBlogs: HotelPostSummaryDto[];
   nearbyPlaces: PinFeedItemDto[];
-} | null> {
+  coSaveScoreByPinIdEntries: Array<[string, number]>;
+  coSaveScoreByHotelIdEntries: Array<[string, number]>;
+}
+
+async function fetchPublicPinDetailBaseFromDb(
+  pinId: string
+): Promise<CachedPinDetailBase | null> {
   const rawPin = await prisma.pin.findUnique({
     where: { id: pinId },
     include: {
@@ -529,131 +679,128 @@ export async function getPinDetailById(
     return null;
   }
 
-  const [
-    rawComments,
-    relatedRaw,
-    rawHotelPosts,
-    anchorBoards,
-    userLike,
-    userSave,
-    taste,
-  ] = await Promise.all([
-      prisma.pinComment.findMany({
-        where: { pinId, status: "VISIBLE" },
-        orderBy: { createdAt: "asc" },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, avatarUrl: true },
-          },
+  const [relatedRaw, rawHotelPosts, anchorBoards] = await Promise.all([
+    prisma.pin.findMany({
+      where: {
+        id: { not: pinId },
+        hotelId: { not: rawPin.hotelId },
+        publishStatus: "PUBLISHED",
+        isCanonicalCard: true,
+        hotel: {
+          isPublished: true,
+          verificationStatus: { not: "SUSPENDED" },
         },
-      }),
-      prisma.pin.findMany({
-        where: {
-          id: { not: pinId },
-          hotelId: { not: rawPin.hotelId },
-          publishStatus: "PUBLISHED",
-          isCanonicalCard: true,
-          hotel: {
-            isPublished: true,
-            verificationStatus: { not: "SUSPENDED" },
-          },
-        },
-        orderBy: [{ isSponsored: "desc" }, { likesCount: "desc" }, { createdAt: "desc" }],
-        take: 100,
-        include: {
-          hotel: {
-            select: {
-              slug: true,
-              nameTh: true,
-              nameEn: true,
-              districtTh: true,
-              addressTh: true,
-              placeCategory: true,
-              merchantMode: true,
-              externalWebsiteUrl: true,
-              primaryCtaLabelTh: true,
-              featuredCouponId: true,
-              latitude: true,
-              longitude: true,
-              googleMapsUrl: true,
-              nearbySpotsJson: true,
-              logoUrl: true,
-              verificationStatus: true,
-              ratingAvg: true,
-              rooms: {
-                where: { isActive: true },
-                select: { weekdayPriceThb: true },
-              },
-              coupons: {
-                where: { isActive: true, expiresAt: { gt: new Date() } },
-                orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
-                take: 6,
-                select: PIN_COUPON_SELECT,
-              },
+      },
+      orderBy: [
+        { isSponsored: "desc" },
+        { likesCount: "desc" },
+        { createdAt: "desc" },
+      ],
+      take: 64,
+      select: {
+        id: true,
+        hotelId: true,
+        roomId: true,
+        couponId: true,
+        mediaType: true,
+        category: true,
+        titleTh: true,
+        titleEn: true,
+        coverImageUrl: true,
+        videoUrl: true,
+        aspectRatio: true,
+        provinceId: true,
+        stayStyles: true,
+        semanticTags: true,
+        sourcePlatform: true,
+        dealSourceType: true,
+        externalDealUrl: true,
+        externalSourceName: true,
+        promoHeadlineTh: true,
+        promoHeadlineEn: true,
+        promoCode: true,
+        promoOriginalPriceThb: true,
+        promoDealPriceThb: true,
+        promoExpiresAt: true,
+        externalClickCount: true,
+        publishStatus: true,
+        aiConfidenceScore: true,
+        isSponsored: true,
+        sponsoredPriority: true,
+        likesCount: true,
+        savesCount: true,
+        commentsCount: true,
+        sharesCount: true,
+        createdAt: true,
+        hotel: {
+          select: {
+            slug: true,
+            nameTh: true,
+            nameEn: true,
+            districtTh: true,
+            placeCategory: true,
+            merchantMode: true,
+            externalWebsiteUrl: true,
+            primaryCtaLabelTh: true,
+            featuredCouponId: true,
+            latitude: true,
+            longitude: true,
+            logoUrl: true,
+            verificationStatus: true,
+            ratingAvg: true,
+            rooms: {
+              where: { isActive: true },
+              select: { weekdayPriceThb: true },
+            },
+            coupons: {
+              where: { isActive: true, expiresAt: { gt: new Date() } },
+              orderBy: [{ isFeaturedDeal: "desc" }, { discountValue: "desc" }],
+              take: 2,
+              select: PIN_COUPON_SELECT,
             },
           },
+        },
+        room: {
+          select: {
+            code: true,
+            nameTh: true,
+            nameEn: true,
+            weekdayPriceThb: true,
+          },
+        },
+        coupon: { select: PIN_COUPON_SELECT },
+      },
+    }),
+    prisma.hotelPost
+      .findMany({
+        where: {
+          hotelId: rawPin.hotelId,
+          status: "PUBLISHED",
+        },
+        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+        take: 16,
+        include: {
           room: {
             select: {
               code: true,
               nameTh: true,
-              nameEn: true,
               weekdayPriceThb: true,
             },
           },
-          coupon: { select: PIN_COUPON_SELECT },
         },
-      }),
-      prisma.hotelPost
-        .findMany({
-          where: {
-            hotelId: rawPin.hotelId,
-            status: "PUBLISHED",
-          },
-          orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-          take: 16,
-          include: {
-            room: {
-              select: {
-                code: true,
-                nameTh: true,
-                weekdayPriceThb: true,
-              },
-            },
-          },
-        })
-        .catch(() => []),
-      prisma.savedBoardPin
-        .findMany({
-          where: {
-            OR: [{ pinId }, { pin: { hotelId: rawPin.hotelId } }],
-          },
-          take: 40,
-          select: { boardId: true },
-        })
-        .catch(() => []),
-      userId
-        ? prisma.pinLike.findUnique({
-            where: { userId_pinId: { userId, pinId } },
-            select: { pinId: true },
-          })
-        : Promise.resolve(null),
-      userId
-        ? prisma.savedBoardPin.findFirst({
-            where: { userId, pinId },
-            select: { pinId: true },
-          })
-        : Promise.resolve(null),
-      loadMergedTasteContext({
-        userId,
-        visitorId: hints?.visitorId,
-        hasAnalyticsConsent: hints?.hasAnalyticsConsent,
-        sessionSignal: hints?.sessionSignal,
-        originProvinceId: hints?.originProvinceId,
-        deviceType: hints?.deviceType,
-      }),
-    ]);
+      })
+      .catch(() => []),
+    prisma.savedBoardPin
+      .findMany({
+        where: {
+          OR: [{ pinId }, { pin: { hotelId: rawPin.hotelId } }],
+        },
+        take: 40,
+        select: { boardId: true },
+      })
+      .catch(() => []),
+  ]);
 
-  // Collaborative Pixie-style Board Co-Save Graph
   const coSaveScoreByPinId = new Map<string, number>();
   const coSaveScoreByHotelId = new Map<string, number>();
 
@@ -687,69 +834,27 @@ export async function getPinDetailById(
     }
   }
 
-  let relatedLikedSet = new Set<string>();
-  let relatedSavedSet = new Set<string>();
-  if (userId && relatedRaw.length > 0) {
-    const relatedIds = relatedRaw.map((r) => r.id);
-    const [rLikes, rSaves] = await Promise.all([
-      prisma.pinLike.findMany({
-        where: { userId, pinId: { in: relatedIds } },
-        select: { pinId: true },
-      }),
-      prisma.savedBoardPin.findMany({
-        where: { userId, pinId: { in: relatedIds } },
-        select: { pinId: true },
-      }),
-    ]);
-    relatedLikedSet = new Set(rLikes.map((l) => l.pinId));
-    relatedSavedSet = new Set(rSaves.map((s) => s.pinId));
-  }
-
-  // Group threaded replies under parent comments
-  const commentMap = new Map<string, PinCommentDto>();
-  const topLevelComments: PinCommentDto[] = [];
-
-  for (const c of rawComments) {
-    const dto: PinCommentDto = {
-      id: c.id,
-      pinId: c.pinId,
-      userId: c.userId,
-      authorName: c.user.name || c.user.email.split("@")[0],
-      authorAvatar: c.user.avatarUrl,
-      parentId: c.parentId,
-      isHotelOwnerReply: c.isHotelOwnerReply,
-      body: c.body,
-      likesCount: c.likesCount,
-      createdAt: c.createdAt.toISOString(),
-      replies: [],
-    };
-    commentMap.set(c.id, dto);
-  }
-
-  for (const dto of commentMap.values()) {
-    if (dto.parentId && commentMap.has(dto.parentId)) {
-      commentMap.get(dto.parentId)!.replies.push(dto);
-    } else {
-      topLevelComments.push(dto);
-    }
-  }
-
-  const likedSet = new Set<string>(userLike ? [pinId] : []);
-  const savedSet = new Set<string>(userSave ? [pinId] : []);
-
-  const anchorDto = mapPinToDto(rawPin, likedSet, savedSet);
+  const emptySet = new Set<string>();
+  const anchorDto = mapPinToDto(rawPin, emptySet, emptySet);
   const candidateDtos = relatedRaw.map((r) =>
-    mapPinToDto(r, relatedLikedSet, relatedSavedSet)
+    mapPinToDto(
+      {
+        ...r,
+        descriptionTh: "",
+        descriptionEn: "",
+        mediaUrls: [r.coverImageUrl],
+        aiTriageNote: null,
+        hotel: {
+          ...r.hotel,
+          addressTh: null,
+          googleMapsUrl: null,
+          nearbySpotsJson: null,
+        },
+      },
+      emptySet,
+      emptySet
+    )
   );
-
-  const rankedRelated = rankRelatedPinsForPin({
-    anchorPin: anchorDto,
-    candidates: candidateDtos,
-    coSaveScoreByPinId,
-    coSaveScoreByHotelId,
-    taste,
-    limit: 24,
-  });
 
   const hotelPosts = rawHotelPosts.map((post) =>
     mapHotelPostToSummaryDto(post, {
@@ -764,7 +869,6 @@ export async function getPinDetailById(
   const ownerFeedPosts = hotelPosts.filter((p) => p.postKind === "FEED_POST");
   const ownerBlogs = hotelPosts.filter((p) => p.postKind !== "FEED_POST");
 
-  // Compute real Haversine nearby places from our platform's Canonical Place Cards
   let nearbyPlaces: PinFeedItemDto[] = [];
   if (
     typeof anchorDto.hotelLatitude === "number" &&
@@ -800,12 +904,169 @@ export async function getPinDetailById(
   }
 
   return {
-    pin: anchorDto,
-    comments: topLevelComments,
-    relatedPins: rankedRelated,
+    anchorDto,
+    candidateDtos,
     hotelPosts,
     ownerFeedPosts,
     ownerBlogs,
+    nearbyPlaces,
+    coSaveScoreByPinIdEntries: Array.from(coSaveScoreByPinId.entries()),
+    coSaveScoreByHotelIdEntries: Array.from(coSaveScoreByHotelId.entries()),
+  };
+}
+
+function getCachedPinDetailBase(
+  pinId: string
+): Promise<CachedPinDetailBase | null> {
+  return unstable_cache(
+    async () => fetchPublicPinDetailBaseFromDb(pinId),
+    [`nondii-pin-detail-base-v1-${pinId}`],
+    {
+      revalidate: 600, // 10m cache; invalidated on pin/hotel mutation
+      tags: [
+        NONDII_CACHE_TAGS.places,
+        NONDII_CACHE_TAGS.pinDetail,
+        NONDII_CACHE_TAGS.pin(pinId),
+      ],
+    }
+  )();
+}
+
+export async function getPinDetailById(
+  pinId: string,
+  userId?: string | null,
+  hints?: PersonalizationRequestHints
+): Promise<{
+  pin: PinFeedItemDto;
+  comments: PinCommentDto[];
+  relatedPins: PinFeedItemDto[];
+  hotelPosts: HotelPostSummaryDto[];
+  ownerFeedPosts: HotelPostSummaryDto[];
+  ownerBlogs: HotelPostSummaryDto[];
+  nearbyPlaces: PinFeedItemDto[];
+} | null> {
+  const [base, rawComments, taste] = await Promise.all([
+    getCachedPinDetailBase(pinId),
+    prisma.pinComment.findMany({
+      where: { pinId, status: "VISIBLE" },
+      orderBy: { createdAt: "asc" },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, avatarUrl: true },
+        },
+      },
+    }),
+    loadMergedTasteContext({
+      userId,
+      visitorId: hints?.visitorId,
+      hasAnalyticsConsent: hints?.hasAnalyticsConsent,
+      sessionSignal: hints?.sessionSignal,
+      originProvinceId: hints?.originProvinceId,
+      deviceType: hints?.deviceType,
+    }),
+  ]);
+
+  if (!base) {
+    return null;
+  }
+
+  let likedSet = new Set<string>();
+  let savedSet = new Set<string>();
+
+  if (userId) {
+    const allPinIds = [
+      base.anchorDto.id,
+      ...base.candidateDtos.map((c) => c.id),
+    ];
+    const [likes, saves] = await Promise.all([
+      prisma.pinLike.findMany({
+        where: { userId, pinId: { in: allPinIds } },
+        select: { pinId: true },
+      }),
+      prisma.savedBoardPin.findMany({
+        where: { userId, pinId: { in: allPinIds } },
+        select: { pinId: true },
+      }),
+    ]);
+    likedSet = new Set(likes.map((l) => l.pinId));
+    savedSet = new Set(saves.map((s) => s.pinId));
+  }
+
+  const commentMap = new Map<string, PinCommentDto>();
+  const topLevelComments: PinCommentDto[] = [];
+
+  for (const c of rawComments) {
+    const dto: PinCommentDto = {
+      id: c.id,
+      pinId: c.pinId,
+      userId: c.userId,
+      authorName: c.user.name || c.user.email.split("@")[0],
+      authorAvatar: c.user.avatarUrl,
+      parentId: c.parentId,
+      isHotelOwnerReply: c.isHotelOwnerReply,
+      body: c.body,
+      likesCount: c.likesCount,
+      createdAt: c.createdAt.toISOString(),
+      replies: [],
+    };
+    commentMap.set(c.id, dto);
+  }
+
+  for (const dto of commentMap.values()) {
+    if (dto.parentId && commentMap.has(dto.parentId)) {
+      commentMap.get(dto.parentId)!.replies.push(dto);
+    } else {
+      topLevelComments.push(dto);
+    }
+  }
+
+  const anchorDto = userId
+    ? {
+        ...base.anchorDto,
+        isLikedByMe: likedSet.has(base.anchorDto.id),
+        isSavedByMe: savedSet.has(base.anchorDto.id),
+      }
+    : base.anchorDto;
+
+  const candidateDtos = userId
+    ? base.candidateDtos.map((c) => ({
+        ...c,
+        isLikedByMe: likedSet.has(c.id),
+        isSavedByMe: savedSet.has(c.id),
+      }))
+    : base.candidateDtos;
+
+  const nearbyPlaces = userId
+    ? base.nearbyPlaces.map((c) => ({
+        ...c,
+        isLikedByMe: likedSet.has(c.id),
+        isSavedByMe: savedSet.has(c.id),
+      }))
+    : base.nearbyPlaces;
+
+  const coSaveScoreByPinId = new Map<string, number>(
+    base.coSaveScoreByPinIdEntries
+  );
+  const coSaveScoreByHotelId = new Map<string, number>(
+    base.coSaveScoreByHotelIdEntries
+  );
+
+  const rankedRelated = rankRelatedPinsForPin({
+    anchorPin: anchorDto,
+    candidates: candidateDtos,
+    coSaveScoreByPinId,
+    coSaveScoreByHotelId,
+    taste,
+    limit: 24,
+  });
+
+  return {
+    pin: anchorDto,
+    comments: topLevelComments,
+    relatedPins: rankedRelated,
+    hotelPosts: base.hotelPosts,
+    ownerFeedPosts: base.ownerFeedPosts,
+    ownerBlogs: base.ownerBlogs,
     nearbyPlaces,
   };
 }

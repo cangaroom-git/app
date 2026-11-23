@@ -3012,7 +3012,7 @@ export function PinterestPinDetail({
           <div className="hidden lg:flex items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)] shrink-0">
             <Link
               href={`/${pin.hotelSlug}`}
-              prefetch={true}
+              prefetch={false}
               onClick={handleVisitHotelClick}
               className="inline-flex items-center gap-3 min-w-0 group/author"
             >
@@ -3178,7 +3178,7 @@ export function PinterestPinDetail({
 
             <Link
               href={`/${pin.hotelSlug}`}
-              prefetch={true}
+              prefetch={false}
               onClick={handleVisitHotelClick}
               className="inline-flex items-center gap-2.5 min-w-0 pt-0.5"
             >
@@ -3242,7 +3242,7 @@ export function PinterestPinDetail({
                 <div className="flex-1 min-w-0 text-[14px] leading-relaxed text-[var(--color-text-primary)]">
                   <Link
                     href={`/${pin.hotelSlug}`}
-                    prefetch={true}
+                    prefetch={false}
                     onClick={handleVisitHotelClick}
                     className="font-semibold hover:underline mr-1.5"
                   >

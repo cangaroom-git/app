@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
-import { preloadPinHeroImages } from "@/lib/mediaUtils";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
-import { DeleteBoardConfirmModal } from "@/components/board/BoardActionModals";
 import {
   TripCardFlipModal,
   type CardOriginRect,
 } from "@/components/trip/TripCardFlipModal";
-import { ShareTripModal } from "@/components/trip/ShareTripModal";
 import type {
   HotelPostSummaryDto,
   PinCommentDto,
@@ -20,6 +17,22 @@ import type {
   PublicTripDto,
   SavedBoardPinItemDto,
 } from "@/types/cangaroom";
+
+const ShareTripModal = dynamic(
+  () =>
+    import("@/components/trip/ShareTripModal").then(
+      (mod) => mod.ShareTripModal
+    ),
+  { ssr: false }
+);
+
+const DeleteBoardConfirmModal = dynamic(
+  () =>
+    import("@/components/board/BoardActionModals").then(
+      (mod) => mod.DeleteBoardConfirmModal
+    ),
+  { ssr: false }
+);
 
 const TripMapPlannerView = dynamic(
   () =>
@@ -29,7 +42,7 @@ const TripMapPlannerView = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[108px]">
+      <div className="fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[74px]">
         <div className="w-full h-full lg:max-w-[1220px] lg:mx-auto lg:rounded-[26px] bg-[var(--color-background-muted)] animate-pulse" />
       </div>
     ),
@@ -89,10 +102,19 @@ export function TripSharePageClient({ initialTrip }: TripSharePageClientProps) {
   // Keep local reactive copy so guest viewers & owner actions update smoothly in real time!
   const [trip, setTrip] = useState<PublicTripDto>(initialTrip);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [hasMountedShareModal, setHasMountedShareModal] = useState(false);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
   const [isCloningTrip, setIsCloningTrip] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [hasMountedDeleteModal, setHasMountedDeleteModal] = useState(false);
   const [isDeletingTrip, setIsDeletingTrip] = useState(false);
+
+  useEffect(() => {
+    if (isShareOpen) setHasMountedShareModal(true);
+  }, [isShareOpen]);
+  useEffect(() => {
+    if (isDeleteOpen) setHasMountedDeleteModal(true);
+  }, [isDeleteOpen]);
 
   // If the signed-in user owns this board and it exists in HotelAppShell `savedBoards`, sync live edits cleanly
   const matchingOwnedBoard = useMemo(
@@ -157,14 +179,6 @@ export function TripSharePageClient({ initialTrip }: TripSharePageClientProps) {
     slides: PureMediaSlide[];
     index: number;
   } | null>(null);
-
-  // Preload PinterestPinDetail chunk silently so card flip -> modal is instant!
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void import("@/components/home/PinterestPinDetail");
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
     latestPinReqRef.current = pinId;
@@ -571,20 +585,22 @@ export function TripSharePageClient({ initialTrip }: TripSharePageClientProps) {
         )}
       </TripCardFlipModal>
 
-      <ShareTripModal
-        isOpen={isShareOpen}
-        tripName={liveBoard.name}
-        shareSlug={liveBoard.shareSlug}
-        pinCount={liveEntries.length}
-        isOwner={isOwner}
-        isPublic={liveBoard.isPublic}
-        isUpdatingVisibility={isUpdatingVisibility}
-        language={language}
-        onTogglePublic={handleTogglePublic}
-        onClose={() => setIsShareOpen(false)}
-      />
+      {(hasMountedShareModal || isShareOpen) && (
+        <ShareTripModal
+          isOpen={isShareOpen}
+          tripName={liveBoard.name}
+          shareSlug={liveBoard.shareSlug}
+          pinCount={liveEntries.length}
+          isOwner={isOwner}
+          isPublic={liveBoard.isPublic}
+          isUpdatingVisibility={isUpdatingVisibility}
+          language={language}
+          onTogglePublic={handleTogglePublic}
+          onClose={() => setIsShareOpen(false)}
+        />
+      )}
 
-      {isOwner && (
+      {isOwner && (hasMountedDeleteModal || isDeleteOpen) && (
         <DeleteBoardConfirmModal
           board={isDeleteOpen ? liveBoard : null}
           language={language}

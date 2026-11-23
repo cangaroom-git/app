@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/studioAccess";
 import { addDaysToDate, formatDateStr, listDatesInRange } from "@/lib/bookingMath";
 import { prisma } from "@/lib/prisma";
+import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 import { mapBookingRowToDto } from "@/lib/services/bookingCheckoutService";
 import { mapHotelPostToDetailDto } from "@/lib/services/hotelPostService";
@@ -409,6 +410,7 @@ export async function PATCH(request: Request) {
       );
     }
 
+    revalidatePlaceCatalog({ slug: updated.slug, previousSlug: hotel.slug });
     return NextResponse.json({ hotel: updated });
   } catch (err) {
     if (err instanceof StudioAuthError) {

@@ -2,7 +2,10 @@ import React from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getServerSessionUser } from "@/lib/auth/session";
-import { getHotelStorefrontBySlug } from "@/lib/services/hotelStorefrontService";
+import {
+  getHotelStorefrontBySlug,
+  getPlaceMetadataBySlug,
+} from "@/lib/services/hotelStorefrontService";
 import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import {
   HotelStorefrontClient,
@@ -43,22 +46,18 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { hotelSlug } = await params;
   const cleanSlug = (hotelSlug || "").trim().toLowerCase();
-  const storefront = await getHotelStorefrontBySlug(cleanSlug);
+  const hotel = await getPlaceMetadataBySlug(cleanSlug);
 
-  if (!storefront) {
+  if (!hotel) {
     return {
       title: `ไม่พบสถานที่ @${cleanSlug} | Nondii`,
     };
   }
 
-  const { hotel, rooms } = storefront;
   const catMeta = getPlaceCategoryMeta(hotel.placeCategory);
   const isDirectStay =
-    hotel.merchantMode !== "PROFILE_ONLY" && rooms.length > 0;
-  const minPrice = rooms.reduce(
-    (min, r) => (r.weekdayPriceThb < min ? r.weekdayPriceThb : min),
-    rooms[0]?.weekdayPriceThb ?? 0
-  );
+    hotel.merchantMode !== "PROFILE_ONLY" && hotel.hasActiveRooms;
+  const minPrice = hotel.minWeekdayPriceThb;
 
   const title = isDirectStay
     ? `${hotel.nameTh} — ที่พัก${hotel.provinceNameTh}${
@@ -105,13 +104,13 @@ export default async function HotelStorefrontPage({
   params: Promise<{ hotelSlug: string }>;
   searchParams?: Promise<{ tab?: string; room?: string; coupon?: string }>;
 }) {
-  const [{ hotelSlug }, sp] = await Promise.all([
+  const [{ hotelSlug }, sp, sessionUser] = await Promise.all([
     params,
     searchParams ?? Promise.resolve(undefined),
+    getServerSessionUser().catch(() => null),
   ]);
   const cleanSlug = (hotelSlug || "").trim().toLowerCase();
 
-  const sessionUser = await getServerSessionUser().catch(() => null);
   const storefront = await getHotelStorefrontBySlug(cleanSlug, {
     userId: sessionUser?.id ?? null,
   });
