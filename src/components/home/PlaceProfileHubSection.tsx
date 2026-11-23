@@ -15,6 +15,7 @@ import type { LanguageCode } from "@/lib/dateFormatters";
 import { getOptimizedPinImageUrl } from "@/lib/mediaUtils";
 import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import type {
   HotelPostSummaryDto,
   PinActiveCouponDto,
@@ -103,11 +104,16 @@ function HorizontalPreviewRow({
     return () => ro.disconnect();
   }, [updateScrollArrows, children]);
 
+  const { scrollBySmooth } = useUltraHorizontalScroll(trackRef, {
+    stopPropagation: true,
+    onScrollUpdate: updateScrollArrows,
+  });
+
   const scrollByStep = (dir: -1 | 1) => {
     const el = trackRef.current;
     if (!el) return;
     const step = Math.max(260, Math.round(el.clientWidth * 0.78));
-    el.scrollBy({ left: dir * step, behavior: "smooth" });
+    scrollBySmooth(dir * step, 460);
   };
 
   return (
@@ -160,14 +166,14 @@ function HorizontalPreviewRow({
         </div>
       </div>
 
-      {/* Edge-Safe Horizontal Snap Track (Strictly Isolated From Parent Modal Swipes!) */}
+      {/* Edge-Safe Ultra-Smooth Inertial Momentum Track (Strictly Isolated From Parent Modal Swipes!) */}
       <div
         ref={trackRef}
         data-swipe-ignore="true"
         onScroll={updateScrollArrows}
         onTouchStart={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
-        className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1"
+        className="flex gap-3.5 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 pb-1"
       >
         {children}
       </div>

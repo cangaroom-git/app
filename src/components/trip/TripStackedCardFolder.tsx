@@ -77,6 +77,7 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
     startY: number;
     axis: "horizontal" | "vertical" | null;
     moved: boolean;
+    samples: Array<{ x: number; t: number }>;
   } | null>(null);
   const suppressClickRef = useRef(false);
   const flyTimeoutRef = useRef<number | null>(null);
@@ -180,6 +181,7 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
       startY: e.clientY,
       axis: null,
       moved: false,
+      samples: [{ x: e.clientX, t: performance.now() }],
     };
   };
 
@@ -188,9 +190,15 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
     if (!g || g.pointerId !== e.pointerId) return;
     const dx = e.clientX - g.startX;
     const dy = e.clientY - g.startY;
+    const now = performance.now();
+
+    g.samples.push({ x: e.clientX, t: now });
+    while (g.samples.length > 2 && now - g.samples[0].t > 105) {
+      g.samples.shift();
+    }
 
     if (g.axis === null) {
-      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+      if (Math.abs(dx) > 6 && Math.abs(dx) >= Math.abs(dy) * 0.9) {
         g.axis = "horizontal";
         g.moved = true;
         setIsDragging(true);
@@ -199,15 +207,19 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
         } catch {
           // ignore if capture unavailable
         }
-      } else if (Math.abs(dy) > 8) {
+      } else if (Math.abs(dy) > 7 && Math.abs(dy) > Math.abs(dx) * 1.15) {
         g.axis = "vertical";
       }
     }
 
     if (g.axis === "horizontal") {
-      // Gentle rubber resistance beyond 150px
-      const clamped = Math.max(-185, Math.min(185, dx));
-      setDragX(clamped);
+      // Silky 1:1 follow with gentle hyperbolic rubber resistance beyond 140px
+      const absDx = Math.abs(dx);
+      const effective =
+        absDx <= 140
+          ? dx
+          : Math.sign(dx) * (140 + ((absDx - 140) * 0.38) / (1 + (absDx - 140) / 140));
+      setDragX(Math.max(-195, Math.min(195, effective)));
     }
   };
 
@@ -215,6 +227,13 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
     const g = gestureRef.current;
     gestureRef.current = null;
     if (!g || g.pointerId !== e.pointerId) return;
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // ignore
+    }
     if (g.axis === "horizontal") {
       suppressClickRef.current = true;
       window.setTimeout(() => {
@@ -222,8 +241,24 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
       }, 240);
 
       const finalDx = e.clientX - g.startX;
-      if (Math.abs(finalDx) >= 46) {
-        cycleNext(finalDx < 0 ? -1 : 1);
+      const now = performance.now();
+      let vx = 0;
+      if (g.samples.length >= 2) {
+        const newest = g.samples[g.samples.length - 1];
+        if (now - newest.t < 90) {
+          const oldest = g.samples[0];
+          const dt = newest.t - oldest.t;
+          if (dt > 5) {
+            vx = (newest.x - oldest.x) / dt;
+          }
+        }
+      }
+
+      // Effortless iOS flick detection: either deliberate drag (>= 38px) OR quick velocity flick (|vx| >= 0.24 px/ms & >= 14px)!
+      const isVelocityFlick = Math.abs(vx) >= 0.24 && Math.abs(finalDx) >= 14;
+      if (Math.abs(finalDx) >= 38 || isVelocityFlick) {
+        const dir = isVelocityFlick ? (vx < 0 ? -1 : 1) : finalDx < 0 ? -1 : 1;
+        cycleNext(dir);
       } else {
         setIsDragging(false);
         setDragX(0);

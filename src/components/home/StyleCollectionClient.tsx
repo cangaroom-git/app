@@ -12,6 +12,7 @@ import {
 } from "@/data/thailandProvinces";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { UltraHorizontalScroll } from "@/components/shared/UltraHorizontalScroll";
 import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import {
@@ -554,9 +555,10 @@ export function StyleCollectionClient({
             <ArrowLeft className="w-4 h-4" strokeWidth={2.2} />
           </Link>
 
-          <nav
+          <UltraHorizontalScroll
+            as="nav"
             aria-label={isTh ? "เปลี่ยนสไตล์ที่เที่ยว" : "Switch travel style"}
-            className="h-11 flex-1 min-w-0 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar select-none"
+            className="h-11 flex-1 min-w-0 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-x-contain overscroll-y-none no-scrollbar select-none"
           >
             {STYLE_SWITCHER_ITEMS.map((item) => {
               const isCurrent = item.slug === meta.slug;
@@ -574,7 +576,7 @@ export function StyleCollectionClient({
                 </Link>
               );
             })}
-          </nav>
+          </UltraHorizontalScroll>
         </div>
 
         {/* Editorial Style Heading + Quiet Bridge to "เที่ยวไหน" Map */}
@@ -606,7 +608,7 @@ export function StyleCollectionClient({
 
         {/* Clean Single-Row Sub-Filter Bar: Province Chips + 0% GP Toggle + Custom Sort */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar touch-pan-x min-w-0 flex-1">
+          <UltraHorizontalScroll className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y min-w-0 flex-1">
             <button
               type="button"
               aria-pressed={selectedProvince === null}
@@ -649,7 +651,7 @@ export function StyleCollectionClient({
                 </button>
               );
             })}
-          </div>
+          </UltraHorizontalScroll>
 
           <div className="flex items-center gap-2 shrink-0">
             {meta.slug !== "direct" && (

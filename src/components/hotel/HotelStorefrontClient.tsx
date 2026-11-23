@@ -44,6 +44,7 @@ import {
 } from "@/lib/bookingMath";
 import { formatShortDate, type LanguageCode } from "@/lib/dateFormatters";
 import { getFacilityIconMeta } from "@/lib/facilityIcons";
+import { UltraHorizontalScroll } from "@/components/shared/UltraHorizontalScroll";
 import {
   getOptimizedPinImageSrcSet,
   getOptimizedPinImageUrl,
@@ -2358,7 +2359,7 @@ export function HotelStorefrontClient({
         }`}
       >
         <div className="cgr-page-standard flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar">
+          <UltraHorizontalScroll className="flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-x-contain overscroll-y-none no-scrollbar">
             {anchorNavItems.map((item) => {
               const isActive = activeAnchor === item.id;
               return (
@@ -2376,7 +2377,7 @@ export function HotelStorefrontClient({
                 </button>
               );
             })}
-          </div>
+          </UltraHorizontalScroll>
 
           {minRoomPrice > 0 && (
             <div className="hidden lg:flex items-center gap-3 shrink-0 py-2">
@@ -2580,11 +2581,11 @@ export function HotelStorefrontClient({
                 </div>
               </div>
 
-              <div
+              <UltraHorizontalScroll
                 className={
                   coupons.length === 1
                     ? "max-w-[380px]"
-                    : "-mx-4 px-4 scroll-px-4 sm:mx-0 sm:px-0 flex sm:grid sm:grid-cols-2 gap-3.5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory no-scrollbar"
+                    : "-mx-4 px-4 sm:mx-0 sm:px-0 flex sm:grid sm:grid-cols-2 gap-3.5 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y sm:touch-auto sm:overflow-visible no-scrollbar"
                 }
               >
                 {coupons.map((coupon) => (
@@ -2592,7 +2593,7 @@ export function HotelStorefrontClient({
                     key={coupon.id}
                     className={
                       coupons.length > 1
-                        ? "w-[88%] max-w-[340px] sm:w-auto sm:max-w-none shrink-0 snap-start"
+                        ? "w-[88%] max-w-[340px] sm:w-auto sm:max-w-none shrink-0"
                         : "w-full"
                     }
                   >
@@ -2611,7 +2612,7 @@ export function HotelStorefrontClient({
                     />
                   </div>
                 ))}
-              </div>
+              </UltraHorizontalScroll>
             </section>
           )}
 
@@ -3502,11 +3503,11 @@ export function HotelStorefrontClient({
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory gap-3.5 -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:scroll-px-0 md:pb-0 md:grid md:grid-cols-2 md:gap-x-16 md:gap-y-8">
+            <UltraHorizontalScroll className="flex overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y md:touch-auto gap-3.5 -mx-4 px-4 sm:-mx-6 sm:px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-2 md:gap-x-16 md:gap-y-8">
               {reviews.slice(0, 6).map((rv) => (
                 <article
                   key={rv.id}
-                  className="w-[82vw] max-w-[330px] shrink-0 snap-start rounded-[16px] border border-[var(--color-border)] p-4 flex flex-col justify-between gap-3 md:w-auto md:max-w-none md:rounded-none md:border-0 md:p-0"
+                  className="w-[82vw] max-w-[330px] shrink-0 rounded-[16px] border border-[var(--color-border)] p-4 flex flex-col justify-between gap-3 md:w-auto md:max-w-none md:rounded-none md:border-0 md:p-0"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -3562,7 +3563,10 @@ export function HotelStorefrontClient({
                   </div>
 
                   {rv.photoUrls.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pt-1">
+                    <UltraHorizontalScroll
+                      ultraOptions={{ stopPropagation: true }}
+                      className="flex gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y no-scrollbar pt-1"
+                    >
                       {rv.photoUrls.map((u, idx) => (
                         <img
                           key={idx}
@@ -3584,11 +3588,11 @@ export function HotelStorefrontClient({
                           className="h-20 w-28 rounded-[10px] object-cover cursor-pointer shrink-0 hover:brightness-95 transition"
                         />
                       ))}
-                    </div>
+                    </UltraHorizontalScroll>
                   )}
                 </article>
               ))}
-            </div>
+            </UltraHorizontalScroll>
 
             <button
               type="button"
@@ -3659,11 +3663,11 @@ export function HotelStorefrontClient({
             </Link>
           </div>
 
-          <div className="flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory gap-4 -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:scroll-px-0 md:pb-0 md:grid md:grid-cols-3 md:gap-6 md:items-start">
+          <UltraHorizontalScroll className="flex overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y md:touch-auto gap-4 -mx-4 px-4 sm:-mx-6 sm:px-6 pb-1 no-scrollbar md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-3 md:gap-6 md:items-start">
             {posts.map((post) => (
               <article
                 key={post.id}
-                className="w-[80vw] max-w-[310px] shrink-0 snap-start md:w-auto md:max-w-none flex flex-col gap-3"
+                className="w-[80vw] max-w-[310px] shrink-0 md:w-auto md:max-w-none flex flex-col gap-3"
               >
                 <Link
                   href={`/${hotel.slug}/posts/${post.slug}`}
@@ -3727,7 +3731,7 @@ export function HotelStorefrontClient({
                 </div>
               </article>
             ))}
-          </div>
+          </UltraHorizontalScroll>
         </section>
       )}
 
@@ -3750,11 +3754,11 @@ export function HotelStorefrontClient({
             </p>
           </div>
 
-          <div className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1">
+          <UltraHorizontalScroll className="flex gap-3.5 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 pb-1">
             {nearbyPlaces.slice(0, 8).map((nearby) => (
               <div
                 key={nearby.id}
-                className="w-[44vw] min-w-[154px] max-w-[186px] sm:w-[192px] shrink-0 snap-start"
+                className="w-[44vw] min-w-[154px] max-w-[186px] sm:w-[192px] shrink-0"
               >
                 <VerticalCouponCard
                   pin={nearby}
@@ -3768,7 +3772,7 @@ export function HotelStorefrontClient({
                 />
               </div>
             ))}
-          </div>
+          </UltraHorizontalScroll>
         </section>
       )}
 
@@ -4114,7 +4118,10 @@ export function HotelStorefrontClient({
               )}
 
               {rv.photoUrls.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pt-1">
+                <UltraHorizontalScroll
+                  ultraOptions={{ stopPropagation: true }}
+                  className="flex gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y no-scrollbar pt-1"
+                >
                   {rv.photoUrls.map((u, idx) => (
                     <img
                       key={idx}
@@ -4136,7 +4143,7 @@ export function HotelStorefrontClient({
                       className="h-20 w-28 rounded-[10px] object-cover cursor-pointer shrink-0 hover:brightness-95 transition"
                     />
                   ))}
-                </div>
+                </UltraHorizontalScroll>
               )}
             </article>
           ))}

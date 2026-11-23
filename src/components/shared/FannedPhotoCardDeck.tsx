@@ -828,15 +828,21 @@ export function FannedPhotoCardDeck({
             ? 50
             : Math.max(10, 45 - Math.round(absRel * 10));
 
-          // Non-center cards smoothly desaturate to crisp warm grayscale + softer opacity so the vivid full-color larger center card commands 100% focus!
+          // Non-center cards smoothly desaturate into soft, airy faded gray so the vivid larger center hero card commands 100% focus!
           const grayscaleAmount =
             absRel <= 0.05 ? 0 : Math.min(1, absRel * 1.15);
           const cardContentOpacity =
             absRel <= 0.05
               ? 1
               : absRel <= 1
-              ? 1 - absRel * 0.34
-              : Math.max(0.42, 0.66 - (absRel - 1) * 0.22);
+              ? 1 - absRel * 0.56
+              : Math.max(0.24, 0.44 - (absRel - 1) * 0.18);
+          // Subtle floating elevation shadow strictly on the center hero card (respects coupon side cutouts via drop-shadow!)
+          const centerLift = Math.max(0, 1 - absRel * 1.35);
+          const centerShadowFilter =
+            centerLift > 0.02
+              ? `drop-shadow(0 16px 26px rgba(0, 0, 0, ${(0.22 * centerLift).toFixed(3)})) drop-shadow(0 4px 10px rgba(0, 0, 0, ${(0.11 * centerLift).toFixed(3)}))`
+              : "none";
 
           // Center-Out Staggered Spring Entry Delay (0ms -> 85ms -> 170ms)
           const entryDelayMs =
@@ -849,23 +855,23 @@ export function FannedPhotoCardDeck({
             transitionCss = "none";
           } else if (isTuckedByMap) {
             transitionCss =
-              "transform 230ms var(--ease-ios-sheet), opacity 180ms ease";
+              "transform 230ms var(--ease-ios-sheet), opacity 180ms ease, filter 220ms ease";
           } else if (isShufflingOut) {
             transitionCss =
-              "transform 140ms var(--ease-ios-sheet), opacity 125ms ease";
+              "transform 140ms var(--ease-ios-sheet), opacity 125ms ease, filter 160ms ease";
           } else if (!hasEntered) {
             transitionCss = "none";
           } else if (!entrySettled) {
-            transitionCss = `transform 520ms cubic-bezier(0.22, 1, 0.36, 1) ${entryDelayMs}ms, opacity 240ms ease ${entryDelayMs}ms`;
+            transitionCss = `transform 520ms cubic-bezier(0.22, 1, 0.36, 1) ${entryDelayMs}ms, opacity 240ms ease ${entryDelayMs}ms, filter 280ms ease ${entryDelayMs}ms`;
           } else if (isHiddenForFlip) {
             transitionCss = "none";
           } else if (absRel > 2.25) {
             transitionCss =
-              "transform 260ms var(--ease-ios-sheet), opacity 220ms ease";
+              "transform 260ms var(--ease-ios-sheet), opacity 220ms ease, filter 220ms ease";
           } else {
             // Critically-damped ultra-smooth iOS deceleration (zero ugly rubber snap-back!)
             transitionCss =
-              "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease";
+              "transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease, filter 280ms ease";
           }
 
           const shouldPopInOuter =
@@ -906,6 +912,7 @@ export function FannedPhotoCardDeck({
                   3
                 )})`,
                 opacity,
+                filter: centerShadowFilter,
                 visibility: isHiddenForFlip ? "hidden" : "visible",
                 zIndex,
                 transformOrigin: "50% 108%",
@@ -918,7 +925,7 @@ export function FannedPhotoCardDeck({
                 !isTuckedByMap
                   ? "pointer-events-auto"
                   : "pointer-events-none"
-              } cgr-fanned-coupon-wrap absolute ${
+              } absolute ${
                 bottomOffsetPx === null
                   ? "bottom-[4px] sm:bottom-[6px] lg:bottom-[6px]"
                   : ""
@@ -1027,7 +1034,13 @@ export function FannedPhotoCardDeck({
                     opacity: cardContentOpacity,
                     filter:
                       grayscaleAmount > 0.01
-                        ? `grayscale(${grayscaleAmount.toFixed(2)})`
+                        ? `grayscale(${grayscaleAmount.toFixed(2)}) brightness(${(
+                            1 +
+                            grayscaleAmount * 0.14
+                          ).toFixed(2)}) contrast(${(
+                            1 -
+                            grayscaleAmount * 0.18
+                          ).toFixed(2)})`
                         : "none",
                     transition: isDraggingDeck
                       ? "none"
@@ -1036,13 +1049,20 @@ export function FannedPhotoCardDeck({
                   className="absolute inset-0 w-full h-full object-cover object-center"
                 />
 
-                {/* Top-Left Flush Corner Category Crest (+ Trip Stop #) — Grayscale on Non-Center Cards */}
+                {/* Top-Left Flush Corner Category Crest (+ Trip Stop #) — Soft Faded Gray on Non-Center Cards */}
                 <div
                   style={{
-                    opacity: cardContentOpacity,
+                    opacity:
+                      absRel <= 0.05 ? 1 : cardContentOpacity * 0.82,
                     filter:
                       grayscaleAmount > 0.01
-                        ? `grayscale(${grayscaleAmount.toFixed(2)})`
+                        ? `grayscale(${grayscaleAmount.toFixed(2)}) brightness(${(
+                            1 +
+                            grayscaleAmount * 0.18
+                          ).toFixed(2)}) contrast(${(
+                            1 -
+                            grayscaleAmount * 0.14
+                          ).toFixed(2)})`
                         : "none",
                     transition: isDraggingDeck
                       ? "none"

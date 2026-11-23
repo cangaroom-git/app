@@ -41,6 +41,7 @@ import {
   X,
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
+import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import {
   getOptimizedPinImageSrcSet,
   getOptimizedPinImageUrl,
@@ -1396,6 +1397,7 @@ export function PinterestPinDetail({
   const desktopCommentInputRef = useRef<HTMLInputElement | null>(null);
   const desktopCommentsSectionRef = useRef<HTMLDivElement | null>(null);
   const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
+  useUltraHorizontalScroll(thumbnailStripRef, { stopPropagation: true });
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const pageSwipeTrackRef = useRef<HTMLDivElement | null>(null);
   const leftPeekPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2885,7 +2887,7 @@ export function PinterestPinDetail({
           >
             <div
               ref={thumbnailStripRef}
-              className="flex-1 flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-1.5 -mx-1.5"
+              className="flex-1 flex items-center gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y no-scrollbar py-1.5 px-1.5 -mx-1.5"
             >
               {stageSlides.map((slide, idx) => {
                 const isCurrent = idx === slideIndex;

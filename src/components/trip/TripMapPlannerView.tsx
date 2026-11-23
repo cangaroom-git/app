@@ -247,6 +247,7 @@ export function TripMapPlannerView({
   const [isDeckReorderMode, setIsDeckReorderMode] = useState(false);
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const [sheetDragDy, setSheetDragDy] = useState(0);
+  const [sheetDragHeight, setSheetDragHeight] = useState<number | null>(null);
   const [isMapMoving, setIsMapMoving] = useState(false);
 
   const isDeckHiddenRef = useRef(isDeckHidden);
@@ -254,6 +255,7 @@ export function TripMapPlannerView({
   const isMapMovingRef = useRef(isMapMoving);
   isMapMovingRef.current = isMapMoving;
   const sheetSwipeStartYRef = useRef<number | null>(null);
+  const sheetBaseHeightRef = useRef<number>(76);
   const sheetDragMovedRef = useRef(false);
   const isProgrammaticCameraRef = useRef(false);
   const userGestureActiveRef = useRef(false);
@@ -358,11 +360,24 @@ export function TripMapPlannerView({
   // Highlight "Play" Trip Story Playback Mode
   const [isPlayingStory, setIsPlayingStory] = useState(false);
 
+  const getExpandedSheetHeight = () =>
+    typeof window !== "undefined" && window.innerWidth >= 640 ? 358 : 314;
+  const getCollapsedSheetHeight = () =>
+    typeof window !== "undefined" && window.innerWidth >= 1024 ? 74 : 76;
+
   const handleSheetPullMove = useCallback(
     (dy: number) => {
       if (isPlayingStory) return;
       setIsDraggingSheet(true);
-      setSheetDragDy(dy);
+      if (dy < 0) {
+        setSheetDragDy(0);
+        setSheetDragHeight(
+          getExpandedSheetHeight() + Math.min(22, Math.abs(dy) * 0.25)
+        );
+      } else {
+        setSheetDragHeight(null);
+        setSheetDragDy(Math.min(280, dy));
+      }
     },
     [isPlayingStory]
   );
@@ -371,6 +386,7 @@ export function TripMapPlannerView({
     (dy: number, vy: number) => {
       setIsDraggingSheet(false);
       setSheetDragDy(0);
+      setSheetDragHeight(null);
       if (!isPlayingStory && (dy >= 48 || (dy >= 20 && vy > 0.32))) {
         setIsDeckReorderMode(false);
         setIsDeckHidden(true);
@@ -1904,7 +1920,12 @@ export function TripMapPlannerView({
             style={
               isDraggingSheet
                 ? {
-                    transform: `translate3d(0, ${sheetDragDy}px, 0)`,
+                    ...(sheetDragHeight !== null
+                      ? { height: `${sheetDragHeight}px` }
+                      : {}),
+                    ...(sheetDragDy > 0
+                      ? { transform: `translate3d(0, ${sheetDragDy}px, 0)` }
+                      : {}),
                   }
                 : undefined
             }
@@ -1929,6 +1950,7 @@ export function TripMapPlannerView({
                 }}
                 onTouchStart={(e) => {
                   sheetSwipeStartYRef.current = e.touches[0]?.clientY ?? null;
+                  sheetBaseHeightRef.current = getCollapsedSheetHeight();
                   sheetDragMovedRef.current = false;
                 }}
                 onTouchMove={(e) => {
@@ -1939,11 +1961,19 @@ export function TripMapPlannerView({
                   if (Math.abs(rawDy) > 4) {
                     sheetDragMovedRef.current = true;
                     setIsDraggingSheet(true);
-                    const resisted =
-                      rawDy > 0
-                        ? rawDy * 0.35
-                        : Math.max(-72, rawDy * 0.65);
-                    setSheetDragDy(resisted);
+                    if (rawDy < 0) {
+                      const baseH = sheetBaseHeightRef.current;
+                      const maxH = getExpandedSheetHeight();
+                      const nextH = Math.min(
+                        maxH + 16,
+                        baseH + Math.abs(rawDy)
+                      );
+                      setSheetDragDy(0);
+                      setSheetDragHeight(nextH);
+                    } else {
+                      setSheetDragDy(0);
+                      setSheetDragHeight(sheetBaseHeightRef.current);
+                    }
                   }
                 }}
                 onTouchEnd={(e) => {
@@ -1952,10 +1982,11 @@ export function TripMapPlannerView({
                   const endY = e.changedTouches[0]?.clientY;
                   setIsDraggingSheet(false);
                   setSheetDragDy(0);
+                  setSheetDragHeight(null);
                   if (
                     startY !== null &&
                     endY !== undefined &&
-                    startY - endY >= 24
+                    startY - endY >= 20
                   ) {
                     setIsDeckHidden(false);
                   }
@@ -1964,6 +1995,7 @@ export function TripMapPlannerView({
                   sheetSwipeStartYRef.current = null;
                   setIsDraggingSheet(false);
                   setSheetDragDy(0);
+                  setSheetDragHeight(null);
                 }}
                 aria-expanded={false}
                 aria-label={
@@ -1971,7 +2003,7 @@ export function TripMapPlannerView({
                     ? `แสดง ${entries.length} สถานที่ในทริปนี้`
                     : `Show ${entries.length} places in this trip`
                 }
-                className="cgr-sheet-content-in w-full h-full flex flex-col items-center justify-center gap-2 px-5 cursor-pointer hover:bg-[var(--color-background-muted)]/60 transition-colors"
+                className="cgr-sheet-content-in w-full h-full flex flex-col items-center justify-start pt-3.5 gap-2 px-5 cursor-pointer touch-none hover:bg-[var(--color-background-muted)]/60 transition-colors"
               >
                 <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
                 <span className="inline-flex items-center gap-1.5 text-[14.5px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] tracking-[-0.01em] tabular-nums">
@@ -2017,9 +2049,16 @@ export function TripMapPlannerView({
                     if (Math.abs(rawDy) > 4) {
                       sheetDragMovedRef.current = true;
                       setIsDraggingSheet(true);
-                      const resisted =
-                        rawDy < 0 ? rawDy * 0.35 : Math.min(260, rawDy);
-                      setSheetDragDy(resisted);
+                      if (rawDy < 0) {
+                        setSheetDragDy(0);
+                        setSheetDragHeight(
+                          getExpandedSheetHeight() +
+                            Math.min(22, Math.abs(rawDy) * 0.18)
+                        );
+                      } else {
+                        setSheetDragHeight(null);
+                        setSheetDragDy(Math.min(260, rawDy));
+                      }
                     }
                   }}
                   onTouchEnd={(e) => {
@@ -2028,6 +2067,7 @@ export function TripMapPlannerView({
                     const endY = e.changedTouches[0]?.clientY;
                     setIsDraggingSheet(false);
                     setSheetDragDy(0);
+                    setSheetDragHeight(null);
                     if (
                       !isPlayingStory &&
                       startY !== null &&
@@ -2042,6 +2082,7 @@ export function TripMapPlannerView({
                     sheetSwipeStartYRef.current = null;
                     setIsDraggingSheet(false);
                     setSheetDragDy(0);
+                    setSheetDragHeight(null);
                   }}
                   aria-label={isTh ? "ซ่อนแถบการ์ด" : "Hide cards"}
                   title={isTh ? "ซ่อนการ์ด" : "Hide cards"}

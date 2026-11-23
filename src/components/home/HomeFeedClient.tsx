@@ -27,6 +27,7 @@ import { useHotelApp } from "@/components/HotelAppShell";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import { DealSlideRow } from "@/components/home/DealSlideRow";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
+import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import type {
   HotelPostSummaryDto,
   PinCommentDto,
@@ -199,6 +200,8 @@ export function HomeFeedClient({
   const inlineTabsSentinelRef = useRef<HTMLDivElement | null>(null);
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
   const stickyTabsScrollRef = useRef<HTMLDivElement | null>(null);
+  useUltraHorizontalScroll(tabsScrollRef);
+  useUltraHorizontalScroll(stickyTabsScrollRef);
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const stickyTabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
     {}
@@ -1004,7 +1007,7 @@ export function HomeFeedClient({
             <div
               ref={stickyTabsScrollRef}
               data-style-tabs-bar="true"
-              className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar select-none"
+              className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-x-contain overscroll-y-none no-scrollbar select-none"
             >
               {STAY_STYLE_TABS.map((tab) => {
                 const isActive = activeAnchorId === tab.id;
@@ -1053,7 +1056,7 @@ export function HomeFeedClient({
           <div
             ref={tabsScrollRef}
             data-style-tabs-bar="true"
-            className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
+            className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
           >
             {STAY_STYLE_TABS.map((tab) => {
               const isActive = activeAnchorId === tab.id;

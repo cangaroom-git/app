@@ -7,12 +7,13 @@ import type { LanguageCode } from "@/lib/dateFormatters";
 import { SeeAllCouponCard } from "@/components/home/SeeAllCouponCard";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
+import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
 // Mobile (< sm): 2 cards + gentle peek; Tablet (sm..lg-1): 3 cards + gentle peek;
 // Desktop lg (1024-1279px): EXACTLY 5 FULL 3:4 CARDS; Desktop xl (>= 1280px): EXACTLY 6 FULL 3:4 CARDS (ZERO clipped edge card!)
 export const COUPON_CARD_SLOT_WIDTH_CLASS =
-  "w-[calc((100%-36px)/2)] sm:w-[calc((100%-52px)/3)] lg:w-[calc((100%-64px)/5)] xl:w-[calc((100%-80px)/6)] shrink-0 snap-start flex items-start";
+  "w-[calc((100%-36px)/2)] sm:w-[calc((100%-52px)/3)] lg:w-[calc((100%-64px)/5)] xl:w-[calc((100%-80px)/6)] shrink-0 flex items-start";
 
 export interface DealSlideRowProps {
   id?: string;
@@ -92,6 +93,10 @@ export const DealSlideRow = React.memo(function DealSlideRow({
     };
   }, [deals.length, updateScrollBounds]);
 
+  const { scrollBySmooth } = useUltraHorizontalScroll(trackRef, {
+    onScrollUpdate: updateScrollBounds,
+  });
+
   const scrollByStep = (direction: "prev" | "next") => {
     const el = trackRef.current;
     if (!el) return;
@@ -102,10 +107,7 @@ export const DealSlideRow = React.memo(function DealSlideRow({
     const step = isDesktop
       ? el.clientWidth + 16
       : Math.max(280, Math.round(el.clientWidth * 0.78));
-    el.scrollBy({
-      left: direction === "next" ? step : -step,
-      behavior: "smooth",
-    });
+    scrollBySmooth(direction === "next" ? step : -step, 480);
   };
 
   if (deals.length === 0) return null;
@@ -219,11 +221,11 @@ export const DealSlideRow = React.memo(function DealSlideRow({
         </div>
       </div>
 
-      {/* Pure Horizontal Card Slide Track — Allows BOTH Vertical Page Scroll & Horizontal Slide on Touch Devices! */}
+      {/* Ultra-Smooth 120fps Inertial Momentum Card Slide Track — Pure Vertical Page Scroll + Fluid Horizontal Coast! */}
       <div
         ref={trackRef}
         data-swipe-ignore="true"
-        className={`${trackEdgeClassName} flex items-start gap-3 lg:gap-4 overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-proximity lg:snap-mandatory`}
+        className={`${trackEdgeClassName} flex items-start gap-3 lg:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y no-scrollbar`}
       >
         {visibleDeals.map((deal, idx) => (
           <div

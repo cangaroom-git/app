@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
+import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
 export interface ExploreHorizontalCardStripProps {
@@ -101,10 +102,18 @@ export function ExploreHorizontalCardStrip({
     };
   }, [deals.length, syncScrollButtons]);
 
+  const { scrollBySmooth, scrollToSmooth, stopMotion } =
+    useUltraHorizontalScroll(scrollRef, {
+      stopPropagation: true,
+      onVerticalPullMove: onSheetPullMove,
+      onVerticalPullEnd: onSheetPullEnd,
+      onScrollUpdate: syncScrollButtons,
+    });
+
   // Scroll behavior:
   // - Initial mount (e.g. Back from /{slug} or Fan->List toggle): jump silently (`instant`) ONLY if active card is off-screen
   // - New deals loaded (after map pan/zoom/filter/shuffle): instantly reset to left=0 with ZERO sideways slide animation!
-  // - Same deals + activeIdx changed via map pin click: smoothly center the selected card
+  // - Same deals + activeIdx changed via map pin click: smoothly center the selected card via 120fps ease-out
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -123,11 +132,9 @@ export function ExploreHorizontalCardStrip({
         const isOutsideView =
           nodeRect.left < elRect.left || nodeRect.right > elRect.right;
         if (isOutsideView) {
-          node.scrollIntoView({
-            behavior: "instant",
-            inline: "center",
-            block: "nearest",
-          });
+          const target =
+            node.offsetLeft - Math.max(0, (el.clientWidth - node.clientWidth) / 2);
+          el.scrollLeft = Math.max(0, target);
         }
       }
       const timer = window.setTimeout(syncScrollButtons, 60);
@@ -135,7 +142,8 @@ export function ExploreHorizontalCardStrip({
     }
 
     if (dealsChanged) {
-      el.scrollTo({ left: 0, behavior: "instant" });
+      stopMotion();
+      el.scrollLeft = 0;
       const timer = window.setTimeout(syncScrollButtons, 60);
       return () => window.clearTimeout(timer);
     }
@@ -145,120 +153,23 @@ export function ExploreHorizontalCardStrip({
     const node = activeDeal ? cardNodesRef.current.get(activeDeal.id) : null;
     if (!node) return;
 
-    node.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
-    });
+    const targetLeft =
+      node.offsetLeft - Math.max(0, (el.clientWidth - node.clientWidth) / 2);
+    scrollToSmooth(targetLeft, 440);
 
-    const timer = window.setTimeout(syncScrollButtons, 360);
+    const timer = window.setTimeout(syncScrollButtons, 460);
     return () => window.clearTimeout(timer);
-  }, [activeIdx, deals, dealsKey, syncScrollButtons]);
+  }, [activeIdx, deals, dealsKey, scrollToSmooth, stopMotion, syncScrollButtons]);
 
-  const onSheetPullMoveRef = useRef(onSheetPullMove);
-  onSheetPullMoveRef.current = onSheetPullMove;
-  const onSheetPullEndRef = useRef(onSheetPullEnd);
-  onSheetPullEndRef.current = onSheetPullEnd;
-
-  // Dual-axis native touch arbitrator on horizontal card track:
-  // - Horizontal swipe -> 100% locked native horizontal scroll (zero vertical wobble!)
-  // - Vertical downward drag -> prevents browser pull-to-refresh & collapses parent white dock sheet 1:1!
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    let state: {
-      startX: number;
-      startY: number;
-      axis: "horizontal" | "vertical" | null;
-      samples: Array<{ y: number; t: number }>;
-    } | null = null;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      const t = e.touches[0];
-      if (!t) return;
-      state = {
-        startX: t.clientX,
-        startY: t.clientY,
-        axis: null,
-        samples: [{ y: t.clientY, t: performance.now() }],
-      };
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (!state || e.touches.length !== 1) return;
-      const t = e.touches[0];
-      if (!t) return;
-
-      const dx = t.clientX - state.startX;
-      const dy = t.clientY - state.startY;
-      const now = performance.now();
-
-      if (state.axis === null) {
-        if (Math.abs(dx) > 6 && Math.abs(dx) >= Math.abs(dy) * 0.9) {
-          state.axis = "horizontal";
-        } else if (Math.abs(dy) > 7 && Math.abs(dy) > Math.abs(dx) * 1.15) {
-          state.axis = "vertical";
-        }
-      }
-
-      if (state.axis === "vertical") {
-        // Strictly block browser pull-to-refresh & vertical bounce!
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-        state.samples.push({ y: t.clientY, t: now });
-        while (state.samples.length > 2 && now - state.samples[0].t > 105) {
-          state.samples.shift();
-        }
-        const resisted = dy < 0 ? dy * 0.28 : Math.min(280, dy);
-        onSheetPullMoveRef.current?.(resisted);
-      }
-    };
-
-    const finishTouch = (e: TouchEvent) => {
-      if (!state) return;
-      const st = state;
-      state = null;
-      if (st.axis !== "vertical") return;
-
-      const t = e.changedTouches[0];
-      const dy = t ? t.clientY - st.startY : 0;
-      const now = performance.now();
-      let vy = 0;
-      if (st.samples.length >= 2) {
-        const newest = st.samples[st.samples.length - 1];
-        if (now - newest.t < 90) {
-          const oldest = st.samples[0];
-          const dt = newest.t - oldest.t;
-          if (dt > 6) vy = (newest.y - oldest.y) / dt;
-        }
-      }
-      onSheetPullEndRef.current?.(dy, vy);
-    };
-
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", finishTouch, { passive: true });
-    el.addEventListener("touchcancel", finishTouch, { passive: true });
-
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", finishTouch);
-      el.removeEventListener("touchcancel", finishTouch);
-    };
-  }, []);
-
-  const handleStepScroll = useCallback((direction: -1 | 1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const delta = Math.max(320, Math.round(el.clientWidth * 0.68));
-    el.scrollBy({
-      left: direction * delta,
-      behavior: "smooth",
-    });
-  }, []);
+  const handleStepScroll = useCallback(
+    (direction: -1 | 1) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const delta = Math.max(320, Math.round(el.clientWidth * 0.68));
+      scrollBySmooth(direction * delta, 460);
+    },
+    [scrollBySmooth]
+  );
 
   if (deals.length === 0) return null;
 
@@ -277,13 +188,13 @@ export function ExploreHorizontalCardStrip({
           </button>
         )}
 
-        {/* Single-Row Horizontally Scrollable Card Track (Strictly X-Locked: ZERO Vertical Wobble!) */}
+        {/* Single-Row Ultra-Smooth Inertial Momentum Card Track (Strictly X-Locked + Downward Sheet Collapse!) */}
         <div
           ref={scrollRef}
           onScroll={syncScrollButtons}
           onPointerDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          className="flex flex-nowrap items-start gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain overscroll-y-none touch-pan-x no-scrollbar snap-x snap-proximity lg:snap-mandatory w-full h-full px-4 sm:px-5 lg:px-5 scroll-px-4 sm:scroll-px-5 lg:scroll-px-5 pt-1 pb-2.5 sm:pt-1.5 sm:pb-3"
+          className="flex flex-nowrap items-start gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-none touch-none no-scrollbar w-full h-full px-4 sm:px-5 lg:px-5 pt-1 pb-2.5 sm:pt-1.5 sm:pb-3"
         >
           {deals.slice(0, visibleCount).map((deal, idx) => (
             <div
@@ -295,7 +206,7 @@ export function ExploreHorizontalCardStrip({
                   cardNodesRef.current.delete(deal.id);
                 }
               }}
-              className="shrink-0 w-[132px] sm:w-[152px] snap-start"
+              className="shrink-0 w-[132px] sm:w-[152px]"
             >
               <VerticalCouponCard
                 pin={deal}

@@ -23,6 +23,7 @@ import type { LanguageCode } from "@/lib/dateFormatters";
 import { getOptimizedPinImageUrl } from "@/lib/mediaUtils";
 import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { UltraHorizontalScroll } from "@/components/shared/UltraHorizontalScroll";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import type {
   HotelPostSummaryDto,
@@ -628,11 +629,11 @@ export function PlaceOnlyProfileBody({
               </Link>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1">
+            <UltraHorizontalScroll className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 pb-1">
               {ownerFeedPosts.map((post) => (
                 <article
                   key={post.id}
-                  className="w-[260px] sm:w-[290px] shrink-0 snap-start flex flex-col gap-2.5"
+                  className="w-[260px] sm:w-[290px] shrink-0 flex flex-col gap-2.5"
                 >
                   <Link
                     href={`/${encodeURIComponent(post.hotelSlug)}/posts/${encodeURIComponent(post.slug)}`}
@@ -674,7 +675,7 @@ export function PlaceOnlyProfileBody({
                   </div>
                 </article>
               ))}
-            </div>
+            </UltraHorizontalScroll>
           </section>
         )}
 
@@ -701,11 +702,11 @@ export function PlaceOnlyProfileBody({
               </Link>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1">
+            <UltraHorizontalScroll className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 pb-1">
               {ownerBlogs.map((blog) => (
                 <article
                   key={blog.id}
-                  className="w-[272px] sm:w-[310px] shrink-0 snap-start flex flex-col gap-2.5"
+                  className="w-[272px] sm:w-[310px] shrink-0 flex flex-col gap-2.5"
                 >
                   <Link
                     href={`/${encodeURIComponent(blog.hotelSlug)}/posts/${encodeURIComponent(blog.slug)}`}
@@ -748,7 +749,7 @@ export function PlaceOnlyProfileBody({
                   </div>
                 </article>
               ))}
-            </div>
+            </UltraHorizontalScroll>
           </section>
         )}
 
@@ -831,11 +832,11 @@ export function PlaceOnlyProfileBody({
               </p>
             </div>
 
-            <div className="flex gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory touch-pan-x -mx-4 px-4 scroll-px-4 sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0 pb-1">
+            <UltraHorizontalScroll className="flex gap-3.5 sm:gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 pb-1">
               {nearbyPlaces.slice(0, 8).map((nearby) => (
                 <div
                   key={nearby.id}
-                  className="w-[44vw] min-w-[154px] max-w-[186px] sm:w-[192px] shrink-0 snap-start"
+                  className="w-[44vw] min-w-[154px] max-w-[186px] sm:w-[192px] shrink-0"
                 >
                   <VerticalCouponCard
                     pin={nearby}
@@ -849,7 +850,7 @@ export function PlaceOnlyProfileBody({
                   />
                 </div>
               ))}
-            </div>
+            </UltraHorizontalScroll>
           </section>
         )}
       </div>

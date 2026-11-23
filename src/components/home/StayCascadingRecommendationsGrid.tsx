@@ -11,6 +11,7 @@ import {
 } from "@/data/thailandProvinces";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
+import { UltraHorizontalScroll } from "@/components/shared/UltraHorizontalScroll";
 import type { PinFeedItemDto } from "@/types/cangaroom";
 
 type TierId =
@@ -300,7 +301,7 @@ export function StayCascadingRecommendationsGrid({
 
       {/* Cascading Tier Filter Chips (Borderless Warm Minimal Squircles) */}
       {tierPills.length > 2 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden no-scrollbar touch-pan-x pb-0.5">
+        <UltraHorizontalScroll className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar touch-pan-y pb-0.5">
           {tierPills.map((pill) => {
             const isActive = activeTier === pill.id;
             return (
@@ -329,7 +330,7 @@ export function StayCascadingRecommendationsGrid({
               </button>
             );
           })}
-        </div>
+        </UltraHorizontalScroll>
       )}
 
       {/* Pure Vertical Grid: Mobile 2 cols -> Tablet 3-4 cols -> Desktop 5-6 cols matching Home 3:4 card width! */}
