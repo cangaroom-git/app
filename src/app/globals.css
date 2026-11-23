@@ -1075,8 +1075,13 @@ html.dark .border-stone-300 {
   .cgr-fade-slide-pill[data-state="open"] {
     opacity: 1;
   }
-  .cgr-map-mobile-sheet {
+  .cgr-map-mobile-sheet,
+  .cgr-explore-dock-sheet {
+    transform: none !important;
     transition: opacity 140ms ease !important;
+  }
+  .cgr-explore-dock-sheet[data-tucked="true"] {
+    opacity: 0;
   }
   .cgr-sheet-content-in,
   .cgr-popover-appear {
@@ -1163,6 +1168,38 @@ html.dark .border-stone-300 {
     opacity 240ms var(--ease-out-expo);
 }
 .cgr-map-mobile-sheet[data-dragging="true"] {
+  transition: none !important;
+}
+
+/* Persistent Explore Bottom Dock Sheet (Expanded Fan/List <-> Permanent Collapsed Peek Bar + Map-Drag Fade Slide-Out/In)
+   Follows Cangaroom Motion Constitution:
+   - Enter/Reveal: 360ms --ease-out-expo (translate3d + opacity)
+   - Exit/Tuck on map drag: 250ms --ease-ios-sheet (~30% faster than enter)
+   - Continuous Detent Morph: 420ms --ease-ios-sheet
+   - 1:1 Direct Touch Tracking ([data-dragging="true"]): transition: none! */
+.cgr-explore-dock-sheet {
+  will-change: transform, height, opacity, border-radius;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    transform var(--duration-sheet) var(--ease-out-expo),
+    opacity 280ms var(--ease-out-expo),
+    height var(--duration-morph) var(--ease-ios-sheet),
+    border-radius var(--duration-morph) var(--ease-ios-sheet);
+}
+.cgr-explore-dock-sheet[data-tucked="true"] {
+  transform: translate3d(0, 100%, 0);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--duration-sheet-exit) var(--ease-ios-sheet),
+    opacity 200ms var(--ease-ios-sheet),
+    height var(--duration-morph) var(--ease-ios-sheet),
+    border-radius var(--duration-morph) var(--ease-ios-sheet);
+}
+.cgr-explore-dock-sheet[data-dragging="true"] {
   transition: none !important;
 }
 

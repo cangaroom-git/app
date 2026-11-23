@@ -14,11 +14,17 @@ export interface ExploreCameraSnapshot {
   zoom: number;
   activeDealId: string | null;
   hasUserMovedMap?: boolean;
+  /** Exact visible deal ID order before leaving /explore so Back restores 1:1 order with zero scrambling */
+  visibleDealIds?: string[];
+  activeIdx?: number;
+  deckViewMode?: "fan" | "list";
+  isDeckHidden?: boolean;
   ts: number;
 }
 
 const NEARBY_HOP_KEY = "nondii:nearby-hop-origin:v1";
 const EXPLORE_CAMERA_KEY = "nondii:explore-camera:v1";
+const EXPLORE_VIEW_MODE_KEY = "nondii:explore-view-mode:v1";
 const TRIP_ACTIVE_INDEX_PREFIX = "nondii:trip-active-idx:v1:";
 
 export function saveNearbyHopOrigin(origin: Omit<PlaceNearbyHopOrigin, "ts">): void {
@@ -88,34 +94,69 @@ export function saveExploreCameraSnapshot(
   }
 }
 
+export function saveExploreViewMode(mode: "fan" | "list"): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(EXPLORE_VIEW_MODE_KEY, mode);
+  } catch {
+    // ignore
+  }
+}
+
+export function readExploreViewMode(): "fan" | "list" | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(EXPLORE_VIEW_MODE_KEY);
+    return raw === "list" || raw === "fan" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeExploreSnapshot(
+  parsed: Partial<ExploreCameraSnapshot> | null
+): ExploreCameraSnapshot | null {
+  if (
+    !parsed ||
+    typeof parsed.lat !== "number" ||
+    typeof parsed.lng !== "number" ||
+    typeof parsed.zoom !== "number" ||
+    typeof parsed.ts !== "number"
+  ) {
+    return null;
+  }
+  if (Date.now() - parsed.ts > 30 * 60 * 1000) return null;
+  return {
+    lat: parsed.lat,
+    lng: parsed.lng,
+    zoom: parsed.zoom,
+    activeDealId:
+      typeof parsed.activeDealId === "string" ? parsed.activeDealId : null,
+    hasUserMovedMap:
+      typeof parsed.hasUserMovedMap === "boolean"
+        ? parsed.hasUserMovedMap
+        : true,
+    visibleDealIds: Array.isArray(parsed.visibleDealIds)
+      ? parsed.visibleDealIds.filter((id): id is string => typeof id === "string")
+      : undefined,
+    activeIdx: typeof parsed.activeIdx === "number" ? parsed.activeIdx : undefined,
+    deckViewMode:
+      parsed.deckViewMode === "list" || parsed.deckViewMode === "fan"
+        ? parsed.deckViewMode
+        : undefined,
+    isDeckHidden:
+      typeof parsed.isDeckHidden === "boolean" ? parsed.isDeckHidden : undefined,
+    ts: parsed.ts,
+  };
+}
+
 export function peekExploreCameraSnapshot(): ExploreCameraSnapshot | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.sessionStorage.getItem(EXPLORE_CAMERA_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ExploreCameraSnapshot>;
-    if (
-      !parsed ||
-      typeof parsed.lat !== "number" ||
-      typeof parsed.lng !== "number" ||
-      typeof parsed.zoom !== "number" ||
-      typeof parsed.ts !== "number"
-    ) {
-      return null;
-    }
-    if (Date.now() - parsed.ts > 30 * 60 * 1000) return null;
-    return {
-      lat: parsed.lat,
-      lng: parsed.lng,
-      zoom: parsed.zoom,
-      activeDealId:
-        typeof parsed.activeDealId === "string" ? parsed.activeDealId : null,
-      hasUserMovedMap:
-        typeof parsed.hasUserMovedMap === "boolean"
-          ? parsed.hasUserMovedMap
-          : true,
-      ts: parsed.ts,
-    };
+    return normalizeExploreSnapshot(parsed);
   } catch {
     return null;
   }
@@ -128,28 +169,7 @@ export function consumeExploreCameraSnapshot(): ExploreCameraSnapshot | null {
     if (!raw) return null;
     window.sessionStorage.removeItem(EXPLORE_CAMERA_KEY);
     const parsed = JSON.parse(raw) as Partial<ExploreCameraSnapshot>;
-    if (
-      !parsed ||
-      typeof parsed.lat !== "number" ||
-      typeof parsed.lng !== "number" ||
-      typeof parsed.zoom !== "number" ||
-      typeof parsed.ts !== "number"
-    ) {
-      return null;
-    }
-    if (Date.now() - parsed.ts > 30 * 60 * 1000) return null;
-    return {
-      lat: parsed.lat,
-      lng: parsed.lng,
-      zoom: parsed.zoom,
-      activeDealId:
-        typeof parsed.activeDealId === "string" ? parsed.activeDealId : null,
-      hasUserMovedMap:
-        typeof parsed.hasUserMovedMap === "boolean"
-          ? parsed.hasUserMovedMap
-          : true,
-      ts: parsed.ts,
-    };
+    return normalizeExploreSnapshot(parsed);
   } catch {
     return null;
   }

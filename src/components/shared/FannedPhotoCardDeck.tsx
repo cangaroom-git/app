@@ -47,6 +47,12 @@ export interface FannedPhotoCardDeckProps {
   /** Top-right button behavior on the active center card */
   cardTopAction?: "remove" | "bookmark" | "none";
   savedPinIds?: Set<string>;
+  /** Optional visible vertical fraction of the center card (default 1 = 100%; e.g. 0.85 = 85% visible, 15% clipped at bottom) */
+  centerVisibleRatio?: number;
+  /** Renders a clean solid white bottom backdrop behind the fan deck on Mobile/Tablet (< lg) to separate cards from the map */
+  showMobileWhiteBackdrop?: boolean;
+  /** Captures horizontal deck swipes across the mobile/tablet bottom backdrop area when backdrop is rendered by parent */
+  captureMobileBackdropSwipe?: boolean;
   onSelectIndex: (nextIndex: number) => void;
   onOpenCard: (
     pin: PinFeedItemDto,
@@ -145,6 +151,9 @@ export function FannedPhotoCardDeck({
   enableReorder = false,
   cardTopAction = "none",
   savedPinIds,
+  centerVisibleRatio = 1,
+  showMobileWhiteBackdrop = false,
+  captureMobileBackdropSwipe = false,
   onSelectIndex,
   onOpenCard,
   onRemovePin,
@@ -517,6 +526,12 @@ export function FannedPhotoCardDeck({
   const cardW = isCompactMobile ? 180 : 216;
   const cardH = isCompactMobile ? 240 : 288;
   const stepX = Math.round(cardW * 0.57);
+  const clampedVisibleRatio = Math.max(0.45, Math.min(1, centerVisibleRatio));
+  const bottomOffsetPx =
+    clampedVisibleRatio < 1
+      ? -Math.round(cardH * (1 - clampedVisibleRatio))
+      : null;
+  const isDeckTuckedByMap = isMapMoving && !isModalActive;
 
   const safeActiveIdx =
     renderedItems.length === 0
@@ -624,15 +639,42 @@ export function FannedPhotoCardDeck({
   return (
     <>
       {/* =====================================================================
-          FLUSH-BOTTOM 85-90% VISIBLE FANNED PHOTO DECK (BOTH MOBILE & DESKTOP!)
+          FLUSH-BOTTOM FANNED PHOTO DECK (BOTH MOBILE & DESKTOP!)
       ====================================================================== */}
       <div
         onPointerDown={handleDeckPointerDown}
         onPointerMove={handleDeckPointerMove}
         onPointerUp={handleDeckPointerUp}
         onPointerCancel={handleDeckPointerUp}
-        className="absolute inset-x-0 bottom-0 z-30 h-[250px] sm:h-[300px] lg:h-[324px] pointer-events-none flex items-end justify-center touch-pan-y"
+        className={`absolute inset-x-0 bottom-0 z-10 ${
+          clampedVisibleRatio < 1
+            ? "h-[260px] sm:h-[300px] lg:h-[300px]"
+            : "h-[250px] sm:h-[300px] lg:h-[324px] z-30"
+        } pointer-events-none flex items-end justify-center touch-pan-y`}
       >
+        {/* Transparent swipe capture layer over parent-rendered mobile white backdrop */}
+        {captureMobileBackdropSwipe && !isDeckTuckedByMap && !isModalActive && (
+          <div
+            aria-hidden="true"
+            className="lg:hidden pointer-events-auto absolute inset-0 z-0"
+          />
+        )}
+        {/* Clean Solid White Backdrop Behind Fan Deck on Mobile/Tablet (< lg) */}
+        {showMobileWhiteBackdrop && (
+          <div
+            aria-hidden="true"
+            style={{
+              transform: isDeckTuckedByMap
+                ? "translate3d(0, 100%, 0)"
+                : "translate3d(0, 0, 0)",
+              opacity: isDeckTuckedByMap ? 0 : 1,
+              transition: isDeckTuckedByMap
+                ? "transform 230ms var(--ease-ios-sheet), opacity 180ms ease"
+                : "transform 360ms var(--ease-ios-sheet), opacity 220ms ease",
+            }}
+            className="lg:hidden pointer-events-auto absolute inset-x-0 bottom-0 z-0 h-[272px] sm:h-[308px] rounded-t-[26px] bg-[var(--color-background-body)] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] will-change-transform"
+          />
+        )}
         {renderedItems.map((item, idx) => {
           const isCenter = idx === safeActiveIdx;
           const isTuckedByMap = isMapMoving && !isModalActive;
@@ -746,6 +788,9 @@ export function FannedPhotoCardDeck({
               style={{
                 width: `${cardW}px`,
                 height: `${cardH}px`,
+                ...(bottomOffsetPx !== null
+                  ? { bottom: `${bottomOffsetPx}px` }
+                  : {}),
                 transform: `translate3d(${tx}px, ${ty}px, 0) rotate(${rot}deg)`,
                 opacity,
                 visibility: isHiddenForFlip ? "hidden" : "visible",
@@ -760,7 +805,11 @@ export function FannedPhotoCardDeck({
                 !isTuckedByMap
                   ? "pointer-events-auto"
                   : "pointer-events-none"
-              } cgr-fanned-coupon-wrap absolute bottom-[4px] sm:bottom-[6px] lg:bottom-[6px] will-change-transform`}
+              } cgr-fanned-coupon-wrap absolute ${
+                bottomOffsetPx === null
+                  ? "bottom-[4px] sm:bottom-[6px] lg:bottom-[6px]"
+                  : ""
+              } will-change-transform`}
             >
               {/* Clean Bg-Less Floating Promo + Place Name Above Center Card ONLY */}
               {isCenter && (

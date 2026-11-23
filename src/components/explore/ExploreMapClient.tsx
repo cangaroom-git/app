@@ -3,6 +3,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,8 +13,10 @@ import dynamic from "next/dynamic";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
+  ChevronUp,
   Crosshair,
   Globe,
+  Layers,
   LayoutGrid,
   Loader2,
   Minus,
@@ -34,7 +37,9 @@ import { useHotelApp } from "@/components/HotelAppShell";
 import {
   consumeExploreCameraSnapshot,
   peekExploreCameraSnapshot,
+  readExploreViewMode,
   saveExploreCameraSnapshot,
+  saveExploreViewMode,
 } from "@/lib/placeNavigationStore";
 import {
   configureThailandMapInteractions,
@@ -45,10 +50,8 @@ import {
   THAILAND_MAX_ZOOM,
   WORLD_MIN_ZOOM,
 } from "@/lib/geo/airbnbMapLibreStyle";
-import {
-  getDealPromoOnlyHeadline,
-  VerticalCouponCard,
-} from "@/components/home/VerticalCouponCard";
+import { getDealPromoOnlyHeadline } from "@/components/home/VerticalCouponCard";
+import { ExploreHorizontalCardStrip } from "@/components/explore/ExploreHorizontalCardStrip";
 import {
   getPlaceCategoryMeta,
   PLACE_CATEGORIES,
@@ -120,6 +123,7 @@ interface MapBoundsSnapshot {
 }
 
 const MIN_EXPLORE_CAMERA_ZOOM = 5.1;
+const EXPLORE_MAP_SETTLE_DELAY_MS = 1000;
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
@@ -300,9 +304,17 @@ export function ExploreMapClient({
   const [recentPinIds, setRecentPinIds] =
     useState<string[]>(initialRecentPinIds);
 
-  // Modal States: List Modal (Slide-Up on Mobile / Centered Modal on Desktop) & Unified Filter Modal
-  const [isListModalOpen, setIsListModalOpen] = useState(false);
+  // Bottom Deck Presentation Mode ("fan" = Fanned Photo Deck | "list" = Horizontal Single-Row Card Strip),
+  // Permanent Hide/Collapse state (Airbnb peek bar — stays hidden until user explicitly clicks to expand!), & Filter Modal
+  const [deckViewMode, setDeckViewMode] = useState<"fan" | "list">("fan");
+  const [isDeckHidden, setIsDeckHidden] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const [sheetDragDy, setSheetDragDy] = useState(0);
+  const isDeckHiddenRef = useRef(isDeckHidden);
+  isDeckHiddenRef.current = isDeckHidden;
+  const sheetSwipeStartYRef = useRef<number | null>(null);
+  const sheetDragMovedRef = useRef(false);
 
   // Map Viewport & Auto-Shuffle Deck State
   const [mapBounds, setMapBounds] = useState<MapBoundsSnapshot | null>(null);
@@ -317,9 +329,13 @@ export function ExploreMapClient({
   const [manualShuffleOrder, setManualShuffleOrder] = useState<string[] | null>(
     null
   );
+  // Exact 1:1 card order restored on Back navigation from /{slug} (locks deck order until user pans/filters/shuffles!)
+  const [restoredDealIds, setRestoredDealIds] = useState<string[] | null>(null);
   const [pinnedOutsideDealId, setPinnedOutsideDealId] = useState<string | null>(
     null
   );
+  const deckViewModeRef = useRef(deckViewMode);
+  deckViewModeRef.current = deckViewMode;
 
   // User GPS Location State
   const [userCoords, setUserCoords] = useState<{
@@ -383,6 +399,13 @@ export function ExploreMapClient({
   const userLocationMarkerRef = useRef<maplibregl.Marker | null>(null);
   const isProgrammaticCameraRef = useRef(false);
   const userGestureActiveRef = useRef(false);
+  const pendingUserGestureRef = useRef(false);
+  const isMapMovingRef = useRef(false);
+  isMapMovingRef.current = isMapMoving;
+  const settleTimerRef = useRef<number | null>(null);
+  const onMapUserStartRef = useRef<(e: { originalEvent?: Event }) => void>(() => {});
+  const onMapMoveStartRef = useRef<(e: { originalEvent?: Event }) => void>(() => {});
+  const onMapMoveEndRef = useRef<() => void>(() => {});
   const prevDeckSignatureRef = useRef<string>("");
   const skipNextDeckSignatureRef = useRef(false);
   const pendingRestoreDealIdRef = useRef<string | null>(null);
@@ -390,16 +413,13 @@ export function ExploreMapClient({
   hasUserMovedMapRef.current = hasUserMovedMap;
   const [isMapReady, setIsMapReady] = useState(false);
 
-  const listModalPresence = useModalPresence(isListModalOpen, 250);
   const filterModalPresence = useModalPresence(isFilterModalOpen, 250);
   const listDetailPresence = useModalPresence(
     Boolean(selectedPinId) && detailOpenSource === "list",
     240
   );
   useBodyScrollLock(
-    filterModalPresence.shouldRender ||
-      listModalPresence.shouldRender ||
-      listDetailPresence.shouldRender
+    filterModalPresence.shouldRender || listDetailPresence.shouldRender
   );
 
   // Clean up list-mode detail snapshot after fade slide-out finishes so content never flashes blank mid-exit
@@ -414,7 +434,7 @@ export function ExploreMapClient({
     }
   }, [detailOpenSource, listDetailPresence.shouldRender, selectedPinId]);
 
-  // Escape key dismisses topmost modal cleanly (Filter -> List Detail -> List Modal)
+  // Escape key dismisses topmost modal cleanly (Filter -> List Detail)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -428,14 +448,11 @@ export function ExploreMapClient({
         setPinHistoryStack([]);
         setDetailRestoreScrollY(null);
         setSelectedPinId(null);
-      } else if (isListModalOpen && !selectedPinId) {
-        e.preventDefault();
-        setIsListModalOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [detailOpenSource, fullscreenMedia, isFilterModalOpen, isListModalOpen, selectedPinId]);
+  }, [detailOpenSource, fullscreenMedia, isFilterModalOpen, selectedPinId]);
 
   // Preload PinterestPinDetail chunk silently so tapping any card flips instantaneously!
   useEffect(() => {
@@ -445,17 +462,54 @@ export function ExploreMapClient({
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
+  // Synchronously restore exact view mode, hidden state, active card & 1:1 card order BEFORE first paint on Back!
+  useLayoutEffect(() => {
     if (initialQuery && !globalSearchQuery) {
       setGlobalSearchQuery(initialQuery);
     }
-    // Pre-focus the previously clicked card at t=0ms on Back so the fan rises ONCE
-    // with the exact card already dead-center (zero double-bounce!).
+
+    const savedMode = readExploreViewMode();
     if (!initialCenter) {
       const peek = peekExploreCameraSnapshot();
       if (peek) {
         skipNextDeckSignatureRef.current = true;
         pendingRestoreDealIdRef.current = peek.activeDealId;
+
+        if (peek.deckViewMode) {
+          setDeckViewMode(peek.deckViewMode);
+        } else if (savedMode) {
+          setDeckViewMode(savedMode);
+        }
+        if (typeof peek.isDeckHidden === "boolean") {
+          setIsDeckHidden(peek.isDeckHidden);
+        }
+        if (peek.hasUserMovedMap) {
+          setHasUserMovedMap(true);
+        }
+
+        if (peek.visibleDealIds && peek.visibleDealIds.length > 0) {
+          const availableIds = new Set(
+            attributeFilteredDealsRef.current.map((d) => d.id)
+          );
+          const validOrder = peek.visibleDealIds.filter((id) =>
+            availableIds.has(id)
+          );
+          if (validOrder.length > 0) {
+            skipNextDeckSignatureRef.current = false;
+            setRestoredDealIds(validOrder);
+            const restoredIdx = peek.activeDealId
+              ? validOrder.indexOf(peek.activeDealId)
+              : typeof peek.activeIdx === "number"
+              ? peek.activeIdx
+              : -1;
+            if (restoredIdx >= 0) {
+              setActiveIdx(restoredIdx);
+              pendingRestoreDealIdRef.current = null;
+            }
+            return;
+          }
+        }
+
         if (!peek.hasUserMovedMap && peek.activeDealId) {
           const idx = visibleDealsRef.current.findIndex(
             (d) => d.id === peek.activeDealId
@@ -465,9 +519,27 @@ export function ExploreMapClient({
             pendingRestoreDealIdRef.current = null;
           }
         }
+        return;
       }
     }
+
+    if (savedMode) {
+      setDeckViewMode(savedMode);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist user's chosen Fan <-> Horizontal Row mode across navigations
+  const handleToggleDeckViewMode = useCallback(() => {
+    if (isDeckHiddenRef.current) {
+      setIsDeckHidden(false);
+      return;
+    }
+    setDeckViewMode((prev) => {
+      const next = prev === "fan" ? "list" : "fan";
+      saveExploreViewMode(next);
+      return next;
+    });
   }, []);
 
   // Silently fetch user GPS coordinates on load if browser permission is already granted
@@ -606,8 +678,18 @@ export function ExploreMapClient({
     globalSearchQuery,
   ]);
 
-  // 2. Spatial bounds filtering (excluding bottom card-covered strip when open area has deals!)
+  // 2. Spatial bounds filtering (preserving exact 1:1 restored card order on Back until next user pan/filter/shuffle!)
   const visibleDeals = useMemo(() => {
+    if (restoredDealIds && restoredDealIds.length > 0) {
+      const dealById = new Map(attributeFilteredDeals.map((d) => [d.id, d]));
+      const restored = restoredDealIds
+        .map((id) => dealById.get(id))
+        .filter((d): d is PinFeedItemDto => Boolean(d));
+      if (restored.length > 0) {
+        return restored;
+      }
+    }
+
     let base: PinFeedItemDto[];
     if (!mapBounds || !hasUserMovedMap) {
       base = attributeFilteredDeals;
@@ -669,6 +751,7 @@ export function ExploreMapClient({
     manualShuffleOrder,
     mapBounds,
     pinnedOutsideDealId,
+    restoredDealIds,
   ]);
 
   // Trigger Auto-Shuffle animation ONLY when the visible deal signature actually changes!
@@ -750,16 +833,23 @@ export function ExploreMapClient({
       typeof window !== "undefined" ? window.innerWidth >= 1024 : true;
     if (isDesktop) {
       return {
-        top: 64,
-        right: 92,
-        bottom: Math.min(Math.round(containerH * 0.45), 252),
-        left: 72,
+        top: 56,
+        right: 84,
+        bottom: isDeckHiddenRef.current
+          ? 56
+          : Math.min(Math.round(containerH * 0.48), 276),
+        left: 64,
       };
     }
+    const isTablet =
+      typeof window !== "undefined" ? window.innerWidth >= 640 : false;
+    const mobileBottom = isDeckHiddenRef.current
+      ? 92
+      : Math.min(Math.round(containerH * 0.52), isTablet ? 348 : 308);
     return {
       top: 72,
       right: 56,
-      bottom: Math.min(Math.round(containerH * 0.46), 268),
+      bottom: mobileBottom,
       left: 32,
     };
   }, []);
@@ -771,8 +861,15 @@ export function ExploreMapClient({
       const w = el?.clientWidth || window.innerWidth;
       const h = el?.clientHeight || window.innerHeight;
       const isDesktop = window.innerWidth >= 1024;
+      const isTablet = window.innerWidth >= 640;
       const padTop = isDesktop ? 44 : 48;
-      const padBottom = Math.min(Math.round(h * 0.42), isDesktop ? 236 : 252);
+      const padBottom = isDesktop
+        ? isDeckHiddenRef.current
+          ? 44
+          : Math.min(Math.round(h * 0.48), 276)
+        : isDeckHiddenRef.current
+        ? 92
+        : Math.min(Math.round(h * 0.52), isTablet ? 348 : 308);
       const padSide = isDesktop ? 48 : 16;
 
       const nw = map.unproject([padSide, padTop]);
@@ -865,6 +962,99 @@ export function ExploreMapClient({
     [getMapCameraPadding]
   );
 
+  const clearSettleTimer = useCallback(() => {
+    if (settleTimerRef.current !== null) {
+      window.clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleMapSettleReveal = useCallback(
+    (wasUserGesture: boolean) => {
+      clearSettleTimer();
+      // 1000ms (1s) Settle-to-Reveal debounce:
+      // Gives generous breathing room for consecutive drag-lift-drag strokes so the bottom sheet
+      // stays tucked until the user genuinely finishes exploring, then glides smoothly back up once!
+      settleTimerRef.current = window.setTimeout(() => {
+        settleTimerRef.current = null;
+        pendingUserGestureRef.current = false;
+        const map = mapRef.current;
+        if (!map) {
+          setIsMapMoving(false);
+          return;
+        }
+        if (wasUserGesture) {
+          const nextBounds = readEffectiveBounds(map);
+          const nextInArea = getDealsInBounds(
+            attributeFilteredDealsRef.current,
+            nextBounds
+          );
+          const currentSetKey = getUnorderedDealSetKey(
+            visibleDealsRef.current
+          );
+          const nextSetKey = getUnorderedDealSetKey(nextInArea);
+          if (nextSetKey === currentSetKey) {
+            // Exact same stays -> smoothly rise the same cards back up with ZERO reload!
+            setIsMapMoving(false);
+            return;
+          }
+          // Batch new bounds + activeIdx + shuffleKey + isMapMoving=false atomically
+          // so the tucked deck swaps invisibly and springs straight up with ZERO double-dip!
+          skipNextDeckSignatureRef.current = true;
+          setRestoredDealIds(null);
+          setManualShuffleOrder(null);
+          setPinnedOutsideDealId(null);
+          setHasUserMovedMap(true);
+          setMapBounds(nextBounds);
+          setActiveIdx(getExploreSymmetricStartIdx(nextInArea.length));
+          setShuffleKey((k) => k + 1);
+        }
+        setIsMapMoving(false);
+      }, EXPLORE_MAP_SETTLE_DELAY_MS);
+    },
+    [clearSettleTimer, readEffectiveBounds]
+  );
+
+  onMapUserStartRef.current = (e: { originalEvent?: Event }) => {
+    if (e.originalEvent) {
+      clearSettleTimer();
+      userGestureActiveRef.current = true;
+      pendingUserGestureRef.current = true;
+      isProgrammaticCameraRef.current = false;
+      setIsMapMoving(true);
+    }
+  };
+
+  onMapMoveStartRef.current = (e: { originalEvent?: Event }) => {
+    if (e.originalEvent) {
+      clearSettleTimer();
+    }
+  };
+
+  onMapMoveEndRef.current = () => {
+    syncMarkersLodRef.current();
+    clearSettleTimer();
+    if (lodRafRef.current !== null) {
+      window.cancelAnimationFrame(lodRafRef.current);
+      lodRafRef.current = null;
+    }
+
+    if (
+      isProgrammaticCameraRef.current &&
+      !userGestureActiveRef.current &&
+      !pendingUserGestureRef.current
+    ) {
+      isProgrammaticCameraRef.current = false;
+      setIsMapMoving(false);
+      return;
+    }
+
+    const wasUserGesture =
+      userGestureActiveRef.current || pendingUserGestureRef.current;
+    userGestureActiveRef.current = false;
+    scheduleMapSettleReveal(wasUserGesture);
+  };
+
   // Initialize MapLibre Vector Map ($0 OpenFreeMap style matching /trip!)
   useEffect(() => {
     const el = mapContainerRef.current;
@@ -872,7 +1062,6 @@ export function ExploreMapClient({
 
     let cancelled = false;
     let mapInstance: maplibregl.Map | null = null;
-    let settleTimer: number | null = null;
 
     const initMap = async () => {
       ensureMapLibreWorker();
@@ -893,21 +1082,23 @@ export function ExploreMapClient({
         ? 11.4
         : THAILAND_DEFAULT_ZOOM;
       if (restoredCam) {
-        // Restore camera & active card silently with ZERO redundant 2nd fan bounce!
-        skipNextDeckSignatureRef.current = true;
-        pendingRestoreDealIdRef.current = restoredCam.activeDealId;
-        if (restoredCam.hasUserMovedMap) {
-          setHasUserMovedMap(true);
-          if (restoredCam.activeDealId) {
-            setPinnedOutsideDealId(restoredCam.activeDealId);
-          }
-        } else if (restoredCam.activeDealId) {
-          const idx = visibleDealsRef.current.findIndex(
-            (d) => d.id === restoredCam.activeDealId
-          );
-          if (idx >= 0) {
-            setActiveIdx(idx);
-            pendingRestoreDealIdRef.current = null;
+        // Camera, exact card order, active card & view mode are already restored synchronously in useLayoutEffect!
+        if (!restoredCam.visibleDealIds?.length) {
+          skipNextDeckSignatureRef.current = true;
+          pendingRestoreDealIdRef.current = restoredCam.activeDealId;
+          if (restoredCam.hasUserMovedMap) {
+            setHasUserMovedMap(true);
+            if (restoredCam.activeDealId) {
+              setPinnedOutsideDealId(restoredCam.activeDealId);
+            }
+          } else if (restoredCam.activeDealId) {
+            const idx = visibleDealsRef.current.findIndex(
+              (d) => d.id === restoredCam.activeDealId
+            );
+            if (idx >= 0) {
+              setActiveIdx(idx);
+              pendingRestoreDealIdRef.current = null;
+            }
           }
         }
       }
@@ -929,7 +1120,7 @@ export function ExploreMapClient({
       mapInstance.on("load", () => {
         if (cancelled || !mapInstance) return;
         setIsMapReady(true);
-        if (restoredCam) {
+        if (restoredCam && !restoredCam.visibleDealIds?.length) {
           skipNextDeckSignatureRef.current = true;
         }
         setMapBounds(readEffectiveBounds(mapInstance));
@@ -942,16 +1133,9 @@ export function ExploreMapClient({
         }
       });
 
-      const onUserStart = (e: { originalEvent?: Event }) => {
-        if (e.originalEvent) {
-          userGestureActiveRef.current = true;
-          isProgrammaticCameraRef.current = false;
-          setIsMapMoving(true);
-        }
-      };
-
-      mapInstance.on("dragstart", onUserStart);
-      mapInstance.on("zoomstart", onUserStart);
+      mapInstance.on("dragstart", (e) => onMapUserStartRef.current(e));
+      mapInstance.on("zoomstart", (e) => onMapUserStartRef.current(e));
+      mapInstance.on("movestart", (e) => onMapMoveStartRef.current(e));
       mapInstance.on("zoom", () => {
         if (lodRafRef.current !== null) return;
         lodRafRef.current = window.requestAnimationFrame(() => {
@@ -959,60 +1143,7 @@ export function ExploreMapClient({
           syncMarkersLodRef.current();
         });
       });
-
-      mapInstance.on("moveend", () => {
-        syncMarkersLodRef.current();
-        if (settleTimer !== null) window.clearTimeout(settleTimer);
-      if (lodRafRef.current !== null) {
-        window.cancelAnimationFrame(lodRafRef.current);
-        lodRafRef.current = null;
-      }
-
-        if (isProgrammaticCameraRef.current && !userGestureActiveRef.current) {
-          isProgrammaticCameraRef.current = false;
-          setIsMapMoving(false);
-          return;
-        }
-
-        const wasUserGesture = userGestureActiveRef.current;
-        userGestureActiveRef.current = false;
-
-        // 240ms Settle-to-Shuffle debounce:
-        // Cards stay tucked beneath bottom edge while moving, then rise smoothly in 1 continuous stroke!
-        // Only swap/reload deals if the SET of visible stays actually changed!
-        settleTimer = window.setTimeout(() => {
-          if (!mapInstance) {
-            setIsMapMoving(false);
-            return;
-          }
-          if (wasUserGesture) {
-            const nextBounds = readEffectiveBounds(mapInstance);
-            const nextInArea = getDealsInBounds(
-              attributeFilteredDealsRef.current,
-              nextBounds
-            );
-            const currentSetKey = getUnorderedDealSetKey(
-              visibleDealsRef.current
-            );
-            const nextSetKey = getUnorderedDealSetKey(nextInArea);
-            if (nextSetKey === currentSetKey) {
-              // Exact same stays -> smoothly rise the same cards back up with ZERO reload!
-              setIsMapMoving(false);
-              return;
-            }
-            // Batch new bounds + activeIdx + shuffleKey + isMapMoving=false atomically
-            // so the tucked deck swaps invisibly and springs straight up with ZERO double-dip!
-            skipNextDeckSignatureRef.current = true;
-            setManualShuffleOrder(null);
-            setPinnedOutsideDealId(null);
-            setHasUserMovedMap(true);
-            setMapBounds(nextBounds);
-            setActiveIdx(getExploreSymmetricStartIdx(nextInArea.length));
-            setShuffleKey((k) => k + 1);
-          }
-          setIsMapMoving(false);
-        }, 240);
-      });
+      mapInstance.on("moveend", () => onMapMoveEndRef.current());
     };
 
     void initMap();
@@ -1028,7 +1159,7 @@ export function ExploreMapClient({
     return () => {
       cancelled = true;
       ro?.disconnect();
-      if (settleTimer !== null) window.clearTimeout(settleTimer);
+      clearSettleTimer();
       if (lodRafRef.current !== null) {
         window.cancelAnimationFrame(lodRafRef.current);
         lodRafRef.current = null;
@@ -1106,7 +1237,13 @@ export function ExploreMapClient({
     const h = el.clientHeight;
     const isDesktop = window.innerWidth >= 1024;
     const topSafe = isDesktop ? 82 : 112;
-    const bottomSafe = h - Math.min(Math.round(h * 0.42), isDesktop ? 225 : 264);
+    const bottomSafe =
+      h -
+      (isDeckHiddenRef.current
+        ? isDesktop
+          ? 56
+          : 92
+        : Math.min(Math.round(h * 0.48), isDesktop ? 276 : 308));
     const sideSafe = isDesktop ? 76 : 42;
 
     if (
@@ -1371,6 +1508,7 @@ export function ExploreMapClient({
           } else {
             setPinnedOutsideDealId(deal.id);
           }
+          setRestoredDealIds(null);
           setManualShuffleOrder(nextOrder);
           setActiveIdx(getExploreSymmetricStartIdx(nextOrder.length));
           panSoftlyToDealIfNeeded(deal);
@@ -1413,6 +1551,7 @@ export function ExploreMapClient({
       [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
     }
     skipNextDeckSignatureRef.current = true;
+    setRestoredDealIds(null);
     setManualShuffleOrder(shuffled.map((d) => d.id));
     setActiveIdx(getExploreSymmetricStartIdx(shuffled.length));
     setShuffleKey((k) => k + 1);
@@ -1477,6 +1616,7 @@ export function ExploreMapClient({
   // Reset to All Thailand / All Filtered Deals
   const handleResetMapArea = useCallback(() => {
     setHasUserMovedMap(false);
+    setRestoredDealIds(null);
     setManualShuffleOrder(null);
     setPinnedOutsideDealId(null);
     setActiveIdx(getExploreSymmetricStartIdx(attributeFilteredDeals.length));
@@ -1491,6 +1631,7 @@ export function ExploreMapClient({
     setRecentOnly(false);
     setGlobalSearchQuery("");
     setHasUserMovedMap(false);
+    setRestoredDealIds(null);
     setManualShuffleOrder(null);
     setPinnedOutsideDealId(null);
     setActiveIdx(getExploreSymmetricStartIdx(allDeals.length));
@@ -1574,22 +1715,26 @@ export function ExploreMapClient({
       ? visibleDeals[activePinIdxInDeck + 1] ?? null
       : null;
 
-  // Save current MapLibre camera before leaving /explore so pressing Back restores exact spot!
-  const persistExploreCameraBeforeNavigate = useCallback(
-    (dealId: string) => {
-      const map = mapRef.current;
-      if (!map) return;
-      const c = map.getCenter();
-      saveExploreCameraSnapshot({
-        lat: c.lat,
-        lng: c.lng,
-        zoom: map.getZoom(),
-        activeDealId: dealId,
-        hasUserMovedMap: hasUserMovedMapRef.current,
-      });
-    },
-    []
-  );
+  // Save current MapLibre camera, exact card order & view mode before leaving /explore so Back restores 1:1!
+  const persistExploreCameraBeforeNavigate = useCallback((dealId: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const c = map.getCenter();
+    const currentVisibleIds = visibleDealsRef.current.map((d) => d.id);
+    const currentIdx = currentVisibleIds.indexOf(dealId);
+    saveExploreViewMode(deckViewModeRef.current);
+    saveExploreCameraSnapshot({
+      lat: c.lat,
+      lng: c.lng,
+      zoom: map.getZoom(),
+      activeDealId: dealId,
+      hasUserMovedMap: hasUserMovedMapRef.current,
+      visibleDealIds: currentVisibleIds,
+      activeIdx: currentIdx >= 0 ? currentIdx : undefined,
+      deckViewMode: deckViewModeRef.current,
+      isDeckHidden: isDeckHiddenRef.current,
+    });
+  }, []);
 
   // Open from Bottom Fanned Deck -> Persistent Cross-Route 3D Card Flip straight into /{slug}!
   const handleOpenCardFlip = useCallback(
@@ -1606,12 +1751,11 @@ export function ExploreMapClient({
     [navigateToPlaceWithFlip, persistExploreCameraBeforeNavigate]
   );
 
-  // Open from List Modal -> Persistent Cross-Route 3D Card Flip straight into /{slug}!
+  // Open from Horizontal List Strip -> Persistent Cross-Route 3D Card Flip straight into /{slug}!
   const handleOpenDetailFromList = useCallback(
     (pin: PinFeedItemDto, originRect?: CardOriginRect | null) => {
       clearLastClickedPinOrigin();
       persistExploreCameraBeforeNavigate(pin.id);
-      setIsListModalOpen(false);
       navigateToPlaceWithFlip({ pin, originRect });
     },
     [navigateToPlaceWithFlip, persistExploreCameraBeforeNavigate]
@@ -1776,11 +1920,32 @@ export function ExploreMapClient({
           CONTINUOUS LIVE MAP STAGE (DESKTOP DIV CARD / MOBILE FULL-BLEED)
           + FLUSH-BOTTOM AUTO-SHUFFLE FANNED PHOTO DECK (EXACT /trip CLONE!)
       ====================================================================== */}
-      <div className="cgr-trip-stage-enter fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 overflow-clip bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[108px] select-none">
+      {/* Static Map Stage Height (ZERO MapLibre canvas resize or WebGL flicker on hide/show!) */}
+      <div className="cgr-trip-stage-enter fixed inset-x-0 top-0 bottom-[var(--cgr-mobile-nav-h)] lg:left-[72px] lg:top-16 lg:bottom-0 z-20 overflow-clip bg-[var(--color-background-body)] lg:px-8 lg:pt-4 lg:pb-[74px] select-none">
         <div className="relative w-full h-full lg:max-w-[1220px] lg:mx-auto lg:rounded-[26px] overflow-hidden lg:border lg:border-[var(--color-border)] bg-[var(--color-background-muted)]">
           {/* 1. ISOLATED MAPLIBRE VECTOR MAP LAYER */}
           <div
             ref={mapContainerRef}
+            onPointerDownCapture={() => {
+              if (isMapMovingRef.current && settleTimerRef.current !== null) {
+                clearSettleTimer();
+                const resume = () => {
+                  window.removeEventListener("pointerup", resume);
+                  window.removeEventListener("pointercancel", resume);
+                  if (
+                    isMapMovingRef.current &&
+                    !userGestureActiveRef.current &&
+                    settleTimerRef.current === null
+                  ) {
+                    scheduleMapSettleReveal(pendingUserGestureRef.current);
+                  }
+                };
+                window.addEventListener("pointerup", resume, { once: true });
+                window.addEventListener("pointercancel", resume, {
+                  once: true,
+                });
+              }
+            }}
             className="absolute inset-0 z-0 isolate w-full h-full"
             aria-label={isTh ? "แผนที่สำรวจโปรที่พัก" : "Explore stay deals map"}
           />
@@ -1859,11 +2024,22 @@ export function ExploreMapClient({
             )}
           </div>
 
-          {/* 3. BOTTOM-RIGHT VERTICAL ICON STACK: FILTER & LIST (Thumb-Friendly Icon-Only Buttons!) */}
+          {/* 3. BOTTOM-RIGHT VERTICAL ICON STACK: FILTER & DECK/ROW TOGGLE (Thumb-Friendly Icon-Only Buttons!) */}
           <div
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="absolute bottom-[186px] right-3 sm:bottom-[216px] sm:right-4 lg:bottom-5 lg:right-4 z-30 flex flex-col items-end gap-2.5"
+            style={{
+              transitionProperty: "bottom",
+              transitionDuration: "var(--duration-morph)",
+              transitionTimingFunction: "var(--ease-ios-sheet)",
+            }}
+            className={`absolute right-3 sm:right-4 lg:right-4 z-30 flex flex-col items-end gap-2.5 ${
+              isDeckHidden && visibleDeals.length > 0
+                ? "bottom-[90px] sm:bottom-[90px] lg:bottom-5"
+                : visibleDeals.length > 0
+                ? "bottom-[308px] sm:bottom-[348px] lg:bottom-[276px]"
+                : "bottom-[164px] sm:bottom-[164px] lg:bottom-5"
+            }`}
           >
             {/* Filter Icon Button */}
             <button
@@ -1885,15 +2061,44 @@ export function ExploreMapClient({
               )}
             </button>
 
-            {/* List Modal Icon Button */}
+            {/* Toggle Fan Deck <-> Horizontal Single-Row Card Strip */}
             <button
               type="button"
-              onClick={() => setIsListModalOpen(true)}
-              aria-label={isTh ? "ดูแบบรายการ" : "Open list view"}
-              title={isTh ? `รายการ (${visibleDeals.length})` : `List (${visibleDeals.length})`}
+              aria-pressed={!isDeckHidden && deckViewMode === "list"}
+              onClick={handleToggleDeckViewMode}
+              aria-label={
+                isDeckHidden
+                  ? isTh
+                    ? "แสดงการ์ดสถานที่"
+                    : "Show place cards"
+                  : deckViewMode === "fan"
+                  ? isTh
+                    ? "เปลี่ยนเป็นแถวการ์ดแนวนอน"
+                    : "Switch to horizontal card row"
+                  : isTh
+                  ? "สลับกลับเป็น Fan Card"
+                  : "Switch back to fanned deck"
+              }
+              title={
+                isDeckHidden
+                  ? isTh
+                    ? `แสดงการ์ด (${visibleDeals.length})`
+                    : `Show cards (${visibleDeals.length})`
+                  : deckViewMode === "fan"
+                  ? isTh
+                    ? `แถวการ์ดแนวนอน (${visibleDeals.length})`
+                    : `Card row (${visibleDeals.length})`
+                  : isTh
+                  ? "กลับไปดูแบบ Fan Card"
+                  : "Fanned deck"
+              }
               className="h-11 w-11 rounded-[13px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors"
             >
-              <LayoutGrid className="w-[18px] h-[18px]" strokeWidth={2.1} />
+              {deckViewMode === "fan" ? (
+                <LayoutGrid className="w-[18px] h-[18px]" strokeWidth={2.1} />
+              ) : (
+                <Layers className="w-[18px] h-[18px]" strokeWidth={2.1} />
+              )}
             </button>
           </div>
 
@@ -2003,159 +2208,208 @@ export function ExploreMapClient({
           )}
         </div>
 
-        {/* 6. SHARED FLUSH-BOTTOM FANNED PHOTO DECK WITH AUTO-SHUFFLE! */}
+        {/* 6. PERSISTENT AIRBNB WHITE BOTTOM SHEET (CANGAROOM MOTION CONSTITUTION: 120FPS GPU FADE SLIDE-IN/OUT + 420MS MORPH + 1:1 LIVE DRAG) */}
         {visibleDeals.length > 0 && (
-          <FannedPhotoCardDeck
-            items={deckItems}
-            activeIdx={safeActiveIdx}
-            language={language}
-            mode="explore"
-            deckIdentityKey="explore-deck"
-            shuffleKey={shuffleKey}
-            isMapMoving={isMapMoving}
-            modalOpenPinId={detailOpenSource === "deck" ? animatingPinId : null}
-            enableReorder={false}
-            cardTopAction="bookmark"
-            savedPinIds={globalSavedPinIds}
-            onSelectIndex={handleSelectDeckIndex}
-            onOpenCard={(pin, stopNum, badgeText, originRect) =>
-              handleOpenCardFlip(pin, stopNum, badgeText, originRect)
-            }
-            onToggleSavePin={handleToggleSavePin}
-          />
-        )}
-      </div>
-
-      {/* =====================================================================
-          LIST VIEW MODAL (Slide-Up Bottom Sheet on Mobile / Centered Modal on Desktop)
-          Zero top filter-chip clutter; tapping any card opens calm Fade-Slide Detail Modal!
-      ====================================================================== */}
-      {listModalPresence.shouldRender &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={isTh ? "รายการโปรที่พัก" : "Stay deals list"}
-            data-state={listModalPresence.dataState}
-            onClick={() => setIsListModalOpen(false)}
-            className="cgr-modal-backdrop fixed inset-0 z-[80] bg-black/50 flex items-end lg:items-center justify-center p-0 lg:p-6"
-          >
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 lg:px-[104px] flex justify-center">
             <div
-              data-state={listModalPresence.dataState}
+              data-tucked={
+                !isDeckHidden && isMapMoving && !selectedPinId
+                  ? "true"
+                  : "false"
+              }
+              data-dragging={isDraggingSheet ? "true" : "false"}
               onPointerDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              className="cgr-modal-surface-lg w-full lg:max-w-[1080px] h-[88dvh] lg:h-[86dvh] rounded-t-[24px] lg:rounded-[24px] bg-[var(--color-background-popover)] border-t lg:border border-[var(--color-border)] lg:border-black/[0.06] lg:dark:border-white/[0.1] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden"
+              style={
+                isDraggingSheet
+                  ? {
+                      transform: `translate3d(0, ${sheetDragDy}px, 0)`,
+                    }
+                  : undefined
+              }
+              className={`cgr-explore-dock-sheet w-full lg:max-w-[1160px] flex flex-col overflow-hidden bg-[var(--color-background-body)] ${
+                isDeckHidden
+                  ? "h-[76px] lg:h-[74px] rounded-t-[26px] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] lg:rounded-none lg:border-0 lg:shadow-none"
+                  : "h-[296px] sm:h-[336px] lg:h-[336px] rounded-t-[26px] border-t lg:border-x border-[var(--color-border)] shadow-[var(--shadow-popover)]"
+              }`}
             >
-              {/* Mobile Slide-Up Drag Handle */}
-              <div className="flex lg:hidden justify-center pt-2.5 pb-1 shrink-0">
-                <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
-              </div>
-
-              {/* Clean Single-Row Modal Header */}
-              <div className="shrink-0 px-5 sm:px-6 py-3.5 border-b border-[var(--color-border)] flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-[17px] sm:text-[19px] font-semibold text-[var(--color-text-primary)] tracking-[-0.015em] truncate tabular-nums">
-                    {isTh
-                      ? `โปรที่พักที่พบ (${visibleDeals.length} แห่ง)`
-                      : `Stay deals (${visibleDeals.length})`}
-                  </h2>
-                  {hasUserMovedMap && (
-                    <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5 truncate">
-                      {isTh
-                        ? "แสดงเฉพาะโซนที่คุณเลือกบนแผนที่"
-                        : "Filtered to your current map area"}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
+              {isDeckHidden ? (
+                /* AIRBNB COLLAPSED PEEK BAR: Stays hidden permanently until user taps or drags up! */
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sheetDragMovedRef.current) {
+                      sheetDragMovedRef.current = false;
+                      return;
+                    }
+                    setIsDeckHidden(false);
+                  }}
+                  onTouchStart={(e) => {
+                    sheetSwipeStartYRef.current = e.touches[0]?.clientY ?? null;
+                    sheetDragMovedRef.current = false;
+                  }}
+                  onTouchMove={(e) => {
+                    const startY = sheetSwipeStartYRef.current;
+                    const currY = e.touches[0]?.clientY;
+                    if (startY === null || currY === undefined) return;
+                    const rawDy = currY - startY;
+                    if (Math.abs(rawDy) > 4) {
+                      sheetDragMovedRef.current = true;
+                      setIsDraggingSheet(true);
+                      // Gentle 0.35x rubber-banding past bounds
+                      const resisted =
+                        rawDy > 0
+                          ? rawDy * 0.35
+                          : Math.max(-72, rawDy * 0.65);
+                      setSheetDragDy(resisted);
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    const startY = sheetSwipeStartYRef.current;
+                    sheetSwipeStartYRef.current = null;
+                    const endY = e.changedTouches[0]?.clientY;
+                    setIsDraggingSheet(false);
+                    setSheetDragDy(0);
+                    if (
+                      startY !== null &&
+                      endY !== undefined &&
+                      startY - endY >= 24
+                    ) {
+                      setIsDeckHidden(false);
+                    }
+                  }}
+                  onTouchCancel={() => {
+                    sheetSwipeStartYRef.current = null;
+                    setIsDraggingSheet(false);
+                    setSheetDragDy(0);
+                  }}
+                  aria-expanded={false}
+                  aria-label={
+                    isTh
+                      ? `แสดง ${visibleDeals.length} สถานที่ในแผนที่`
+                      : `Show ${visibleDeals.length} places within map area`
+                  }
+                  className="cgr-sheet-content-in w-full h-full flex flex-col items-center justify-center gap-2 px-5 cursor-pointer hover:bg-[var(--color-background-muted)]/60 transition-colors"
+                >
+                  <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
+                  <span className="inline-flex items-center gap-1.5 text-[14.5px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] tracking-[-0.01em] tabular-nums">
+                    <span>
+                      {hasUserMovedMap
+                        ? isTh
+                          ? `พบ ${visibleDeals.length.toLocaleString()} สถานที่ในโซนแผนที่นี้`
+                          : `${visibleDeals.length.toLocaleString()} places within map area`
+                        : isTh
+                        ? `พบ ${visibleDeals.length.toLocaleString()} สถานที่บนแผนที่`
+                        : `${visibleDeals.length.toLocaleString()} places on map`}
+                    </span>
+                    <ChevronUp
+                      className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0"
+                      strokeWidth={2.2}
+                    />
+                  </span>
+                </button>
+              ) : (
+                /* EXPANDED SHEET: Minimal Airbnb Grab Handle (1:1 live drag or tap to collapse) -> Fan Card (85%) OR Horizontal Strip */
+                <>
                   <button
                     type="button"
-                    onClick={() => setIsFilterModalOpen(true)}
-                    className={`h-9 px-3 rounded-[10px] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
-                      activeFilterCount > 0
-                        ? "bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222]"
-                        : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    }`}
+                    onClick={() => {
+                      if (sheetDragMovedRef.current) {
+                        sheetDragMovedRef.current = false;
+                        return;
+                      }
+                      setIsDeckHidden(true);
+                    }}
+                    onTouchStart={(e) => {
+                      sheetSwipeStartYRef.current =
+                        e.touches[0]?.clientY ?? null;
+                      sheetDragMovedRef.current = false;
+                    }}
+                    onTouchMove={(e) => {
+                      const startY = sheetSwipeStartYRef.current;
+                      const currY = e.touches[0]?.clientY;
+                      if (startY === null || currY === undefined) return;
+                      const rawDy = currY - startY;
+                      if (Math.abs(rawDy) > 4) {
+                        sheetDragMovedRef.current = true;
+                        setIsDraggingSheet(true);
+                        // 1:1 finger tracking downward; gentle 0.35x rubber-band upward
+                        const resisted =
+                          rawDy < 0 ? rawDy * 0.35 : Math.min(260, rawDy);
+                        setSheetDragDy(resisted);
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      const startY = sheetSwipeStartYRef.current;
+                      sheetSwipeStartYRef.current = null;
+                      const endY = e.changedTouches[0]?.clientY;
+                      setIsDraggingSheet(false);
+                      setSheetDragDy(0);
+                      if (
+                        startY !== null &&
+                        endY !== undefined &&
+                        endY - startY >= 36
+                      ) {
+                        setIsDeckHidden(true);
+                      }
+                    }}
+                    onTouchCancel={() => {
+                      sheetSwipeStartYRef.current = null;
+                      setIsDraggingSheet(false);
+                      setSheetDragDy(0);
+                    }}
+                    aria-label={isTh ? "ซ่อนแถบการ์ด" : "Hide cards"}
+                    title={isTh ? "ซ่อนการ์ด" : "Hide cards"}
+                    className="group relative z-40 shrink-0 h-9 w-full flex items-center justify-center cursor-pointer touch-none"
                   >
-                    <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-                    <span>{isTh ? "ตัวกรอง" : "Filters"}</span>
-                    {activeFilterCount > 0 && (
-                      <span className="h-4 min-w-[16px] px-1 rounded-full bg-[#e60023] text-white text-[10px] font-bold inline-flex items-center justify-center tabular-nums">
-                        {activeFilterCount}
-                      </span>
-                    )}
+                    <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] group-hover:bg-[var(--color-text-secondary)] transition-colors" />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsListModalOpen(false)}
-                    aria-label={isTh ? "ปิดรายการ" : "Close list"}
-                    className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Scrollable Coupon Grid */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-5 pb-[max(24px,var(--cgr-safe-bottom))] lg:pb-6">
-                {visibleDeals.length === 0 ? (
-                  <div className="rounded-[18px] bg-[var(--color-background-muted)] px-6 py-14 text-center space-y-3">
-                    <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
-                      {isTh
-                        ? "ไม่พบโปรที่พักที่ตรงกับเงื่อนไข"
-                        : "No stay deals match these filters"}
-                    </p>
-                    <p className="text-[13px] text-[var(--color-text-secondary)]">
-                      {isTh
-                        ? "ลองล้างตัวกรองหรือกลับไปดูโปรทั่วไทย"
-                        : "Try resetting filters or showing all deals in Thailand."}
-                    </p>
-                    <div className="flex items-center justify-center gap-2 pt-1">
-                      {hasUserMovedMap && attributeFilteredDeals.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleResetMapArea}
-                          className="h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold cursor-pointer transition-colors"
-                        >
-                          {isTh ? "ดูโปรทั่วไทย" : "Show all Thailand"}
-                        </button>
-                      )}
-                      {(activeFilterCount > 0 || globalSearchQuery) && (
-                        <button
-                          type="button"
-                          onClick={handleClearAllFilters}
-                          className="h-10 px-4 rounded-[11px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
-                        >
-                          {isTh ? "ล้างตัวกรอง" : "Reset filters"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                    {visibleDeals.map((deal, idx) => (
-                      <VerticalCouponCard
-                        key={deal.id}
-                        pin={deal}
+                  {deckViewMode === "fan" ? (
+                    <div className="cgr-sheet-content-in relative flex-1 min-h-0 w-full">
+                      <FannedPhotoCardDeck
+                        items={deckItems}
+                        activeIdx={safeActiveIdx}
                         language={language}
-                        isSaved={globalSavedPinIds.has(deal.id)}
-                        priority={idx < 8}
-                        enablePhotoSlide={true}
-                        onSelect={(p, rect) => handleOpenDetailFromList(p, rect)}
-                        onToggleSave={() => handleToggleSavePin(deal)}
+                        mode="explore"
+                        deckIdentityKey="explore-deck"
+                        shuffleKey={shuffleKey}
+                        isMapMoving={isMapMoving}
+                        modalOpenPinId={
+                          detailOpenSource === "deck" ? animatingPinId : null
+                        }
+                        enableReorder={false}
+                        cardTopAction="bookmark"
+                        savedPinIds={globalSavedPinIds}
+                        centerVisibleRatio={0.85}
+                        showMobileWhiteBackdrop={false}
+                        captureMobileBackdropSwipe={true}
+                        onSelectIndex={handleSelectDeckIndex}
+                        onOpenCard={(pin, stopNum, badgeText, originRect) =>
+                          handleOpenCardFlip(pin, stopNum, badgeText, originRect)
+                        }
+                        onToggleSavePin={handleToggleSavePin}
                       />
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ) : (
+                    <ExploreHorizontalCardStrip
+                      deals={visibleDeals}
+                      activeIdx={safeActiveIdx}
+                      language={language}
+                      savedPinIds={globalSavedPinIds}
+                      onSelectPin={(pin, rect) =>
+                        handleOpenDetailFromList(pin, rect)
+                      }
+                      onHoverIndex={(idx) => setActiveIdx(idx)}
+                      onToggleSavePin={handleToggleSavePin}
+                    />
+                  )}
+                </>
+              )}
             </div>
-          </div>,
-          document.body
+          </div>
         )}
+      </div>
 
       {/* =====================================================================
           UNIFIED AIRBNB WARM MINIMAL FILTER MODAL
@@ -2220,6 +2474,7 @@ export function ExploreMapClient({
                       aria-pressed={placeCategoryFilter === "ALL"}
                       onClick={() => {
                         setPlaceCategoryFilter("ALL");
+                        setRestoredDealIds(null);
                         setManualShuffleOrder(null);
                         setPinnedOutsideDealId(null);
                       }}
@@ -2240,6 +2495,7 @@ export function ExploreMapClient({
                           aria-pressed={isActive}
                           onClick={() => {
                             setPlaceCategoryFilter(cat.id);
+                            setRestoredDealIds(null);
                             setManualShuffleOrder(null);
                             setPinnedOutsideDealId(null);
                           }}
@@ -2287,6 +2543,7 @@ export function ExploreMapClient({
                         aria-pressed={sourceFilter === opt.id}
                         onClick={() => {
                           setSourceFilter(opt.id);
+                          setRestoredDealIds(null);
                           setManualShuffleOrder(null);
                           setPinnedOutsideDealId(null);
                         }}
@@ -2324,6 +2581,7 @@ export function ExploreMapClient({
                           aria-pressed={isActive}
                           onClick={() => {
                             setActiveStyle(tab.id);
+                            setRestoredDealIds(null);
                             setManualShuffleOrder(null);
                             setPinnedOutsideDealId(null);
                           }}
@@ -2350,6 +2608,7 @@ export function ExploreMapClient({
                       checked={recentOnly}
                       onChange={(next) => {
                         setRecentOnly(next);
+                        setRestoredDealIds(null);
                         setManualShuffleOrder(null);
                         setPinnedOutsideDealId(null);
                       }}
@@ -2375,6 +2634,7 @@ export function ExploreMapClient({
                           onClick={() => {
                             setProvinceFilter(null);
                             setGlobalSearchQuery("");
+                            setRestoredDealIds(null);
                             setManualShuffleOrder(null);
                           }}
                           className="text-[12.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 shrink-0 cursor-pointer"
