@@ -246,7 +246,6 @@ export function TripMapPlannerView({
   const [isDeckHidden, setIsDeckHidden] = useState(false);
   const [isDeckReorderMode, setIsDeckReorderMode] = useState(false);
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
-  const [sheetDragDy, setSheetDragDy] = useState(0);
   const [sheetDragHeight, setSheetDragHeight] = useState<number | null>(null);
   const [isMapMoving, setIsMapMoving] = useState(false);
 
@@ -255,7 +254,7 @@ export function TripMapPlannerView({
   const isMapMovingRef = useRef(isMapMoving);
   isMapMovingRef.current = isMapMoving;
   const sheetSwipeStartYRef = useRef<number | null>(null);
-  const sheetBaseHeightRef = useRef<number>(76);
+  const sheetTouchSamplesRef = useRef<Array<{ y: number; t: number }>>([]);
   const sheetDragMovedRef = useRef(false);
   const isProgrammaticCameraRef = useRef(false);
   const userGestureActiveRef = useRef(false);
@@ -360,40 +359,137 @@ export function TripMapPlannerView({
   // Highlight "Play" Trip Story Playback Mode
   const [isPlayingStory, setIsPlayingStory] = useState(false);
 
-  const getExpandedSheetHeight = () =>
-    typeof window !== "undefined" && window.innerWidth >= 640 ? 358 : 314;
-  const getCollapsedSheetHeight = () =>
-    typeof window !== "undefined" && window.innerWidth >= 1024 ? 74 : 76;
+  const getExpandedSheetHeight = useCallback(
+    () => (typeof window !== "undefined" && window.innerWidth >= 640 ? 358 : 314),
+    []
+  );
+  const getCollapsedSheetHeight = useCallback(
+    () => (typeof window !== "undefined" && window.innerWidth >= 1024 ? 74 : 76),
+    []
+  );
+
+  // Single-Axis Native iOS Detent Physics (100% Parity with /explore!)
+  const computeDraggedSheetHeight = useCallback(
+    (rawDy: number, startedCollapsed: boolean): number => {
+      const expandedH = getExpandedSheetHeight();
+      const collapsedH = getCollapsedSheetHeight();
+      const baseH = startedCollapsed ? collapsedH : expandedH;
+      const rawH = baseH - rawDy;
+      if (rawH > expandedH) {
+        const over = rawH - expandedH;
+        return expandedH + Math.min(20, (over * 0.22) / (1 + over / 110));
+      }
+      if (rawH < collapsedH) {
+        const under = collapsedH - rawH;
+        return collapsedH - Math.min(4, under * 0.05);
+      }
+      return rawH;
+    },
+    [getCollapsedSheetHeight, getExpandedSheetHeight]
+  );
 
   const handleSheetPullMove = useCallback(
-    (dy: number) => {
+    (rawDy: number) => {
       if (isPlayingStory) return;
       setIsDraggingSheet(true);
-      if (dy < 0) {
-        setSheetDragDy(0);
-        setSheetDragHeight(
-          getExpandedSheetHeight() + Math.min(22, Math.abs(dy) * 0.25)
-        );
-      } else {
-        setSheetDragHeight(null);
-        setSheetDragDy(Math.min(280, dy));
-      }
+      setSheetDragHeight(computeDraggedSheetHeight(rawDy, false));
     },
-    [isPlayingStory]
+    [computeDraggedSheetHeight, isPlayingStory]
   );
 
   const handleSheetPullEnd = useCallback(
-    (dy: number, vy: number) => {
+    (rawDy: number, vy: number) => {
       setIsDraggingSheet(false);
-      setSheetDragDy(0);
       setSheetDragHeight(null);
-      if (!isPlayingStory && (dy >= 48 || (dy >= 20 && vy > 0.32))) {
+      if (!isPlayingStory && (rawDy >= 48 || (rawDy >= 18 && vy > 0.3))) {
         setIsDeckReorderMode(false);
         setIsDeckHidden(true);
       }
     },
     [isPlayingStory]
   );
+
+  const handleSheetHeaderTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLButtonElement>) => {
+      if (isPlayingStory && !isDeckHiddenRef.current) return;
+      const y = e.touches[0]?.clientY;
+      if (y === undefined) return;
+      sheetSwipeStartYRef.current = y;
+      sheetTouchSamplesRef.current = [{ y, t: performance.now() }];
+      sheetDragMovedRef.current = false;
+    },
+    [isPlayingStory]
+  );
+
+  const handleSheetHeaderTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLButtonElement>) => {
+      if (isPlayingStory && !isDeckHiddenRef.current) return;
+      const startY = sheetSwipeStartYRef.current;
+      const currY = e.touches[0]?.clientY;
+      if (startY === null || currY === undefined) return;
+      const rawDy = currY - startY;
+      const now = performance.now();
+      const samples = sheetTouchSamplesRef.current;
+      samples.push({ y: currY, t: now });
+      while (samples.length > 2 && now - samples[0].t > 105) {
+        samples.shift();
+      }
+      if (Math.abs(rawDy) > 4) {
+        sheetDragMovedRef.current = true;
+        setIsDraggingSheet(true);
+        setSheetDragHeight(
+          computeDraggedSheetHeight(rawDy, isDeckHiddenRef.current)
+        );
+      }
+    },
+    [computeDraggedSheetHeight, isPlayingStory]
+  );
+
+  const handleSheetHeaderTouchEnd = useCallback(
+    (e: React.TouchEvent<HTMLButtonElement>) => {
+      const startY = sheetSwipeStartYRef.current;
+      sheetSwipeStartYRef.current = null;
+      const endY = e.changedTouches[0]?.clientY;
+      const samples = sheetTouchSamplesRef.current;
+      sheetTouchSamplesRef.current = [];
+
+      let vy = 0;
+      const now = performance.now();
+      if (samples.length >= 2) {
+        const newest = samples[samples.length - 1];
+        if (now - newest.t < 95) {
+          const oldest = samples[0];
+          const dt = newest.t - oldest.t;
+          if (dt > 5) vy = (newest.y - oldest.y) / dt;
+        }
+      }
+
+      setIsDraggingSheet(false);
+      setSheetDragHeight(null);
+
+      if (startY === null || endY === undefined) return;
+      const rawDy = endY - startY;
+
+      if (isDeckHiddenRef.current) {
+        if (rawDy <= -24 || (rawDy <= -12 && vy < -0.24)) {
+          setIsDeckHidden(false);
+        }
+      } else if (!isPlayingStory) {
+        if (rawDy >= 44 || (rawDy >= 16 && vy > 0.28)) {
+          setIsDeckReorderMode(false);
+          setIsDeckHidden(true);
+        }
+      }
+    },
+    [isPlayingStory]
+  );
+
+  const handleSheetHeaderTouchCancel = useCallback(() => {
+    sheetSwipeStartYRef.current = null;
+    sheetTouchSamplesRef.current = [];
+    setIsDraggingSheet(false);
+    setSheetDragHeight(null);
+  }, []);
   const [isStoryMuted, setIsStoryMuted] = useState(false);
   const [storyStatusText, setStoryStatusText] = useState<string | null>(null);
   const storyBannerPresence = useModalPresence(
@@ -1918,18 +2014,13 @@ export function TripMapPlannerView({
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             style={
-              isDraggingSheet
+              isDraggingSheet && sheetDragHeight !== null
                 ? {
-                    ...(sheetDragHeight !== null
-                      ? { height: `${sheetDragHeight}px` }
-                      : {}),
-                    ...(sheetDragDy > 0
-                      ? { transform: `translate3d(0, ${sheetDragDy}px, 0)` }
-                      : {}),
+                    height: `${sheetDragHeight}px`,
                   }
                 : undefined
             }
-            className={`cgr-explore-dock-sheet w-full lg:max-w-[1160px] flex flex-col ${
+            className={`cgr-explore-dock-sheet relative w-full lg:max-w-[1160px] flex flex-col ${
               isDeckReorderMode ? "overflow-visible" : "overflow-hidden"
             } bg-[var(--color-background-body)] ${
               isDeckHidden
@@ -1937,216 +2028,187 @@ export function TripMapPlannerView({
                 : "h-[314px] sm:h-[358px] lg:h-[358px] rounded-t-[26px] border-t lg:border-x border-[var(--color-border)] shadow-[var(--shadow-popover)]"
             }`}
           >
-            {isDeckHidden ? (
-              /* AIRBNB COLLAPSED PEEK BAR: Tap or swipe up to expand back! */
-              <button
-                type="button"
-                onClick={() => {
-                  if (sheetDragMovedRef.current) {
-                    sheetDragMovedRef.current = false;
-                    return;
-                  }
-                  setIsDeckHidden(false);
-                }}
-                onTouchStart={(e) => {
-                  sheetSwipeStartYRef.current = e.touches[0]?.clientY ?? null;
-                  sheetBaseHeightRef.current = getCollapsedSheetHeight();
-                  sheetDragMovedRef.current = false;
-                }}
-                onTouchMove={(e) => {
-                  const startY = sheetSwipeStartYRef.current;
-                  const currY = e.touches[0]?.clientY;
-                  if (startY === null || currY === undefined) return;
-                  const rawDy = currY - startY;
-                  if (Math.abs(rawDy) > 4) {
-                    sheetDragMovedRef.current = true;
-                    setIsDraggingSheet(true);
-                    if (rawDy < 0) {
-                      const baseH = sheetBaseHeightRef.current;
-                      const maxH = getExpandedSheetHeight();
-                      const nextH = Math.min(
-                        maxH + 16,
-                        baseH + Math.abs(rawDy)
-                      );
-                      setSheetDragDy(0);
-                      setSheetDragHeight(nextH);
-                    } else {
-                      setSheetDragDy(0);
-                      setSheetDragHeight(sheetBaseHeightRef.current);
-                    }
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  const startY = sheetSwipeStartYRef.current;
-                  sheetSwipeStartYRef.current = null;
-                  const endY = e.changedTouches[0]?.clientY;
-                  setIsDraggingSheet(false);
-                  setSheetDragDy(0);
-                  setSheetDragHeight(null);
-                  if (
-                    startY !== null &&
-                    endY !== undefined &&
-                    startY - endY >= 20
-                  ) {
-                    setIsDeckHidden(false);
-                  }
-                }}
-                onTouchCancel={() => {
-                  sheetSwipeStartYRef.current = null;
-                  setIsDraggingSheet(false);
-                  setSheetDragDy(0);
-                  setSheetDragHeight(null);
-                }}
-                aria-expanded={false}
-                aria-label={
-                  isTh
-                    ? `แสดง ${entries.length} สถานที่ในทริปนี้`
-                    : `Show ${entries.length} places in this trip`
-                }
-                className="cgr-sheet-content-in w-full h-full flex flex-col items-center justify-start pt-3.5 gap-2 px-5 cursor-pointer touch-none hover:bg-[var(--color-background-muted)]/60 transition-colors"
-              >
-                <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
-                <span className="inline-flex items-center gap-1.5 text-[14.5px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] tracking-[-0.01em] tabular-nums">
-                  <span>
-                    {isTh
-                      ? `สถานที่ในทริปนี้ ${entries.length.toLocaleString()} แห่ง`
-                      : `${entries.length.toLocaleString()} ${
-                          entries.length === 1 ? "place" : "places"
-                        } in this trip`}
-                  </span>
-                  <ChevronUp
-                    className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0"
-                    strokeWidth={2.2}
-                  />
-                </span>
-              </button>
-            ) : (
-              /* EXPANDED SHEET: Minimal Airbnb Grab Handle (1:1 live drag or tap to collapse) -> Fan Card (85%) OR Horizontal Strip */
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (sheetDragMovedRef.current) {
-                      sheetDragMovedRef.current = false;
-                      return;
-                    }
-                    if (isPlayingStory) return;
-                    setIsDeckReorderMode(false);
-                    setIsDeckHidden(true);
-                  }}
-                  onTouchStart={(e) => {
-                    if (isPlayingStory) return;
-                    sheetSwipeStartYRef.current =
-                      e.touches[0]?.clientY ?? null;
-                    sheetDragMovedRef.current = false;
-                  }}
-                  onTouchMove={(e) => {
-                    if (isPlayingStory) return;
-                    const startY = sheetSwipeStartYRef.current;
-                    const currY = e.touches[0]?.clientY;
-                    if (startY === null || currY === undefined) return;
-                    const rawDy = currY - startY;
-                    if (Math.abs(rawDy) > 4) {
-                      sheetDragMovedRef.current = true;
-                      setIsDraggingSheet(true);
-                      if (rawDy < 0) {
-                        setSheetDragDy(0);
-                        setSheetDragHeight(
-                          getExpandedSheetHeight() +
-                            Math.min(22, Math.abs(rawDy) * 0.18)
-                        );
-                      } else {
-                        setSheetDragHeight(null);
-                        setSheetDragDy(Math.min(260, rawDy));
-                      }
-                    }
-                  }}
-                  onTouchEnd={(e) => {
-                    const startY = sheetSwipeStartYRef.current;
-                    sheetSwipeStartYRef.current = null;
-                    const endY = e.changedTouches[0]?.clientY;
-                    setIsDraggingSheet(false);
-                    setSheetDragDy(0);
-                    setSheetDragHeight(null);
-                    if (
-                      !isPlayingStory &&
-                      startY !== null &&
-                      endY !== undefined &&
-                      endY - startY >= 36
-                    ) {
-                      setIsDeckReorderMode(false);
-                      setIsDeckHidden(true);
-                    }
-                  }}
-                  onTouchCancel={() => {
-                    sheetSwipeStartYRef.current = null;
-                    setIsDraggingSheet(false);
-                    setSheetDragDy(0);
-                    setSheetDragHeight(null);
-                  }}
-                  aria-label={isTh ? "ซ่อนแถบการ์ด" : "Hide cards"}
-                  title={isTh ? "ซ่อนการ์ด" : "Hide cards"}
-                  className="group relative z-40 shrink-0 h-9 w-full flex items-center justify-center cursor-pointer touch-none"
-                >
-                  <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] group-hover:bg-[var(--color-text-secondary)] transition-colors" />
-                </button>
+            {(() => {
+              const expandedH = getExpandedSheetHeight();
+              const collapsedH = getCollapsedSheetHeight();
+              const liveH =
+                isDraggingSheet && sheetDragHeight !== null
+                  ? sheetDragHeight
+                  : isDeckHidden
+                  ? collapsedH
+                  : expandedH;
+              const collapseProgress = Math.max(
+                0,
+                Math.min(
+                  1,
+                  (expandedH - liveH) / Math.max(1, expandedH - collapsedH)
+                )
+              );
+              const deckContentOpacity = Math.max(
+                0,
+                Math.min(1, 1 - (collapseProgress - 0.08) / 0.54)
+              );
+              const peekLabelOpacity = Math.max(
+                0,
+                Math.min(1, (collapseProgress - 0.56) / 0.36)
+              );
+              const isFullyCollapsedAtRest = isDeckHidden && !isDraggingSheet;
 
-                {deckViewMode === "fan" ? (
-                  <div className="cgr-sheet-content-in relative flex-1 min-h-0 w-full">
-                    <FannedPhotoCardDeck
-                      items={deckItems}
-                      activeIdx={activeIdx}
-                      language={language}
-                      mode="trip"
-                      deckIdentityKey={board.id}
-                      isMapMoving={isMapMoving && !isPlayingStory}
-                      modalOpenPinId={modalOpenPinId}
-                      isPlayingStory={isPlayingStory}
-                      enableReorder={isOwner}
-                      cardTopAction={isOwner ? "remove" : "bookmark"}
-                      savedPinIds={savedPinIds}
-                      centerVisibleRatio={0.85}
-                      showMobileWhiteBackdrop={false}
-                      captureMobileBackdropSwipe={true}
-                      onSelectIndex={selectStopIndex}
-                      onOpenCard={(pin, stopNum, _badgeText, originRect) =>
-                        onSelectPinDetail(pin, stopNum, originRect)
+              return (
+                <>
+                  {/* 1. Persistent Grab Handle / Collapsed Full-Bar Tap & Drag Target */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sheetDragMovedRef.current) {
+                        sheetDragMovedRef.current = false;
+                        return;
                       }
-                      onRemovePin={onRemovePin}
-                      onToggleSavePin={onToggleSavePin}
-                      onSwapActiveStop={handleSwapActiveStop}
-                      onInterruptStory={() => stopStoryPlayback(true)}
-                      onReorderModeChange={setIsDeckReorderMode}
-                      onSheetPullMove={handleSheetPullMove}
-                      onSheetPullEnd={handleSheetPullEnd}
-                    />
-                  </div>
-                ) : (
-                  <ExploreHorizontalCardStrip
-                    deals={tripDeals}
-                    activeIdx={activeIdx}
-                    language={language}
-                    savedPinIds={savedPinIds ?? EMPTY_SAVED_PIN_SET}
-                    onSelectPin={(pin, rect) => {
-                      const idx = stops.findIndex(
-                        (s) => s.entry.pin.id === pin.id
-                      );
-                      onSelectPinDetail(pin, idx >= 0 ? idx + 1 : 1, rect);
-                    }}
-                    onHoverIndex={(idx) => selectStopIndex(idx)}
-                    onToggleSavePin={(pin) => {
-                      if (isOwner) {
-                        onRemovePin(pin.id);
+                      if (!isDeckHidden) {
+                        if (isPlayingStory) return;
+                        setIsDeckReorderMode(false);
+                        setIsDeckHidden(true);
                       } else {
-                        onToggleSavePin?.(pin);
+                        setIsDeckHidden(false);
                       }
                     }}
-                    onSheetPullMove={handleSheetPullMove}
-                    onSheetPullEnd={handleSheetPullEnd}
-                  />
-                )}
-              </>
-            )}
+                    onTouchStart={handleSheetHeaderTouchStart}
+                    onTouchMove={handleSheetHeaderTouchMove}
+                    onTouchEnd={handleSheetHeaderTouchEnd}
+                    onTouchCancel={handleSheetHeaderTouchCancel}
+                    aria-expanded={!isDeckHidden}
+                    aria-label={
+                      isDeckHidden
+                        ? isTh
+                          ? `แสดง ${entries.length} สถานที่ในทริปนี้`
+                          : `Show ${entries.length} places in this trip`
+                        : isTh
+                        ? "ซ่อนแถบการ์ด"
+                        : "Hide cards"
+                    }
+                    title={
+                      isDeckHidden
+                        ? isTh
+                          ? "แสดงการ์ด"
+                          : "Show cards"
+                        : isTh
+                        ? "ซ่อนการ์ด"
+                        : "Hide cards"
+                    }
+                    className={`group relative z-40 shrink-0 w-full flex flex-col items-center justify-start pt-3.5 px-5 cursor-pointer touch-none ${
+                      isDeckHidden
+                        ? "h-full hover:bg-[var(--color-background-muted)]/60 transition-colors"
+                        : "h-9"
+                    }`}
+                  >
+                    <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] group-hover:bg-[var(--color-text-secondary)] transition-colors shrink-0" />
+                  </button>
+
+                  {/* 2. Live Crossfade Collapsed Peek Label */}
+                  <div
+                    aria-hidden={peekLabelOpacity < 0.05}
+                    style={{
+                      opacity: peekLabelOpacity,
+                      transform: `translate3d(0, ${(
+                        (1 - peekLabelOpacity) *
+                        6
+                      ).toFixed(2)}px, 0)`,
+                      transition: isDraggingSheet
+                        ? "none"
+                        : "opacity 220ms ease, transform 280ms var(--ease-out-expo)",
+                    }}
+                    className="pointer-events-none absolute inset-x-0 top-[30px] z-40 flex items-center justify-center px-5"
+                  >
+                    <span className="inline-flex items-center gap-1.5 text-[14.5px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] tracking-[-0.01em] tabular-nums">
+                      <span>
+                        {isTh
+                          ? `สถานที่ในทริปนี้ ${entries.length.toLocaleString()} แห่ง`
+                          : `${entries.length.toLocaleString()} ${
+                              entries.length === 1 ? "place" : "places"
+                            } in this trip`}
+                      </span>
+                      <ChevronUp
+                        className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0"
+                        strokeWidth={2.2}
+                      />
+                    </span>
+                  </div>
+
+                  {/* 3. Persistent Rigid Expanded Deck Wrapper */}
+                  <div
+                    aria-hidden={isFullyCollapsedAtRest}
+                    style={{
+                      opacity: deckContentOpacity,
+                      visibility:
+                        isFullyCollapsedAtRest && deckContentOpacity <= 0.01
+                          ? "hidden"
+                          : "visible",
+                      transition: isDraggingSheet
+                        ? "none"
+                        : "opacity 220ms ease",
+                    }}
+                    className={`absolute inset-x-0 top-9 h-[278px] sm:h-[322px] w-full flex flex-col ${
+                      isFullyCollapsedAtRest ? "pointer-events-none" : ""
+                    }`}
+                  >
+                    {deckViewMode === "fan" ? (
+                      <div className="relative flex-1 min-h-0 w-full">
+                        <FannedPhotoCardDeck
+                          items={deckItems}
+                          activeIdx={activeIdx}
+                          language={language}
+                          mode="trip"
+                          deckIdentityKey={board.id}
+                          isMapMoving={isMapMoving && !isPlayingStory}
+                          modalOpenPinId={modalOpenPinId}
+                          isPlayingStory={isPlayingStory}
+                          enableReorder={isOwner}
+                          cardTopAction={isOwner ? "remove" : "bookmark"}
+                          savedPinIds={savedPinIds}
+                          centerVisibleRatio={0.85}
+                          showMobileWhiteBackdrop={false}
+                          captureMobileBackdropSwipe={true}
+                          onSelectIndex={selectStopIndex}
+                          onOpenCard={(pin, stopNum, _badgeText, originRect) =>
+                            onSelectPinDetail(pin, stopNum, originRect)
+                          }
+                          onRemovePin={onRemovePin}
+                          onToggleSavePin={onToggleSavePin}
+                          onSwapActiveStop={handleSwapActiveStop}
+                          onInterruptStory={() => stopStoryPlayback(true)}
+                          onReorderModeChange={setIsDeckReorderMode}
+                          onSheetPullMove={handleSheetPullMove}
+                          onSheetPullEnd={handleSheetPullEnd}
+                        />
+                      </div>
+                    ) : (
+                      <ExploreHorizontalCardStrip
+                        deals={tripDeals}
+                        activeIdx={activeIdx}
+                        language={language}
+                        savedPinIds={savedPinIds ?? EMPTY_SAVED_PIN_SET}
+                        onSelectPin={(pin, rect) => {
+                          const idx = stops.findIndex(
+                            (s) => s.entry.pin.id === pin.id
+                          );
+                          onSelectPinDetail(pin, idx >= 0 ? idx + 1 : 1, rect);
+                        }}
+                        onHoverIndex={(idx) => selectStopIndex(idx)}
+                        onToggleSavePin={(pin) => {
+                          if (isOwner) {
+                            onRemovePin(pin.id);
+                          } else {
+                            onToggleSavePin?.(pin);
+                          }
+                        }}
+                        onSheetPullMove={handleSheetPullMove}
+                        onSheetPullEnd={handleSheetPullEnd}
+                      />
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

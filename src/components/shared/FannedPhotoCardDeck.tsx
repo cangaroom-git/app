@@ -610,8 +610,7 @@ export function FannedPhotoCardDeck({
 
     if (g.axis === "vertical") {
       if (onSheetPullMove) {
-        const resisted = dy < 0 ? dy * 0.28 : Math.min(280, dy);
-        onSheetPullMove(resisted);
+        onSheetPullMove(dy);
       }
       return;
     }

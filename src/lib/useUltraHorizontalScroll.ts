@@ -414,8 +414,7 @@ export function useUltraHorizontalScroll<T extends HTMLElement = HTMLDivElement>
         ) {
           touchState.samples.shift();
         }
-        const resisted = dy < 0 ? dy * 0.25 : Math.min(280, dy);
-        optsRef.current.onVerticalPullMove?.(resisted);
+        optsRef.current.onVerticalPullMove?.(dy);
         return;
       }
 
