@@ -112,7 +112,7 @@ export function BookingCheckoutStep({
                   </p>
                 </div>
               </div>
-              <span className="inline-flex items-center h-7 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-3 font-mono ty-caption font-bold shrink-0">
+              <span className="inline-flex items-center h-7 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] px-3 font-mono ty-caption font-bold shrink-0">
                 {String(Math.floor(holdRemainingSeconds / 60)).padStart(2, "0")}:
                 {String(holdRemainingSeconds % 60).padStart(2, "0")}
               </span>
@@ -175,12 +175,12 @@ export function BookingCheckoutStep({
             <img
               src={room.galleryUrls[0]}
               alt={room.nameTh}
-              className="h-14 w-20 rounded-[12px] object-cover shrink-0"
+              className="h-16 w-16 aspect-square rounded-[16px] object-cover shrink-0"
             />
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center h-5 rounded-[7px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-2 ty-caption font-bold">
+              <span className="inline-flex items-center h-5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] px-2 ty-caption font-bold">
                 {room.code}
               </span>
               <h3 className="ty-body font-bold truncate">
@@ -260,7 +260,7 @@ export function BookingCheckoutStep({
                       <button
                         type="button"
                         onClick={() => onUpdateAddonQuantity(addon.id, -1)}
-                        className="h-8 w-8 rounded-[10px] bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
+                        className="h-8 w-8 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border)] flex items-center justify-center cursor-pointer"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -270,7 +270,7 @@ export function BookingCheckoutStep({
                       <button
                         type="button"
                         onClick={() => onUpdateAddonQuantity(addon.id, 1)}
-                        className="h-8 w-8 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] flex items-center justify-center cursor-pointer"
+                        className="h-8 w-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] flex items-center justify-center cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -279,7 +279,7 @@ export function BookingCheckoutStep({
                     <button
                       type="button"
                       onClick={() => onUpdateAddonQuantity(addon.id, 1)}
-                      className="h-8 rounded-[10px] px-3 ty-caption font-semibold bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] inline-flex items-center gap-1 cursor-pointer shrink-0"
+                      className="h-8 rounded-full px-3.5 ty-caption font-semibold bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] inline-flex items-center gap-1 cursor-pointer shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{language === "th" ? "เพิ่ม" : "Add"}</span>
@@ -363,7 +363,7 @@ export function BookingCheckoutStep({
           <button
             type="button"
             onClick={() => onApplyCoupon()}
-            className="min-h-[56px] px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+            className="min-h-[56px] px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
           >
             <Tag className="w-4 h-4" />
             <span>{language === "th" ? "ใช้โค้ด" : "Apply"}</span>
@@ -387,9 +387,9 @@ export function BookingCheckoutStep({
                   key={c.id}
                   type="button"
                   onClick={() => onApplyCoupon(c.code)}
-                  className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 h-8 ty-caption font-mono font-bold cursor-pointer transition border ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 h-8 ty-caption font-mono font-bold cursor-pointer transition border ${
                     isApplied
-                      ? "bg-[#111111] border-[#111111] !text-white dark:bg-[#f5f5f5] dark:border-[#f5f5f5] dark:!text-[#111111]"
+                      ? "bg-[var(--color-accent)] border-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] border-[var(--color-border)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >

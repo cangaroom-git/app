@@ -297,7 +297,7 @@ export default async function HotelPostDetailPage({
       </header>
 
       {/* Hero Cover Image */}
-      <div className="rounded-[24px] overflow-hidden bg-[var(--color-background-muted)] aspect-[16/9]">
+      <div className="rounded-[24px] overflow-hidden bg-[var(--color-background-muted)] aspect-square max-h-[540px] mx-auto w-full">
         <img
           src={post.coverImageUrl}
           alt={post.titleTh}
@@ -314,7 +314,7 @@ export default async function HotelPostDetailPage({
             {post.galleryUrls.map((url, idx) => (
               <div
                 key={idx}
-                className="rounded-[16px] overflow-hidden aspect-[4/3] bg-[var(--color-background-muted)]"
+                className="rounded-[20px] overflow-hidden aspect-square bg-[var(--color-background-muted)]"
               >
                 <img
                   src={url}
@@ -342,13 +342,13 @@ export default async function HotelPostDetailPage({
       </div>
 
       {/* Embedded 0% GP Direct Booking CTA Card */}
-      <section className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-5">
+      <section className="rounded-[22px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-5">
         <div className="flex items-center gap-4 min-w-0">
           {(linkedRoom?.coverImageUrl || hotel.coverImageUrl) && (
             <img
               src={linkedRoom?.coverImageUrl || hotel.coverImageUrl || ""}
               alt={linkedRoom?.nameTh || hotel.nameTh}
-              className="h-20 w-24 rounded-[14px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+              className="h-20 w-20 rounded-[18px] object-cover shrink-0 bg-[var(--color-background-muted)]"
             />
           )}
           <div className="min-w-0 space-y-1">
@@ -394,12 +394,12 @@ export default async function HotelPostDetailPage({
               <Link
                 key={rp.id}
                 href={`/${hotel.slug}/posts/${rp.slug}`}
-                className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col hover:opacity-95 transition-opacity"
+                className="rounded-[22px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col hover:opacity-95 transition-opacity"
               >
                 <img
                   src={rp.coverImageUrl}
                   alt={rp.titleTh}
-                  className="h-36 w-full object-cover bg-[var(--color-background-muted)]"
+                  className="aspect-square w-full object-cover bg-[var(--color-background-muted)]"
                 />
                 <div className="p-4 space-y-1.5">
                   <span className="ty-caption text-[var(--color-accent)] font-semibold">

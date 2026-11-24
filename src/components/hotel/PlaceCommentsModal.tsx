@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   BadgeCheck,
-  Bookmark,
   ChevronLeft,
   ChevronRight,
   Heart,
@@ -489,13 +488,13 @@ export function PlaceCommentsModal({
                 type="button"
                 onClick={onToggleSave}
                 aria-label={isSaved ? (isTh ? "บันทึกแล้ว" : "Saved") : isTh ? "บันทึก" : "Save"}
-                className={`h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors ${
+                className={`h-9 w-9 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors ${
                   isSaved
                     ? "text-[var(--color-promo)]"
                     : "text-[var(--color-text-primary)]"
                 }`}
               >
-                <Bookmark
+                <Heart
                   className={`w-[20px] h-[20px] ${isSaved ? "fill-current" : ""}`}
                   strokeWidth={2}
                 />
@@ -539,13 +538,13 @@ export function PlaceCommentsModal({
                 placeholder={
                   isTh ? "เพิ่มความคิดเห็น..." : "Add a comment..."
                 }
-                className="flex-1 min-w-0 h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-text-primary)]"
+                className="flex-1 min-w-0 h-10 px-3.5 rounded-[14px] bg-[var(--color-background-muted)] text-[14px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
               />
               <button
                 type="submit"
                 disabled={!text.trim() || isSubmitting}
                 aria-label={isTh ? "โพสต์ความคิดเห็น" : "Post comment"}
-                className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

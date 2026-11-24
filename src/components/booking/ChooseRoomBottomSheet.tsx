@@ -243,7 +243,7 @@ export function ChooseRoomBottomSheet({
                   onClose();
                   onOpenDatePicker();
                 }}
-                className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
               >
                 {isTh ? "เปลี่ยนวันเข้าพัก" : "Change dates"}
               </button>
@@ -274,7 +274,7 @@ export function ChooseRoomBottomSheet({
                       }`}
                     >
                       {/* Room Thumbnail with bottom-left ↗ expand detail button */}
-                      <div className="relative w-[104px] sm:w-[120px] aspect-[4/3] rounded-[10px] overflow-hidden bg-[var(--color-background-subtle)] shrink-0">
+                      <div className="relative w-[104px] sm:w-[116px] aspect-square rounded-[18px] overflow-hidden bg-[var(--color-background-subtle)] shrink-0">
                         <img
                           src={getOptimizedPinImageUrl(roomThumb, "thumb")}
                           srcSet={getOptimizedPinImageSrcSet(roomThumb, "thumb")}
@@ -295,7 +295,7 @@ export function ChooseRoomBottomSheet({
                               ? `ดูรายละเอียดห้อง ${room.nameTh}`
                               : `View ${room.nameEn} details`
                           }
-                          className="absolute bottom-1.5 left-1.5 h-7 w-7 rounded-[8px] bg-white/95 dark:bg-[#222222]/95 text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-white"
+                          className="absolute bottom-1.5 left-1.5 h-7 w-7 rounded-full bg-white/95 dark:bg-[#222222]/95 text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-white"
                         >
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
@@ -382,7 +382,7 @@ export function ChooseRoomBottomSheet({
                 onClose();
                 onConfirmRoom(activeEntry.room);
               }}
-              className="h-12 px-8 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold shrink-0 cursor-pointer transition-colors"
+              className="h-12 px-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[15px] font-semibold shrink-0 cursor-pointer transition-colors"
             >
               {isTh ? "ถัดไป" : "Next"}
             </button>

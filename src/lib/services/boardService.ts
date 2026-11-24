@@ -377,3 +377,107 @@ export async function getTripBySlugOrId(
   }
   return getTripBySlugOrIdCached(cleanKey, viewerUserId ?? "");
 }
+
+export type PublicCommunityTripDto = SavedBoardDto & {
+  ownerDisplayName: string;
+};
+
+/**
+ * Loads public community trip boards containing at least 1 place so `/trip`
+ * showcases real traveller itineraries immediately even before login.
+ */
+export async function getPublicCommunityTrips(
+  limit = 12
+): Promise<PublicCommunityTripDto[]> {
+  const nowDate = new Date();
+  const safeTake = Math.min(Math.max(limit, 1), 24);
+  const boards = await prisma.savedBoard.findMany({
+    where: {
+      isPublic: true,
+      pins: { some: {} },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: safeTake,
+    select: {
+      id: true,
+      name: true,
+      shareSlug: true,
+      isPublic: true,
+      createdAt: true,
+      user: {
+        select: {
+          name: true,
+        },
+      },
+      pins: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: buildLeanBoardPinSelect(nowDate),
+      },
+    },
+  });
+
+  const emptySet = new Set<string>();
+
+  return boards.map((board) => {
+    const shareSlug = (board.shareSlug || "").trim() || board.id;
+    const ownerDisplayName =
+      (board.user?.name || "").trim() || "Nondii Traveller";
+
+    return {
+      id: board.id,
+      name: board.name,
+      shareSlug,
+      isPublic: board.isPublic ?? true,
+      createdAt: board.createdAt.toISOString(),
+      pinCount: board.pins.length,
+      ownerDisplayName,
+      items: board.pins.map((entry) => {
+        const pinDto = mapPinToDto(
+          {
+            ...entry.pin,
+            descriptionTh: "",
+            descriptionEn: "",
+            mediaUrls: [entry.pin.coverImageUrl],
+            semanticTags: [],
+            aiTriageNote: null,
+            hotel: {
+              ...entry.pin.hotel,
+              addressTh: null,
+              googleMapsUrl: null,
+              nearbySpotsJson: null,
+            },
+          },
+          emptySet,
+          emptySet
+        );
+        const currentMinPriceThb = pinDto.nightlyPriceThb;
+        const priceDropThb =
+          entry.savedPriceSnapshotThb &&
+          currentMinPriceThb &&
+          entry.savedPriceSnapshotThb > currentMinPriceThb
+            ? entry.savedPriceSnapshotThb - currentMinPriceThb
+            : 0;
+        const topCoupon = entry.pin.hotel.coupons[0] || null;
+        const activePromoLabel = topCoupon
+          ? topCoupon.discountType === "PERCENT"
+            ? `คูปองลด ${topCoupon.discountValue}% (${topCoupon.code})`
+            : `คูปองลด ฿${topCoupon.discountValue.toLocaleString()} (${topCoupon.code})`
+          : null;
+
+        return {
+          boardPinId: entry.id,
+          boardId: board.id,
+          boardName: board.name,
+          sortOrder: entry.sortOrder,
+          savedPriceSnapshotThb: entry.savedPriceSnapshotThb,
+          currentMinPriceThb,
+          priceDropThb,
+          hasActivePromo: Boolean(topCoupon),
+          activePromoLabel,
+          savedAt: entry.createdAt.toISOString(),
+          pin: pinDto,
+        };
+      }),
+    };
+  });
+}

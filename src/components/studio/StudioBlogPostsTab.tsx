@@ -219,7 +219,7 @@ export function StudioBlogPostsTab({
           <button
             type="button"
             onClick={openCreateModal}
-            className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>เขียนบทความใหม่</span>
@@ -248,7 +248,7 @@ export function StudioBlogPostsTab({
                 <img
                   src={post.coverImageUrl}
                   alt={post.titleTh}
-                  className="w-24 sm:w-28 aspect-[16/10] rounded-[12px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+                  className="w-20 h-20 sm:w-24 sm:h-24 aspect-square rounded-[18px] object-cover shrink-0 bg-[var(--color-background-muted)]"
                 />
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2 text-[12px] text-[var(--color-text-secondary)]">
@@ -342,7 +342,7 @@ export function StudioBlogPostsTab({
               <button
                 type="button"
                 onClick={() => setIsEditorOpen(false)}
-                className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
               >
                 ยกเลิก
               </button>
@@ -350,7 +350,7 @@ export function StudioBlogPostsTab({
                 type="submit"
                 form="studio-blog-form"
                 disabled={isSubmitting || isUploadingCover}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting
                   ? "กำลังบันทึก..."

@@ -82,7 +82,7 @@ export function StayPropertyPostsSection({
                 href={`/${encodeURIComponent(post.hotelSlug)}/posts/${encodeURIComponent(post.slug)}`}
                 className="group block space-y-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[14px]"
               >
-                <div className="relative aspect-[16/10] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]">
+                <div className="relative aspect-square w-full rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
                   {post.coverImageUrl ? (
                     <img
                       src={getOptimizedPinImageUrl(post.coverImageUrl, "card")}

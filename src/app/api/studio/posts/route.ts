@@ -11,27 +11,37 @@ import {
   normalizePostSlug,
 } from "@/lib/services/hotelPostService";
 
-const CreatePostSchema = z.object({
-  hotelSlug: z.string().optional(),
-  slug: z.string().trim().max(90).optional(),
-  roomId: z.string().trim().optional().nullable(),
-  titleTh: z.string().trim().min(3, "กรุณาใส่หัวข้อบทความ").max(180),
-  excerptTh: z.string().trim().max(400).optional(),
-  contentTh: z.string().trim().min(20, "เนื้อหาบทความต้องมีอย่างน้อย 20 ตัวอักษร").max(20000),
-  coverImageUrl: z.string().trim().min(1, "กรุณาอัปโหลดหรือใส่รูปภาพหน้าปก"),
-  galleryUrls: z.array(z.string().trim()).optional(),
-  categoryTh: z.string().trim().max(60).optional(),
-  tags: z.array(z.string().trim()).optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
-});
+const CreatePostSchema = z
+  .object({
+    hotelSlug: z.string().optional(),
+    slug: z.string().trim().max(90).optional(),
+    roomId: z.string().trim().optional().nullable(),
+    postKind: z.enum(["FEED_POST", "BLOG"]).optional(),
+    titleTh: z.string().trim().min(3, "กรุณาใส่หัวข้อโพสต์").max(180),
+    excerptTh: z.string().trim().max(400).optional(),
+    contentTh: z.string().trim().min(3, "กรุณาใส่เนื้อหาอย่างน้อย 3 ตัวอักษร").max(20000),
+    coverImageUrl: z.string().trim().min(1, "กรุณาอัปโหลดหรือใส่รูปภาพหน้าปก"),
+    galleryUrls: z.array(z.string().trim()).optional(),
+    categoryTh: z.string().trim().max(60).optional(),
+    tags: z.array(z.string().trim()).optional(),
+    status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  })
+  .refine(
+    (d) => d.postKind === "FEED_POST" || d.contentTh.length >= 20,
+    {
+      message: "เนื้อหาบทความต้องมีอย่างน้อย 20 ตัวอักษร",
+      path: ["contentTh"],
+    }
+  );
 
 const PatchPostSchema = z.object({
   hotelSlug: z.string().optional(),
   id: z.string().trim().min(1),
   roomId: z.string().trim().optional().nullable(),
+  postKind: z.enum(["FEED_POST", "BLOG"]).optional(),
   titleTh: z.string().trim().min(3).max(180).optional(),
   excerptTh: z.string().trim().max(400).optional(),
-  contentTh: z.string().trim().min(20).max(20000).optional(),
+  contentTh: z.string().trim().min(3).max(20000).optional(),
   coverImageUrl: z.string().trim().min(1).optional(),
   categoryTh: z.string().trim().max(60).optional(),
   tags: z.array(z.string().trim()).optional(),
@@ -85,7 +95,8 @@ export async function POST(request: Request) {
         contentTh: parsed.data.contentTh,
         coverImageUrl: parsed.data.coverImageUrl,
         galleryUrls: parsed.data.galleryUrls || [],
-        categoryTh: parsed.data.categoryTh || "คู่มือเที่ยว & ที่พัก",
+        categoryTh: parsed.data.categoryTh || (parsed.data.postKind === "FEED_POST" ? "อัปเดตล่าสุด" : "คู่มือเที่ยว & ที่พัก"),
+        postKind: parsed.data.postKind || "BLOG",
         tags: (parsed.data.tags || []).filter(Boolean).slice(0, 10),
         status: parsed.data.status || "PUBLISHED",
       },

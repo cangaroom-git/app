@@ -572,7 +572,7 @@ export function HotelCheckoutClient({
         <button
           type="button"
           onClick={handleBackToHotel}
-          className="h-11 px-5 rounded-[12px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer"
+          className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
         >
           {isTh ? "กลับหน้าเพจที่พัก" : "Back to property"}
         </button>
@@ -733,7 +733,7 @@ export function HotelCheckoutClient({
         <img
           src={roomCover}
           alt={isTh ? selectedRoom.nameTh : selectedRoom.nameEn}
-          className="h-20 w-24 rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+          className="h-20 w-20 rounded-[18px] object-cover bg-[var(--color-background-muted)] shrink-0"
         />
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
@@ -784,7 +784,7 @@ export function HotelCheckoutClient({
                       </div>
                     </div>
 
-                    <span className="inline-flex items-center h-8 rounded-[10px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] px-3 font-mono text-[13px] font-bold shrink-0">
+                    <span className="inline-flex items-center h-8 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] px-3 font-mono text-[13px] font-bold shrink-0">
                       {String(Math.floor(holdRemainingSeconds / 60)).padStart(
                         2,
                         "0"
@@ -817,14 +817,14 @@ export function HotelCheckoutClient({
                   <div className="flex flex-wrap items-center gap-3">
                     <Link
                       href="/bookings"
-                      className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
+                      className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
                     >
                       {isTh ? "ดูการจองของฉัน" : "View my bookings"}
                     </Link>
                     <button
                       type="button"
                       onClick={handleBackToHotel}
-                      className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                      className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                     >
                       {isTh ? "กลับหน้าเพจที่พัก" : "Back to property"}
                     </button>
@@ -974,7 +974,7 @@ export function HotelCheckoutClient({
                         <button
                           type="button"
                           onClick={() => setIsSwitchRoomOpen(true)}
-                          className="h-8 px-3 rounded-[9px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[12.5px] font-semibold cursor-pointer"
+                          className="h-8 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold cursor-pointer transition-colors"
                         >
                           {isTh ? "เลือกห้องที่ว่าง" : "Switch room"}
                         </button>
@@ -1063,7 +1063,7 @@ export function HotelCheckoutClient({
                                 type="button"
                                 onClick={() => handleUpdateAddonQty(addon.id, 1)}
                                 aria-label="Increase addon quantity"
-                                className="h-8 w-8 rounded-[9px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] flex items-center justify-center cursor-pointer"
+                                className="h-8 w-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] flex items-center justify-center cursor-pointer transition-colors"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
@@ -1072,7 +1072,7 @@ export function HotelCheckoutClient({
                             <button
                               type="button"
                               onClick={() => handleUpdateAddonQty(addon.id, 1)}
-                              className="h-9 rounded-[10px] px-3.5 text-[13px] font-semibold bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+                              className="h-9 rounded-full px-4 text-[13px] font-semibold bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>{isTh ? "เพิ่ม" : "Add"}</span>
@@ -1203,7 +1203,7 @@ export function HotelCheckoutClient({
                   <button
                     type="button"
                     onClick={() => handleApplyCoupon()}
-                    className="min-h-[56px] px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+                    className="min-h-[56px] px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
                   >
                     <Tag className="w-4 h-4" />
                     <span>{isTh ? "ใช้โค้ด" : "Apply"}</span>
@@ -1255,9 +1255,9 @@ export function HotelCheckoutClient({
                           key={c.id}
                           type="button"
                           onClick={() => handleApplyCoupon(c.code)}
-                          className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 h-8 text-[12px] font-mono font-bold cursor-pointer transition-colors ${
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 h-8 text-[12px] font-mono font-bold cursor-pointer transition-colors ${
                             isApplied
-                              ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
@@ -1344,7 +1344,7 @@ export function HotelCheckoutClient({
                 <button
                   type="submit"
                   disabled={isCreatingHold || !canConfirm}
-                  className="h-12 w-full sm:w-auto sm:min-w-[260px] px-7 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-12 w-full sm:w-auto sm:min-w-[260px] px-7 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[15.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <QrCode className="w-4 h-4" />
                   <span>
@@ -1368,13 +1368,13 @@ export function HotelCheckoutClient({
 
         {/* COLUMN 7: 8.33% (~93px) AIRBNB BREATHING AIR -> RIGHT STICKY CARD (COLS 8–12) */}
         <aside className="hidden lg:block lg:col-start-8 lg:col-span-5 lg:sticky lg:top-24">
-          <div className="rounded-[16px] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] bg-[var(--color-background-card)] p-6 divide-y divide-[var(--color-border)]">
+          <div className="rounded-[22px] sm:rounded-[24px] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] bg-[var(--color-background-card)] p-6 divide-y divide-[var(--color-border)]">
             {/* Property & Room Header */}
             <div className="pb-5 flex items-start gap-4">
               <img
                 src={roomCover}
                 alt={isTh ? selectedRoom.nameTh : selectedRoom.nameEn}
-                className="h-24 w-28 rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                className="h-24 w-24 rounded-[18px] object-cover bg-[var(--color-background-muted)] shrink-0"
               />
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-[12.5px] text-[var(--color-text-secondary)] truncate">
@@ -1549,7 +1549,7 @@ export function HotelCheckoutClient({
               <button
                 type="button"
                 onClick={() => setIsEditTripOpen(false)}
-                className="h-10 px-5 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors"
+                className="h-10 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
               >
                 {isTh ? "เสร็จสิ้น" : "Save"}
               </button>
@@ -1615,7 +1615,7 @@ export function HotelCheckoutClient({
                       <img
                         src={rmPhoto}
                         alt={isTh ? rm.nameTh : rm.nameEn}
-                        className="h-14 w-16 rounded-[10px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+                        className="h-14 w-14 rounded-[14px] object-cover shrink-0 bg-[var(--color-background-muted)]"
                       />
                       <div className="min-w-0">
                         <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate">

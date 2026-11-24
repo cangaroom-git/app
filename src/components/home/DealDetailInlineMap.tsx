@@ -367,7 +367,7 @@ export function DealDetailInlineMap({
         <button
           type="button"
           onClick={() => setIsNearbyModalOpen(true)}
-          className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors max-w-full"
+          className="h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors max-w-full"
         >
           <Compass className="w-4 h-4 shrink-0" strokeWidth={2.1} />
           <span className="truncate">

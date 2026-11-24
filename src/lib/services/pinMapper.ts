@@ -333,7 +333,7 @@ export function mapPinToDto(
     mediaUrls:
       cleanedMediaUrls.length > 0 ? cleanedMediaUrls : [pin.coverImageUrl],
     videoUrl: pin.videoUrl,
-    aspectRatio: pin.aspectRatio || "aspect-[3/4]",
+    aspectRatio: pin.aspectRatio || "aspect-square",
     provinceId: pin.provinceId,
     provinceNameTh: province
       ? province.nameTh.split("(")[0].trim()

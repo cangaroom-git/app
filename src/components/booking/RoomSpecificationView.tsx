@@ -65,7 +65,7 @@ export function RoomSpecificationView({
     <div className="space-y-4 pb-3">
       {/* 1. Hero Gallery + Tap-to-Zoom Fullscreen + Squircle Thumbnail Strip */}
       <div className="space-y-2.5">
-        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[16px] bg-[var(--color-background-muted)] border border-[var(--color-border)]">
+        <div className="relative aspect-square w-full max-w-[520px] mx-auto overflow-hidden rounded-[22px] bg-[var(--color-background-muted)]">
           <button
             type="button"
             onClick={() => onExpandPhotos?.(photos, safeIdx)}
@@ -88,7 +88,7 @@ export function RoomSpecificationView({
                   setSlideIdx((prev) => (prev - 1 + photos.length) % photos.length);
                 }}
                 aria-label="Previous photo"
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-[12px] bg-[var(--color-background-card)]/95 border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-background-card)]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-[var(--color-background-card)]/95 border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-background-card)]"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -99,7 +99,7 @@ export function RoomSpecificationView({
                   setSlideIdx((prev) => (prev + 1) % photos.length);
                 }}
                 aria-label="Next photo"
-                className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-[12px] bg-[var(--color-background-card)]/95 border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-background-card)]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-[var(--color-background-card)]/95 border border-[var(--color-border)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--color-background-card)]"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -113,7 +113,7 @@ export function RoomSpecificationView({
                 e.stopPropagation();
                 onExpandPhotos(photos, safeIdx);
               }}
-              className="absolute bottom-3 right-3 h-8 px-3 rounded-[10px] bg-[var(--color-background-card)]/95 hover:bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="absolute bottom-3 right-3 h-8 px-3.5 rounded-full bg-[var(--color-background-card)]/95 hover:bg-[var(--color-background-card)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <Maximize2 className="w-3.5 h-3.5" />
               <span>
@@ -128,7 +128,7 @@ export function RoomSpecificationView({
         </div>
 
         {photos.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 max-w-[520px] mx-auto">
             {photos.map((photoUrl, idx) => {
               const isSelected = idx === safeIdx;
               return (
@@ -139,9 +139,9 @@ export function RoomSpecificationView({
                   aria-label={
                     isTh ? `ดูภาพที่ ${idx + 1}` : `View photo ${idx + 1}`
                   }
-                  className={`relative h-[52px] w-[68px] rounded-[10px] overflow-hidden shrink-0 cursor-pointer border-2 transition-opacity ${
+                  className={`relative h-14 w-14 aspect-square rounded-[14px] overflow-hidden shrink-0 cursor-pointer border-2 transition-opacity ${
                     isSelected
-                      ? "border-[#111111] dark:border-[#f5f5f5] opacity-100"
+                      ? "border-[var(--color-accent)] opacity-100"
                       : "border-transparent opacity-65 hover:opacity-100"
                   }`}
                 >
@@ -162,7 +162,7 @@ export function RoomSpecificationView({
         {/* Section A: Header, Specs & Description */}
         <section className="pb-4 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-[8px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-2.5 h-6 ty-caption font-bold">
+            <span className="inline-flex items-center rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] px-2.5 h-6 ty-caption font-bold">
               {room.code}
             </span>
             <span className="inline-flex items-center gap-1 ty-caption font-semibold text-[var(--color-text-primary)]">

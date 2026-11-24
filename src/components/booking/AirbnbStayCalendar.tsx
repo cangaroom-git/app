@@ -334,9 +334,9 @@ export function AirbnbStayCalendar({
                   aria-label={`${dateStr}${
                     isSoldOut ? (isTh ? " ห้องเต็ม" : " sold out") : ""
                   }`}
-                  className={`relative z-10 h-10 w-10 rounded-[10px] flex items-center justify-center text-[14px] transition-colors tabular-nums ${
+                  className={`relative z-10 h-10 w-10 rounded-full flex items-center justify-center text-[14px] transition-colors tabular-nums ${
                     isStart || isEnd
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] font-semibold cursor-pointer"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold cursor-pointer"
                       : isDisabled
                       ? `text-[var(--color-text-disabled)] cursor-not-allowed ${
                           showStrikethrough

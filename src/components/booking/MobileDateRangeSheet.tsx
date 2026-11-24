@@ -381,9 +381,9 @@ export function MobileDateRangeSheet({
                           disabled={isDisabled}
                           onClick={() => handleDayTap(dateStr)}
                           aria-label={dateStr}
-                          className={`relative z-10 h-10 w-10 rounded-[10px] flex items-center justify-center text-[14px] tabular-nums transition-colors ${
+                          className={`relative z-10 h-10 w-10 rounded-full flex items-center justify-center text-[14px] tabular-nums transition-colors ${
                             isStart || isEnd
-                              ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] font-semibold cursor-pointer"
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold cursor-pointer"
                               : isDisabled
                               ? `text-[var(--color-text-disabled)] cursor-not-allowed ${
                                   showStrikethrough
@@ -414,7 +414,7 @@ export function MobileDateRangeSheet({
                     Math.min(MAX_MONTHS, prev + MONTHS_INCREMENT)
                   )
                 }
-                className="w-full h-12 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14.5px] font-semibold cursor-pointer transition-colors"
+                className="w-full h-12 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14.5px] font-semibold cursor-pointer transition-colors"
               >
                 {isTh ? "โหลดเดือนเพิ่มเติม" : "Load more dates"}
               </button>
@@ -448,9 +448,9 @@ export function MobileDateRangeSheet({
             type="button"
             disabled={!canSave}
             onClick={handleSave}
-            className={`h-12 px-7 rounded-[12px] text-[15px] font-semibold transition-colors shrink-0 ${
+            className={`h-12 px-7 rounded-full text-[15px] font-semibold transition-colors shrink-0 ${
               canSave
-                ? "bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] cursor-pointer"
+                ? "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] cursor-pointer"
                 : "bg-[var(--color-background-muted)] text-[var(--color-text-disabled)] cursor-not-allowed"
             }`}
           >

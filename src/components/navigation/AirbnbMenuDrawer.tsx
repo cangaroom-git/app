@@ -7,12 +7,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeftRight,
   Bell,
-  Bookmark,
   Building2,
   CalendarCheck,
+  Compass,
   Crown,
   ExternalLink,
   Globe,
+  Heart,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -269,11 +270,11 @@ export function AirbnbMenuDrawer({
                   <Link
                     href="/studio"
                     onClick={onClose}
-                    className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="w-full h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
                   >
                     <ArrowLeftRight className="w-4 h-4" strokeWidth={1.9} />
                     <span>
-                      {isTh ? "โหมดเจ้าของที่พัก" : "Switch to hosting"}
+                      {isTh ? "จัดการร้าน / Studio" : "Manage place / Studio"}
                     </span>
                     {totalStudioPending > 0 && (
                       <span className="px-1.5 py-0.5 rounded-[6px] bg-[var(--color-promo)] !text-white text-[11px] font-bold leading-none">
@@ -283,13 +284,13 @@ export function AirbnbMenuDrawer({
                   </Link>
                 ) : (
                   <Link
-                    href="/register-hotel"
+                    href="/register"
                     onClick={onClose}
-                    className="w-full h-11 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="w-full h-11 px-4 rounded-[14px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
                   >
                     <Building2 className="w-4 h-4" strokeWidth={1.9} />
                     <span>
-                      {isTh ? "เปิดเพจที่พักฟรี 0% GP" : "List your stay free"}
+                      {isTh ? "ลงธุรกิจ / ที่พักฟรี" : "List your place free"}
                     </span>
                   </Link>
                 )}
@@ -309,7 +310,7 @@ export function AirbnbMenuDrawer({
                 <Link
                   href="/login"
                   onClick={onClose}
-                  className="w-full h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
+                  className="w-full h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold flex items-center justify-center gap-2 transition-colors"
                 >
                   <LogIn className="w-4 h-4" strokeWidth={2} />
                   <span>
@@ -358,7 +359,7 @@ export function AirbnbMenuDrawer({
                 </Link>
 
                 <Link
-                  href="/register-hotel"
+                  href="/register"
                   onClick={onClose}
                   className={rowClass}
                 >
@@ -368,7 +369,7 @@ export function AirbnbMenuDrawer({
                       strokeWidth={1.7}
                     />
                     <span className="truncate">
-                      {isTh ? "เพิ่มที่พักแห่งใหม่" : "Create a new listing"}
+                      {isTh ? "เพิ่มธุรกิจ / สถานที่ใหม่" : "Create a new listing"}
                     </span>
                   </span>
                 </Link>
@@ -527,17 +528,18 @@ export function AirbnbMenuDrawer({
                 </Link>
 
                 <Link
-                  href="/trip"
+                  href="/wishlist"
                   onClick={onClose}
-                  className={activeTab === "board" ? activeRowClass : rowClass}
+                  className={activeTab === "wishlist" ? activeRowClass : rowClass}
                 >
                   <span className="flex items-center gap-4 min-w-0">
-                    <Bookmark
+                    <Heart
                       className="w-[22px] h-[22px] shrink-0"
                       strokeWidth={1.7}
+                      fill={activeTab === "wishlist" ? "currentColor" : "none"}
                     />
                     <span className="truncate">
-                      {isTh ? "ทริป & คูปองที่บันทึกไว้" : "Saved trips"}
+                      {isTh ? "Wishlist ที่ถูกใจ" : "Wishlist"}
                     </span>
                   </span>
                   {savedPinsCount > 0 && (
@@ -545,6 +547,22 @@ export function AirbnbMenuDrawer({
                       {savedPinsCount}
                     </span>
                   )}
+                </Link>
+
+                <Link
+                  href="/trip"
+                  onClick={onClose}
+                  className={activeTab === "board" ? activeRowClass : rowClass}
+                >
+                  <span className="flex items-center gap-4 min-w-0">
+                    <Compass
+                      className="w-[22px] h-[22px] shrink-0"
+                      strokeWidth={1.7}
+                    />
+                    <span className="truncate">
+                      {isTh ? "ทริปเดินทาง" : "Trips"}
+                    </span>
+                  </span>
                 </Link>
 
                 <Link
@@ -609,7 +627,7 @@ export function AirbnbMenuDrawer({
                 )}
 
                 <Link
-                  href="/register-hotel"
+                  href="/register"
                   onClick={onClose}
                   className={
                     activeTab === "register-hotel" ? activeRowClass : rowClass
@@ -622,8 +640,8 @@ export function AirbnbMenuDrawer({
                     />
                     <span className="truncate">
                       {isTh
-                        ? "เปิดเพจที่พักฟรี 0% GP"
-                        : "List property free (0% GP)"}
+                        ? "ลงธุรกิจ / ที่พักฟรี 0% GP"
+                        : "List place free (0% GP)"}
                     </span>
                   </span>
                 </Link>

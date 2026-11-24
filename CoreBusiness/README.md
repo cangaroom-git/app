@@ -1,39 +1,41 @@
-# Cangaroom — Core Business & Architecture Blueprint (`CoreBusiness/`)
+# Nondii (`nondii.com`) — Core Business & Architecture Blueprint (`CoreBusiness/`)
 
 > **MANDATORY SOURCE OF TRUTH FOR ALL AI AGENTS & DEVELOPERS**
-> เอกสารทั้งหมดในโฟลเดอร์ `CoreBusiness/` นี้คือ **พิมพ์เขียวหลักฉบับปัจจุบัน (Single Source of Truth)** ของแพลตฟอร์ม **Cangaroom**
-> - **ยกเลิกโมเดลธุรกิจเก่าทั้งหมด**: ห้ามยึดตามเอกสารเก่าในโฟลเดอร์ `plan/` (โมเดลเก็บค่าเช่า SaaS 12,000 บาท/ปี หรือทดลองใช้ฟรี 30 วัน) และห้ามยึดตาม `booking-flow.md` (โมเดลเว็บไซต์ของรีสอร์ทสะปันอันซีนเพียงแห่งเดียว)
-> - **กฎเหล็กด้าน UI/UX**: ก่อนแก้ไขหรือสร้างหน้าเว็บใดๆ ต้องอ่านและปฏิบัติตาม `.agents/skills/my-hotel-design-system/SKILL.md` และ `AGENTS.md` อย่างเคร่งครัด โดยเฉพาะกฎ **ห้ามใช้ `hover:scale-*` หรือขยายขนาดเมื่อชี้เมาส์ทั่วทั้งเว็บไซต์โดยเด็ดขาด**
+> เอกสารทั้งหมดในโฟลเดอร์ `CoreBusiness/` นี้คือ **พิมพ์เขียวหลักฉบับปัจจุบัน (Single Source of Truth)** ของแพลตฟอร์ม **Nondii (`nondii.com`)**
+> - **กฎเหล็กด้าน UI/UX**: ก่อนแก้ไขหรือสร้างหน้าเว็บใดๆ ต้องอ่านและปฏิบัติตาม `.agents/skills/my-hotel-design-system/SKILL.md` และ `AGENTS.md` อย่างเคร่งครัด โดยเฉพาะกฎ **ห้ามใช้ `hover:scale-*`**, **Minimal Borders**, **Unified Airbnb Inset-Label Inputs**, **Zero Card Shadows** และ **Smooth Fade Slide-In/Out**
+> - **กฎเหล็กด้าน Workspace**: ห้ามแก้ไขไฟล์ใดๆ นอก `my-hotel` (ห้ามยุ่งกับ `weglobal` โดยเด็ดขาด)
 
 ---
 
-## สรุปภาพรวม Cangaroom ใน 1 นาที (TL;DR for AI Agents)
+## สรุปภาพรวม Nondii ใน 1 นาที (TL;DR)
 
-1. **Nondii (Cangaroom) คืออะไร?**
-   - **ศูนย์รวมคูปองและโปรโมชั่นที่พักสวยทั่วไทย** ที่รวบรวมทั้ง **โปรจองตรง 0% GP จากพาร์ทเนอร์บนเว็บเรา (`INTERNAL` -> `/{hotelSlug}`)** และ **ดีล/ส่วนลดคัดพิเศษจากเว็บภายนอก (`EXTERNAL` -> ไทยเที่ยวไทย, Megatix, Agoda, Klook, Trip.com, เว็บตรงโรงแรม)** ในรูปแบบ **การ์ดคูปองแนวตั้ง (Vertical Ticket Card)** บนโครงสร้างหน้าแรกแบบ Airbnb (`/` + แผนที่ซูมเปลี่ยนรายการ `/explore`) และระบบบันทึกคูปองเข้า `/board` (ยกเลิกหน้า `/deal` และกระเป๋าคูปองแยกซ้ำซ้อน)
-2. **โมเดลรายได้ (0% GP Forever -> Sponsored Ads)**:
-   - **เปิดใช้ฟรีตลอดชีพ 0% GP**: เจ้าของที่พักเปิดโปรไฟล์ `cangaroom.com/{hotelSlug}` พร้อมระบบจองห้อง ปฏิทินห้องว่าง ระบบตรวจสลิปชำระเงินตรง และคูปองส่วนลดได้ **ฟรี ไม่มีวันหมดอายุ และไม่หักค่าคอมมิชชัน (0% GP)** เพื่อดึงที่พักทั่วไทยเข้ามาเป็น Supply หลักของแพลตฟอร์ม
-   - **รายได้หลักมาจากค่าโฆษณา (Promoted Pins & Featured Deals)**: โรงแรมที่ต้องการดัน Pin รูป/วิดีโอขึ้นอันดับต้นๆ บนหน้าแรก (`/`), หน้าค้นหาตามจังหวัด/สไตล์, หน้าคูปอง (`/deal`), หรือติดอันดับแนะนำในระบบ AI Agent จะจ่ายเงินค่าโฆษณา (Sponsored Boost)
-3. **ผู้ใช้งาน 3 กลุ่มหลัก (3 Core Roles)**:
-   - `TRAVELLER` — ค้นหาที่พัก กดบันทึก Pin เข้า `/board` เพื่อติดตามราคา/โปรโมชั่น เก็บคูปองจาก `/deal` เข้ากระเป๋า และจองตรงกับที่พัก
-   - `HOTEL_OWNER` — บริหารหน้าร้าน `cangaroom.com/{hotelSlug}` ของตัวเองผ่านหน้า `/studio` เชื่อมต่อ **Facebook Page Auto-Sync** เพื่อดึงโพสต์รูป/คลิปมาสร้าง Pin โดยไม่ต้องอัปโหลดซ้ำ จัดการห้องว่าง/ใบจอง และซื้อโฆษณาโปรโมทที่พัก
-   - `SUPER_ADMIN` — ตรวจสอบยืนยันตัวตนที่พักจริง (`Verified Stay` ป้องกันเพจปลอมมิจฉาชีพ) จัดการผู้ใช้งาน คัดกรองเนื้อหา และบริหารแคมเปญโฆษณาที่หน้า `/super-admin`
-4. **กฎเหล็กด้านข้อมูล (Strict Real-Database Policy)**:
-   - ข้อมูลทุกชิ้นที่แสดงบนหน้าเว็บต้องดึงจาก **ฐานข้อมูลจริง (Neon PostgreSQL ผ่าน Prisma)** เท่านั้น ห้ามซ่อนปัญหาด้วยการใช้ Mock Array ในฝั่ง Client หรือเก็บข้อมูลธุรกิจหลักไว้ใน `localStorage` / JSONB ก้อนเดียวอีกต่อไป
-5. **รากฐานพร้อมรับยุค AI Agent (Agentic Web Ready)**:
-   - โครงสร้างฐานข้อมูลและ Backend API ต้องแยกออกจาก UI อย่างสะอาด (Headless API-First) พร้อมเปิดมาตรฐานสากล (`Schema.org`, `llms.txt`, `/.well-known/agent-card.json` ตามโปรโตคอล A2A และ `/api/mcp` ตามมาตรฐาน MCP) เพื่อให้ AI ผู้ช่วยส่วนตัวเชื่อมต่อค้นหาห้องว่างและส่งลิงก์จองตรงได้ตั้งแต่เฟสแรก
+1. **Nondii (`nondii.com`) คืออะไร?**
+   - **Travel Place Social + 0% GP Direct Booking Hub** ของประเทศไทย ที่รวม 5 ประเภทสถานที่ท่องเที่ยว (`STAY`, `CAFE`, `RESTAURANT`, `ATTRACTION`, `WELLNESS`) ไว้ในรูปแบบ **การ์ดสะสมแนวตั้ง `3:4` (1 Place = 1 Canonical Card)** เชื่อมต่อระหว่าง:
+     - **หน้าฟีด & แผนที่สำรวจ (`/`, `/explore`)**: ค้นหาสถานที่และโปรโมชั่นสวยๆ ตามจังหวัด/สไตล์/พิกัด
+     - **หน้าโปรไฟล์สถานที่ (`/{slug}`)**: โครงสร้างหน้าตาหลักแบบ **Unified Social Profile (เหมือน Facebook Page)** ที่ทุกธุรกิจใช้ร่วมกันได้ และเปิด/ปิดโมดูลเสริมตามความต้องการ (เช่น โมดูลจองตรง 0% GP สำหรับที่พัก)
+     - **ระบบ `Wishlist` (`/wishlist` ในเมนู `More`)**: กดหัวใจเก็บการ์ดที่ถูกใจ (เฉพาะคนล็อกอิน) แยกหมวดอัตโนมัติ (`ที่พัก/คาเฟ่/ร้านอาหาร/ที่เที่ยว/สปา`) + Custom Boards
+     - **ระบบสร้างทริปเดินทางจริง (`/trip`, `/trip/[tripId]` — Public First)**: ไม่ต้องล็อกอินก็ดูทริปคนอื่นได้ เลือกต้นทาง–ปลายทาง เล่น Animation เส้นถนนขับรถจริง (OSRM ฟรี) + จุดแวะแนะนำเด้งตามรายทาง (Nondii Places + `ThailandPlace` OSM) และปรับเปลี่ยนจุดแวะ/ที่พักปลายทางได้อิสระ
+2. **โมเดลธุรกิจและรายได้ (Free Forever 0% GP → Sponsored Ads)**:
+   - **เปิดโปรไฟล์ฟรีตลอดชีพ & จองตรง 0% GP**: ทุกธุรกิจเปิดหน้า `nondii.com/{slug}` ได้ฟรี (ไม่หักค่าคอมมิชชัน ไม่มีวันหมดอายุ) โดยโรงแรมที่มีเว็บจองเองอยู่แล้วสามารถเลือกโหมด `PROFILE_ONLY` เพื่อรับ Traffic โดยไม่ต้องเปลี่ยนระบบจองเดิม
+   - **รายได้หลัก**: ค่าโฆษณาและพื้นที่โปรโมท (`SponsoredCampaign` — Promoted Cards, Featured Promotions, Sponsored AI Agent Priority)
+3. **ผู้ใช้งาน 3 บทบาทหลัก (RBAC)**:
+   - `TRAVELLER` — สำรวจสถานที่, กด Like/Comment/Save, จัดทริปพร้อมเส้นทางขับรถจริงบน `/trip`, แชร์/คัดลอกทริป, และจองที่พักตรง 0% GP
+   - `PLACE_OWNER` *(enum `HOTEL_OWNER` ใน DB)* — เจ้าของธุรกิจทั้ง 5 ประเภท สมัครผ่านหน้าเดียว (`/register`), จัดการงานโซเชียล/โปรไฟล์เบาๆ ได้จาก `/{slug}` (Owner Mode) และจัดการงานหลังบ้าน/จองตรงใน `/studio` ที่ปรับเมนูตามประเภทธุรกิจ
+   - `SUPER_ADMIN` — ยืนยันตัวตนสถานที่จริง (`VERIFIED`), ดูแลคิวรายงานสแปม (`PlaceReport`), จัดการแคมเปญโฆษณา และตั้งค่าจังหวัด/ภูมิภาคที่ `/super-admin`
+4. **กฎเหล็กด้านข้อมูล & Agentic Web**:
+   - **Strict Real-Database Policy**: ข้อมูลธุรกิจทั้งหมดต้องมาจาก **Neon PostgreSQL (Prisma)** เท่านั้น ห้ามใช้ Mock Array หรือ `localStorage` เก็บข้อมูลธุรกิจ
+   - **Agentic Web Ready**: แยก Headless Service Layer (`src/lib/services/*`) พร้อมมาตรฐาน `Schema.org`, `/llms.txt`, `/.well-known/agent-card.json` และ `/api/mcp`
 
 ---
 
-## สารบัญเอกสารใน `CoreBusiness/`
+## สารบัญเอกสารใน `CoreBusiness/` (v3.0 — Active Only)
 
-| ลำดับไฟล์ | ชื่อเอกสาร | เนื้อหาสำคัญที่ AI Agent ต้องอ่านเมื่อทำงานส่วนนั้น |
+| ลำดับไฟล์ | ชื่อเอกสาร | เนื้อหาหลัก |
 | :--- | :--- | :--- |
-| **[01-business-model-and-roles.md](./01-business-model-and-roles.md)** | โมเดลธุรกิจ วงล้อการเติบโต และสิทธิ์ผู้ใช้งาน 3 กลุ่ม | กลไกตัวล่อ 0% GP, ระบบโอนเงินตรงเข้าบัญชีโรงแรม + ตรวจสลิป, ป้าย Verified Stay กันเพจปลอม, โมเดลรายได้โฆษณา และตารางสิทธิ์ RBAC |
-| **[02-page-architecture-and-ux-flows.md](./02-page-architecture-and-ux-flows.md)** | ผังโครงสร้างหน้าเว็บ URL มาตรฐาน และหน้าที่ต้องตัดทิ้ง | สเปกรายหน้าของ `/`, `/board`, `/deal`, `/trips`, `/{hotelSlug}`, `/register-hotel`, `/studio`, `/super-admin` และรายชื่อหน้าเก่าที่ห้ามสร้างซ้ำ |
-| **[03-database-schema-and-zero-mock-rules.md](./03-database-schema-and-zero-mock-rules.md)** | โครงสร้างฐานข้อมูล PostgreSQL & กฎห้ามใช้ Mock Data | Relational Schema ครบทุกตารางบน Neon Postgres + Prisma, การทำ Indexing, การเชื่อม Pooled vs Direct URL และการยกเลิก `localStorage` Store |
-| **[04-facebook-sync-and-agentic-standards.md](./04-facebook-sync-and-agentic-standards.md)** | ระบบดึงโพสต์ Facebook อัตโนมัติ & มาตรฐาน AI Agent สากล | ระบบคัดกรองโพสต์ Facebook ด้วย AI 3 ระดับ (กันโพสต์ตลก/ข่าวไม่เกี่ยว) และสเปก `MCP Server` + `agent-card.json` สำหรับยุค Agent-to-Agent |
-| **[05-system-surgery-master-plan.md](./05-system-surgery-master-plan.md)** | แผนปฏิบัติการผ่าตัดระบบ เคลียร์โค้ดเก่า และผูก DB จริง | ลำดับขั้นการลบไฟล์ที่ไม่ได้ใช้ การรื้อระบบเก่าออกทีละส่วน การย้ายขึ้นฐานข้อมูลจริง และการตรวจสอบหาข้อผิดพลาดแบบ End-to-End |
-| **[06-ugc-trip-board-and-card-motion.md](./06-ugc-trip-board-and-card-motion.md)** | แผนพัฒนา UGC Trip Board, Smart Day Timeline & Card Motion UI *(Draft)* | แผนสร้างวงล้อ UGC (Place/Stay Cards อิสระ + Day Timeline คำนวณเวลาเดินทางจาก Google Maps & Weather) และสเปก Card Motion Animation 2 รูปแบบจาก Dribbble |
-| **[07-place-profile-card-architecture.md](./07-place-profile-card-architecture.md)** | สถาปัตยกรรม 1 การ์ด = 1 โปรไฟล์สถานที่ & Minimal Collectible Travel Card *(Active)* | โมเดล 5 ประเภทสถานที่ (`STAY/CAFE/RESTAURANT/ATTRACTION/WELLNESS`), เจ้าของ 2 กลุ่ม (`/register`), การ์ดสะสม `3:4`, Shared Place Modal 1-Hop Lock, Smart Map & Anti-Spam |
-
+| **[01-business-model-and-roles.md](./01-business-model-and-roles.md)** | โมเดลธุรกิจ กลยุทธ์ดึงผู้ประกอบการ และสิทธิ์ 3 กลุ่ม | 5 ประเภทสถานที่, 2 โหมดธุรกิจ (`DIRECT_BOOKING` / `PROFILE_ONLY`), 4 จุดตัดสินใจชวนธุรกิจที่มี FB/เว็บจองอยู่แล้ว, โมเดลรายได้โฆษณา และ RBAC |
+| **[02-page-architecture-and-ux-flows.md](./02-page-architecture-and-ux-flows.md)** | ผังโครงสร้างหน้าเว็บ Unified `/register`, `/{slug}` และ `/studio` | สถาปัตยกรรม "Unified Social Profile + Opt-in Modules", Hybrid Owner Mode บน `/{slug}`, Adaptive `/studio` ตามประเภทธุรกิจ และ URL มาตรฐานทั้งหมด |
+| **[03-database-schema-and-zero-mock-rules.md](./03-database-schema-and-zero-mock-rules.md)** | โครงสร้างฐานข้อมูล Neon Postgres & กฎห้ามใช้ Mock Data | ตารางจริงทั้งหมดใน `prisma/schema.prisma`, โครงสร้างข้อมูลที่เตรียมไว้สำหรับ Road-Trip Routing, และกฎ Neon Pooled vs Direct |
+| **[04-facebook-sync-and-agentic-standards.md](./04-facebook-sync-and-agentic-standards.md)** | Facebook Auto-Sync, Google Maps Cost Guardrails & AI Agent | AI 3-Tier Triage ดึงโพสต์ FB, Direct Contact Handoff, กฎคุมงบ/ToS ของ Google Places & Routes API, และสเปก MCP/A2A |
+| **[05-place-profile-card-architecture.md](./05-place-profile-card-architecture.md)** | สถาปัตยกรรม 1 การ์ด = 1 สถานที่ & Minimal Collectible Card | กฎ Canonical Card `3:4`, 5 Category Crests, Shared Place Modal (1-Hop Lock), `/explore` Smart Map & Anti-Spam |
+| **[06-traveller-trip-profile-and-road-routing.md](./06-traveller-trip-profile-and-road-routing.md)** | แยกขาด `Wishlist` (`/wishlist`) vs ระบบทริปเดินทางจริง (`/trip`) | Wishlist รูปหัวใจในเมนู More (Auto-Category + Boards) vs Public Road-Trip OSRM + Animation เส้นลาก + จุดแวะเด้งตามรายทาง |
+| **[07-phase-execution-roadmap.md](./07-phase-execution-roadmap.md)** | แผนปฏิบัติการทีละ Phase & Decision Log | ลำดับการพัฒนา Phase 1 → Phase 4 (Unified `/register` & Adaptive `/studio` → Hybrid Owner Mode → `/trip` → Claim & Growth) |

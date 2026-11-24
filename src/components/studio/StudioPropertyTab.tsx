@@ -59,8 +59,11 @@ import {
 import { StudioGrowthTab } from "@/components/studio/StudioGrowthTab";
 import { StudioSeasonalPricingSection } from "@/components/studio/StudioSeasonalPricingSection";
 import { StudioSheetModal } from "@/components/studio/StudioSheetModal";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import type {
   HotelAddonDto,
+  MerchantModeDto,
+  PlaceOpeningHoursDayDto,
   PropertyTypeDto,
 } from "@/types/cangaroom";
 import type {
@@ -786,7 +789,34 @@ export function StudioPropertyTab({
   const [contactLine, setContactLine] = useState(hotel.contactLine);
   const [facebookPageUrl, setFacebookPageUrl] = useState(hotel.facebookPageUrl);
   const [instagramUrl, setInstagramUrl] = useState(hotel.instagramUrl);
+  const [externalWebsiteUrl, setExternalWebsiteUrl] = useState(
+    hotel.externalWebsiteUrl || ""
+  );
+  const [primaryCtaLabelTh, setPrimaryCtaLabelTh] = useState(
+    hotel.primaryCtaLabelTh || ""
+  );
+  const [merchantMode, setMerchantMode] = useState<MerchantModeDto>(
+    hotel.merchantMode || "DIRECT_BOOKING"
+  );
+  const [openingHours, setOpeningHours] = useState<PlaceOpeningHoursDayDto[]>(() => {
+    const defaults: PlaceOpeningHoursDayDto[] = [
+      { day: "mon", open: "09:00", close: "18:00", closed: false },
+      { day: "tue", open: "09:00", close: "18:00", closed: false },
+      { day: "wed", open: "09:00", close: "18:00", closed: false },
+      { day: "thu", open: "09:00", close: "18:00", closed: false },
+      { day: "fri", open: "09:00", close: "18:00", closed: false },
+      { day: "sat", open: "09:00", close: "19:00", closed: false },
+      { day: "sun", open: "09:00", close: "19:00", closed: false },
+    ];
+    if (Array.isArray(hotel.openingHoursJson) && hotel.openingHoursJson.length > 0) {
+      const byDay = new Map(hotel.openingHoursJson.map((d) => [d.day, d]));
+      return defaults.map((def) => byDay.get(def.day) ?? def);
+    }
+    return defaults;
+  });
   const [isPublished, setIsPublished] = useState(hotel.isPublished ?? true);
+  const isDirectBooking = hotel.merchantMode !== "PROFILE_ONLY";
+  const catMeta = getPlaceCategoryMeta(hotel.placeCategory);
 
   const [isUploadingBrand, setIsUploadingBrand] = useState(false);
   const [isSavingHotel, setIsSavingHotel] = useState(false);
@@ -845,72 +875,102 @@ export function StudioPropertyTab({
       label: string;
       sublabel: string;
     }>;
-  }> = [
-    {
-      groupTitle: "ห้องพัก ราคา & โปรโมชั่น",
-      items: [
+  }> = isDirectBooking
+    ? [
         {
-          id: "rooms",
-          label: "ห้องพัก",
-          sublabel: roomPriceSummary,
+          groupTitle: "ห้องพัก ราคา & โปรโมชั่น",
+          items: [
+            {
+              id: "rooms",
+              label: "ห้องพัก",
+              sublabel: roomPriceSummary,
+            },
+            {
+              id: "seasonal",
+              label: "ราคาตามฤดูกาล & เทศกาล",
+              sublabel:
+                activeSeasonalRulesCount > 0
+                  ? `เปิดใช้ ${activeSeasonalRulesCount} ช่วงราคา`
+                  : "ปีใหม่ · สงกรานต์ · ไฮซีซั่น",
+            },
+            {
+              id: "promotions",
+              label: "โปรโมชั่น & ส่วนลด",
+              sublabel: `${discountRules.filter((r) => r.isActive).length} ส่วนลดอัตโนมัติ · ${coupons.length} คูปอง`,
+            },
+            {
+              id: "addons",
+              label: "บริการเสริม",
+              sublabel:
+                addons.length > 0
+                  ? `${addons.length} รายการ (หมูกระทะ / เตียงเสริม)`
+                  : "เพิ่มยอดต่อบิลในหน้าชำระเงิน",
+            },
+          ],
         },
         {
-          id: "seasonal",
-          label: "ราคาตามฤดูกาล & เทศกาล",
-          sublabel:
-            activeSeasonalRulesCount > 0
-              ? `เปิดใช้ ${activeSeasonalRulesCount} ช่วงราคา`
-              : "ปีใหม่ · สงกรานต์ · ไฮซีซั่น",
+          groupTitle: "ข้อมูลที่พัก & คอนเทนต์",
+          items: [
+            {
+              id: "about",
+              label: "ข้อมูลหน้าร้าน & จุดเด่น",
+              sublabel:
+                highlights.length > 0
+                  ? `${highlights.length} จุดเด่น · ${hotel.nameTh}`
+                  : hotel.nameTh,
+            },
+            {
+              id: "location",
+              label: "ทำเล & สถานที่ใกล้เคียง",
+              sublabel: `${nearbySpots.length} จุดเช็กอินใกล้เคียง`,
+            },
+            {
+              id: "policies",
+              label: "กฎที่พัก & คำถามพบบ่อย",
+              sublabel: `เช็กอิน ${hotel.checkInTime} · ${faqs.length} FAQ`,
+            },
+            {
+              id: "content",
+              label: "Pins / Facebook & บทความ",
+              sublabel: `${data.pins.length} Pins · ${posts.length} บทความ`,
+            },
+            {
+              id: "payout",
+              label: "รับเงิน 0% GP & ติดต่อ",
+              sublabel: promptPayId
+                ? `PromptPay ${promptPayId}`
+                : "ยังไม่ได้ตั้งค่ารับเงิน",
+            },
+          ],
         },
+      ]
+    : [
         {
-          id: "promotions",
-          label: "โปรโมชั่น & ส่วนลด",
-          sublabel: `${discountRules.filter((r) => r.isActive).length} ส่วนลดอัตโนมัติ · ${coupons.length} คูปอง`,
+          groupTitle: `จัดการ${catMeta.shortLabelTh}`,
+          items: [
+            {
+              id: "about",
+              label: "ข้อมูลร้าน เวลาเปิด–ปิด & ติดต่อ",
+              sublabel: hotel.nameTh,
+            },
+            {
+              id: "location",
+              label: "พิกัดแผนที่ & สถานที่ใกล้เคียง",
+              sublabel: `${nearbySpots.length} จุดใกล้เคียง`,
+            },
+            {
+              id: "promotions",
+              label: "โปรโมชั่น & สิทธิพิเศษ",
+              sublabel: `${coupons.length} โปรโมชั่น`,
+            },
+            {
+              id: "content",
+              label: "โพสต์อัปเดต Facebook & บทความ",
+              sublabel: `${data.pins.length} การ์ด · ${posts.length} โพสต์`,
+            },
+          ],
         },
-        {
-          id: "addons",
-          label: "บริการเสริม",
-          sublabel:
-            addons.length > 0
-              ? `${addons.length} รายการ (หมูกระทะ / เตียงเสริม)`
-              : "เพิ่มยอดต่อบิลในหน้าชำระเงิน",
-        },
-      ],
-    },
-    {
-      groupTitle: "ข้อมูลที่พัก & คอนเทนต์",
-      items: [
-        {
-          id: "about",
-          label: "ข้อมูลหน้าร้าน & จุดเด่น",
-          sublabel:
-            highlights.length > 0
-              ? `${highlights.length} จุดเด่น · ${hotel.nameTh}`
-              : hotel.nameTh,
-        },
-        {
-          id: "location",
-          label: "ทำเล & สถานที่ใกล้เคียง",
-          sublabel: `${nearbySpots.length} จุดเช็กอินใกล้เคียง`,
-        },
-        {
-          id: "policies",
-          label: "กฎที่พัก & คำถามพบบ่อย",
-          sublabel: `เช็กอิน ${hotel.checkInTime} · ${faqs.length} FAQ`,
-        },
-        {
-          id: "content",
-          label: "Pins / Facebook & บทความ",
-          sublabel: `${data.pins.length} Pins · ${posts.length} บทความ`,
-        },
-        {
-          id: "payout",
-          label: "รับเงิน 0% GP & ติดต่อ",
-          sublabel: promptPayId ? `PromptPay ${promptPayId}` : "ยังไม่ได้ตั้งค่ารับเงิน",
-        },
-      ],
-    },
-  ];
+      ];
 
   const flatNavItems = navGroups.flatMap((g) => g.items);
 
@@ -965,10 +1025,10 @@ export function StudioPropertyTab({
             <div className="space-y-8">
               <div className="space-y-1">
                 <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                  จัดการที่พัก
+                  {isDirectBooking ? "จัดการที่พัก" : `จัดการ${catMeta.shortLabelTh}`}
                 </h1>
                 <p className="text-[13.5px] text-[var(--color-text-secondary)] truncate">
-                  {hotel.nameTh} · 0% GP
+                  {hotel.nameTh} · {isDirectBooking ? "0% GP" : catMeta.labelTh}
                 </p>
               </div>
 
@@ -1002,9 +1062,9 @@ export function StudioPropertyTab({
                             </p>
                           </div>
                           <span
-                            className={`h-8 w-8 rounded-[10px] inline-flex items-center justify-center shrink-0 transition-colors ${
+                            className={`h-8 w-8 rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
                               active
-                                ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                                 : "bg-[var(--color-background-muted)] group-hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                             }`}
                           >
@@ -1056,7 +1116,7 @@ export function StudioPropertyTab({
                       <button
                         type="button"
                         onClick={openCreateRoomModal}
-                        className="h-10 sm:h-11 px-4 sm:px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+                        className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         <span>เพิ่มประเภทห้องพัก</span>
@@ -1077,7 +1137,7 @@ export function StudioPropertyTab({
                         <button
                           type="button"
                           onClick={openCreateRoomModal}
-                          className="h-11 px-6 rounded-[12px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] text-[14px] font-semibold cursor-pointer"
+                          className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
                         >
                           เพิ่มห้องพักแรกของคุณ
                         </button>
@@ -1256,16 +1316,16 @@ export function StudioPropertyTab({
                                   }
                                   disabled={isToggling}
                                   onClick={() => void handleToggleRoomActive(rm)}
-                                  className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                                  className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
                                     isRoomActive
-                                      ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                                      ? "bg-[var(--color-accent)]"
                                       : "bg-[var(--color-border-emphasized)]"
                                   }`}
                                 >
                                   <span
                                     className={`block h-5 w-5 rounded-full transition-transform ${
                                       isRoomActive
-                                        ? "translate-x-5 bg-white dark:bg-[#222222]"
+                                        ? "translate-x-5 bg-white"
                                         : "translate-x-0 bg-white"
                                     }`}
                                   />
@@ -1380,7 +1440,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={openCreateAddonModal}
-                className="h-10 sm:h-11 px-4 sm:px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+                className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>เพิ่มบริการเสริม</span>
@@ -1413,7 +1473,7 @@ export function StudioPropertyTab({
                     className="py-4 first:pt-0 flex items-center justify-between gap-4 rounded-[12px] px-2 -mx-2 hover:bg-[var(--color-background-muted)]/70 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="h-14 w-16 rounded-[10px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 flex items-center justify-center text-[var(--color-text-secondary)]">
+                      <div className="h-14 w-14 aspect-square rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] shrink-0 flex items-center justify-center text-[var(--color-text-secondary)]">
                         {a.imageUrl ? (
                           <img
                             src={a.imageUrl}
@@ -1464,7 +1524,8 @@ export function StudioPropertyTab({
               e.preventDefault();
               void saveHotelPatch(
                 {
-                  propertyType,
+                  ...(isDirectBooking ? { propertyType } : {}),
+                  ...(hotel.placeCategory === "STAY" ? { merchantMode } : {}),
                   nameTh: nameTh.trim(),
                   nameEn: nameEn.trim(),
                   taglineTh: taglineTh.trim(),
@@ -1475,6 +1536,17 @@ export function StudioPropertyTab({
                   coverImageUrl: coverImageUrl.trim() || null,
                   stayStyles,
                   highlightsJson: highlights.filter((h) => h.titleTh.trim()),
+                  externalWebsiteUrl: externalWebsiteUrl.trim(),
+                  primaryCtaLabelTh: primaryCtaLabelTh.trim(),
+                  ...(!isDirectBooking
+                    ? {
+                        contactPhone: contactPhone.trim(),
+                        contactLine: contactLine.trim(),
+                        facebookPageUrl: facebookPageUrl.trim(),
+                        instagramUrl: instagramUrl.trim(),
+                        openingHoursJson: openingHours,
+                      }
+                    : {}),
                 },
                 "บันทึกข้อมูลหน้าร้านและจุดเด่นแล้ว"
               );
@@ -1484,42 +1556,76 @@ export function StudioPropertyTab({
             <div className="pb-8 space-y-5">
               <div className="pb-5 border-b border-[var(--color-border)]">
                 <h2 className="text-[24px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                  ข้อมูลหน้าร้าน & จุดเด่นที่พัก
+                  {isDirectBooking
+                    ? "ข้อมูลหน้าร้าน & จุดเด่นที่พัก"
+                    : `ข้อมูล${catMeta.shortLabelTh} เวลาเปิด–ปิด & ช่องทางติดต่อ`}
                 </h2>
               </div>
 
-              {/* Property Type selector */}
-              <div className="space-y-2">
-                <span className="text-[14px] font-semibold text-[var(--color-text-primary)] block">
-                  ประเภทที่พัก
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {PROPERTY_TYPE_OPTIONS.map((opt) => {
-                    const active = propertyType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setPropertyType(opt.value)}
-                        className={`p-3.5 rounded-[12px] text-left cursor-pointer transition-colors ${
-                          active
-                            ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                            : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                        }`}
-                      >
-                        <p className="text-[14.5px] font-semibold">{opt.label}</p>
-                        <p
-                          className={`text-[12.5px] mt-0.5 ${
-                            active ? "opacity-80" : "text-[var(--color-text-secondary)]"
+              {/* Property Type selector (Direct Booking Stays ONLY) */}
+              {isDirectBooking && (
+                <div className="space-y-2">
+                  <span className="text-[14px] font-semibold text-[var(--color-text-primary)] block">
+                    ประเภทที่พัก
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {PROPERTY_TYPE_OPTIONS.map((opt) => {
+                      const active = propertyType === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setPropertyType(opt.value)}
+                          className={`p-3.5 rounded-[14px] text-left cursor-pointer transition-colors ${
+                            active
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
-                          {opt.desc}
-                        </p>
-                      </button>
-                    );
-                  })}
+                          <p className="text-[14.5px] font-semibold">{opt.label}</p>
+                          <p
+                            className={`text-[12.5px] mt-0.5 ${
+                              active ? "opacity-85" : "text-[var(--color-text-secondary)]"
+                            }`}
+                          >
+                            {opt.desc}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Optional Direct Booking opt-in/out toggle for STAY owners */}
+              {hotel.placeCategory === "STAY" && (
+                <div className="rounded-[18px] bg-[var(--color-background-muted)] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                      โหมดการขายหน้าโปรไฟล์ ({merchantMode === "DIRECT_BOOKING" ? "เปิดระบบจองตรง 0% GP" : "หน้าโปรไฟล์ & ลิงก์จองภายนอก"})
+                    </p>
+                    <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                      สลับได้ตลอดเวลาหากต้องการเปิด/ปิดปฏิทินห้องว่างบน Nondii
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(["DIRECT_BOOKING", "PROFILE_ONLY"] as const).map((modeVal) => (
+                      <button
+                        key={modeVal}
+                        type="button"
+                        onClick={() => setMerchantMode(modeVal)}
+                        className={`h-9 px-3 rounded-[10px] text-[12.5px] font-semibold cursor-pointer transition-colors ${
+                          merchantMode === modeVal
+                            ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                            : "bg-[var(--color-background-card)] text-[var(--color-text-primary)]"
+                        }`}
+                      >
+                        {modeVal === "DIRECT_BOOKING" ? "จองตรง 0% GP" : "โปรไฟล์อย่างเดียว"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <StandardFieldGroup>
                 <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
@@ -1664,9 +1770,9 @@ export function StudioPropertyTab({
                               : [...prev, style.id]
                           )
                         }
-                        className={`h-9 px-3.5 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-colors ${
+                        className={`h-9 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
                           active
-                            ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                            ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                         }`}
                       >
@@ -1768,11 +1874,149 @@ export function StudioPropertyTab({
                 </div>
               )}
 
+              {/* External Link, Contact Channels & 7-Day Opening Hours (for PROFILE_ONLY venues) */}
+              {!isDirectBooking && (
+                <div className="space-y-5 pt-2">
+                  <StandardFieldGroup>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                      <StandardInput
+                        grouped
+                        label="ลิงก์เว็บไซต์ / จองโต๊ะ / จองห้องภายนอก"
+                        optionalText="ไม่บังคับ"
+                        placeholder="https://yourwebsite.com"
+                        value={externalWebsiteUrl}
+                        onChange={(e) => setExternalWebsiteUrl(e.target.value)}
+                      />
+                      <StandardInput
+                        grouped
+                        label="ข้อความปุ่มหลัก (CTA Label)"
+                        optionalText="ค่าเริ่มต้นตามหมวด"
+                        placeholder={catMeta.defaultCtaTh}
+                        value={primaryCtaLabelTh}
+                        onChange={(e) => setPrimaryCtaLabelTh(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                      <StandardInput
+                        grouped
+                        label="เบอร์โทรศัพท์"
+                        placeholder="08X-XXX-XXXX"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                      />
+                      <StandardInput
+                        grouped
+                        label="LINE ID / @LINE OA"
+                        placeholder="@yourplace"
+                        value={contactLine}
+                        onChange={(e) => setContactLine(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                      <StandardInput
+                        grouped
+                        label="ลิงก์ Facebook Page"
+                        optionalText="ไม่บังคับ"
+                        placeholder="https://facebook.com/..."
+                        value={facebookPageUrl}
+                        onChange={(e) => setFacebookPageUrl(e.target.value)}
+                      />
+                      <StandardInput
+                        grouped
+                        label="ลิงก์ Instagram"
+                        optionalText="ไม่บังคับ"
+                        placeholder="https://instagram.com/..."
+                        value={instagramUrl}
+                        onChange={(e) => setInstagramUrl(e.target.value)}
+                      />
+                    </div>
+                  </StandardFieldGroup>
+
+                  <div className="space-y-2.5">
+                    <span className="text-[14px] font-semibold text-[var(--color-text-primary)] block">
+                      เวลาเปิด–ปิดประจำสัปดาห์
+                    </span>
+                    <div className="rounded-[16px] border border-[var(--color-border)] divide-y divide-[var(--color-border)] overflow-hidden bg-[var(--color-background-card)]">
+                      {openingHours.map((oh, dayIdx) => {
+                        const DAY_TH: Record<string, string> = {
+                          mon: "วันจันทร์",
+                          tue: "วันอังคาร",
+                          wed: "วันพุธ",
+                          thu: "วันพฤหัสบดี",
+                          fri: "วันศุกร์",
+                          sat: "วันเสาร์",
+                          sun: "วันอาทิตย์",
+                        };
+                        return (
+                          <div
+                            key={oh.day}
+                            className="px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+                          >
+                            <div className="flex items-center gap-3 min-w-[130px]">
+                              <StandardCheckbox
+                                checked={!oh.closed}
+                                onChange={(isOpenDay) =>
+                                  setOpeningHours((prev) =>
+                                    prev.map((row, idx) =>
+                                      idx === dayIdx
+                                        ? { ...row, closed: !isOpenDay }
+                                        : row
+                                    )
+                                  )
+                                }
+                                label={DAY_TH[oh.day] ?? oh.day}
+                              />
+                            </div>
+                            {oh.closed ? (
+                              <span className="text-[13px] font-medium text-[var(--color-text-secondary)]">
+                                ปิดทำการ
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="time"
+                                  value={oh.open}
+                                  onChange={(e) =>
+                                    setOpeningHours((prev) =>
+                                      prev.map((row, idx) =>
+                                        idx === dayIdx
+                                          ? { ...row, open: e.target.value }
+                                          : row
+                                      )
+                                    )
+                                  }
+                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[13.5px] tabular-nums"
+                                />
+                                <span className="text-[var(--color-text-secondary)]">–</span>
+                                <input
+                                  type="time"
+                                  value={oh.close}
+                                  onChange={(e) =>
+                                    setOpeningHours((prev) =>
+                                      prev.map((row, idx) =>
+                                        idx === dayIdx
+                                          ? { ...row, close: e.target.value }
+                                          : row
+                                      )
+                                    )
+                                  }
+                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[13.5px] tabular-nums"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4 flex justify-end">
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกข้อมูลหน้าร้าน"}</span>
@@ -1950,7 +2194,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกทำเลที่ตั้ง"}</span>
@@ -2021,16 +2265,16 @@ export function StudioPropertyTab({
                     role="switch"
                     aria-checked={petsAllowed}
                     onClick={() => setPetsAllowed((v) => !v)}
-                    className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 ${
+                    className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                       petsAllowed
-                        ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                        ? "bg-[var(--color-accent)]"
                         : "bg-[var(--color-border-emphasized)]"
                     }`}
                   >
                     <span
                       className={`block h-5 w-5 rounded-full transition-transform ${
                         petsAllowed
-                          ? "translate-x-5 bg-white dark:bg-[#222222]"
+                          ? "translate-x-5 bg-white"
                           : "translate-x-0 bg-white"
                       }`}
                     />
@@ -2158,7 +2402,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกกฎ & คำถามที่พบบ่อย"}</span>
@@ -2298,16 +2542,16 @@ export function StudioPropertyTab({
                   role="switch"
                   aria-checked={isPublished}
                   onClick={() => setIsPublished((v) => !v)}
-                  className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 ${
+                  className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                     isPublished
-                      ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                      ? "bg-[var(--color-accent)]"
                       : "bg-[var(--color-border-emphasized)]"
                   }`}
                 >
                   <span
                     className={`block h-5 w-5 rounded-full transition-transform ${
                       isPublished
-                        ? "translate-x-5 bg-white dark:bg-[#222222]"
+                        ? "translate-x-5 bg-white"
                         : "translate-x-0 bg-white"
                     }`}
                   />
@@ -2318,7 +2562,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกบัญชี & ช่องทางติดต่อ"}</span>
@@ -2363,7 +2607,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={handleRoomModalBack}
-                className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors"
+                className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>
@@ -2379,7 +2623,7 @@ export function StudioPropertyTab({
                   setRoomModalPage("details");
                   roomModalBodyRef.current?.scrollTo({ top: 0 });
                 }}
-                className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
+                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold cursor-pointer transition-colors"
               >
                 เสร็จสิ้น
               </button>
@@ -2401,7 +2645,7 @@ export function StudioPropertyTab({
                 <button
                   type="button"
                   onClick={() => setIsRoomModalOpen(false)}
-                  className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                  className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                 >
                   ยกเลิก
                 </button>
@@ -2409,7 +2653,7 @@ export function StudioPropertyTab({
                   type="submit"
                   form="studio-room-editor-form"
                   disabled={isSavingRoom || isUploadingRoomPhoto}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {isSavingRoom ? "กำลังบันทึก..." : "บันทึกห้องพัก"}
                 </button>
@@ -2505,7 +2749,7 @@ export function StudioPropertyTab({
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-[var(--color-background-subtle)] overflow-hidden">
                   <div
-                    className="h-full bg-[#222222] dark:bg-[#f5f5f5] transition-all duration-300"
+                    className="h-full bg-[var(--color-accent)] transition-all duration-300"
                     style={{
                       width: `${Math.max(
                         8,
@@ -2548,13 +2792,13 @@ export function StudioPropertyTab({
                   aria-hidden="true"
                   className="mx-auto flex items-end justify-center gap-2 pt-1"
                 >
-                  <div className="w-12 h-10 rounded-[10px] bg-[var(--color-background-card)] -rotate-6 flex items-center justify-center text-[var(--color-text-tertiary)]">
+                  <div className="w-11 h-11 aspect-square rounded-[12px] bg-[var(--color-background-card)] -rotate-6 flex items-center justify-center text-[var(--color-text-tertiary)]">
                     <BedDouble className="w-4 h-4 stroke-[1.6]" />
                   </div>
-                  <div className="w-16 h-12 rounded-[12px] bg-[var(--color-background-card)] flex items-center justify-center text-[var(--color-text-primary)] z-10">
+                  <div className="w-14 h-14 aspect-square rounded-[14px] bg-[var(--color-background-card)] flex items-center justify-center text-[var(--color-text-primary)] z-10">
                     <Images className="w-6 h-6 stroke-[1.6]" />
                   </div>
-                  <div className="w-12 h-10 rounded-[10px] bg-[var(--color-background-card)] rotate-6 flex items-center justify-center text-[var(--color-text-tertiary)]">
+                  <div className="w-11 h-11 aspect-square rounded-[12px] bg-[var(--color-background-card)] rotate-6 flex items-center justify-center text-[var(--color-text-tertiary)]">
                     <Upload className="w-4 h-4 stroke-[1.6]" />
                   </div>
                 </div>
@@ -2570,7 +2814,7 @@ export function StudioPropertyTab({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-                  <label className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors">
+                  <label className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors">
                     <Upload className="w-4 h-4" />
                     <span>
                       {isUploadingRoomPhoto
@@ -2621,7 +2865,7 @@ export function StudioPropertyTab({
               >
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {/* Large Cover Photo Tile */}
-                  <div className="relative col-span-2 row-span-2 aspect-[4/3] sm:aspect-auto sm:min-h-[210px] rounded-[14px] overflow-hidden bg-[var(--color-background-muted)] group">
+                  <div className="relative col-span-2 row-span-2 aspect-square rounded-[20px] overflow-hidden bg-[var(--color-background-muted)] group">
                     <button
                       type="button"
                       onClick={openModalPhotoPage}
@@ -2659,7 +2903,7 @@ export function StudioPropertyTab({
                     return (
                       <div
                         key={`${photo.url}-${realIdx}`}
-                        className="relative aspect-[4/3] rounded-[12px] overflow-hidden bg-[var(--color-background-muted)] group"
+                        className="relative aspect-square rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] group"
                       >
                         <button
                           type="button"
@@ -2697,7 +2941,7 @@ export function StudioPropertyTab({
 
                   {/* Fill Remaining Slot with Quick Add Tile when < 5 photos */}
                   {rmPhotos.length < 5 && (
-                    <label className="aspect-[4/3] rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--color-text-secondary)] cursor-pointer transition-colors">
+                    <label className="aspect-square rounded-[16px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] flex flex-col items-center justify-center gap-1 text-[var(--color-text-secondary)] cursor-pointer transition-colors">
                       <Plus className="w-5 h-5" />
                       <span className="text-[12px] font-medium">เพิ่มรูป</span>
                       <input
@@ -2949,16 +3193,16 @@ export function StudioPropertyTab({
                 role="switch"
                 aria-checked={rmPetsAllowed}
                 onClick={() => setRmPetsAllowed((v) => !v)}
-                className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 ${
+                className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                   rmPetsAllowed
-                    ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                    ? "bg-[var(--color-accent)]"
                     : "bg-[var(--color-border-emphasized)]"
                 }`}
               >
                 <span
                   className={`block h-5 w-5 rounded-full transition-transform ${
                     rmPetsAllowed
-                      ? "translate-x-5 bg-white dark:bg-[#222222]"
+                      ? "translate-x-5 bg-white"
                       : "translate-x-0 bg-white"
                   }`}
                 />
@@ -2990,9 +3234,9 @@ export function StudioPropertyTab({
                         setRmAmenities((prev) => [...prev, am]);
                       }
                     }}
-                    className={`px-3 py-2.5 rounded-[12px] text-left flex items-center justify-between gap-2 text-[13px] font-medium cursor-pointer transition-colors ${
+                    className={`px-3.5 py-2.5 rounded-full text-left flex items-center justify-between gap-2 text-[13px] font-medium cursor-pointer transition-colors ${
                       selected
-                        ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                         : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                     }`}
                   >
@@ -3069,7 +3313,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={() => setIsAddonModalOpen(false)}
-                className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
               >
                 ยกเลิก
               </button>
@@ -3077,7 +3321,7 @@ export function StudioPropertyTab({
                 type="submit"
                 form="studio-addon-form"
                 disabled={isSavingAddon || isUploadingAddon}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingAddon ? "กำลังบันทึก..." : "บันทึก"}
               </button>
@@ -3138,7 +3382,7 @@ export function StudioPropertyTab({
                 <img
                   src={adImageUrl}
                   alt="Addon"
-                  className="h-14 w-16 rounded-[10px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                  className="h-14 w-14 aspect-square rounded-[16px] object-cover bg-[var(--color-background-muted)] shrink-0"
                 />
               )}
               <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer">

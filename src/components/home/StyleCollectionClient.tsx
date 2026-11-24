@@ -613,9 +613,9 @@ export function StyleCollectionClient({
               type="button"
               aria-pressed={selectedProvince === null}
               onClick={() => setSelectedProvince(null)}
-              className={`h-9 px-3.5 rounded-[11px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+              className={`h-9 px-3.5 rounded-[12px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
                 selectedProvince === null
-                  ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                   : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
               }`}
             >
@@ -634,9 +634,9 @@ export function StyleCollectionClient({
                       prev === prov.id ? null : prov.id
                     )
                   }
-                  className={`h-9 px-3.5 rounded-[11px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors tabular-nums ${
+                  className={`h-9 px-3.5 rounded-[12px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors tabular-nums ${
                     isActive
-                      ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
@@ -659,9 +659,9 @@ export function StyleCollectionClient({
                 type="button"
                 aria-pressed={directOnly}
                 onClick={() => setDirectOnly((prev) => !prev)}
-                className={`h-9 px-3.5 rounded-[11px] text-[12.5px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                className={`h-9 px-3.5 rounded-[12px] text-[12.5px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
                   directOnly
-                    ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                    ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                     : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                 }`}
               >
@@ -703,14 +703,14 @@ export function StyleCollectionClient({
                     setSelectedProvince(null);
                     setDirectOnly(meta.slug === "direct");
                   }}
-                  className="h-10 px-4 rounded-[11px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13px] font-semibold cursor-pointer"
+                  className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold cursor-pointer transition-colors"
                 >
                   {isTh ? "ล้างตัวกรอง" : "Reset filters"}
                 </button>
               )}
               <Link
                 href="/"
-                className="h-10 px-4 rounded-[11px] bg-[var(--color-background-card)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center"
+                className="h-10 px-5 rounded-full bg-[var(--color-background-card)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center"
               >
                 {isTh ? "กลับหน้าเที่ยวอะไร" : "Back to Discover"}
               </Link>

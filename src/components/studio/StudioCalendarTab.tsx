@@ -378,7 +378,7 @@ export function StudioCalendarTab({
           </p>
           <Link
             href={buildHref("/studio/listings/rooms")}
-            className="inline-flex items-center h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[14px] font-semibold transition-colors"
+            className="inline-flex items-center h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold transition-colors"
           >
             ไปเพิ่มห้องพัก
           </Link>
@@ -609,7 +609,7 @@ export function StudioCalendarTab({
                       <span
                         className={`text-[14.5px] sm:text-[15.5px] font-semibold tabular-nums leading-none ${
                           isToday
-                            ? "inline-flex items-center justify-center min-w-[28px] h-[28px] px-1.5 rounded-[8px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                            ? "inline-flex items-center justify-center min-w-[28px] h-[28px] px-1.5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : isPast || isClosed
                             ? "line-through opacity-75"
                             : ""
@@ -684,9 +684,9 @@ export function StudioCalendarTab({
                           {day.weekdayLabel}
                         </span>
                         <span
-                          className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1 rounded-[8px] text-[13.5px] font-semibold tabular-nums mt-0.5 ${
+                          className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1 rounded-full text-[13.5px] font-semibold tabular-nums mt-0.5 ${
                             day.isToday
-                              ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                               : "text-[var(--color-text-primary)]"
                           }`}
                         >
@@ -833,7 +833,7 @@ export function StudioCalendarTab({
                   type="button"
                   disabled={isSavingDay}
                   onClick={() => handleSaveSingleDay(false)}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {isSavingDay ? "กำลังบันทึก..." : "บันทึก"}
                 </button>
@@ -880,13 +880,13 @@ export function StudioCalendarTab({
                     prev >= maxBlock ? 0 : maxBlock
                   );
                 }}
-                className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 ${
+                className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
                   editBlockedUnits <
                   Math.max(
                     1,
                     selectedRoomObj.totalUnits - selectedMetrics.booked
                   )
-                    ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                    ? "bg-[var(--color-accent)]"
                     : "bg-[var(--color-border-emphasized)]"
                 }`}
               >
@@ -897,7 +897,7 @@ export function StudioCalendarTab({
                       1,
                       selectedRoomObj.totalUnits - selectedMetrics.booked
                     )
-                      ? "translate-x-5 bg-white dark:bg-[#222222]"
+                      ? "translate-x-5 bg-white"
                       : "translate-x-0 bg-white"
                   }`}
                 />
@@ -1008,7 +1008,7 @@ export function StudioCalendarTab({
               <button
                 type="button"
                 onClick={() => setIsBulkModalOpen(false)}
-                className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
               >
                 ยกเลิก
               </button>
@@ -1016,7 +1016,7 @@ export function StudioCalendarTab({
                 type="button"
                 disabled={isSavingBulk}
                 onClick={() => handleSaveBulk(false)}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
               >
                 {isSavingBulk ? "กำลังอัปเดต..." : "บันทึกช่วงวัน"}
               </button>
@@ -1061,9 +1061,9 @@ export function StudioCalendarTab({
                             : [...prev, rm.id]
                         )
                       }
-                      className={`h-9 px-3 rounded-[10px] text-[13px] font-medium cursor-pointer transition-colors ${
+                      className={`h-9 px-3.5 rounded-full text-[13px] font-medium cursor-pointer transition-colors ${
                         picked
-                          ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                          ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                           : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                       }`}
                     >
@@ -1120,9 +1120,9 @@ export function StudioCalendarTab({
                           : [...prev, item.dow].sort()
                       )
                     }
-                    className={`h-9 rounded-[10px] text-[13px] font-medium cursor-pointer transition-colors ${
+                    className={`h-9 rounded-full text-[13px] font-medium cursor-pointer transition-colors ${
                       active
-                        ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                         : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
                     }`}
                   >
@@ -1148,9 +1148,9 @@ export function StudioCalendarTab({
                   key={opt.id}
                   type="button"
                   onClick={() => setBulkPriceAction(opt.id)}
-                  className={`h-9 rounded-[10px] text-[13px] font-medium cursor-pointer transition-colors ${
+                  className={`h-9 rounded-full text-[13px] font-medium cursor-pointer transition-colors ${
                     bulkPriceAction === opt.id
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                   }`}
                 >
@@ -1182,9 +1182,9 @@ export function StudioCalendarTab({
                   key={opt.id}
                   type="button"
                   onClick={() => setBulkBlockAction(opt.id)}
-                  className={`h-9 rounded-[10px] text-[13px] font-medium cursor-pointer transition-colors ${
+                  className={`h-9 rounded-full text-[13px] font-medium cursor-pointer transition-colors ${
                     bulkBlockAction === opt.id
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                   }`}
                 >

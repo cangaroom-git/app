@@ -1,19 +1,24 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
 import {
-  Bookmark,
   CalendarCheck,
   Check,
   CheckCheck,
   ExternalLink,
+  FileText,
+  Heart,
+  MapPin,
   MessageCircle,
   Plus,
   Receipt,
   Search,
+  TicketPercent,
   TrendingUp,
   X,
 } from "lucide-react";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import {
   addDaysToDate,
   calculateStayPricing,
@@ -260,6 +265,134 @@ export function StudioTodayTab({
     { id: "all", label: "ทั้งหมด", count: counts.all },
   ];
 
+  // Clean Adaptive Overview for PROFILE_ONLY venues (Cafe / Restaurant / Attraction / Wellness / External Stay)
+  if (hotel.merchantMode === "PROFILE_ONLY") {
+    const catMeta = getPlaceCategoryMeta(hotel.placeCategory);
+    const activePromosCount = data.coupons.filter((c) => c.isActive).length;
+    const publishedPostsCount = data.posts.filter((p) => p.status === "PUBLISHED").length;
+
+    return (
+      <div className="divide-y divide-[var(--color-border)]">
+        <section className="pb-8 lg:pb-10 space-y-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-[12.5px] font-semibold text-[var(--color-accent)]">
+                {catMeta.labelTh} · หน้าโปรไฟล์ธุรกิจ
+              </p>
+              <h1 className="text-[24px] sm:text-[26px] font-semibold tracking-tight text-[var(--color-text-primary)]">
+                ภาพรวมของ {hotel.nameTh}
+              </h1>
+              <p className="text-[14px] text-[var(--color-text-secondary)]">
+                ติดตามยอดบันทึกเข้า Wishlist, ยอดคลิกติดต่อ และจัดการโพสต์หรือโปรโมชั่นล่าสุด
+              </p>
+            </div>
+
+            <Link
+              href={`/${encodeURIComponent(hotel.slug)}`}
+              className="h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
+            >
+              <span>ดูหน้าร้านจริง & แก้ไขด่วน</span>
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--color-border)] bg-[var(--color-background-muted)] rounded-[20px]">
+            <div className="p-5 space-y-1">
+              <div className="flex items-center justify-between text-[13px] font-medium text-[var(--color-text-secondary)]">
+                <span>คนบันทึกเข้า Wishlist</span>
+                <Heart className="w-4 h-4 text-[var(--color-promo)]" />
+              </div>
+              <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
+                {stats.boardSavesCount.toLocaleString()} ครั้ง
+              </p>
+              <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                ผู้สนใจเก็บสถานที่ของคุณไว้ดูซ้ำ
+              </p>
+            </div>
+
+            <div className="p-5 space-y-1">
+              <div className="flex items-center justify-between text-[13px] font-medium text-[var(--color-text-secondary)]">
+                <span>ยอดคลิกติดต่อ & นำทาง</span>
+                <MessageCircle className="w-4 h-4 text-[var(--color-accent)]" />
+              </div>
+              <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
+                {stats.contactClicksTotal.toLocaleString()} ครั้ง
+              </p>
+              <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                LINE {stats.contactClicksByChannel.LINE} · FB{" "}
+                {stats.contactClicksByChannel.FACEBOOK_MESSENGER} · โทร{" "}
+                {stats.contactClicksByChannel.PHONE}
+              </p>
+            </div>
+
+            <div className="p-5 space-y-1">
+              <div className="flex items-center justify-between text-[13px] font-medium text-[var(--color-text-secondary)]">
+                <span>โปรโมชั่น & โพสต์ที่เผยแพร่</span>
+                <TicketPercent className="w-4 h-4 text-[var(--color-accent)]" />
+              </div>
+              <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
+                {activePromosCount} โปร · {publishedPostsCount} โพสต์
+              </p>
+              <button
+                type="button"
+                onClick={() => onNavigateTab("growth")}
+                className="text-[12.5px] font-semibold text-[var(--color-accent)] underline underline-offset-2 cursor-pointer hover:opacity-80"
+              >
+                จัดการโปรโมชั่น & คูปอง →
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-8 lg:py-10 space-y-4">
+          <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+            ทางลัดจัดการ{catMeta.shortLabelTh}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <Link
+              href={`/studio/listings/content?hotel=${encodeURIComponent(hotel.slug)}`}
+              className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
+            >
+              <FileText className="w-5 h-5 text-[var(--color-accent)]" />
+              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                โพสต์อัปเดต & ซิงก์ Facebook
+              </p>
+              <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
+                อัปเดตรูปบรรยากาศ เมนูใหม่ หรือบทความแนะนำสถานที่
+              </p>
+            </Link>
+
+            <Link
+              href={`/studio/listings/promotions?hotel=${encodeURIComponent(hotel.slug)}`}
+              className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
+            >
+              <TicketPercent className="w-5 h-5 text-[var(--color-accent)]" />
+              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                โปรโมชั่น & สิทธิพิเศษหน้าการ์ด
+              </p>
+              <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
+                สร้างดีลหรือส่วนลดพิเศษเพื่อปักหมุดโชว์บนการ์ดและหน้าโปรไฟล์
+              </p>
+            </Link>
+
+            <Link
+              href={`/studio/listings/about?hotel=${encodeURIComponent(hotel.slug)}`}
+              className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
+            >
+              <MapPin className="w-5 h-5 text-[var(--color-accent)]" />
+              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                ข้อมูลร้าน เวลาเปิด–ปิด & พิกัด
+              </p>
+              <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
+                ตั้งค่าลิงก์เว็บไซต์/จองภายนอก ช่องทางติดต่อ และเวลาเปิดทำการ
+              </p>
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="divide-y divide-[var(--color-border)]">
       {/* 1. Minimalist ROI Summary Strip (Zero border fatigue, zero pastel boxes) */}
@@ -281,7 +414,7 @@ export function StudioTodayTab({
               setIsManualModalOpen(true);
             }}
             disabled={rooms.length === 0}
-            className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+            className="h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
           >
             <Plus className="w-4 h-4" />
             <span>บันทึกการจอง Walk-in / LINE</span>
@@ -306,8 +439,8 @@ export function StudioTodayTab({
 
           <div className="p-5 space-y-1">
             <div className="flex items-center justify-between text-[13px] font-medium text-[var(--color-text-secondary)]">
-              <span>คนบันทึกเข้า /board</span>
-              <Bookmark className="w-4 h-4 text-[var(--color-text-primary)]" />
+              <span>คนบันทึกเข้า Wishlist</span>
+              <Heart className="w-4 h-4 text-[#e60023]" />
             </div>
             <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
               {stats.boardSavesCount.toLocaleString()} ครั้ง
@@ -341,7 +474,7 @@ export function StudioTodayTab({
       {/* 2. Filterable Reservations & Slip Verification */}
       <section className="py-8 lg:py-10 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Status filter pills (Squircle, monochrome hierarchy) */}
+          {/* Status filter pills (Full-Round Travel-Blue Pill) */}
           <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar pb-0.5">
             {filterOptions.map((opt) => {
               const active = filterTab === opt.id;
@@ -350,9 +483,9 @@ export function StudioTodayTab({
                   key={opt.id}
                   type="button"
                   onClick={() => setFilterTab(opt.id)}
-                  className={`h-10 px-4 rounded-[12px] text-[13.5px] font-semibold whitespace-nowrap inline-flex items-center gap-2 cursor-pointer transition-colors ${
+                  className={`h-10 px-4 rounded-full text-[13.5px] font-semibold whitespace-nowrap inline-flex items-center gap-2 cursor-pointer transition-colors ${
                     active
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
                   }`}
                 >
@@ -493,7 +626,7 @@ export function StudioTodayTab({
                         type="button"
                         disabled={busyId === b.id}
                         onClick={() => handleBookingStatus(b.id, "CONFIRMED")}
-                        className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                        className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
                         <span>ยืนยันจอง</span>
@@ -579,7 +712,7 @@ export function StudioTodayTab({
                     onClick={() =>
                       handleBookingStatus(slipPreviewBooking.id, "CONFIRMED")
                     }
-                    className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     <span>ยอดตรง · ยืนยันจอง</span>
@@ -630,7 +763,7 @@ export function StudioTodayTab({
             <button
               type="button"
               onClick={() => setIsManualModalOpen(false)}
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
             >
               ยกเลิก
             </button>
@@ -638,7 +771,7 @@ export function StudioTodayTab({
               type="submit"
               form="manual-booking-form"
               disabled={isSubmittingManual}
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
             >
               {isSubmittingManual ? "กำลังบันทึก..." : "บันทึกการจอง"}
             </button>

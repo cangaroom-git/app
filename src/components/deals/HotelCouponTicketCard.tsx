@@ -381,7 +381,7 @@ export function HotelCouponTicketCard({
                     type="button"
                     disabled={isClaiming}
                     onClick={(e) => void triggerClaim(e, frontClaimBtnRef.current)}
-                    className={`rounded-[9px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] font-semibold inline-flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 transition-colors ${
+                    className={`rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] font-semibold inline-flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 transition-colors ${
                       isCompact
                         ? "h-7 px-3 text-[12px]"
                         : "h-8 px-3.5 text-[12.5px]"
@@ -477,7 +477,7 @@ export function HotelCouponTicketCard({
                   <button
                     type="button"
                     onClick={() => onRedeem(deal)}
-                    className="h-8 px-3 rounded-[8px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+                    className="h-8 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <span>{isTh ? "ใช้โค้ด" : "Redeem"}</span>
                     <ArrowUpRight className="w-3 h-3" />
@@ -488,7 +488,7 @@ export function HotelCouponTicketCard({
                       deal.code
                     )}`}
                     onClick={onNavigateHotel}
-                    className="h-8 px-3 rounded-[8px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[12px] font-semibold inline-flex items-center gap-1 transition-colors"
+                    className="h-8 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1 transition-colors"
                   >
                     <span>{isTh ? "ใช้โค้ด" : "Redeem"}</span>
                     <ArrowUpRight className="w-3 h-3" />
@@ -500,7 +500,7 @@ export function HotelCouponTicketCard({
                   type="button"
                   disabled={isClaiming || quotaInfo.isSoldOut}
                   onClick={(e) => void triggerClaim(e, backClaimBtnRef.current)}
-                  className="h-8 px-3 rounded-[8px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                  className="h-8 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
                 >
                   <span>
                     {isClaiming

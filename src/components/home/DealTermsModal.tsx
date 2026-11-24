@@ -6,9 +6,9 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   BadgeCheck,
-  Bookmark,
   CheckCircle2,
   Clock,
+  Heart,
   Info,
   Sparkles,
   Tag,
@@ -297,13 +297,13 @@ export function DealTermsModal({
           <button
             type="button"
             onClick={() => onToggleSave(pin.id)}
-            className={`h-11 px-4 rounded-[12px] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+            className={`h-11 px-4 rounded-full text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
               isSaved
                 ? "bg-[var(--color-promo)] !text-white"
                 : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
             }`}
           >
-            <Bookmark
+            <Heart
               className={`w-4 h-4 ${isSaved ? "fill-current" : ""}`}
               strokeWidth={2}
             />
@@ -313,8 +313,8 @@ export function DealTermsModal({
                   ? "บันทึกแล้ว"
                   : "Saved"
                 : isTh
-                ? "บันทึกโปร"
-                : "Save deal"}
+                ? "บันทึก Wishlist"
+                : "Wishlist"}
             </span>
           </button>
 
@@ -327,7 +327,7 @@ export function DealTermsModal({
                 onExternalDealClick();
                 onClose();
               }}
-              className="flex-1 h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+              className="flex-1 h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
             >
               <span className="truncate">
                 {isTh
@@ -344,7 +344,7 @@ export function DealTermsModal({
                 onClose();
                 onVisitHotelClick(e);
               }}
-              className="flex-1 h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+              className="flex-1 h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
             >
               <span>{isTh ? "จองตรง 0% GP" : "Book direct 0% GP"}</span>
               <ArrowUpRight className="w-4 h-4 shrink-0" strokeWidth={2.2} />

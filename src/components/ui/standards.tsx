@@ -106,20 +106,20 @@ export function StandardButton({
   ...props
 }: StandardButtonProps) {
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: "h-8 px-3 rounded-[10px] text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
-    md: "h-9 px-4 rounded-[12px] text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
-    lg: "h-10 px-5 rounded-[13px] text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    sm: "h-8 px-3.5 rounded-full text-[13px] leading-[1.35] [&_svg]:w-3.5 [&_svg]:h-3.5",
+    md: "h-9 px-4 rounded-full text-[14px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
+    lg: "h-11 px-6 rounded-full text-[15px] leading-[1.35] [&_svg]:w-4 [&_svg]:h-4",
   };
 
   const variantClasses: Record<ButtonVariant, string> = {
     primary:
-      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
+      "bg-[var(--color-accent)] !text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
     promo:
-      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
+      "bg-[var(--color-accent)] !text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
     secondary:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
+      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-accent)] hover:bg-[var(--color-background-muted)]",
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
   };
@@ -150,19 +150,19 @@ export function StandardIconButton({
   ...props
 }: StandardIconButtonProps) {
   const sizeMap = {
-    sm: "h-9 w-9 rounded-[12px] [&_svg]:w-4 [&_svg]:h-4",
-    md: "h-10 w-10 rounded-[13px] [&_svg]:w-5 [&_svg]:h-5",
+    sm: "h-9 w-9 rounded-full [&_svg]:w-4 [&_svg]:h-4",
+    md: "h-10 w-10 rounded-full [&_svg]:w-5 [&_svg]:h-5",
   };
 
   const variantMap = {
     subtle:
       "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]",
     outline:
-      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]",
+      "bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] text-[var(--color-text-primary)] hover:border-[var(--color-accent)] hover:bg-[var(--color-background-muted)]",
     primary:
-      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
+      "bg-[var(--color-accent)] !text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
     promo:
-      "bg-[#222222] !text-white hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] dark:!text-[#222222]",
+      "bg-[var(--color-accent)] !text-[var(--color-on-accent)] hover:bg-[var(--color-accent-hover)]",
     ghost:
       "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]",
   };
@@ -453,10 +453,10 @@ export function StandardCheckbox({
       aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`h-5 w-5 rounded-[6px] inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#222222] dark:focus-visible:ring-[#f5f5f5] focus-visible:ring-offset-1 ${
+      className={`h-5 w-5 rounded-[6px] inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-1 ${
         checked
-          ? "bg-[#222222] border border-[#222222] !text-white dark:bg-[#f5f5f5] dark:border-[#f5f5f5] dark:!text-[#222222]"
-          : "bg-[var(--color-background-card)] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] hover:border-[var(--color-text-primary)]"
+          ? "bg-[var(--color-accent)] border border-[var(--color-accent)] !text-[var(--color-on-accent)]"
+          : "bg-[var(--color-background-card)] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] hover:border-[var(--color-accent)]"
       } ${!label ? className : ""}`}
     >
       {checked && <Check className="w-3.5 h-3.5 stroke-[2.75]" />}
@@ -512,15 +512,15 @@ export function StatusPill({
     available: "bg-emerald-500",
     last_unit: "bg-amber-500",
     booked: "bg-rose-500",
-    promo: "bg-[#111111] dark:bg-[#f5f5f5]",
+    promo: "bg-[var(--color-accent)]",
   };
 
   const dotByVariant: Record<StatusPillVariant, string> = {
     success: "bg-emerald-500",
     warning: "bg-amber-500",
     error: "bg-rose-500",
-    promo: "bg-[#111111] dark:bg-[#f5f5f5]",
-    accent: "bg-[#111111] dark:bg-[#f5f5f5]",
+    promo: "bg-[var(--color-accent)]",
+    accent: "bg-[var(--color-accent)]",
     neutral: "bg-[var(--color-text-secondary)]",
   };
 

@@ -200,16 +200,16 @@ export function ProvinceSearchDropdown({
                     key={prov.id}
                     type="button"
                     onClick={() => handlePick(isSelected ? null : prov.id)}
-                    className={`h-[31px] px-2 rounded-[8px] text-left truncate transition-colors cursor-pointer flex items-center justify-between gap-1 ${
+                    className={`h-[31px] px-2.5 rounded-full text-left truncate transition-colors cursor-pointer flex items-center justify-between gap-1 ${
                       isSelected
-                        ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] font-semibold"
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold"
                         : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                     }`}
                   >
                     <span
                       className={`text-[13px] truncate ${
                         isSelected
-                          ? "!text-white dark:!text-[#111111] font-semibold"
+                          ? "!text-[var(--color-on-accent)] font-semibold"
                           : prov.isPopular
                           ? "font-semibold text-[var(--color-text-primary)]"
                           : "font-normal text-[var(--color-text-primary)]"

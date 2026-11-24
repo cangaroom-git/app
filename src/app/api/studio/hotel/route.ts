@@ -10,6 +10,9 @@ import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
 import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 import { mapBookingRowToDto } from "@/lib/services/bookingCheckoutService";
 import { mapHotelPostToDetailDto } from "@/lib/services/hotelPostService";
+import {
+  sanitizeOutboundHttpsUrl,
+} from "@/lib/placeCategories";
 import { mapPinToDto, PIN_COUPON_SELECT } from "@/lib/services/pinMapper";
 
 const UpdateHotelSchema = z.object({
@@ -31,6 +34,24 @@ const UpdateHotelSchema = z.object({
   stayStyles: z.array(z.string()).optional(),
   propertyType: z
     .enum(["BOUTIQUE_HOTEL", "RESORT", "POOL_VILLA", "GLAMPING_HOMESTAY"])
+    .optional(),
+  placeCategory: z
+    .enum(["STAY", "CAFE", "RESTAURANT", "ATTRACTION", "WELLNESS"])
+    .optional(),
+  merchantMode: z.enum(["DIRECT_BOOKING", "PROFILE_ONLY"]).optional(),
+  externalWebsiteUrl: z.string().trim().max(400).optional(),
+  primaryCtaLabelTh: z.string().trim().max(60).optional(),
+  featuredCouponId: z.string().trim().max(80).optional().nullable(),
+  openingHoursJson: z
+    .array(
+      z.object({
+        day: z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+        open: z.string().trim().max(10),
+        close: z.string().trim().max(10),
+        closed: z.boolean(),
+      })
+    )
+    .max(7)
     .optional(),
   checkInTime: z.string().trim().max(10).optional(),
   checkOutTime: z.string().trim().max(10).optional(),
@@ -391,13 +412,58 @@ export async function PATCH(request: Request) {
     }
 
     const { hotel } = await requireHotelStudioAccess(parsed.data.hotelSlug);
-    const { hotelSlug: _ignored, ...updateData } = parsed.data;
+    const { hotelSlug: _ignored, ...rawUpdateData } = parsed.data;
     void _ignored;
+
+    const updateData = { ...rawUpdateData };
+    if (updateData.externalWebsiteUrl !== undefined) {
+      const trimmed = updateData.externalWebsiteUrl.trim();
+      if (trimmed.length > 0) {
+        const safe = sanitizeOutboundHttpsUrl(trimmed);
+        if (!safe) {
+          return NextResponse.json(
+            { error: "ลิงก์เว็บไซต์ต้องขึ้นต้นด้วย https:// และถูกต้อง" },
+            { status: 422 }
+          );
+        }
+        updateData.externalWebsiteUrl = safe;
+      } else {
+        updateData.externalWebsiteUrl = "";
+      }
+    }
 
     const updated = await prisma.hotel.update({
       where: { id: hotel.id },
       data: updateData,
     });
+
+    // Keep canonical Place Card synchronized when core identity fields change
+    if (
+      updated.canonicalPinId &&
+      (updateData.nameTh !== undefined ||
+        updateData.coverImageUrl !== undefined ||
+        updateData.provinceId !== undefined ||
+        updateData.taglineTh !== undefined)
+    ) {
+      await prisma.pin
+        .update({
+          where: { id: updated.canonicalPinId },
+          data: {
+            ...(updateData.nameTh !== undefined ? { titleTh: updated.nameTh } : {}),
+            ...(updateData.taglineTh !== undefined
+              ? { descriptionTh: updated.taglineTh }
+              : {}),
+            ...(typeof updated.coverImageUrl === "string" &&
+            updated.coverImageUrl
+              ? { coverImageUrl: updated.coverImageUrl }
+              : {}),
+            ...(updateData.provinceId !== undefined
+              ? { provinceId: updated.provinceId }
+              : {}),
+          },
+        })
+        .catch(() => undefined);
+    }
 
     if (
       typeof updated.latitude === "number" &&

@@ -39,17 +39,18 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
 ### Surface & Ink Tokens (`globals.css`)
 | Token | Light Mode | Dark Mode (`html.dark`) | Usage |
 |---|---|---|---|
-| `--color-background-body` | `#ffffff` | `#161616` | Main pure-white canvas & left `72px` sidebar |
-| `--color-background-card` | `#ffffff` | `#222222` | Floating cards (`border-black/[0.04]` + sticky shadow) |
-| `--color-background-popover` | `#ffffff` | `#262626` | Dropdown popovers, dialogs & bottom sheets |
-| `--color-background-muted` | `#f7f7f7` | `#2c2c2c` | Secondary buttons, borderless inputs, muted tags |
-| `--color-background-subtle` | `#ebebeb` | `#383838` | Hover fill for muted buttons/inputs |
-| `--color-border` | `#ebebeb` | `#333333` | Single `1px` horizontal section/list dividers |
-| `--color-border-emphasized` | `#dddddd` | `#4a4a4a` | Structural hairlines & dashed coupon splits |
-| `--color-text-primary` | `#222222` | `#f5f5f5` | Warm charcoal headings, prices, primary copy |
-| `--color-text-secondary` | `#6a6a6a` | `#a8a8a8` | Foggy slate captions, sublabels, metadata |
-| `--color-promo` | `#e60023` | `#e60023` | **ONLY** Save/Bookmark `'บันทึก'` (`Save`), active Like heart & nav notification dots |
-| Category Crest Tokens | `STAY #2B3A67` · `CAFE #9A4D1C` · `RESTAURANT #B83B3B` · `ATTRACTION #1F6E50` · `WELLNESS #146373` | Same matte tokens | **ONLY** Top-Left Category Crest on `3:4` Collectible Place Cards & `/explore`/`/trip` Map Pins (never buttons/banners/gradients) |
+| `--color-background-body` | `#ffffff` | `#11161d` | Main pure-white canvas & left `72px` sidebar |
+| `--color-background-card` | `#ffffff` | `#18202b` | Floating cards (`border-black/[0.04]` + sticky shadow) |
+| `--color-background-popover` | `#ffffff` | `#1e2736` | Dropdown popovers, dialogs & bottom sheets |
+| `--color-background-muted` | `#f3f7fc` | `#18202b` | Secondary buttons, borderless inputs, muted tags |
+| `--color-background-subtle` | `#e7eff8` | `#243041` | Hover fill for muted buttons/inputs |
+| `--color-border` | `#e3ebf4` | `#283444` | Single `1px` horizontal section/list dividers |
+| `--color-border-emphasized` | `#cedbe9` | `#3a495e` | Structural hairlines & dashed splits |
+| `--color-accent` | `#1e78d6` | `#4ca3f5` | **Travel-Blue Primary CTA & Active Pill Accent** |
+| `--color-text-primary` | `#182334` | `#f1f5fa` | Calm slate-navy headings, prices, primary copy |
+| `--color-text-secondary` | `#5c6b80` | `#9ba8bc` | Slate captions, sublabels, metadata |
+| `--color-promo` | `#e60023` | `#e60023` | **ONLY** Heart Wishlist `'บันทึก'`, active Like heart & nav notification dots |
+| Category Crest Tokens | `STAY #5369A6` · `CAFE #D47E35` · `RESTAURANT #C6566E` · `ATTRACTION #529D48` · `WELLNESS #3A8D9A` | Same matte tokens | **ONLY** Category Medallion on `1:1` Collectible Place Cards & `/explore`/`/trip` Map Pins (never buttons/banners/gradients) |
 
 ### Typography (`Plus Jakarta Sans` + `Anuphan`)
 - Warm balanced semi-bold headings (`font-semibold` / `600`) paired with readable Thai line-heights:
@@ -66,10 +67,10 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
    - **Counter Steppers (`StandardStepperRow`)**: Integer counts (bedrooms, beds, bathrooms, guests, units) use clean `divide-y` rows with `−` / `count` / `+` squircle buttons (`h-8 w-8 rounded-[10px] border border-[#b0b0b0]`) instead of raw number inputs.
    - **Global Squircle Checkboxes (`StandardCheckbox`) & Airbnb 2-Month Date Pickers (`StudioDateRangePicker`)**: NEVER use raw `<input type="checkbox">` or native `<input type="date">`. Always use `<StandardCheckbox />` (`20×20px` squircle `#222222`/`#f5f5f5` with crisp `Check` icon) and `<StudioDateRangePicker />` (2-month desktop Portal popover + mobile slide-up Bottom Sheet matching `DesktopDateRangePopover`).
 
-### Strict 2-Button Hierarchy & Ironclad Unified Squircle Curvature
-- **Unified Squircle Curvature (`ห้ามใช้ปุ่ม rounded-full เด็ดขาด`)**: Every `<button>` and `<input>` MUST use squircle radii (`h-11–12` -> `rounded-[14px]`, `h-10` -> `rounded-[12px]`, `h-9` -> `rounded-[10px]–rounded-[12px]`, `h-7–8` -> `rounded-[8px]–rounded-[10px]`). `rounded-full` is permitted **ONLY** on circular user/hotel avatars, tiny `6px` status/pagination dots, map resort home badge, and switch thumbs.
-1. **Primary Button**: Solid `#222222` (`hover:bg-[#3f3f3f]`) + `#ffffff` text (`#f5f5f5` + `#222222` Dark), squircle radius (`rounded-[12px]`).
-2. **Secondary Button**: Flat borderless `bg-[var(--color-background-muted)]` (`#f7f7f7`) + `text-[var(--color-text-primary)]`, `hover:bg-[var(--color-background-subtle)]` (`#ebebeb`).
+### Strict 2-Button Hierarchy & Full-Round Pill Buttons (`rounded-full`)
+- **Full-Round Pill Curvature on ALL Buttons**: Every `<button>`, filter pill, and icon button MUST use `rounded-full` (like the Travel-Blue `Discover now` pill CTA). Multi-line `<input>` / `<textarea>` fields keep clean inset-label `rounded-[14px]`–`rounded-[16px]`. All cards, posts, review photos, and room thumbnails MUST use `aspect-square` (`rounded-[18px..24px]`); only Desktop 5-Photo Hero Mosaic (`aspect-[2/1]`), full-screen maps, and video players remain rectangular.
+1. **Primary Button**: Solid Travel-Blue `bg-[var(--color-accent)] !text-[var(--color-on-accent)]` (`hover:bg-[var(--color-accent-hover)]`), **`rounded-full`**.
+2. **Secondary Button**: Flat borderless `bg-[var(--color-background-muted)]` + `text-[var(--color-text-primary)]`, `hover:bg-[var(--color-background-subtle)]`, **`rounded-full`**.
 3. **Underline Text Link**: Secondary editorial actions (`แก้ไข`, `เปลี่ยนห้อง`, `ล้างการค้นหา`, `ดูบนแผนที่`) use clean underlined text buttons (`underline underline-offset-2`) with zero outer box.
 
 ---

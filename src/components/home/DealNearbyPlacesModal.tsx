@@ -1906,7 +1906,7 @@ export function DealNearbyPlacesModal({
               <button
                 type="button"
                 onClick={handleSearchThisArea}
-                className="h-9 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+                className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
               >
                 <Search className="w-3.5 h-3.5" />
                 <span>{isTh ? "ค้นหาในพื้นที่นี้" : "Search this area"}</span>

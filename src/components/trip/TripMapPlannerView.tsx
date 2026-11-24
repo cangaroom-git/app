@@ -1705,7 +1705,7 @@ export function TripMapPlannerView({
                     ? "เล่นเรื่องราวทริปพร้อมเสียงดนตรีและเส้นทาง"
                     : "Play trip story with ambient music"
                 }
-                className="h-10 px-3 sm:px-3.5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] text-[12.5px] sm:text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] text-[12.5px] sm:text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               >
                 {isPlayingStory ? (
                   <Pause className="w-3.5 h-3.5 fill-current shrink-0" />
@@ -1750,9 +1750,9 @@ export function TripMapPlannerView({
                     ? "แสดงที่เที่ยว คาเฟ่ และร้านอาหารใกล้จุดที่เลือก"
                     : "Show nearby attractions, cafes & dining"
                 }
-                className={`h-10 px-2.5 sm:px-3 rounded-[12px] border shadow-[var(--shadow-popover)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                className={`h-10 px-3 sm:px-3.5 rounded-full border shadow-[var(--shadow-popover)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
                   showNearbySpots
-                    ? "bg-[#222222] dark:bg-[#f5f5f5] border-transparent !text-white dark:!text-[#222222]"
+                    ? "bg-[var(--color-accent)] border-transparent !text-[var(--color-on-accent)]"
                     : "bg-[var(--color-background-popover)]/96 backdrop-blur-md border-black/[0.06] dark:border-white/[0.1] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]"
                 }`}
               >
@@ -1958,7 +1958,7 @@ export function TripMapPlannerView({
                   ? "กลับไปดูแบบ Fan Card"
                   : "Fanned deck"
               }
-              className="h-11 w-11 rounded-[13px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors"
+              className="h-11 w-11 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors"
             >
               {deckViewMode === "fan" ? (
                 <LayoutGrid className="w-[18px] h-[18px]" strokeWidth={2.1} />
@@ -1983,12 +1983,12 @@ export function TripMapPlannerView({
               </h2>
               <p className="text-[13.5px] text-[var(--color-text-secondary)] leading-relaxed">
                 {isTh
-                  ? "กลับไปหน้าแรกแล้วกดปุ่มปักหมุดบนการ์ดที่พักที่ถูกใจ เพื่อสร้างแผนที่เส้นทางทริปและกด Play แชร์ได้เลย"
-                  : "Bookmark stays from the home feed to map your trip and play your travel story."}
+                  ? "กลับไปหน้าแรกแล้วกดหัวใจบนการ์ดสถานที่ที่ถูกใจ เพื่อเก็บเข้า Wishlist และจัดทริปของคุณ"
+                  : "Save places to your Wishlist from the home feed to map your trip and play your travel story."}
               </p>
               <Link
                 href="/"
-                className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center transition-colors"
+                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center transition-colors"
               >
                 {isTh ? "สำรวจคูปองที่พัก" : "Explore stay deals"}
               </Link>

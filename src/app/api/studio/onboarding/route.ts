@@ -6,15 +6,43 @@ import {
   RESERVED_HOTEL_SLUGS,
 } from "@/lib/bookingMath";
 import { revalidatePlaceCatalog } from "@/lib/cache/revalidateNondii";
+import {
+  computeHaversineKm,
+  getPlaceCategoryMeta,
+  sanitizeOutboundHttpsUrl,
+} from "@/lib/placeCategories";
 import { prisma } from "@/lib/prisma";
 import { ensureThailandPlacesAroundCoord } from "@/lib/geo/thailandPlacesDb";
 
+const CATEGORY_DEFAULT_COVERS: Record<string, string> = {
+  STAY: "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=85",
+  CAFE: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1200&q=85",
+  RESTAURANT:
+    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=85",
+  ATTRACTION:
+    "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=85",
+  WELLNESS:
+    "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=85",
+};
+
+const OpeningHourSchema = z.object({
+  day: z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+  open: z.string().trim().max(10),
+  close: z.string().trim().max(10),
+  closed: z.boolean(),
+});
+
 const OnboardingSchema = z.object({
+  placeCategory: z
+    .enum(["STAY", "CAFE", "RESTAURANT", "ATTRACTION", "WELLNESS"])
+    .default("STAY"),
+  merchantMode: z.enum(["DIRECT_BOOKING", "PROFILE_ONLY"]).optional(),
   propertyType: z
     .enum(["BOUTIQUE_HOTEL", "RESORT", "POOL_VILLA", "GLAMPING_HOMESTAY"])
     .optional(),
-  nameTh: z.string().trim().min(2, "กรุณาระบุชื่อที่พัก").max(100),
+  nameTh: z.string().trim().min(2, "กรุณาระบุชื่อสถานที่").max(100),
   nameEn: z.string().trim().max(100).optional(),
+  taglineTh: z.string().trim().max(240).optional(),
   slug: z
     .string()
     .trim()
@@ -26,6 +54,10 @@ const OnboardingSchema = z.object({
   latitude: z.number().min(-90).max(90).optional().nullable(),
   longitude: z.number().min(-180).max(180).optional().nullable(),
   googleMapsUrl: z.string().trim().max(400).optional().nullable(),
+  googlePlaceId: z.string().trim().max(200).optional().nullable(),
+  externalWebsiteUrl: z.string().trim().max(400).optional(),
+  primaryCtaLabelTh: z.string().trim().max(60).optional(),
+  openingHoursJson: z.array(OpeningHourSchema).max(7).optional(),
   stayStyles: z.array(z.string()).optional(),
   quickSetup: z.boolean().optional(),
   contactPhone: z.string().trim().max(30).optional(),
@@ -83,7 +115,7 @@ export async function GET(request: Request) {
       available: !existing,
       slug,
       profileUrl: `nondii.com/${slug}`,
-      reason: existing ? "ชื่อลิงก์นี้มีที่พักอื่นใช้งานแล้ว" : null,
+      reason: existing ? "ชื่อลิงก์นี้มีสถานที่อื่นใช้งานแล้ว" : null,
     });
   } catch (err) {
     console.error("[GET /api/studio/onboarding]", err);
@@ -99,7 +131,7 @@ export async function POST(request: Request) {
     const sessionUser = await getServerSessionUser();
     if (!sessionUser) {
       return NextResponse.json(
-        { error: "กรุณาเข้าสู่ระบบด้วย Google / Email ก่อนเปิดเพจที่พัก" },
+        { error: "กรุณาเข้าสู่ระบบด้วย Google / Email ก่อนเปิดหน้าสถานที่" },
         { status: 401 }
       );
     }
@@ -121,6 +153,101 @@ export async function POST(request: Request) {
       );
     }
 
+    const placeCategory = parsed.data.placeCategory;
+    const resolvedMerchantMode =
+      placeCategory === "STAY"
+        ? parsed.data.merchantMode ?? "DIRECT_BOOKING"
+        : "PROFILE_ONLY";
+    const safeExternalUrl = parsed.data.externalWebsiteUrl
+      ? sanitizeOutboundHttpsUrl(parsed.data.externalWebsiteUrl)
+      : "";
+    if (
+      parsed.data.externalWebsiteUrl &&
+      parsed.data.externalWebsiteUrl.trim().length > 0 &&
+      !safeExternalUrl
+    ) {
+      return NextResponse.json(
+        { error: "ลิงก์เว็บไซต์ภายนอกต้องขึ้นต้นด้วย https:// และเป็นโดเมนที่ถูกต้อง" },
+        { status: 422 }
+      );
+    }
+
+    // Anti-spam & duplicate checks
+    const cleanGooglePlaceId = parsed.data.googlePlaceId?.trim() || null;
+    if (cleanGooglePlaceId) {
+      const dupGoogle = await prisma.hotel.findFirst({
+        where: { googlePlaceId: cleanGooglePlaceId },
+        select: { slug: true, nameTh: true },
+      });
+      if (dupGoogle) {
+        return NextResponse.json(
+          {
+            error: `สถานที่นี้ถูกเปิดโปรไฟล์ไว้แล้ว (${dupGoogle.nameTh} · /${dupGoogle.slug})`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const lat =
+      typeof parsed.data.latitude === "number" &&
+      Number.isFinite(parsed.data.latitude)
+        ? parsed.data.latitude
+        : null;
+    const lng =
+      typeof parsed.data.longitude === "number" &&
+      Number.isFinite(parsed.data.longitude)
+        ? parsed.data.longitude
+        : null;
+
+    if (lat !== null && lng !== null) {
+      const nearbySameCat = await prisma.hotel.findMany({
+        where: {
+          placeCategory,
+          latitude: { gte: lat - 0.002, lte: lat + 0.002 },
+          longitude: { gte: lng - 0.002, lte: lng + 0.002 },
+        },
+        select: { slug: true, nameTh: true, latitude: true, longitude: true },
+        take: 15,
+      });
+      const dupCoord = nearbySameCat.find(
+        (h) =>
+          typeof h.latitude === "number" &&
+          typeof h.longitude === "number" &&
+          computeHaversineKm(lat, lng, h.latitude, h.longitude) < 0.08
+      );
+      if (dupCoord) {
+        return NextResponse.json(
+          {
+            error: `พบสถานที่ประเภทเดียวกันในรัศมี 80 ม. แล้ว (${dupCoord.nameTh} · /${dupCoord.slug})`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    if (
+      resolvedMerchantMode === "PROFILE_ONLY" &&
+      sessionUser.role !== "SUPER_ADMIN"
+    ) {
+      const pendingProfileOnlyCount = await prisma.hotel.count({
+        where: {
+          ownerId: sessionUser.id,
+          merchantMode: "PROFILE_ONLY",
+          verificationStatus: "PENDING_REVIEW",
+        },
+      });
+      if (pendingProfileOnlyCount >= 3) {
+        return NextResponse.json(
+          {
+            error:
+              "บัญชีนี้สร้างสถานที่ที่รอยืนยันครบ 3 แห่งแล้ว กรุณารอทีมงานตรวจสอบก่อนเพิ่มสถานที่ใหม่",
+          },
+          { status: 429 }
+        );
+      }
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const exists = await tx.hotel.findUnique({
         where: { slug },
@@ -131,60 +258,80 @@ export async function POST(request: Request) {
       }
 
       const isQuickSetup = Boolean(parsed.data.quickSetup);
+      const catMeta = getPlaceCategoryMeta(placeCategory);
+
       const resolvedStyles =
         parsed.data.stayStyles && parsed.data.stayStyles.length > 0
           ? parsed.data.stayStyles
-          : parsed.data.propertyType === "POOL_VILLA"
-          ? ["pool-villa"]
-          : parsed.data.propertyType === "GLAMPING_HOMESTAY"
-          ? ["glamping"]
-          : ["mountain"];
+          : placeCategory === "STAY"
+          ? parsed.data.propertyType === "POOL_VILLA"
+            ? ["pool-villa"]
+            : parsed.data.propertyType === "GLAMPING_HOMESTAY"
+            ? ["glamping"]
+            : ["mountain"]
+          : [placeCategory.toLowerCase()];
 
       const uploadedGallery =
         parsed.data.firstRoom?.galleryUrls?.filter(Boolean) ?? [];
-      const resolvedCover =
-        parsed.data.coverImageUrl || uploadedGallery[0] || null;
+      const fallbackImg =
+        parsed.data.coverImageUrl ||
+        uploadedGallery[0] ||
+        CATEGORY_DEFAULT_COVERS[placeCategory] ||
+        CATEGORY_DEFAULT_COVERS.STAY;
+
+      const resolvedTagline =
+        parsed.data.taglineTh?.trim() ||
+        (resolvedMerchantMode === "DIRECT_BOOKING"
+          ? `จองตรงกับ ${parsed.data.nameTh} ไม่มีค่า GP`
+          : `${catMeta.labelTh} · ${parsed.data.nameTh}`);
 
       const hotel = await tx.hotel.create({
         data: {
           slug,
           ownerId: sessionUser.id,
+          placeCategory,
+          merchantMode: resolvedMerchantMode,
           propertyType: parsed.data.propertyType ?? "BOUTIQUE_HOTEL",
           nameTh: parsed.data.nameTh,
           nameEn: parsed.data.nameEn || parsed.data.nameTh,
-          taglineTh: `จองตรงกับ ${parsed.data.nameTh} ไม่มีค่า GP`,
+          taglineTh: resolvedTagline,
           provinceId: parsed.data.provinceId,
           districtTh: parsed.data.districtTh || "",
           addressTh: parsed.data.addressTh || "",
-          latitude:
-            typeof parsed.data.latitude === "number"
-              ? parsed.data.latitude
-              : null,
-          longitude:
-            typeof parsed.data.longitude === "number"
-              ? parsed.data.longitude
-              : null,
+          latitude: lat,
+          longitude: lng,
           googleMapsUrl: parsed.data.googleMapsUrl || null,
+          googlePlaceId: cleanGooglePlaceId,
+          externalWebsiteUrl: safeExternalUrl,
+          primaryCtaLabelTh: parsed.data.primaryCtaLabelTh || "",
+          openingHoursJson:
+            parsed.data.openingHoursJson &&
+            parsed.data.openingHoursJson.length > 0
+              ? parsed.data.openingHoursJson
+              : undefined,
           stayStyles: resolvedStyles,
           contactPhone: parsed.data.contactPhone || "",
           contactLine: parsed.data.contactLine || "",
           promptPayId:
-            parsed.data.promptPayId || parsed.data.contactPhone || "",
+            resolvedMerchantMode === "DIRECT_BOOKING"
+              ? parsed.data.promptPayId || parsed.data.contactPhone || ""
+              : "",
           promptPayAccountName:
-            parsed.data.promptPayAccountName || parsed.data.nameTh,
+            resolvedMerchantMode === "DIRECT_BOOKING"
+              ? parsed.data.promptPayAccountName || parsed.data.nameTh
+              : "",
           facebookPageUrl: parsed.data.facebookPageUrl || "",
-          coverImageUrl: resolvedCover,
-          logoUrl: resolvedCover,
+          coverImageUrl: parsed.data.coverImageUrl || fallbackImg,
+          logoUrl: parsed.data.coverImageUrl || fallbackImg,
           verificationStatus: "PENDING_REVIEW",
-          isPublished: !isQuickSetup,
+          isPublished:
+            resolvedMerchantMode === "PROFILE_ONLY" ? true : !isQuickSetup,
         },
       });
 
-      if (!isQuickSetup) {
+      let starterRoomId: string | null = null;
+      if (resolvedMerchantMode === "DIRECT_BOOKING" && !isQuickSetup) {
         const fr = parsed.data.firstRoom;
-        const fallbackImg =
-          resolvedCover ||
-          "https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=1200&q=85";
         const starterGallery =
           uploadedGallery.length > 0 ? uploadedGallery : [fallbackImg];
         const starterCode = (fr?.code || "R1").toUpperCase();
@@ -217,24 +364,39 @@ export async function POST(request: Request) {
             galleryUrls: starterGallery,
           },
         });
-
-        await tx.pin.create({
-          data: {
-            hotelId: hotel.id,
-            roomId: starterRoom.id,
-            category: "ROOMS",
-            titleTh: parsed.data.nameTh,
-            descriptionTh: `จองตรง ${parsed.data.nameTh} ฟรีค่า GP ผ่าน Nondii`,
-            coverImageUrl: fallbackImg,
-            mediaUrls: starterGallery,
-            aspectRatio: "aspect-[4/5]",
-            provinceId: parsed.data.provinceId,
-            stayStyles: resolvedStyles,
-            semanticTags: resolvedStyles,
-            publishStatus: "PUBLISHED",
-          },
-        });
+        starterRoomId = starterRoom.id;
       }
+
+      const canonicalPin = await tx.pin.create({
+        data: {
+          hotelId: hotel.id,
+          roomId: starterRoomId,
+          category:
+            placeCategory === "CAFE" || placeCategory === "RESTAURANT"
+              ? "DINING"
+              : placeCategory === "STAY"
+              ? "ROOMS"
+              : "VIEWS",
+          titleTh: parsed.data.nameTh,
+          descriptionTh: resolvedTagline,
+          coverImageUrl: parsed.data.coverImageUrl || fallbackImg,
+          mediaUrls:
+            uploadedGallery.length > 0
+              ? uploadedGallery
+              : [parsed.data.coverImageUrl || fallbackImg],
+          aspectRatio: "aspect-square",
+          provinceId: parsed.data.provinceId,
+          stayStyles: resolvedStyles,
+          semanticTags: resolvedStyles,
+          isCanonicalCard: true,
+          publishStatus: "PUBLISHED",
+        },
+      });
+
+      const updatedHotel = await tx.hotel.update({
+        where: { id: hotel.id },
+        data: { canonicalPinId: canonicalPin.id },
+      });
 
       if (sessionUser.role === "TRAVELLER") {
         await tx.user.update({
@@ -243,7 +405,7 @@ export async function POST(request: Request) {
         });
       }
 
-      return hotel;
+      return updatedHotel;
     });
 
     if (
@@ -262,9 +424,8 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[POST /api/studio/onboarding]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "เปิดเพจที่พักไม่สำเร็จ" },
+      { error: err instanceof Error ? err.message : "เปิดหน้าสถานที่ไมสำเร็จ" },
       { status: 400 }
     );
   }
 }
-

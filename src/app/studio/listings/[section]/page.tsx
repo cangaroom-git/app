@@ -10,10 +10,12 @@ import {
 
 export default function StudioListingsSectionPage() {
   const params = useParams<{ section?: string }>();
-  const section = resolveListingSection(
-    typeof params?.section === "string" ? params.section : "rooms"
-  );
   const { data, reload, notify, buildHref } = useStudio();
+  const fallbackSection =
+    data.hotel.merchantMode === "PROFILE_ONLY" ? "about" : "rooms";
+  const section = resolveListingSection(
+    typeof params?.section === "string" ? params.section : fallbackSection
+  );
 
   return (
     <StudioPropertyTab

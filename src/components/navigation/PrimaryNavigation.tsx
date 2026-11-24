@@ -399,15 +399,11 @@ export function PrimaryNavigation({
             <PlatformNavIcon id="explore" isActive={activeTab === "explore"} />
           </Link>
 
-          {/* 3) ทริป (Saved Trips & Shareable Route Boards) */}
+          {/* 3) ทริปเดินทาง (Public Road Trips & Saved Itineraries) */}
           <Link
             href="/trip"
-            title={
-              language === "th"
-                ? "ทริป · ที่พักที่บันทึกไว้"
-                : "Saved trips"
-            }
-            aria-label={language === "th" ? "ทริป" : "Trips"}
+            title={language === "th" ? "ทริปเดินทาง" : "Trips"}
+            aria-label={language === "th" ? "ทริปเดินทาง" : "Trips"}
             className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors relative ${
               activeTab === "board" ? "bg-[var(--color-background-muted)]/85" : ""
             }`}
@@ -427,6 +423,7 @@ export function PrimaryNavigation({
             aria-haspopup="dialog"
             className={`h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors cursor-pointer relative ${
               isMobileProfileDrawerOpen ||
+              activeTab === "wishlist" ||
               activeTab === "trips" ||
               activeTab === "register-hotel" ||
               activeTab === "studio" ||
@@ -627,7 +624,7 @@ export function PrimaryNavigation({
 
                 <button
                   type="submit"
-                  className="h-11 px-4 rounded-[13px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[14px] font-semibold shrink-0 cursor-pointer"
+                  className="h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold shrink-0 cursor-pointer transition-colors"
                 >
                   {language === "th" ? "ค้นหา" : "Search"}
                 </button>

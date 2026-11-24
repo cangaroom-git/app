@@ -302,18 +302,18 @@ export function AgodaDateRangeFilter({
                   type="button"
                   disabled={isPast}
                   onClick={() => handleDayClick(dateStr)}
-                  className={`relative z-10 h-9 w-9 rounded-[10px] flex flex-col items-center justify-center text-[14px] transition-colors ${
+                  className={`relative z-10 h-9 w-9 rounded-full flex flex-col items-center justify-center text-[14px] transition-colors ${
                     isPast
                       ? "text-[var(--color-text-disabled)] cursor-not-allowed"
                       : isStart || isEnd
-                      ? "bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] font-semibold cursor-pointer"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold cursor-pointer"
                       : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] font-normal cursor-pointer"
                   }`}
                 >
                   {isHolidayDot && !isStart && !isEnd && !isPast && (
                     <span className="absolute top-1 h-1 w-1 rounded-full bg-[#374151] dark:bg-[#d1d5db]" />
                   )}
-                  <span className={isStart || isEnd ? "!text-white dark:!text-[#111111]" : ""}>
+                  <span className={isStart || isEnd ? "!text-[var(--color-on-accent)]" : ""}>
                     {dayNumber}
                   </span>
                 </button>

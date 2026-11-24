@@ -186,10 +186,10 @@ export function ShareTripModal({
                 type="button"
                 disabled={isUpdatingVisibility}
                 onClick={() => void onTogglePublic(!isPublic)}
-                className={`h-9 px-3 rounded-[10px] text-[12.5px] font-semibold shrink-0 cursor-pointer disabled:opacity-50 transition-colors ${
+                className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold shrink-0 cursor-pointer disabled:opacity-50 transition-colors ${
                   isPublic
                     ? "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                    : "bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222]"
+                    : "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)]"
                 }`}
               >
                 {isPublic
@@ -239,7 +239,7 @@ export function ShareTripModal({
             type="button"
             disabled={!isPublic && isOwner}
             onClick={() => void handleNativeShare()}
-            className="w-full h-11 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] disabled:opacity-40 text-[14px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            className="w-full h-11 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] disabled:opacity-40 text-[14px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
             <Share2 className="w-4 h-4" />
             <span>

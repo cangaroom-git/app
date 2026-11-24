@@ -35,7 +35,7 @@ export default function StudioRoomPhotosPage() {
           <div className="pt-2">
             <Link
               href={buildHref("/studio/listings/rooms")}
-              className="h-10 px-5 rounded-[12px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-2"
+              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>กลับหน้ารายการห้องพัก</span>

@@ -158,7 +158,7 @@ export function StudioReviewsPanel({
                         type="button"
                         disabled={savingId === rv.id}
                         onClick={() => handleSaveReply(rv.id)}
-                        className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>
@@ -168,7 +168,7 @@ export function StudioReviewsPanel({
                       <button
                         type="button"
                         onClick={() => setOpenReplyId(null)}
-                        className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold cursor-pointer"
+                        className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold cursor-pointer"
                       >
                         ยกเลิก
                       </button>
@@ -361,7 +361,7 @@ export function StudioMobileMenuTab({
       <div className="pt-2">
         <Link
           href="/"
-          className="w-full h-12 rounded-[14px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+          className="w-full h-12 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[15px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"
         >
           <ArrowLeftRight className="w-4 h-4" />
           <span>สลับเป็นโหมดนักเดินทาง</span>

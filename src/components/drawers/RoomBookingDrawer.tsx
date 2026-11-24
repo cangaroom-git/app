@@ -283,7 +283,7 @@ export function RoomBookingDrawer({
             onClose();
             onCheckRoomDates?.(selectedRoom);
           }}
-          className="h-12 px-6 sm:px-7 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+          className="h-12 px-7 sm:px-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[15px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
         >
           <span>{isTh ? "เช็กวันว่าง" : "Check availability"}</span>
         </button>
@@ -302,7 +302,7 @@ export function RoomBookingDrawer({
               onCheckRoomDates?.(selectedRoom);
             }
           }}
-          className="h-12 px-6 sm:px-7 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+          className="h-12 px-7 sm:px-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
         >
           <span>
             {isTh
@@ -318,7 +318,7 @@ export function RoomBookingDrawer({
         <button
           type="button"
           onClick={() => onProceedToCheckout(selectedRoom)}
-          className="h-12 px-7 sm:px-8 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[15px] font-semibold inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+          className="h-12 px-7 sm:px-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[15px] font-semibold inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
         >
           <span>{isTh ? "จองห้องนี้" : "Reserve"}</span>
         </button>
@@ -332,7 +332,7 @@ export function RoomBookingDrawer({
           onClose();
           onCheckRoomDates?.(selectedRoom);
         }}
-        className="h-12 px-6 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+        className="h-12 px-6 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
       >
         <Calendar className="w-4 h-4" />
         <span>
@@ -412,7 +412,7 @@ export function RoomBookingDrawer({
             <button
               type="button"
               onClick={() => setShowAllAmenities((v) => !v)}
-              className={`h-10 px-4 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors ${
+              className={`h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors ${
                 isMobileLayout ? "w-full" : ""
               }`}
             >
@@ -476,7 +476,7 @@ export function RoomBookingDrawer({
               onClose();
               onCheckRoomDates?.(selectedRoom);
             }}
-            className="h-9 px-4 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
+            className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
           >
             {hasConfirmedDates
               ? isTh
@@ -654,7 +654,7 @@ export function RoomBookingDrawer({
                 }
               }}
               aria-label={isTh ? "ห้องก่อนหน้า" : "Previous room"}
-              className="h-10 w-10 rounded-[12px] bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+              className="h-10 w-10 rounded-full bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
             >
               <ArrowUp className="w-4 h-4" />
             </button>
@@ -707,7 +707,7 @@ export function RoomBookingDrawer({
                 }
               }}
               aria-label={isTh ? "ห้องถัดไป" : "Next room"}
-              className="h-10 w-10 rounded-[12px] bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+              className="h-10 w-10 rounded-full bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
             >
               <ArrowDown className="w-4 h-4" />
             </button>
@@ -728,9 +728,7 @@ export function RoomBookingDrawer({
                   type="button"
                   onClick={() => onExpandPhotos?.(gallery, 0)}
                   aria-label={isTh ? "ขยายรูปภาพห้องพัก" : "Expand room photos"}
-                  className={`group relative block w-full overflow-hidden rounded-[14px] bg-[var(--color-background-muted)] cursor-pointer text-left ${
-                    gallery.length === 1 ? "h-full min-h-[420px]" : "aspect-[4/3]"
-                  }`}
+                  className="group relative block aspect-square w-full overflow-hidden rounded-[22px] bg-[var(--color-background-muted)] cursor-pointer text-left"
                 >
                   <img
                     src={getOptimizedPinImageUrl(gallery[0], "gallery")}
@@ -740,7 +738,7 @@ export function RoomBookingDrawer({
                     className="w-full h-full object-cover group-hover:brightness-[0.96] transition"
                   />
                   {onExpandPhotos && (
-                    <span className="absolute bottom-3 right-3 h-8 px-3 rounded-[9px] bg-white/92 dark:bg-[#222222]/90 text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] text-[12px] font-semibold inline-flex items-center gap-1.5 opacity-95 group-hover:opacity-100">
+                    <span className="absolute bottom-3 right-3 h-8 px-3.5 rounded-full bg-white/92 dark:bg-[#222222]/90 text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] text-[12px] font-semibold inline-flex items-center gap-1.5 opacity-95 group-hover:opacity-100">
                       <Maximize2 className="w-3.5 h-3.5" />
                       <span>
                         {gallery.length > 1
@@ -764,7 +762,7 @@ export function RoomBookingDrawer({
                         type="button"
                         onClick={() => onExpandPhotos?.(gallery, idx + 1)}
                         aria-label={`${roomName} photo ${idx + 2}`}
-                        className="group relative block aspect-[4/3] w-full overflow-hidden rounded-[12px] bg-[var(--color-background-muted)] cursor-pointer"
+                        className="group relative block aspect-square w-full overflow-hidden rounded-[18px] bg-[var(--color-background-muted)] cursor-pointer"
                       >
                         <img
                           src={getOptimizedPinImageUrl(url, "gallery")}
@@ -799,7 +797,7 @@ export function RoomBookingDrawer({
                 type="button"
                 onClick={onClose}
                 aria-label={isTh ? "ปิด" : "Close"}
-                className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+                className="h-9 w-9 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-[18px] h-[18px]" />
               </button>
@@ -830,7 +828,7 @@ export function RoomBookingDrawer({
           type="button"
           onClick={onClose}
           aria-label={isTh ? "ปิด" : "Close"}
-          className="absolute top-3.5 right-3.5 z-30 h-9 w-9 rounded-[12px] bg-white/95 dark:bg-[#222222]/95 border border-black/[0.08] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[#222222] dark:text-[#f5f5f5] inline-flex items-center justify-center cursor-pointer"
+          className="absolute top-3.5 right-3.5 z-30 h-9 w-9 rounded-full bg-white/95 dark:bg-[#222222]/95 border border-black/[0.08] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -841,7 +839,7 @@ export function RoomBookingDrawer({
           className="flex-1 overflow-y-auto overscroll-contain"
         >
           {/* Full-Bleed Swipeable Photo Carousel */}
-          <div className="relative w-full aspect-[4/3] bg-[var(--color-background-muted)] overflow-hidden">
+          <div className="relative w-full aspect-square bg-[var(--color-background-muted)] overflow-hidden">
             {gallery.length > 0 ? (
               <>
                 <div

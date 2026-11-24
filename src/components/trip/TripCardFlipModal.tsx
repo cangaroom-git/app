@@ -702,7 +702,7 @@ export function TripCardFlipModal({
               }}
               className="cgr-fanned-coupon-wrap"
             >
-              <div className="cgr-fanned-coupon-mask relative w-full h-full rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
+              <div className="relative w-full h-full rounded-[22px] sm:rounded-[24px] overflow-hidden bg-[var(--color-background-muted)]">
                 <img
                   src={cardImgUrl}
                   srcSet={cardImgSrcSet}

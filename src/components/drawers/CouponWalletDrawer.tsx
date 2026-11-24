@@ -203,7 +203,7 @@ export function CouponWalletDrawer({
             <button
               type="submit"
               disabled={!manualCodeInput.trim() || isSubmittingCode}
-              className="min-h-[56px] px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-45 transition-colors"
+              className="min-h-[56px] px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ty-body font-semibold inline-flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-45 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>{isTh ? "เก็บโค้ด" : "Save"}</span>
@@ -252,7 +252,7 @@ export function CouponWalletDrawer({
                       reasonEn: "Log in to access your coupon wallet",
                     })
                   }
-                  className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] ty-body font-semibold inline-flex items-center justify-center cursor-pointer transition-colors"
+                  className="h-10 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ty-body font-semibold inline-flex items-center justify-center cursor-pointer transition-colors"
                 >
                   {isTh ? "เข้าสู่ระบบ" : "Log in"}
                 </button>

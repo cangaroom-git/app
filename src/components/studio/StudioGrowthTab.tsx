@@ -691,7 +691,7 @@ export function StudioGrowthTab({
             <button
               type="button"
               onClick={openCreateCouponModal}
-              className="h-10 sm:h-11 px-4 sm:px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+              className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>สร้างคูปองใหม่</span>
@@ -749,7 +749,7 @@ export function StudioGrowthTab({
                 <button
                   type="button"
                   onClick={openCreateCouponModal}
-                  className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>สร้างคูปองใหม่</span>
@@ -959,16 +959,16 @@ export function StudioGrowthTab({
                             }
                             disabled={isToggling}
                             onClick={() => void handleToggleCoupon(c)}
-                            className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                            className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
                               c.isActive
-                                ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                                ? "bg-[var(--color-accent)]"
                                 : "bg-[var(--color-border-emphasized)]"
                             }`}
                           >
                             <span
                               className={`block h-5 w-5 rounded-full transition-transform ${
                                 c.isActive
-                                  ? "translate-x-5 bg-white dark:bg-[#222222]"
+                                  ? "translate-x-5 bg-white"
                                   : "translate-x-0 bg-white"
                               }`}
                             />
@@ -1037,9 +1037,9 @@ export function StudioGrowthTab({
 
                       {/* Discount Value Badge */}
                       <span
-                        className={`h-9 min-w-[56px] px-2.5 rounded-[10px] text-[14px] font-semibold inline-flex items-center justify-center shrink-0 tabular-nums transition-colors ${
+                        className={`h-9 min-w-[56px] px-2.5 rounded-full text-[14px] font-semibold inline-flex items-center justify-center shrink-0 tabular-nums transition-colors ${
                           rule.isActive
-                            ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                            ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
                         }`}
                       >
@@ -1097,16 +1097,16 @@ export function StudioGrowthTab({
                           }
                           disabled={isToggling}
                           onClick={() => void handleToggleRule(rule)}
-                          className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                          className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
                             rule.isActive
-                              ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                              ? "bg-[var(--color-accent)]"
                               : "bg-[var(--color-border-emphasized)]"
                           }`}
                         >
                           <span
                             className={`block h-5 w-5 rounded-full transition-transform ${
                               rule.isActive
-                                ? "translate-x-5 bg-white dark:bg-[#222222]"
+                                ? "translate-x-5 bg-white"
                                 : "translate-x-0 bg-white"
                             }`}
                           />
@@ -1172,7 +1172,7 @@ export function StudioGrowthTab({
               <button
                 type="button"
                 onClick={() => setIsCouponModalOpen(false)}
-                className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
               >
                 ยกเลิก
               </button>
@@ -1180,7 +1180,7 @@ export function StudioGrowthTab({
                 type="submit"
                 form="studio-coupon-form"
                 disabled={isSavingCoupon}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingCoupon ? "กำลังบันทึก..." : "บันทึกคูปอง"}
               </button>
@@ -1348,7 +1348,7 @@ export function StudioGrowthTab({
               <button
                 type="button"
                 onClick={() => setIsRuleModalOpen(false)}
-                className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
               >
                 ยกเลิก
               </button>
@@ -1356,7 +1356,7 @@ export function StudioGrowthTab({
                 type="submit"
                 form="studio-rule-form"
                 disabled={isSavingRule}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingRule ? "กำลังบันทึก..." : "บันทึกกฎส่วนลด"}
               </button>

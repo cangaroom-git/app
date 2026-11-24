@@ -213,9 +213,9 @@ function SortableProvinceRow({
               ? "นำออกจากเมืองท่องเที่ยวเด่น"
               : "ตั้งเป็นเมืองท่องเที่ยวเด่น"
           }
-          className={`h-9 px-3 rounded-[10px] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+          className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
             province.isTouristHub
-              ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
           }`}
         >
@@ -569,9 +569,9 @@ export function SuperAdminLocationsManager({
           <button
             type="button"
             onClick={() => setScopeMode("region")}
-            className={`h-10 px-4 rounded-[12px] text-[13px] font-semibold cursor-pointer transition-colors ${
+            className={`h-10 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
               scopeMode === "region"
-                ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                 : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
             }`}
           >
@@ -580,9 +580,9 @@ export function SuperAdminLocationsManager({
           <button
             type="button"
             onClick={() => setScopeMode("national")}
-            className={`h-10 px-4 rounded-[12px] text-[13px] font-semibold cursor-pointer transition-colors ${
+            className={`h-10 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
               scopeMode === "national"
-                ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                 : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
             }`}
           >
@@ -832,7 +832,7 @@ export function SuperAdminLocationsManager({
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {isSaving ? "กำลังบันทึก..." : "บันทึกพิกัด"}
                 </button>

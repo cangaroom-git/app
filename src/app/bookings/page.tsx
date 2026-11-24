@@ -263,7 +263,7 @@ export default function BookingsAndAccountPage() {
             </div>
             <button
               type="submit"
-              className="min-h-[56px] px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
+              className="min-h-[56px] px-7 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer transition-colors"
             >
               <Search className="w-4 h-4" />
               <span>ค้นหาใบจอง</span>

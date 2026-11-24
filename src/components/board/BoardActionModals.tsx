@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Bookmark, Check, Loader2, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { Check, Heart, Loader2, Plus, X } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { getOptimizedPinImageUrl } from "@/lib/mediaUtils";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
@@ -24,7 +25,7 @@ export function BoardFolderThumb({
       <div
         className={`${sizeClass} bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-secondary)] shrink-0`}
       >
-        <Bookmark className="w-4 h-4" />
+        <Heart className="w-4 h-4" />
       </div>
     );
   }
@@ -123,8 +124,8 @@ export function CreateBoardModal({
         err instanceof Error
           ? err.message
           : isTh
-          ? "สร้างทริปไม่สำเร็จ"
-          : "Failed to create trip"
+          ? "สร้างรายการ Wishlist ไม่สำเร็จ"
+          : "Failed to create wishlist"
       );
     }
   };
@@ -133,7 +134,7 @@ export function CreateBoardModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "สร้างทริปใหม่" : "Create trip"}
+      aria-label={isTh ? "สร้างรายการ Wishlist ใหม่" : "Create wishlist"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -150,7 +151,7 @@ export function CreateBoardModal({
         {/* Header */}
         <div className="relative px-6 py-4 flex items-center justify-center border-b border-[var(--color-border)]">
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "สร้างทริปใหม่" : "Create trip"}
+            {isTh ? "สร้างรายการ Wishlist ใหม่" : "Create wishlist"}
           </h2>
           <button
             type="button"
@@ -166,7 +167,7 @@ export function CreateBoardModal({
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-6 space-y-2">
             <StandardInput
-              label={isTh ? "ชื่อทริป" : "Trip name"}
+              label={isTh ? "ชื่อรายการ Wishlist" : "Wishlist name"}
               optionalText={`${name.length}/50`}
               type="text"
               autoFocus
@@ -174,7 +175,7 @@ export function CreateBoardModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={
-                isTh ? "เช่น ทริปน่านปลายปี" : "e.g. Nan Winter Trip"
+                isTh ? "เช่น ที่พัก & คาเฟ่น่านปลายปี" : "e.g. Nan Winter Wishlist"
               }
             />
             {errorMsg && (
@@ -188,7 +189,7 @@ export function CreateBoardModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-10 px-4 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[14.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+              className="h-10 px-4 rounded-full hover:bg-[var(--color-background-muted)] text-[14.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
             >
               {isTh ? "ยกเลิก" : "Cancel"}
             </button>
@@ -196,10 +197,10 @@ export function CreateBoardModal({
             <button
               type="submit"
               disabled={!trimmed || isSubmitting}
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-35 disabled:cursor-not-allowed"
             >
               {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              <span>{isTh ? "สร้างทริป" : "Create"}</span>
+              <span>{isTh ? "สร้างรายการ" : "Create"}</span>
             </button>
           </div>
         </form>
@@ -249,7 +250,7 @@ export function ChooseBoardModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "เลือกทริปที่ต้องการบันทึก" : "Save to trip"}
+      aria-label={isTh ? "เลือกรายการ Wishlist ที่ต้องการบันทึก" : "Save to wishlist"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -265,7 +266,7 @@ export function ChooseBoardModal({
 
         <div className="relative px-6 py-4 flex items-center justify-center border-b border-[var(--color-border)] shrink-0">
           <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "เลือกทริปสำหรับบันทึก" : "Save to trip"}
+            {isTh ? "เลือกรายการ Wishlist" : "Save to wishlist"}
           </h2>
           <button
             type="button"
@@ -306,7 +307,7 @@ export function ChooseBoardModal({
                   </p>
                 </div>
                 {isSelected && (
-                  <span className="h-7 w-7 rounded-[9px] bg-[#222222] dark:bg-[#f5f5f5] text-white dark:text-[#222222] inline-flex items-center justify-center shrink-0">
+                  <span className="h-7 w-7 rounded-[9px] bg-[var(--color-accent)] text-[var(--color-on-accent)] inline-flex items-center justify-center shrink-0">
                     <Check className="w-3.5 h-3.5" />
                   </span>
                 )}
@@ -319,10 +320,10 @@ export function ChooseBoardModal({
           <button
             type="button"
             onClick={onOpenCreateNew}
-            className="w-full h-11 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            className="w-full h-11 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>{isTh ? "สร้างทริปใหม่" : "Create new trip"}</span>
+            <span>{isTh ? "สร้างรายการ Wishlist ใหม่" : "Create new wishlist"}</span>
           </button>
         </div>
       </div>
@@ -368,7 +369,7 @@ export function DeleteBoardConfirmModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isTh ? "ยืนยันการลบทริป" : "Delete trip"}
+      aria-label={isTh ? "ยืนยันการลบรายการ Wishlist" : "Delete wishlist"}
       data-state={dataState}
       onClick={onClose}
       className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/48 cgr-modal-backdrop"
@@ -393,7 +394,7 @@ export function DeleteBoardConfirmModal({
 
         <div className="px-6 pt-8 pb-6 text-center space-y-2">
           <h2 className="text-[19px] font-semibold text-[var(--color-text-primary)]">
-            {isTh ? "ลบทริปนี้หรือไม่?" : "Delete this trip?"}
+            {isTh ? "ลบรายการ Wishlist นี้หรือไม่?" : "Delete this wishlist?"}
           </h2>
           <p className="text-[14px] text-[var(--color-text-secondary)]">
             {isTh
@@ -406,7 +407,7 @@ export function DeleteBoardConfirmModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[14.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+            className="h-10 px-4 rounded-full hover:bg-[var(--color-background-muted)] text-[14.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
           >
             {isTh ? "ยกเลิก" : "Cancel"}
           </button>
@@ -415,7 +416,7 @@ export function DeleteBoardConfirmModal({
             type="button"
             disabled={isDeleting}
             onClick={() => void onConfirmDelete()}
-            className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+            className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
           >
             {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
             <span>{isTh ? "ลบ" : "Delete"}</span>
@@ -467,8 +468,14 @@ export function BoardSaveToast({
           />
 
           <div className="flex-1 min-w-0 text-[13.5px] text-[var(--color-text-primary)] leading-snug">
-            <span>{isTh ? "บันทึกไปที่ " : "Saved to "}</span>
-            <strong className="font-semibold">{toast.boardName}</strong>
+            <span>{isTh ? "บันทึกเข้า Wishlist · " : "Saved to wishlist · "}</span>
+            <Link
+              href="/wishlist"
+              onClick={onDismiss}
+              className="font-semibold text-[var(--color-accent)] hover:underline underline-offset-2"
+            >
+              {toast.boardName}
+            </Link>
           </div>
 
           <button

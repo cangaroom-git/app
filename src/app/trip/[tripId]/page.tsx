@@ -83,14 +83,14 @@ export default async function PublicTripDetailPage({
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Link
               href="/explore"
-              className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
             >
               <Compass className="w-4 h-4" />
               <span>สำรวจแผนที่ที่พัก</span>
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
             >
               กลับหน้าแรก
             </Link>
@@ -118,14 +118,14 @@ export default async function PublicTripDetailPage({
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Link
               href="/explore"
-              className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
             >
               <Compass className="w-4 h-4" />
               <span>สำรวจแผนที่ที่พัก</span>
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center justify-center transition-colors"
             >
               กลับหน้าแรก
             </Link>

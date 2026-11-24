@@ -427,9 +427,9 @@ export function DesktopDateRangePopover({
                   disabled={isDisabled}
                   onClick={() => handleDayClick(dateStr)}
                   aria-label={dateStr}
-                  className={`relative z-10 h-9 w-9 rounded-[10px] flex items-center justify-center text-[13.5px] tabular-nums transition-colors ${
+                  className={`relative z-10 h-9 w-9 rounded-full flex items-center justify-center text-[13.5px] tabular-nums transition-colors ${
                     isStart || isEnd
-                      ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] font-semibold cursor-pointer"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold cursor-pointer"
                       : isDisabled
                       ? `text-[var(--color-text-disabled)] cursor-not-allowed ${
                           showStrikethrough
@@ -658,7 +658,7 @@ export function DesktopDateRangePopover({
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-5 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
+            className="h-9 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold cursor-pointer transition-colors"
           >
             {isTh ? "ปิด" : "Close"}
           </button>

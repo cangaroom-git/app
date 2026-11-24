@@ -395,7 +395,7 @@ export default function SuperAdminConsolePage() {
                       onClick={() =>
                         handleUpdateHotelVerification(h.id, "VERIFIED")
                       }
-                      className="h-9 px-3.5 rounded-[12px] bg-[var(--color-accent)] text-white ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <BadgeCheck className="w-4 h-4" />
                       <span>อนุมัติ Verified</span>
@@ -408,7 +408,7 @@ export default function SuperAdminConsolePage() {
                       onClick={() =>
                         handleUpdateHotelVerification(h.id, "SUSPENDED")
                       }
-                      className="h-9 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-error)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                      className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-error)] ty-caption font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Ban className="w-3.5 h-3.5" />
                       <span>ระงับ</span>
@@ -454,9 +454,9 @@ export default function SuperAdminConsolePage() {
                     <button
                       type="button"
                       onClick={() => handleToggleFeaturedDeal(c)}
-                      className={`h-9 px-3.5 rounded-[12px] ty-caption font-semibold shrink-0 cursor-pointer ${
+                      className={`h-9 px-4 rounded-full ty-caption font-semibold shrink-0 cursor-pointer transition-colors ${
                         c.isFeaturedDeal
-                          ? "bg-[#111111] !text-white dark:bg-[#f5f5f5] dark:!text-[#111111]"
+                          ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                           : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]"
                       }`}
                     >

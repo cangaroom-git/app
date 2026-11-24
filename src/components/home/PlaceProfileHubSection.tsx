@@ -260,7 +260,7 @@ export function PlaceProfileHubSection({
             return (
               <div
                 key={coupon.id}
-                className="w-[248px] sm:w-[276px] shrink-0 snap-start rounded-[16px] bg-[var(--color-background-muted)] p-4 flex flex-col justify-between gap-3 text-left"
+                className="w-[248px] sm:w-[276px] shrink-0 snap-start rounded-[20px] bg-[var(--color-background-muted)] p-4 flex flex-col justify-between gap-3 text-left"
               >
                 <div className="space-y-1.5 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -268,7 +268,7 @@ export function PlaceProfileHubSection({
                       {kindLabel}
                     </span>
                     {isCardFeatured && (
-                      <span className="px-2 py-0.5 rounded-[7px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[10.5px] font-semibold shrink-0 leading-tight">
+                      <span className="px-2.5 py-0.5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] text-[10.5px] font-semibold shrink-0 leading-tight">
                         {isTh ? "โปรหน้าการ์ด" : "Featured"}
                       </span>
                     )}
@@ -350,7 +350,7 @@ export function PlaceProfileHubSection({
                   href={postUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="relative block aspect-[16/10] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]"
+                  className="relative block aspect-square w-full rounded-[22px] overflow-hidden bg-[var(--color-background-muted)]"
                 >
                   {post.coverImageUrl ? (
                     <img
@@ -428,7 +428,7 @@ export function PlaceProfileHubSection({
                   href={blogUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="relative block aspect-[16/10] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]"
+                  className="relative block aspect-square w-full rounded-[22px] overflow-hidden bg-[var(--color-background-muted)]"
                 >
                   {blog.coverImageUrl ? (
                     <img

@@ -172,22 +172,22 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
           </span>
           <div className="space-y-1.5">
             <h1 className="text-[24px] font-semibold text-[var(--color-text-primary)]">
-              เข้าสู่ระบบเจ้าของที่พัก
+              เข้าสู่ระบบเจ้าของสถานที่
             </h1>
             <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
-              จัดการใบจองตรง 0% GP, ปฏิทินราคาเทศกาล และหน้าร้านที่พักของคุณในที่เดียว
+              จัดการหน้าโปรไฟล์สถานที่ โพสต์ โปรโมชั่น และระบบจองตรง 0% GP ของคุณในที่เดียว
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
               href="/login?next=/studio"
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center transition-colors"
             >
               เข้าสู่ระบบ
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
             >
               กลับหน้าหลัก
             </Link>
@@ -207,26 +207,26 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
           <div className="space-y-2">
             <h1 className="text-[24px] font-semibold text-[var(--color-text-primary)]">
               {errorStatus === 404
-                ? "เริ่มต้นลงที่พักฟรีกับ Nondii"
-                : "ไม่สามารถเปิด Hotel Studio ได้"}
+                ? "เริ่มต้นเปิดหน้าธุรกิจฟรีกับ Nondii"
+                : "ไม่สามารถเปิด Nondii Studio ได้"}
             </h1>
             <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
               {errorStatus === 404
-                ? "เปิดหน้าร้านโรงแรม รีสอร์ต หรือพูลวิลล่าของคุณ พร้อมระบบรับจองตรง 0% GP ผ่าน PromptPay ได้ใน 4 ขั้นตอน"
+                ? "เปิดหน้าโปรไฟล์โรงแรม คาเฟ่ ร้านอาหาร ที่เที่ยว หรือสปา พร้อมปักหมุดแผนที่และลงโปรโมชั่นได้ฟรีตลอดชีพ"
                 : errorMessage || "กรุณาลองใหม่อีกครั้ง"}
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
-              href="/register-hotel"
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center gap-2 transition-colors"
+              href="/register"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>ลงทะเบียนที่พักฟรี (0% GP)</span>
+              <span>ลงทะเบียนสถานที่ฟรี (0% GP)</span>
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
             >
               กลับโหมดนักเดินทาง
             </Link>

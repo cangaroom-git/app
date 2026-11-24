@@ -1080,7 +1080,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeTab === "register-hotel";
 
   const showSearchBar =
-    activeTab === "home" || activeTab === "explore" || activeTab === "board";
+    activeTab === "home" ||
+    activeTab === "explore" ||
+    activeTab === "board" ||
+    activeTab === "wishlist";
   const isExploreFullBleed = activeTab === "explore";
 
   const contextValue: PlatformAppContextValue = useMemo(

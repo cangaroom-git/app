@@ -741,9 +741,9 @@ export function RoomPhotoStudio({
           }}
           aria-label={isSelectMode ? "เสร็จสิ้นการเลือกรูป" : "เลือกรูป"}
           title={isSelectMode ? "เสร็จสิ้น" : "เลือกรูป"}
-          className={`h-9 w-9 sm:w-auto sm:px-3.5 rounded-[10px] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+          className={`h-9 w-9 sm:w-auto sm:px-4 rounded-full text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
             isSelectMode
-              ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
           }`}
         >
@@ -771,7 +771,7 @@ export function RoomPhotoStudio({
               ? `เพิ่มรูป${activeSpaceMeta.labelTh}`
               : "เพิ่มรูปภาพ"
           }
-          className="h-9 w-9 sm:w-auto sm:px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shrink-0"
+          className="h-9 w-9 sm:w-auto sm:px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shrink-0"
         >
           {isUploading ? (
             <Loader2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-spin" />
@@ -888,7 +888,7 @@ export function RoomPhotoStudio({
           </div>
           <div className="h-1.5 w-full rounded-full bg-[var(--color-background-subtle)] overflow-hidden">
             <div
-              className="h-full bg-[#222222] dark:bg-[#f5f5f5] transition-all duration-300"
+              className="h-full bg-[var(--color-accent)] transition-all duration-300"
               style={{
                 width: `${Math.max(
                   8,
@@ -1011,9 +1011,9 @@ export function RoomPhotoStudio({
                         );
                       }
                     }}
-                    className={`group shrink-0 md:w-full h-10 md:h-auto px-3 md:py-2.5 rounded-[11px] flex items-center justify-between gap-2.5 text-left cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#222222] dark:focus-visible:ring-[#f5f5f5] ${
+                    className={`group shrink-0 md:w-full h-10 md:h-auto px-3.5 md:py-2.5 rounded-full flex items-center justify-between gap-2.5 text-left cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] ${
                       isDropHover
-                        ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                         : isActive
                         ? "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] font-semibold"
                         : isDroppableWhileDragging
@@ -1094,7 +1094,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={selectedUrls.size === 0}
                     onClick={() => setIsMoveModalOpen(true)}
-                    className="h-8.5 px-3 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <FolderInput className="w-3.5 h-3.5" />
                     <span>ย้ายหมวดหมู่</span>
@@ -1103,7 +1103,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={selectedUrls.size === 0}
                     onClick={() => void handleBulkDelete()}
-                    className="h-8.5 px-3 rounded-[10px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>ลบ</span>
@@ -1126,7 +1126,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={isUploading || photos.length >= MAX_PHOTOS_PER_ROOM}
                     onClick={() => triggerUpload(currentUploadSpace)}
-                    className="h-9.5 px-4 rounded-[10px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="h-9.5 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>เพิ่มรูปเข้าหมวดนี้</span>
@@ -1135,7 +1135,7 @@ export function RoomPhotoStudio({
                     <button
                       type="button"
                       onClick={() => selectSpaceTab("all")}
-                      className="h-9.5 px-4 rounded-[10px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-text-primary)] cursor-pointer"
+                      className="h-9.5 px-4 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-text-primary)] cursor-pointer"
                     >
                       ดูรูปทั้งหมด ({photos.length})
                     </button>
@@ -1214,11 +1214,11 @@ export function RoomPhotoStudio({
                             else openPhotoDetail(photo.url);
                           }
                         }}
-                        className={`relative aspect-[4/3] rounded-[14px] overflow-hidden bg-[var(--color-background-muted)] cursor-grab active:cursor-grabbing transition ${
+                        className={`relative aspect-square rounded-[18px] overflow-hidden bg-[var(--color-background-muted)] cursor-grab active:cursor-grabbing transition ${
                           isSelected
-                            ? "ring-2 ring-[#222222] dark:ring-[#f5f5f5] ring-offset-2 ring-offset-[var(--color-background-popover)]"
+                            ? "ring-2 ring-[var(--color-accent)] ring-offset-2 ring-offset-[var(--color-background-popover)]"
                             : isDragTarget
-                            ? "ring-2 ring-[#222222] dark:ring-[#f5f5f5]"
+                            ? "ring-2 ring-[var(--color-accent)]"
                             : ""
                         }`}
                       >
@@ -1235,10 +1235,10 @@ export function RoomPhotoStudio({
 
                         {isSelectMode ? (
                           <span
-                            className={`absolute top-2.5 left-2.5 h-6.5 w-6.5 rounded-[8px] inline-flex items-center justify-center transition-colors ${
+                            className={`absolute top-2.5 left-2.5 h-6.5 w-6.5 rounded-full inline-flex items-center justify-center transition-colors ${
                               isSelected
-                                ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
-                                : "bg-white/90 text-[#222222]"
+                                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                                : "bg-white/90 text-[var(--color-text-primary)]"
                             }`}
                           >
                             {isSelected && (
@@ -1341,7 +1341,7 @@ export function RoomPhotoStudio({
         >
           {/* Left: Large Photo Preview + Prev/Next */}
           <div className="space-y-3.5">
-            <div className="relative w-full aspect-[4/3] rounded-[16px] overflow-hidden bg-[var(--color-background-muted)]">
+            <div className="relative w-full aspect-square rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
               <img
                 src={activePhoto.url}
                 alt={activePhoto.captionTh || room.nameTh}
@@ -1397,7 +1397,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={isSaving}
                     onClick={() => void handleSetCover(activePhoto.url)}
-                    className="h-9.5 px-3.5 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="h-9.5 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Star className="w-3.5 h-3.5" />
                     <span>ตั้งเป็นภาพปกหลัก</span>
@@ -1408,7 +1408,7 @@ export function RoomPhotoStudio({
                   type="button"
                   disabled={isSaving}
                   onClick={() => void handleDeletePhoto(activePhoto.url)}
-                  className="h-9.5 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="h-9.5 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>ลบรูป</span>
@@ -1475,7 +1475,7 @@ export function RoomPhotoStudio({
                   type="button"
                   disabled={isSaving || !isCaptionDirty}
                   onClick={() => void handleSaveCaption()}
-                  className="h-9.5 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
+                  className="h-9.5 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
                 >
                   {isSaving ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

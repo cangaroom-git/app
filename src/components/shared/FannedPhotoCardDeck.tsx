@@ -533,9 +533,9 @@ export function FannedPhotoCardDeck({
 
   const isDesktop = viewportWidth >= 1024;
   const isCompactMobile = viewportWidth < 640;
-  // Heroic larger center card with exact 3:4 portrait ratio (198x264 mobile · 236x314 tablet/desktop!)
-  const cardW = isCompactMobile ? 198 : 236;
-  const cardH = isCompactMobile ? 264 : 314;
+  // Modern super-rounded 1:1 square cards matching Screen #3 ("Explore Nearby")
+  const cardW = isCompactMobile ? 204 : 244;
+  const cardH = isCompactMobile ? 204 : 244;
   const stepX = Math.round(cardW * 0.61);
   const clampedVisibleRatio = Math.max(0.45, Math.min(1, centerVisibleRatio));
   const bottomOffsetPx =
@@ -752,8 +752,8 @@ export function FannedPhotoCardDeck({
         onPointerCancel={handleDeckPointerUp}
         className={`absolute inset-x-0 bottom-0 z-10 ${
           clampedVisibleRatio < 1
-            ? "h-[278px] sm:h-[322px] lg:h-[322px]"
-            : "h-[268px] sm:h-[322px] lg:h-[344px] z-30"
+            ? "h-[244px] sm:h-[282px] lg:h-[286px]"
+            : "h-[234px] sm:h-[276px] lg:h-[296px] z-30"
         } pointer-events-none flex items-end justify-center touch-none overscroll-none`}
       >
         {/* Transparent swipe capture layer over parent-rendered mobile white backdrop */}
@@ -776,7 +776,7 @@ export function FannedPhotoCardDeck({
                 ? "transform 230ms var(--ease-ios-sheet), opacity 180ms ease"
                 : "transform 360ms var(--ease-ios-sheet), opacity 220ms ease",
             }}
-            className="lg:hidden pointer-events-auto absolute inset-x-0 bottom-0 z-0 h-[272px] sm:h-[308px] rounded-t-[26px] bg-[var(--color-background-body)] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] will-change-transform"
+            className="lg:hidden pointer-events-auto absolute inset-x-0 bottom-0 z-0 h-[232px] sm:h-[268px] rounded-t-[26px] bg-[var(--color-background-body)] border-t border-[var(--color-border)] shadow-[var(--shadow-popover)] will-change-transform"
           />
         )}
         {renderedItems.map((item, idx) => {
@@ -1007,7 +1007,7 @@ export function FannedPhotoCardDeck({
                 }}
                 className={`${
                   shouldPopInOuter ? "cgr-fan-outer-pop-in" : ""
-                } cgr-fanned-coupon-mask relative w-full h-full rounded-[20px] overflow-hidden cursor-pointer ${
+                } relative w-full h-full rounded-[22px] sm:rounded-[24px] overflow-hidden cursor-pointer ${
                   isCenter
                     ? "bg-[var(--color-background-muted)]"
                     : "bg-[var(--color-background-body)]"
@@ -1075,13 +1075,13 @@ export function FannedPhotoCardDeck({
                     corner="top-left"
                   />
                   {mode === "trip" && (
-                    <span className="mt-1.5 ml-1.5 h-6 px-1.5 rounded-[7px] bg-black/48 backdrop-blur-sm text-white text-[10.5px] font-bold tabular-nums inline-flex items-center leading-none">
+                    <span className="mt-2.5 h-7 px-2 rounded-[9px] bg-black/48 backdrop-blur-sm text-white text-[11px] font-bold tabular-nums inline-flex items-center leading-none">
                       #{stopNumber}
                     </span>
                   )}
                 </div>
 
-                {/* Top-Right Flush Corner Pin / Remove Button */}
+                {/* Top-Right Inset Heart Wishlist / Remove Button */}
                 {showActionBtn && cardTopAction === "remove" && onRemovePin && (
                   <button
                     type="button"
@@ -1091,20 +1091,20 @@ export function FannedPhotoCardDeck({
                       onRemovePin(pin.id);
                     }}
                     aria-label={
-                      isTh ? "นำสถานที่ออกจากทริป" : "Remove place from trip"
+                      isTh ? "นำสถานที่ออกจาก Wishlist" : "Remove place"
                     }
-                    title={isTh ? "นำออกจากทริปนี้" : "Remove from trip"}
-                    className="absolute top-0 right-0 z-10 h-8 w-8 sm:h-9 sm:w-9 rounded-bl-[14px] bg-black/46 hover:bg-black/62 backdrop-blur-sm inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                    title={isTh ? "นำออกจากรายการนี้" : "Remove from list"}
+                    className="absolute top-2.5 right-2.5 z-10 h-8 w-8 sm:h-9 sm:w-9 rounded-[11px] sm:rounded-[12px] bg-white/95 hover:bg-white dark:bg-[#1f1f1f]/95 ring-1 ring-black/[0.06] dark:ring-white/[0.1] backdrop-blur-sm inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
                   >
                     <svg
                       viewBox="0 0 24 24"
-                      className="w-[17px] h-[17px]"
+                      className="w-[18px] h-[18px]"
                       aria-hidden="true"
                     >
                       <path
-                        d="M6.5 3.75h11a1.75 1.75 0 0 1 1.75 1.75v15.2l-6.64-4.15a1.15 1.15 0 0 0-1.22 0L4.75 20.7V5.5A1.75 1.75 0 0 1 6.5 3.75Z"
+                        d="M12 20.25s-7.25-4.55-9.2-8.72C1.22 8.17 3.05 4.75 6.45 4.75c1.92 0 3.55 1.03 4.55 2.48 1-1.45 2.63-2.48 4.55-2.48 3.4 0 5.23 3.42 3.65 6.78-1.95 4.17-9.2 8.72-9.2 8.72Z"
                         fill="#e60023"
-                        stroke="#ffffff"
+                        stroke="#e60023"
                         strokeWidth="1.9"
                         strokeLinejoin="round"
                       />
@@ -1122,35 +1122,40 @@ export function FannedPhotoCardDeck({
                         e.stopPropagation();
                         onToggleSavePin(pin);
                       }}
+                      aria-pressed={isSavedByMe}
                       aria-label={
                         isSavedByMe
                           ? isTh
-                            ? "บันทึกแล้ว"
-                            : "Saved"
+                            ? "อยู่ใน Wishlist แล้ว"
+                            : "Saved in Wishlist"
                           : isTh
-                          ? "บันทึกเข้าทริป"
-                          : "Save to trip"
+                          ? "บันทึกเข้า Wishlist"
+                          : "Save to Wishlist"
                       }
                       title={
                         isSavedByMe
                           ? isTh
-                            ? "บันทึกในทริปแล้ว"
-                            : "Saved to trip"
+                            ? "อยู่ใน Wishlist แล้ว"
+                            : "Saved in Wishlist"
                           : isTh
-                          ? "บันทึกเข้าทริป"
-                          : "Save to trip"
+                          ? "เพิ่มใน Wishlist"
+                          : "Add to Wishlist"
                       }
-                      className="absolute top-0 right-0 z-10 h-8 w-8 sm:h-9 sm:w-9 rounded-bl-[14px] bg-black/46 hover:bg-black/62 backdrop-blur-sm inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                      className={`absolute top-2.5 right-2.5 z-10 h-8 w-8 sm:h-9 sm:w-9 rounded-[11px] sm:rounded-[12px] backdrop-blur-sm inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                        isSavedByMe
+                          ? "bg-white/95 dark:bg-[#1f1f1f]/95 ring-1 ring-black/[0.06] dark:ring-white/[0.1]"
+                          : "bg-black/28 hover:bg-black/44"
+                      }`}
                     >
                       <svg
                         viewBox="0 0 24 24"
-                        className="w-[17px] h-[17px]"
+                        className="w-[18px] h-[18px]"
                         aria-hidden="true"
                       >
                         <path
-                          d="M6.5 3.75h11a1.75 1.75 0 0 1 1.75 1.75v15.2l-6.64-4.15a1.15 1.15 0 0 0-1.22 0L4.75 20.7V5.5A1.75 1.75 0 0 1 6.5 3.75Z"
-                          fill={isSavedByMe ? "#e60023" : "rgba(0,0,0,0.35)"}
-                          stroke="#ffffff"
+                          d="M12 20.25s-7.25-4.55-9.2-8.72C1.22 8.17 3.05 4.75 6.45 4.75c1.92 0 3.55 1.03 4.55 2.48 1-1.45 2.63-2.48 4.55-2.48 3.4 0 5.23 3.42 3.65 6.78-1.95 4.17-9.2 8.72-9.2 8.72Z"
+                          fill={isSavedByMe ? "#e60023" : "rgba(0,0,0,0.22)"}
+                          stroke={isSavedByMe ? "#e60023" : "#ffffff"}
                           strokeWidth="1.9"
                           strokeLinejoin="round"
                         />
@@ -1198,7 +1203,7 @@ export function FannedPhotoCardDeck({
                 <button
                   type="button"
                   onClick={() => setReorderModeSynced(false)}
-                  className="h-9 px-3.5 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
+                  className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
                 >
                   <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
                   <span>

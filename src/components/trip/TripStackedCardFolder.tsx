@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bookmark,
   ChevronRight,
+  Heart,
   MapPin,
   X,
 } from "lucide-react";
@@ -25,8 +25,9 @@ interface TripStackedCardFolderProps {
   board: SavedBoardDto;
   language: LanguageCode;
   priority?: boolean;
+  ownerDisplayName?: string | null;
   onOpenTrip: (board: SavedBoardDto) => void;
-  onDeleteTrip: (board: SavedBoardDto) => void;
+  onDeleteTrip?: (board: SavedBoardDto) => void;
 }
 
 const MAX_VISIBLE_STACK = 4;
@@ -42,6 +43,7 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
   board,
   language,
   priority = false,
+  ownerDisplayName,
   onOpenTrip,
   onDeleteTrip,
 }: TripStackedCardFolderProps) {
@@ -293,33 +295,35 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
                 onOpenTrip(board);
               }
             }}
-            className="relative aspect-[3/4] w-full rounded-[18px] sm:rounded-[20px] border border-dashed border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75 transition-colors cursor-pointer flex flex-col items-center justify-center text-center px-3.5 sm:px-5 py-7 sm:py-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
+            className="relative aspect-square w-full rounded-[22px] sm:rounded-[24px] border border-dashed border-[var(--color-border-emphasized)] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/75 transition-colors cursor-pointer flex flex-col items-center justify-center text-center px-3.5 sm:px-5 py-7 sm:py-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)]"
           >
             <span className="h-11 w-11 rounded-[12px] bg-[var(--color-background-card)] text-[var(--color-text-secondary)] inline-flex items-center justify-center mb-3">
-              <Bookmark className="w-5 h-5" />
+              <Heart className="w-5 h-5" />
             </span>
             <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              {isTh ? "ยังไม่มีคูปองในทริปนี้" : "No stays saved yet"}
+              {isTh ? "ยังไม่มีสถานที่ในรายการนี้" : "No places saved yet"}
             </p>
             <p className="text-[12.5px] text-[var(--color-text-secondary)] mt-1">
               {isTh
-                ? "กดปักหมุดที่พักที่ชอบเพื่อจัดเส้นทาง"
-                : "Bookmark stays to build your route"}
+                ? "กดหัวใจบนการ์ดสถานที่ที่ถูกใจเพื่อเก็บไว้ที่นี่"
+                : "Tap the heart on places you love to save them here"}
             </p>
 
             {/* Top-Left Delete Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteTrip(board);
-              }}
-              aria-label={isTh ? `ลบทริป ${board.name}` : `Delete ${board.name}`}
-              title={isTh ? "ลบทริปนี้" : "Delete trip"}
-              className="absolute top-2.5 left-2.5 z-20 h-8 w-8 rounded-[10px] bg-white/94 dark:bg-[#222222]/94 hover:bg-white dark:hover:bg-[#2c2c2c] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover/trip:opacity-100 transition-opacity cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {onDeleteTrip && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteTrip(board);
+                }}
+                aria-label={isTh ? `ลบทริป ${board.name}` : `Delete ${board.name}`}
+                title={isTh ? "ลบทริปนี้" : "Delete trip"}
+                className="absolute top-2.5 left-2.5 z-20 h-8 w-8 rounded-[10px] bg-white/94 dark:bg-[#222222]/94 hover:bg-white dark:hover:bg-[#2c2c2c] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] inline-flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover/trip:opacity-100 transition-opacity cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         ) : (
           /* Looping Stacked Nondii Coupon Cards */
@@ -427,10 +431,9 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
                       : "absolute inset-0 pointer-events-none"
                   } will-change-transform`}
                 >
-                  {/* Clean Borderless 3:4 Photo Card (ZERO border rim, ZERO Like badge!
-                      Back cards sit on opaque body canvas with faded imagery -> zero bleed-through!) */}
+                  {/* Clean Borderless Modern Super-Rounded Square Photo Card (1:1, ZERO side notches) */}
                   <div
-                    className={`cgr-fanned-coupon-mask relative aspect-[3/4] w-full rounded-[18px] sm:rounded-[20px] overflow-hidden text-left ${
+                    className={`relative aspect-square w-full rounded-[22px] sm:rounded-[24px] overflow-hidden text-left ${
                       isFront
                         ? "bg-[var(--color-background-muted)]"
                         : "bg-[var(--color-background-body)]"
@@ -454,7 +457,7 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
                       className="absolute inset-0 h-full w-full object-cover object-center"
                     />
 
-                    {/* Top-Left Flush Corner Category Crest (Front Card Only) */}
+                    {/* Top-Left Floating White Medallion (Front Card Only) */}
                     {isFront && (
                       <div className="absolute top-0 left-0 z-10 pointer-events-none">
                         <PlaceCategoryCrest
@@ -465,27 +468,29 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
                       </div>
                     )}
 
-                    {/* Top-Right Flush Corner Count (+ Hover Delete) */}
+                    {/* Top-Right Inset Count Pill (+ Hover Delete) */}
                     {isFront && (
-                      <div className="absolute top-0 right-0 z-10 flex items-center">
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteTrip(board);
-                          }}
-                          aria-label={
-                            isTh
-                              ? `ลบทริป ${board.name}`
-                              : `Delete ${board.name}`
-                          }
-                          title={isTh ? "ลบทริปนี้" : "Delete trip"}
-                          className="mr-1 mt-1 h-6 w-6 rounded-[8px] bg-white/92 dark:bg-[#222222]/92 hover:bg-white dark:hover:bg-[#2c2c2c] text-[#222222] dark:text-[#f5f5f5] inline-flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover/trip:opacity-100 transition-opacity cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" strokeWidth={2.2} />
-                        </button>
-                        <span className="h-8 sm:h-9 px-2.5 rounded-bl-[14px] bg-black/46 backdrop-blur-sm text-white text-[11px] font-semibold inline-flex items-center tabular-nums leading-none">
+                      <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1.5">
+                        {onDeleteTrip && (
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteTrip(board);
+                            }}
+                            aria-label={
+                              isTh
+                                ? `ลบทริป ${board.name}`
+                                : `Delete ${board.name}`
+                            }
+                            title={isTh ? "ลบทริปนี้" : "Delete trip"}
+                            className="h-7 w-7 rounded-[9px] bg-white/95 dark:bg-[#1f1f1f]/95 hover:bg-white dark:hover:bg-[#2c2c2c] text-[#222222] dark:text-[#f5f5f5] ring-1 ring-black/[0.06] dark:ring-white/[0.1] inline-flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover/trip:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" strokeWidth={2.2} />
+                          </button>
+                        )}
+                        <span className="h-7 sm:h-8 px-2.5 rounded-[10px] bg-black/46 backdrop-blur-sm text-white text-[11px] font-semibold inline-flex items-center tabular-nums leading-none">
                           {stopNumber}/{totalCount}
                         </span>
                       </div>
@@ -540,6 +545,14 @@ export const TripStackedCardFolder = React.memo(function TripStackedCardFolder({
                 <span>
                   {isTh ? `รวม ${totalRouteSummary}` : `${totalRouteSummary}`}
                 </span>
+              </span>
+            </>
+          )}
+          {ownerDisplayName && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="truncate">
+                {isTh ? `โดย ${ownerDisplayName}` : `by ${ownerDisplayName}`}
               </span>
             </>
           )}

@@ -214,7 +214,7 @@ export function HotelChooseRoomSection({
             <button
               type="button"
               onClick={onOpenDatePicker}
-              className="h-10 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold cursor-pointer transition-colors"
+              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold cursor-pointer transition-colors"
             >
               {isTh ? "เปลี่ยนวันเข้าพัก" : "Change dates"}
             </button>
@@ -222,7 +222,7 @@ export function HotelChooseRoomSection({
               <button
                 type="button"
                 onClick={() => setRoomSearchQuery("")}
-                className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="h-10 px-5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
               >
                 {isTh ? "ล้างคำค้นหา" : "Clear search"}
               </button>
@@ -253,14 +253,14 @@ export function HotelChooseRoomSection({
                       onSelectRoom(room);
                     }
                   }}
-                  className={`group flex items-center gap-4 rounded-[14px] p-2 -mx-2 cursor-pointer transition-colors focus:outline-none ${
+                  className={`group flex items-center gap-4 rounded-[20px] p-2.5 -mx-2.5 cursor-pointer transition-colors focus:outline-none ${
                     isSelected && hasConfirmedDates
                       ? "bg-[var(--color-background-muted)]"
                       : "bg-transparent hover:bg-[var(--color-background-muted)]/70"
                   }`}
                 >
-                  {/* Left Room Photo Thumbnail */}
-                  <div className="relative w-[118px] sm:w-[176px] aspect-[4/3] sm:aspect-[16/10] rounded-[12px] overflow-hidden bg-[var(--color-background-subtle)] shrink-0 group-hover:brightness-95 transition">
+                  {/* Left Room Photo Thumbnail (Square + Super-Rounded) */}
+                  <div className="relative w-[108px] sm:w-[136px] aspect-square rounded-[18px] sm:rounded-[20px] overflow-hidden bg-[var(--color-background-subtle)] shrink-0 group-hover:brightness-95 transition">
                     <img
                       src={getOptimizedPinImageUrl(roomCover, "gallery")}
                       srcSet={getOptimizedPinImageSrcSet(roomCover, "gallery")}

@@ -52,7 +52,7 @@ const DAY_PILLS = [
 const TIER_BAR_CLASS: Record<DailyPriceTier, string> = {
   promo: "bg-[#16a34a]",
   normal: "bg-[#e5e5e5] dark:bg-[#333333]",
-  high: "bg-[#222222] dark:bg-[#e5e5e5]",
+  high: "bg-[var(--color-accent)]",
   peak: "bg-[#dc2626]",
 };
 
@@ -481,7 +481,7 @@ export function StudioSeasonalPricingSection({
           <button
             type="button"
             onClick={() => openCreateNewRuleModal()}
-            className="h-10 sm:h-11 px-4 sm:px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+            className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>สร้างช่วงราคาใหม่</span>
@@ -531,9 +531,9 @@ export function StudioSeasonalPricingSection({
 
                 {/* Left: Crisp Minimal Icon Badge */}
                   <div
-                    className={`h-8 w-8 rounded-[10px] flex items-center justify-center shrink-0 transition-colors ${
+                    className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
                       rule.isActive
-                        ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                         : "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
                     }`}
                   >
@@ -644,16 +644,16 @@ export function StudioSeasonalPricingSection({
                       }
                       disabled={isToggling}
                       onClick={() => void handleToggleRule(rule)}
-                      className={`h-7 w-12 rounded-[10px] p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
+                      className={`h-7 w-12 rounded-full p-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50 ${
                         rule.isActive
-                          ? "bg-[#222222] dark:bg-[#f5f5f5]"
+                          ? "bg-[var(--color-accent)]"
                           : "bg-[var(--color-border-emphasized)]"
                       }`}
                     >
                       <span
                         className={`block h-5 w-5 rounded-full transition-transform ${
                           rule.isActive
-                            ? "translate-x-5 bg-white dark:bg-[#222222]"
+                            ? "translate-x-5 bg-white"
                             : "translate-x-0 bg-white"
                         }`}
                       />
@@ -681,7 +681,7 @@ export function StudioSeasonalPricingSection({
             <button
               type="button"
               onClick={() => setIsReportOpen(false)}
-              className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
             >
               ปิดรายงาน
             </button>
@@ -791,7 +791,7 @@ export function StudioSeasonalPricingSection({
               ราคาปกติ (0%)
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-[3px] bg-[#222222] dark:bg-[#e5e5e5]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-accent)]" />
               ปรับขึ้น (+1% ถึง +29%)
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -929,7 +929,7 @@ export function StudioSeasonalPricingSection({
                               `ราคาพิเศษ ${m.monthFullTh}`
                             );
                           }}
-                          className="h-8 px-3 rounded-[9px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                          className="h-8 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>ตั้งราคาเดือนนี้</span>
@@ -1017,7 +1017,7 @@ export function StudioSeasonalPricingSection({
               <button
                 type="button"
                 onClick={() => setIsEditorOpen(false)}
-                className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
               >
                 ยกเลิก
               </button>
@@ -1025,7 +1025,7 @@ export function StudioSeasonalPricingSection({
                 type="button"
                 disabled={isSaving}
                 onClick={() => void handleSaveRule()}
-                className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
               >
                 {isSaving ? "กำลังบันทึก..." : "บันทึกช่วงราคา"}
               </button>
@@ -1132,9 +1132,9 @@ export function StudioSeasonalPricingSection({
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleDayOfWeek(dp.dow)}
-                      className={`h-11 first:rounded-l-[11px] last:rounded-r-[11px] text-[13.5px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-text-primary)] ${
+                      className={`h-11 first:rounded-l-[11px] last:rounded-r-[11px] text-[13.5px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)] ${
                         selected
-                          ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222]"
+                          ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                           : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
                       }`}
                     >

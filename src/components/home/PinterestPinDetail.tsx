@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   ArrowUpRight,
   BadgeCheck,
-  Bookmark,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -358,7 +357,7 @@ function PinMoreOptionsControl({
       {feedbackToast &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[96] rounded-[12px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] px-4 py-2 text-[13px] font-semibold shadow-[var(--shadow-popover)] pointer-events-none">
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[96] rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] px-5 py-2 text-[13px] font-semibold shadow-[var(--shadow-popover)] pointer-events-none">
             {feedbackToast}
           </div>,
           document.body
@@ -493,7 +492,7 @@ function PinMoreOptionsControl({
                       ? "บันทึกเข้าทริป"
                       : "Save to trip"}
                   </span>
-                  <Bookmark
+                  <Heart
                     className={`w-4 h-4 shrink-0 ${isSaved ? "fill-[var(--color-promo)] text-[var(--color-promo)]" : ""}`}
                   />
                 </button>
@@ -942,7 +941,7 @@ export function PinterestPinCard({
         onMouseEnter={() => preloadPinHeroImages(pin)}
         onTouchStart={() => preloadPinHeroImages(pin)}
         style={hasCarousel ? { touchAction: "pan-y" } : undefined}
-        className={`group relative w-full ${pin.aspectRatio} rounded-[14px] sm:rounded-[16px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer`}
+        className="group relative w-full aspect-square rounded-[22px] sm:rounded-[24px] overflow-hidden bg-[var(--color-background-muted)] cursor-pointer"
       >
         {isInlineMp4Video && optimizedCardVideoUrl ? (
           <>
@@ -1017,7 +1016,7 @@ export function PinterestPinCard({
                   goToCardSlide(cardSlideIndex - 1);
                 }}
                 aria-label={isTh ? "ภาพก่อนหน้า" : "Previous photo"}
-                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-[9px] bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
+                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" strokeWidth={2.2} />
               </button>
@@ -1031,7 +1030,7 @@ export function PinterestPinCard({
                   goToCardSlide(cardSlideIndex + 1);
                 }}
                 aria-label={isTh ? "ภาพถัดไป" : "Next photo"}
-                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-[9px] bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
+                className="hidden lg:inline-flex opacity-0 group-hover:opacity-100 absolute right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-white/90 hover:bg-white dark:bg-[#222222]/90 dark:hover:bg-[#222222] text-[#222222] dark:text-[#f5f5f5] shadow-[var(--shadow-popover)] items-center justify-center transition-opacity cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" strokeWidth={2.2} />
               </button>
@@ -1122,13 +1121,13 @@ export function PinterestPinCard({
               ? "บันทึก"
               : "Save"
           }
-          className={`h-8 w-8 -mr-1 -mt-0.5 rounded-[9px] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-[var(--color-background-muted)] ${
+          className={`h-8 w-8 -mr-1 -mt-0.5 rounded-full inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors hover:bg-[var(--color-background-muted)] ${
             isSaved
               ? "text-[var(--color-promo)]"
               : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
           }`}
         >
-          <Bookmark
+          <Heart
             className={`w-[18px] h-[18px] ${isSaved ? "fill-current" : ""}`}
             strokeWidth={1.9}
           />
@@ -1153,7 +1152,7 @@ function MobileAdjacentPinPreview({
   const captionText = (description || title || "").trim();
   const hotelName = isTh ? pin.hotelNameTh : pin.hotelNameEn;
   const provinceLabel = isTh ? pin.provinceNameTh : pin.provinceNameEn;
-  const heroAspectCss = resolveAspectRatioCss(pin.aspectRatio);
+  const heroAspectCss = "1 / 1";
   const coverSource =
     pin.mediaUrls.length > 0 ? pin.mediaUrls[0] : pin.coverImageUrl;
 
@@ -1190,23 +1189,23 @@ function MobileAdjacentPinPreview({
           } right-3 z-20 flex items-center gap-2`}
         >
           {pin.activeCoupons.length > 0 && (
-            <span className="h-10 w-10 rounded-[12px] bg-[var(--color-promo)] !text-white inline-flex items-center justify-center">
+            <span className="h-10 w-10 rounded-full bg-[var(--color-promo)] !text-white inline-flex items-center justify-center">
               <TicketPercent className="w-[19px] h-[19px]" strokeWidth={2} />
             </span>
           )}
           <span
-            className={`h-10 w-10 rounded-[12px] inline-flex items-center justify-center ${
+            className={`h-10 w-10 rounded-full inline-flex items-center justify-center ${
               isSaved
                 ? "bg-[var(--color-promo)] !text-white"
                 : "bg-black/50 text-white backdrop-blur-md"
             }`}
           >
-            <Bookmark
+            <Heart
               className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
               strokeWidth={2.1}
             />
           </span>
-          <span className="h-10 w-10 rounded-[12px] bg-black/50 text-white backdrop-blur-md inline-flex items-center justify-center">
+          <span className="h-10 w-10 rounded-full bg-black/50 text-white backdrop-blur-md inline-flex items-center justify-center">
             <MoreHorizontal className="w-5 h-5" />
           </span>
         </div>
@@ -1215,19 +1214,19 @@ function MobileAdjacentPinPreview({
       <div className="px-3.5 sm:px-5 pt-3 pb-4 space-y-2.5 bg-[var(--color-background-body)]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-0.5 -ml-1.5">
-            <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+            <span className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--color-text-primary)]">
               <Heart className="w-[22px] h-[22px]" strokeWidth={2} />
             </span>
-            <span className="h-10 px-2 rounded-[12px] inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+            <span className="h-10 px-2 rounded-full inline-flex items-center gap-1 text-[14px] font-semibold text-[var(--color-text-primary)] tabular-nums">
               <MessageCircle className="w-[21px] h-[21px]" strokeWidth={2} />
               {pin.commentsCount > 0 && <span>{pin.commentsCount}</span>}
             </span>
-            <span className="h-10 w-10 rounded-[12px] inline-flex items-center justify-center text-[var(--color-text-primary)]">
+            <span className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--color-text-primary)]">
               <Share className="w-[20px] h-[20px]" strokeWidth={2} />
             </span>
           </div>
 
-          <span className="h-9 px-4 rounded-[10px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap shrink-0">
+          <span className="h-9 px-4 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1 whitespace-nowrap shrink-0">
             <span>{isTh ? "เข้าชมที่พัก" : "Visit stay"}</span>
             <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
           </span>
@@ -2296,7 +2295,7 @@ export function PinterestPinDetail({
     pin.aspectRatio.includes("16/9") || pin.aspectRatio.includes("4/3")
       ? "16/9"
       : "9/16";
-  const heroAspectCss = resolveAspectRatioCss(pin.aspectRatio);
+  const heroAspectCss = "1 / 1";
 
   const handleStepBack = () => {
     if (onBack) {
@@ -2727,13 +2726,13 @@ export function PinterestPinDetail({
                       ? "บันทึกคูปองเข้าทริป"
                       : "Save to trip"
                   }
-                  className={`h-10 w-10 rounded-[12px] backdrop-blur-md border inline-flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`h-10 w-10 rounded-full backdrop-blur-md border inline-flex items-center justify-center transition-colors cursor-pointer ${
                     isSaved
                       ? "bg-[#e60023] border-white/80 !text-white shadow-[0_4px_14px_rgba(230,0,35,0.35)]"
                       : "bg-black/45 hover:bg-black/62 text-white border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)]"
                   }`}
                 >
-                  <Bookmark
+                  <Heart
                     className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
                     strokeWidth={2}
                   />
@@ -2747,7 +2746,7 @@ export function PinterestPinDetail({
                   onSharePin={handleShareWithFeedback}
                   onHidePin={onHidePin}
                   iconClassName="w-[19px] h-[19px]"
-                  triggerClassName="h-10 w-10 rounded-[12px] bg-black/45 hover:bg-black/62 text-white backdrop-blur-md border border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)] inline-flex items-center justify-center transition-colors cursor-pointer"
+                  triggerClassName="h-10 w-10 rounded-full bg-black/45 hover:bg-black/62 text-white backdrop-blur-md border border-white/35 shadow-[0_2px_10px_rgba(0,0,0,0.22)] inline-flex items-center justify-center transition-colors cursor-pointer"
                 />
               </div>
             </div>
@@ -2903,7 +2902,7 @@ export function PinterestPinDetail({
                       data-thumb-idx={idx}
                       onClick={() => navigateCarouselSlide(idx)}
                       aria-label={isTh ? "การ์ดคูปอง" : "Coupon card"}
-                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[12px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] flex flex-col items-center justify-center gap-0.5 ${activeRingClass}`}
+                      className={`relative h-[54px] w-[54px] sm:h-[58px] sm:w-[58px] rounded-[14px] overflow-hidden shrink-0 cursor-pointer transition-all bg-[var(--color-accent)] !text-[var(--color-on-accent)] flex flex-col items-center justify-center gap-0.5 ${activeRingClass}`}
                     >
                       <TicketPercent className="w-4 h-4 shrink-0" strokeWidth={2} />
                       <span className="text-[10px] font-semibold leading-none">
@@ -3061,7 +3060,7 @@ export function PinterestPinDetail({
                 <button
                   type="button"
                   onClick={onPrimaryProfileAction}
-                  className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 cursor-pointer"
+                  className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 cursor-pointer"
                 >
                   <span>{primaryProfileActionLabel || primaryCtaLabel}</span>
                 </button>
@@ -3071,7 +3070,7 @@ export function PinterestPinDetail({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleExternalDealClick}
-                  className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0"
+                  className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0"
                 >
                   <span>{primaryCtaLabel}</span>
                   <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
@@ -3082,7 +3081,7 @@ export function PinterestPinDetail({
                   prefetch={true}
                   onClick={handleVisitHotelClick}
                   aria-busy={isNavigatingToHotel}
-                  className={`h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 ${
+                  className={`h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors shrink-0 ${
                     isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
                   }`}
                 >
@@ -3457,13 +3456,13 @@ export function PinterestPinDetail({
                       ? "บันทึกโปรเข้าทริป"
                       : "Save deal"
                   }
-                  className={`h-9 px-3 rounded-[10px] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  className={`h-9 px-3.5 rounded-full text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                     isSaved
                       ? "bg-[var(--color-promo)] !text-white"
                       : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <Bookmark
+                  <Heart
                     className={`w-[16px] h-[16px] ${
                       isSaved ? "fill-current" : ""
                     }`}
@@ -3572,7 +3571,7 @@ export function PinterestPinDetail({
                     type="submit"
                     disabled={isSubmittingComment}
                     aria-label="Send comment"
-                    className="h-7 px-2.5 rounded-[8px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] hover:opacity-90 text-[12px] font-semibold inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
+                    className="h-7 px-3 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
                   >
                     {isTh ? "โพสต์" : "Post"}
                   </button>
@@ -3627,7 +3626,7 @@ export function PinterestPinDetail({
               <button
                 type="button"
                 onClick={handleStepBack}
-                className="h-11 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 min-w-0 max-w-[46%] cursor-pointer transition-colors"
+                className="h-11 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 min-w-0 max-w-[46%] cursor-pointer transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 shrink-0" strokeWidth={2.2} />
                 <span className="truncate">
@@ -3649,7 +3648,7 @@ export function PinterestPinDetail({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={handleExternalDealClick}
-                    className="h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
+                    className="h-11 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
                   >
                     <span className="max-w-[140px] truncate">{primaryCtaLabel}</span>
                     <ArrowUpRight className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
@@ -3660,7 +3659,7 @@ export function PinterestPinDetail({
                     prefetch={true}
                     onClick={handleVisitHotelClick}
                     aria-busy={isNavigatingToHotel}
-                    className={`h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors ${
+                    className={`h-11 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors ${
                       isNavigatingToHotel ? "opacity-80 pointer-events-none" : ""
                     }`}
                   >
@@ -3676,14 +3675,14 @@ export function PinterestPinDetail({
                 <button
                   type="button"
                   onClick={() => onToggleSave(pin.id)}
-                  aria-label={isSaved ? (isTh ? "บันทึกแล้ว" : "Saved") : isTh ? "บันทึกลงทริป" : "Save to trip"}
-                  className={`h-11 w-11 rounded-[12px] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                  aria-label={isSaved ? (isTh ? "บันทึกแล้ว" : "Saved") : isTh ? "บันทึก Wishlist" : "Save to Wishlist"}
+                  className={`h-11 w-11 rounded-full inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
                     isSaved
                       ? "bg-[var(--color-promo)] !text-white"
                       : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <Bookmark
+                  <Heart
                     className={`w-[19px] h-[19px] ${isSaved ? "fill-current" : ""}`}
                     strokeWidth={2.1}
                   />
@@ -3974,7 +3973,7 @@ export function PinterestPinDetail({
                       type="submit"
                       disabled={isSubmittingComment}
                       aria-label="Send comment"
-                      className="h-8 w-8 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] hover:opacity-90 inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
+                      className="h-8 w-8 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] inline-flex items-center justify-center transition cursor-pointer shrink-0 disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>

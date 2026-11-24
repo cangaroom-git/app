@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import {
-  Bookmark,
   Check,
   ChevronDown,
   ChevronUp,
@@ -171,7 +170,7 @@ export function StudioPinsAndFacebookTab({
   const [pinDesc, setPinDesc] = useState("");
   const [pinCategory, setPinCategory] = useState<PinCategoryDto>("VIEWS");
   const [pinRoomId, setPinRoomId] = useState("");
-  const [pinAspectRatio, setPinAspectRatio] = useState("aspect-[3/4]");
+  const [pinAspectRatio, setPinAspectRatio] = useState("aspect-square");
   const [pinCoverUrl, setPinCoverUrl] = useState("");
   const [extraMediaUrls, setExtraMediaUrls] = useState<string[]>([]);
   const [pinVideoUrl, setPinVideoUrl] = useState("");
@@ -380,7 +379,7 @@ export function StudioPinsAndFacebookTab({
           <button
             type="button"
             onClick={() => setIsUploadModalOpen(true)}
-            className="h-11 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+            className="h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
           >
             <ImagePlus className="w-4 h-4" />
             <span>อัปโหลด Pin ใหม่</span>
@@ -454,7 +453,7 @@ export function StudioPinsAndFacebookTab({
             <button
               type="submit"
               disabled={isSyncingFb}
-              className="h-10 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-4 h-4 ${isSyncingFb ? "animate-spin" : ""}`}
@@ -489,7 +488,7 @@ export function StudioPinsAndFacebookTab({
                   <img
                     src={pin.coverImageUrl}
                     alt={pin.titleTh}
-                    className="w-full sm:w-28 aspect-[3/4] rounded-[12px] object-cover shrink-0 bg-[var(--color-background-muted)]"
+                    className="w-full sm:w-28 aspect-square rounded-[18px] object-cover shrink-0 bg-[var(--color-background-muted)]"
                   />
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="space-y-1">
@@ -534,7 +533,7 @@ export function StudioPinsAndFacebookTab({
                         type="button"
                         disabled={busyPinId === pin.id}
                         onClick={() => handleTriageAction(pin.id, "PUBLISHED")}
-                        className="h-9 px-4 rounded-[10px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                        className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                       >
                         <Check className="w-4 h-4" />
                         <span>อนุมัติขึ้นเว็บ</span>
@@ -592,7 +591,7 @@ export function StudioPinsAndFacebookTab({
                   <img
                     src={pin.coverImageUrl}
                     alt={pin.titleTh}
-                    className="h-12 w-10 rounded-[8px] object-cover shrink-0"
+                    className="h-12 w-12 aspect-square rounded-[12px] object-cover shrink-0"
                   />
                   <p className="text-[13.5px] font-medium truncate">
                     {pin.titleTh || "Pin ที่ซ่อนอยู่"}
@@ -628,7 +627,7 @@ export function StudioPinsAndFacebookTab({
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {publishedPins.map((pin) => (
               <div key={pin.id} className="space-y-2">
-                <div className="relative aspect-[3/4] rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]">
+                <div className="relative aspect-square rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
                   <img
                     src={pin.coverImageUrl}
                     alt={pin.titleTh}
@@ -647,7 +646,7 @@ export function StudioPinsAndFacebookTab({
                         {pin.likesCount}
                       </span>
                       <span className="inline-flex items-center gap-1">
-                        <Bookmark className="w-3 h-3" />
+                        <Heart className="w-3 h-3 text-[#e60023]" />
                         {pin.savesCount}
                       </span>
                     </div>
@@ -692,7 +691,7 @@ export function StudioPinsAndFacebookTab({
             <button
               type="button"
               onClick={() => setIsUploadModalOpen(false)}
-              className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold cursor-pointer"
             >
               ยกเลิก
             </button>
@@ -700,7 +699,7 @@ export function StudioPinsAndFacebookTab({
               type="submit"
               form="studio-manual-pin-form"
               disabled={isCreatingPin || isUploadingCover}
-              className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
             >
               {isCreatingPin ? "กำลังเผยแพร่..." : "เผยแพร่ Pin ขึ้นฟีด"}
             </button>
@@ -744,7 +743,7 @@ export function StudioPinsAndFacebookTab({
                 <img
                   src={pinCoverUrl}
                   alt="Preview"
-                  className="w-24 aspect-[3/4] rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                  className="w-24 aspect-square rounded-[18px] object-cover bg-[var(--color-background-muted)] shrink-0"
                 />
                 {extraMediaUrls.length > 0 && (
                   <p className="text-[13px] text-[var(--color-text-secondary)]">

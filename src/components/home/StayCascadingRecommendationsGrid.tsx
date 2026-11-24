@@ -313,9 +313,9 @@ export function StayCascadingRecommendationsGrid({
                   setActiveTier(pill.id);
                   setVisibleCount(INITIAL_VISIBLE_DEALS);
                 }}
-                className={`h-9 px-3.5 rounded-[11px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors tabular-nums ${
+                className={`h-9 px-3.5 rounded-[12px] text-[12.5px] font-semibold whitespace-nowrap shrink-0 cursor-pointer transition-colors tabular-nums ${
                   isActive
-                    ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                    ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                     : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                 }`}
               >

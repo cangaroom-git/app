@@ -6,14 +6,15 @@ import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   ArrowUpRight,
-  Bookmark,
   BookOpen,
   Clock,
   ExternalLink,
   Globe,
+  Heart,
   MapPin,
   MessageCircle,
   Navigation,
+  Pencil,
   Phone,
   Sparkles,
   Star,
@@ -96,6 +97,7 @@ function formatShortDate(iso: string, lang: LanguageCode): string {
 export interface PlaceOnlyProfileBodyProps {
   storefront: HotelStorefrontDto;
   language: LanguageCode;
+  isOwner?: boolean;
   isSaved: boolean;
   savedPinIds: Set<string>;
   isNearbyHop: boolean;
@@ -118,6 +120,7 @@ export interface PlaceOnlyProfileBodyProps {
 export function PlaceOnlyProfileBody({
   storefront,
   language,
+  isOwner = false,
   isSaved,
   savedPinIds,
   isNearbyHop,
@@ -253,7 +256,7 @@ export function PlaceOnlyProfileBody({
                   href={primaryOutboundUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full h-11 px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                  className="w-full h-11 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <span>{primaryCtaLabel}</span>
                   <ArrowUpRight className="w-4 h-4 shrink-0" strokeWidth={2.2} />
@@ -267,7 +270,7 @@ export function PlaceOnlyProfileBody({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => onContactClick("MAP")}
-                    className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
                   >
                     <Navigation className="w-3.5 h-3.5 shrink-0" />
                     <span>{isTh ? "นำทาง" : "Directions"}</span>
@@ -277,7 +280,7 @@ export function PlaceOnlyProfileBody({
                   <button
                     type="button"
                     onClick={() => onContactClick("LINE")}
-                    className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <MessageCircle className="w-3.5 h-3.5" />
                     <span>LINE</span>
@@ -287,7 +290,7 @@ export function PlaceOnlyProfileBody({
                   <button
                     type="button"
                     onClick={() => onContactClick("PHONE")}
-                    className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
+                    className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
                   >
                     <Phone className="w-3.5 h-3.5" />
                     <span>{hotel.contactPhone}</span>
@@ -300,17 +303,28 @@ export function PlaceOnlyProfileBody({
           {/* 2. All Active Promotions & Onsite Perks */}
           {coupons.length > 0 && (
             <section id="section-coupons" className="py-8 space-y-4">
-              <div className="space-y-0.5">
-                <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)]">
-                  {isTh
-                    ? `โปรโมชั่นและสิทธิพิเศษ (${coupons.length})`
-                    : `Promotions & perks (${coupons.length})`}
-                </h2>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-                  {isTh
-                    ? "สิทธิพิเศษล่าสุดจากร้านนี้ สามารถแสดงหน้าการ์ดหรือกดรับสิทธิ์ผ่านลิงก์ด้านล่าง"
-                    : "Active perks shared by this venue"}
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)]">
+                    {isTh
+                      ? `โปรโมชั่นและสิทธิพิเศษ (${coupons.length})`
+                      : `Promotions & perks (${coupons.length})`}
+                  </h2>
+                  <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                    {isTh
+                      ? "สิทธิพิเศษล่าสุดจากร้านนี้ สามารถแสดงหน้าการ์ดหรือกดรับสิทธิ์ผ่านลิงก์ด้านล่าง"
+                      : "Active perks shared by this venue"}
+                  </p>
+                </div>
+                {isOwner && (
+                  <Link
+                    href={`/studio/listings/promotions?hotel=${encodeURIComponent(hotel.slug)}`}
+                    className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>{isTh ? "จัดการโปร" : "Edit promos"}</span>
+                  </Link>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -348,7 +362,7 @@ export function PlaceOnlyProfileBody({
                   return (
                     <div
                       key={coupon.id}
-                      className="rounded-[16px] bg-[var(--color-background-muted)] p-4 flex flex-col justify-between gap-3"
+                      className="rounded-[20px] bg-[var(--color-background-muted)] p-4 flex flex-col justify-between gap-3"
                     >
                       <div className="space-y-1.5 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -357,7 +371,7 @@ export function PlaceOnlyProfileBody({
                             <span>{promoKindLabel}</span>
                           </span>
                           {isFeatured && (
-                            <span className="px-2 py-0.5 rounded-[7px] bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222] text-[10.5px] font-semibold leading-tight">
+                            <span className="px-2.5 py-0.5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] text-[10.5px] font-semibold leading-tight">
                               {isTh ? "โปรหน้าการ์ด" : "Featured"}
                             </span>
                           )}
@@ -475,7 +489,7 @@ export function PlaceOnlyProfileBody({
 
         {/* 1 EMPTY BREATHING COL + 4-COL DESKTOP STICKY PLACE ACTION CARD */}
         <aside className="hidden lg:block lg:col-start-9 lg:col-span-4 lg:sticky lg:top-24">
-          <div className="rounded-[16px] bg-[var(--color-background-card)] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] p-6 space-y-5">
+          <div className="rounded-[22px] sm:rounded-[24px] bg-[var(--color-background-card)] border border-black/[0.04] dark:border-white/[0.08] shadow-[var(--shadow-booking-widget)] p-6 space-y-5">
             <div className="space-y-1">
               <p className="text-[12.5px] font-semibold text-[var(--color-text-secondary)]">
                 {isTh ? catMeta.labelTh : catMeta.labelEn} ·{" "}
@@ -497,7 +511,7 @@ export function PlaceOnlyProfileBody({
                 href={primaryOutboundUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full h-12 px-5 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"
+                className="w-full h-12 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"
               >
                 <span>{primaryCtaLabel}</span>
                 <ArrowUpRight className="w-4 h-4 shrink-0" strokeWidth={2.2} />
@@ -511,7 +525,7 @@ export function PlaceOnlyProfileBody({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => onContactClick("MAP")}
-                  className="h-10 px-3 rounded-[11px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                  className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Navigation className="w-3.5 h-3.5 shrink-0" />
                   <span>{isTh ? "นำทาง" : "Directions"}</span>
@@ -521,23 +535,23 @@ export function PlaceOnlyProfileBody({
               <button
                 type="button"
                 onClick={onToggleSaveCanonical}
-                className={`h-10 px-3 rounded-[11px] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                className={`h-10 px-4 rounded-full text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                   isSaved
                     ? "bg-[var(--color-promo)] !text-white"
                     : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                 }`}
               >
-                <Bookmark
+                <Heart
                   className={`w-3.5 h-3.5 shrink-0 ${isSaved ? "fill-current" : ""}`}
                 />
                 <span>
                   {isSaved
                     ? isTh
-                      ? "บันทึกแล้ว"
+                      ? "ใน Wishlist"
                       : "Saved"
                     : isTh
-                    ? "บันทึกลงทริป"
-                    : "Save to trip"}
+                    ? "บันทึก Wishlist"
+                    : "Wishlist"}
                 </span>
               </button>
             </div>
@@ -555,7 +569,7 @@ export function PlaceOnlyProfileBody({
                     <button
                       type="button"
                       onClick={() => onContactClick("LINE")}
-                      className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <MessageCircle className="w-3.5 h-3.5" />
                       <span>LINE</span>
@@ -565,7 +579,7 @@ export function PlaceOnlyProfileBody({
                     <button
                       type="button"
                       onClick={() => onContactClick("PHONE")}
-                      className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors tabular-nums"
                     >
                       <Phone className="w-3.5 h-3.5" />
                       <span>{hotel.contactPhone}</span>
@@ -577,7 +591,7 @@ export function PlaceOnlyProfileBody({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => onContactClick("FACEBOOK")}
-                      className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors"
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Facebook</span>
@@ -589,7 +603,7 @@ export function PlaceOnlyProfileBody({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => onContactClick("INSTAGRAM")}
-                      className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors"
+                      className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors"
                     >
                       <Globe className="w-3.5 h-3.5" />
                       <span>Instagram</span>
@@ -622,7 +636,7 @@ export function PlaceOnlyProfileBody({
               </div>
               <Link
                 href={`/${encodeURIComponent(hotel.slug)}/posts`}
-                className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1 shrink-0 transition-colors"
+                className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1 shrink-0 transition-colors"
               >
                 <span>{isTh ? "ดูทั้งหมด" : "All updates"}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -637,7 +651,7 @@ export function PlaceOnlyProfileBody({
                 >
                   <Link
                     href={`/${encodeURIComponent(post.hotelSlug)}/posts/${encodeURIComponent(post.slug)}`}
-                    className="relative block aspect-[16/10] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]"
+                    className="relative block aspect-square w-full rounded-[22px] overflow-hidden bg-[var(--color-background-muted)]"
                   >
                     {post.coverImageUrl ? (
                       <img
@@ -695,7 +709,7 @@ export function PlaceOnlyProfileBody({
               </div>
               <Link
                 href={`/${encodeURIComponent(hotel.slug)}/posts`}
-                className="h-9 px-3.5 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1 shrink-0 transition-colors"
+                className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1 shrink-0 transition-colors"
               >
                 <span>{isTh ? "บทความทั้งหมด" : "All guides"}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -710,7 +724,7 @@ export function PlaceOnlyProfileBody({
                 >
                   <Link
                     href={`/${encodeURIComponent(blog.hotelSlug)}/posts/${encodeURIComponent(blog.slug)}`}
-                    className="relative block aspect-[16/10] w-full rounded-[14px] overflow-hidden bg-[var(--color-background-muted)]"
+                    className="relative block aspect-square w-full rounded-[22px] overflow-hidden bg-[var(--color-background-muted)]"
                   >
                     {blog.coverImageUrl ? (
                       <img
@@ -793,14 +807,25 @@ export function PlaceOnlyProfileBody({
         {typeof hotel.latitude === "number" &&
           typeof hotel.longitude === "number" && (
             <section id="section-location" className="py-8 lg:py-10 space-y-4">
-              <div className="space-y-0.5">
-                <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)]">
-                  {isTh ? "ตำแหน่งที่ตั้ง & แผนที่" : "Location & map"}
-                </h2>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-                  {hotel.addressTh ||
-                    `${hotel.districtTh} ${isTh ? hotel.provinceNameTh : hotel.provinceNameEn}`}
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)]">
+                    {isTh ? "ตำแหน่งที่ตั้ง & แผนที่" : "Location & map"}
+                  </h2>
+                  <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                    {hotel.addressTh ||
+                      `${hotel.districtTh} ${isTh ? hotel.provinceNameTh : hotel.provinceNameEn}`}
+                  </p>
+                </div>
+                {isOwner && (
+                  <Link
+                    href={`/studio/listings/location?hotel=${encodeURIComponent(hotel.slug)}`}
+                    className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>{isTh ? "แก้พิกัด" : "Edit map"}</span>
+                  </Link>
+                )}
               </div>
               <HotelLocationMap
                 hotelName={placeName}

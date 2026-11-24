@@ -1170,7 +1170,7 @@ export function HomeFeedClient({
                   {Array.from({ length: 4 }).map((_, idx) => (
                     <div
                       key={idx}
-                      className="w-[266px] h-[296px] shrink-0 rounded-[16px] bg-[var(--color-background-muted)] animate-pulse"
+                      className="w-[266px] aspect-square shrink-0 rounded-[22px] bg-[var(--color-background-muted)] animate-pulse"
                     />
                   ))}
                 </div>

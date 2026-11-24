@@ -2,9 +2,10 @@
 
 import React from "react";
 import {
-  Bookmark,
   Building2,
   CalendarCheck,
+  Compass,
+  Heart,
   LayoutDashboard,
   Map,
   PlusSquare,
@@ -16,6 +17,7 @@ export type PlatformNavTabId =
   | "home"
   | "explore"
   | "board"
+  | "wishlist"
   | "deal"
   | "search"
   | "studio"
@@ -41,14 +43,21 @@ export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
     return "home";
   }
   if (pathname.startsWith("/explore")) return "explore";
-  if (pathname === "/trip" || pathname.startsWith("/trip/") || pathname.startsWith("/board")) {
+  if (pathname === "/trip" || pathname.startsWith("/trip/")) {
     return "board";
+  }
+  if (
+    pathname === "/wishlist" ||
+    pathname.startsWith("/wishlist/") ||
+    pathname.startsWith("/board")
+  ) {
+    return "wishlist";
   }
   if (pathname.startsWith("/deal")) return "deal";
   if (pathname.startsWith("/studio") || pathname.startsWith("/admin")) {
     return "studio";
   }
-  if (pathname.startsWith("/register-hotel")) return "register-hotel";
+  if (pathname.startsWith("/register")) return "register-hotel";
   if (
     pathname.startsWith("/bookings") ||
     pathname.startsWith("/trips") ||
@@ -93,7 +102,15 @@ export function PlatformNavIcon({
 
     case "board":
       return (
-        <Bookmark
+        <Compass
+          className={className}
+          strokeWidth={isActive ? 2.25 : 1.75}
+        />
+      );
+
+    case "wishlist":
+      return (
+        <Heart
           className={className}
           strokeWidth={isActive ? 2.25 : 1.75}
           fill={isActive ? "currentColor" : "none"}

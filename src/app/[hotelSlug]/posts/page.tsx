@@ -65,7 +65,7 @@ export default async function HotelBlogIndexPage({
       </nav>
 
       {/* Resort Blog Header */}
-      <header className="rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <header className="rounded-[22px] sm:rounded-[24px] bg-[var(--color-background-card)] border border-[var(--color-border)] p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center gap-4 min-w-0">
           {hotel.logoUrl && (
             <img
@@ -115,13 +115,13 @@ export default async function HotelBlogIndexPage({
           {posts.map((post, idx) => (
             <article
               key={post.id}
-              className="h-full rounded-[20px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col justify-between"
+              className="h-full rounded-[22px] bg-[var(--color-background-card)] border border-[var(--color-border)] overflow-hidden flex flex-col justify-between"
             >
               <div>
                 <Link
                   href={`/${hotel.slug}/posts/${post.slug}`}
                   prefetch={false}
-                  className="block relative h-48 bg-[var(--color-background-muted)] overflow-hidden"
+                  className="block relative aspect-square bg-[var(--color-background-muted)] overflow-hidden"
                 >
                   <img
                     src={post.coverImageUrl}
@@ -130,7 +130,7 @@ export default async function HotelBlogIndexPage({
                     decoding="async"
                     className="h-full w-full object-cover"
                   />
-                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold">
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-[10px] bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold">
                     {post.categoryTh}
                   </span>
                 </Link>

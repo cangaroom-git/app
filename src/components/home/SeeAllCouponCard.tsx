@@ -132,10 +132,10 @@ export function SeeAllCouponCard({
       <div className={`${wrapperPositionClass} cgr-fan-ticket ${fanModifier}`}>
         <div className={`${floatModifier} cgr-trip-stack-shadow`}>
           <div
-            className={`cgr-mini-fanned-coupon-mask relative rounded-[14px] sm:rounded-[16px] overflow-hidden ${
+            className={`relative rounded-[18px] sm:rounded-[20px] overflow-hidden ${
               isCenter
-                ? "bg-[var(--color-background-muted)] w-[102px] h-[136px] sm:w-[126px] sm:h-[168px]"
-                : "bg-[var(--color-background-body)] w-[90px] h-[120px] sm:w-[114px] sm:h-[152px]"
+                ? "bg-[var(--color-background-muted)] w-[108px] h-[108px] sm:w-[132px] sm:h-[132px]"
+                : "bg-[var(--color-background-body)] w-[94px] h-[94px] sm:w-[116px] sm:h-[116px]"
             }`}
           >
             {ticket?.imageUrl ? (
@@ -155,7 +155,7 @@ export function SeeAllCouponCard({
               <div className="absolute inset-0 h-full w-full bg-[var(--color-background-subtle)]" />
             )}
 
-            {/* Flush Corner Category Crest (Top-Left) + Count Badge (Top-Right) on Center Mini Card */}
+            {/* Floating White Medallion (Top-Left) + Count Badge (Top-Right) on Center Mini Card */}
             {isCenter && (
               <>
                 <div className="absolute top-0 left-0 z-10 pointer-events-none">
@@ -166,7 +166,7 @@ export function SeeAllCouponCard({
                     corner="top-left"
                   />
                 </div>
-                <span className="absolute top-0 right-0 z-10 h-6 px-2 rounded-bl-[10px] bg-black/48 backdrop-blur-sm text-[10px] font-bold text-white inline-flex items-center justify-center leading-none tabular-nums">
+                <span className="absolute top-2 right-2 z-10 h-6 px-2 rounded-[9px] bg-black/48 backdrop-blur-sm text-[10px] font-bold text-white inline-flex items-center justify-center leading-none tabular-nums">
                   +{totalCount}
                 </span>
               </>
@@ -183,12 +183,12 @@ export function SeeAllCouponCard({
       href={href}
       data-fanned={isFanned ? "true" : "false"}
       aria-label={isTh ? `ดูทั้งหมดใน ${title}` : `See all in ${title}`}
-      className="cgr-seeall-link group relative flex flex-col items-center w-full cursor-pointer select-none text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[20px]"
+      className="cgr-seeall-link group relative flex flex-col items-center w-full cursor-pointer select-none text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-text-primary)] rounded-[22px]"
     >
-      {/* Frameless Open Canvas — 3 Floating Fanned Full-Bleed Sculpted 3:4 Photo Coupons Matching /explore */}
+      {/* Frameless Open Canvas — 3 Floating Fanned Super-Rounded Square Cards */}
       <div
         aria-hidden="true"
-        className="relative aspect-[3/4] w-full flex items-center justify-center"
+        className="relative aspect-square w-full flex items-center justify-center"
       >
         <div className="relative flex items-center justify-center">
           {renderMiniTicket(leftTicket, "left")}
@@ -202,7 +202,7 @@ export function SeeAllCouponCard({
         <span className="text-[14.5px] sm:text-[15.5px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)] leading-snug">
           {isTh ? "ดูทั้งหมด" : "See all"}
         </span>
-        <span className="h-6 w-6 sm:h-7 sm:w-7 rounded-[8px] sm:rounded-[9px] bg-[var(--color-background-muted)] group-hover:bg-[#222222] group-hover:text-white dark:group-hover:bg-[#f5f5f5] dark:group-hover:text-[#222222] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 transition-colors duration-200">
+        <span className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-[var(--color-background-muted)] group-hover:bg-[var(--color-accent)] group-hover:text-[var(--color-on-accent)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 transition-colors duration-200">
           <ChevronRight
             className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
             strokeWidth={2.5}

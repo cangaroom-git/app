@@ -200,14 +200,14 @@ export function CookieConsentBanner({
                 onClick={() => setAnalyticsEnabled((v) => !v)}
                 className={`shrink-0 w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer ${
                   analyticsEnabled
-                    ? "bg-[#111111] dark:bg-[#f5f5f5]"
+                    ? "bg-[var(--color-accent)]"
                     : "bg-[var(--color-border-emphasized)]"
                 }`}
               >
                 <span
                   className={`block h-5 w-5 rounded-full transition-transform ${
                     analyticsEnabled
-                      ? "translate-x-5 bg-white dark:bg-[#111111]"
+                      ? "translate-x-5 bg-white"
                       : "translate-x-0 bg-white"
                   }`}
                 />
@@ -265,7 +265,7 @@ export function CookieConsentBanner({
                 onClick={() =>
                   submitConsent(analyticsEnabled ? "analytics" : "essential")
                 }
-                className="h-9 px-3.5 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12.5px] font-semibold hover:opacity-90 cursor-pointer transition-opacity"
+                className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold cursor-pointer transition-colors"
               >
                 {language === "th" ? "บันทึกการตั้งค่า" : "Save choices"}
               </button>
@@ -275,7 +275,7 @@ export function CookieConsentBanner({
                   type="button"
                   disabled={isSaving}
                   onClick={() => submitConsent("essential")}
-                  className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold cursor-pointer transition-colors"
+                  className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold cursor-pointer transition-colors"
                 >
                   {language === "th" ? "จำเป็นเท่านั้น" : "Essential only"}
                 </button>
@@ -283,7 +283,7 @@ export function CookieConsentBanner({
                   type="button"
                   disabled={isSaving}
                   onClick={() => submitConsent("analytics")}
-                  className="h-9 px-3.5 rounded-[10px] bg-[#111111] dark:bg-[#f5f5f5] !text-white dark:!text-[#111111] text-[12.5px] font-semibold hover:opacity-90 cursor-pointer transition-opacity"
+                  className="h-9 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold cursor-pointer transition-colors"
                 >
                   {language === "th" ? "ยอมรับทั้งหมด" : "Accept all"}
                 </button>

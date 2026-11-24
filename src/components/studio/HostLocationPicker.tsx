@@ -353,7 +353,7 @@ export function HostLocationPicker({
               type="button"
               disabled={isResolving || lookupInput.trim().length < 2}
               onClick={() => void resolveQueryOrLink(lookupInput)}
-              className="min-h-[56px] px-4 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
+              className="min-h-[56px] px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
             >
               {isResolving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -439,7 +439,7 @@ export function HostLocationPicker({
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
           <div className="relative flex flex-col items-center">
             <div
-              className={`h-11 w-11 rounded-full bg-[#222222] dark:bg-[#f5f5f5] text-white dark:text-[#222222] shadow-[var(--shadow-popover)] ring-4 ring-white/90 dark:ring-[#222222]/90 flex items-center justify-center transition-transform duration-150 ${
+              className={`h-11 w-11 rounded-full bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] ring-4 ring-white/90 dark:ring-[#18202b]/90 flex items-center justify-center transition-transform duration-150 ${
                 isDraggingMap ? "-translate-y-2" : "translate-y-0"
               }`}
             >

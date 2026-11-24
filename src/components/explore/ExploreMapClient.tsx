@@ -2473,9 +2473,9 @@ export function ExploreMapClient({
               onClick={() => setIsFilterModalOpen(true)}
               aria-label={isTh ? "ตัวกรองโปรที่พัก" : "Filter stay deals"}
               title={isTh ? "ตัวกรอง" : "Filters"}
-              className={`relative h-11 w-11 rounded-[13px] border shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors ${
+              className={`relative h-11 w-11 rounded-full border shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors ${
                 activeFilterCount > 0
-                  ? "bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] border-transparent !text-white dark:!text-[#222222]"
+                  ? "bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] border-transparent !text-[var(--color-on-accent)]"
                   : "bg-[var(--color-background-popover)]/96 backdrop-blur-md border-black/[0.06] dark:border-white/[0.1] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]"
               }`}
             >
@@ -2518,7 +2518,7 @@ export function ExploreMapClient({
                   ? "กลับไปดูแบบ Fan Card"
                   : "Fanned deck"
               }
-              className="h-11 w-11 rounded-[13px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors"
+              className="h-11 w-11 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] inline-flex items-center justify-center cursor-pointer transition-colors"
             >
               {deckViewMode === "fan" ? (
                 <LayoutGrid className="w-[18px] h-[18px]" strokeWidth={2.1} />
@@ -2675,7 +2675,7 @@ export function ExploreMapClient({
                       <button
                         type="button"
                         onClick={handleRecenterSelectedLocation}
-                        className="h-9 sm:h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                        className="h-9 sm:h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                       >
                         {isTh ? `กลับไป${bookTabLabel}` : `Back to ${bookTabLabel}`}
                       </button>
@@ -2683,7 +2683,7 @@ export function ExploreMapClient({
                       <button
                         type="button"
                         onClick={handleOpenProvincePicker}
-                        className="h-9 sm:h-10 px-4 rounded-[11px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
+                        className="h-9 sm:h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold whitespace-nowrap cursor-pointer transition-colors"
                       >
                         {isTh ? "เปลี่ยนจังหวัด" : "Change province"}
                       </button>
@@ -2966,9 +2966,9 @@ export function ExploreMapClient({
                         setManualShuffleOrder(null);
                         setPinnedOutsideDealId(null);
                       }}
-                      className={`h-10 px-3.5 rounded-[11px] text-[13px] font-semibold cursor-pointer transition-colors ${
+                      className={`h-10 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
                         placeCategoryFilter === "ALL"
-                          ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                          ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                           : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                       }`}
                     >
@@ -2987,9 +2987,9 @@ export function ExploreMapClient({
                             setManualShuffleOrder(null);
                             setPinnedOutsideDealId(null);
                           }}
-                          className={`h-10 pl-2 pr-3.5 rounded-[11px] text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors ${
+                          className={`h-10 pl-2 pr-3.5 rounded-full text-[13px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors ${
                             isActive
-                              ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
@@ -3035,9 +3035,9 @@ export function ExploreMapClient({
                           setManualShuffleOrder(null);
                           setPinnedOutsideDealId(null);
                         }}
-                        className={`h-10 rounded-[11px] text-[13px] font-semibold cursor-pointer transition-colors ${
+                        className={`h-10 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
                           sourceFilter === opt.id
-                            ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                            ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                         }`}
                       >
@@ -3073,9 +3073,9 @@ export function ExploreMapClient({
                             setManualShuffleOrder(null);
                             setPinnedOutsideDealId(null);
                           }}
-                          className={`h-9 px-3.5 rounded-[11px] text-[13px] font-semibold cursor-pointer transition-colors ${
+                          className={`h-9 px-3.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
                             isActive
-                              ? "bg-[#222222] dark:bg-[#f5f5f5] !text-white dark:!text-[#222222]"
+                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
@@ -3155,7 +3155,7 @@ export function ExploreMapClient({
                 <button
                   type="button"
                   onClick={() => setIsFilterModalOpen(false)}
-                  className="h-11 px-6 rounded-[12px] bg-[#222222] hover:bg-[#3f3f3f] dark:bg-[#f5f5f5] dark:hover:bg-[#e5e5e5] !text-white dark:!text-[#222222] text-[14px] font-semibold cursor-pointer transition-colors tabular-nums"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors tabular-nums"
                 >
                   {isTh
                     ? `แสดง ${visibleDeals.length} โปรที่พัก`

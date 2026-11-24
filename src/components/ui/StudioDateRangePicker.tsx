@@ -258,7 +258,7 @@ export function StudioDateRangePicker({
                 onClick={() => handleDayClick(dateStr)}
                 className={`h-9 w-9 rounded-[10px] text-[13px] font-medium tabular-nums inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
                   isStart || isEnd
-                    ? "bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] font-semibold"
+                    ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold"
                     : isRangePreviewEnd
                     ? "bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] font-semibold"
                     : "text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)]"

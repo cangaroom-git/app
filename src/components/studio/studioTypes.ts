@@ -5,7 +5,10 @@ import type {
   HotelAddonDto,
   HotelDiscountRuleDto,
   HotelPostDetailDto,
+  MerchantModeDto,
   PinFeedItemDto,
+  PlaceCategoryDto,
+  PlaceOpeningHoursDayDto,
   PropertyTypeDto,
   RoomDateOverrideDto,
   RoomPhotoMetaDto,
@@ -62,6 +65,14 @@ export interface StudioHotelRecord {
   bankName: string;
   bankAccountNo: string;
   propertyType: PropertyTypeDto;
+  placeCategory: PlaceCategoryDto;
+  merchantMode: MerchantModeDto;
+  externalWebsiteUrl: string;
+  primaryCtaLabelTh: string;
+  openingHoursJson?: PlaceOpeningHoursDayDto[] | null;
+  googlePlaceId?: string | null;
+  canonicalPinId?: string | null;
+  featuredCouponId?: string | null;
   isPublished: boolean;
   ratingAvg: number;
   reviewCount: number;

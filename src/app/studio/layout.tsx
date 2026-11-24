@@ -8,8 +8,12 @@ import {
   Calendar,
   CalendarCheck,
   ExternalLink,
+  FileText,
+  LayoutDashboard,
   Menu,
+  Store,
 } from "lucide-react";
+import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
 import { UserAvatarCircle } from "@/components/navigation/UserProfileDropdown";
@@ -28,44 +32,78 @@ function StudioShellFrame({ children }: { children: React.ReactNode }) {
   const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
 
   const ownedHotels = user?.ownedHotels ?? [];
+  const isDirectBooking = data.hotel.merchantMode !== "PROFILE_ONLY";
+  const catMeta = getPlaceCategoryMeta(data.hotel.placeCategory);
   const isTodayActive = pathname === "/studio" || pathname === "/studio/today";
   const isCalendarActive = pathname.startsWith("/studio/calendar");
   const isListingsActive = pathname.startsWith("/studio/listings");
+  const isContentSection = pathname.startsWith("/studio/listings/content") || pathname.startsWith("/studio/listings/promotions");
+  const isAboutOrLocation =
+    pathname.startsWith("/studio/listings/about") ||
+    pathname.startsWith("/studio/listings/location") ||
+    pathname === "/studio/listings";
   const isMenuOrReviewsActive =
     pathname.startsWith("/studio/menu") || pathname.startsWith("/studio/reviews");
 
-  const primaryTabs = [
-    {
-      id: "today",
-      label: "วันนี้",
-      href: buildHref("/studio"),
-      active: isTodayActive,
-      badge: data.stats.pendingBookingsCount,
-      icon: <CalendarCheck className="w-5 h-5" />,
-    },
-    {
-      id: "calendar",
-      label: "ปฏิทิน",
-      href: buildHref("/studio/calendar"),
-      active: isCalendarActive,
-      badge: 0,
-      icon: <Calendar className="w-5 h-5" />,
-    },
-    {
-      id: "listings",
-      label: "ที่พัก",
-      href: buildHref("/studio/listings"),
-      active: isListingsActive,
-      badge: 0,
-      icon: <BedDouble className="w-5 h-5" />,
-    },
-  ];
+  const primaryTabs = isDirectBooking
+    ? [
+        {
+          id: "today",
+          label: "วันนี้",
+          href: buildHref("/studio"),
+          active: isTodayActive,
+          badge: data.stats.pendingBookingsCount,
+          icon: <CalendarCheck className="w-5 h-5" />,
+        },
+        {
+          id: "calendar",
+          label: "ปฏิทิน",
+          href: buildHref("/studio/calendar"),
+          active: isCalendarActive,
+          badge: 0,
+          icon: <Calendar className="w-5 h-5" />,
+        },
+        {
+          id: "listings",
+          label: "ที่พัก",
+          href: buildHref("/studio/listings"),
+          active: isListingsActive,
+          badge: 0,
+          icon: <BedDouble className="w-5 h-5" />,
+        },
+      ]
+    : [
+        {
+          id: "today",
+          label: "ภาพรวม",
+          href: buildHref("/studio"),
+          active: isTodayActive,
+          badge: 0,
+          icon: <LayoutDashboard className="w-5 h-5" />,
+        },
+        {
+          id: "content",
+          label: "โพสต์ & โปร",
+          href: buildHref("/studio/listings/content"),
+          active: isContentSection,
+          badge: data.stats.pendingSyncPinsCount,
+          icon: <FileText className="w-5 h-5" />,
+        },
+        {
+          id: "about",
+          label: `ข้อมูล${catMeta.shortLabelTh}`,
+          href: buildHref("/studio/listings/about"),
+          active: isAboutOrLocation,
+          badge: 0,
+          icon: <Store className="w-5 h-5" />,
+        },
+      ];
 
   return (
     <div className="min-h-screen bg-[var(--color-background-body)] flex flex-col">
       {/* Floating Toast Notification */}
       {notice && (
-        <div className="fixed bottom-24 lg:bottom-6 right-5 z-[100] rounded-[12px] bg-[#222222] !text-white dark:bg-[#f5f5f5] dark:!text-[#222222] shadow-[var(--shadow-popover)] px-4 py-2.5 text-[13.5px] font-semibold">
+        <div className="fixed bottom-24 lg:bottom-6 right-5 z-[100] rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] shadow-[var(--shadow-popover)] px-5 py-2.5 text-[13.5px] font-semibold">
           {notice}
         </div>
       )}
@@ -94,7 +132,7 @@ function StudioShellFrame({ children }: { children: React.ReactNode }) {
                 <ResponsiveSelect
                   value={data.hotel.slug}
                   onChange={switchHotel}
-                  sheetTitle="เลือกที่พักที่ต้องการจัดการ"
+                  sheetTitle="เลือกสถานที่ที่ต้องการจัดการ"
                   triggerClassName="w-full h-9 px-3 rounded-[10px] bg-transparent hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)]"
                   options={ownedHotels.map((item) => ({
                     value: item.slug,

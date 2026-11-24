@@ -10,73 +10,73 @@
    ============================================================================ */
 :root {
   color-scheme: light;
-  /* Airbnb DLS Warm Monochrome Core Tokens (Light Mode) */
-  --color-accent: #222222;
-  --color-accent-hover: #3f3f3f;
-  --color-accent-muted: #f7f7f7;
+  /* Nondii Travel-Blue Warm Minimal Core Tokens (Light Mode) */
+  --color-accent: #1e78d6;
+  --color-accent-hover: #1766ba;
+  --color-accent-muted: #edf5fd;
   --color-on-accent: #ffffff;
-  --color-tiktok-accent: #222222;
-  --color-tiktok-accent-hover: #3f3f3f;
+  --color-tiktok-accent: #1e78d6;
+  --color-tiktok-accent-hover: #1766ba;
   --color-tiktok-on-accent: #ffffff;
-  --color-tiktok-gray: #f7f7f7;
-  --color-tiktok-gray-hover: #ebebeb;
-  --color-fastwork: #222222;
+  --color-tiktok-gray: #f3f7fc;
+  --color-tiktok-gray-hover: #e7eff8;
+  --color-fastwork: #1e78d6;
   --color-on-fastwork: #ffffff;
-  --color-neutral: rgba(0, 0, 0, 0.04);
+  --color-neutral: rgba(24, 35, 52, 0.04);
 
-  /* Reserved 5% Red — Pin Save Button & Nav Notification Dots ONLY (#e60023) */
+  /* Reserved 5% Red — Wishlist Heart & Nav Notification Dots ONLY (#e60023) */
   --color-promo: #e60023;
   --color-promo-hover: #ad081b;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #f7f7f7;
-  --color-promo-border: #dddddd;
-  --color-promo-text: #222222;
+  --color-promo-muted: #f3f7fc;
+  --color-promo-border: #cedbe9;
+  --color-promo-text: #182334;
 
-  /* Pure White + Airbnb Soft Cloud (#F7F7F7) Surface Hierarchy (Light Mode) */
+  /* Pure White + Sky-Tinted Soft Cloud (#F3F7FC) Surface Hierarchy (Light Mode) */
   --color-background-body: #ffffff;
   --color-background-surface: #ffffff;
   --color-background-card: #ffffff;
   --color-background-popover: #ffffff;
-  --color-background-muted: #f7f7f7;     /* Airbnb --palette-faint (#F7F7F7) */
-  --color-background-subtle: #ebebeb;    /* Airbnb --palette-bebe (#EBEBEB) */
+  --color-background-muted: #f3f7fc;     /* Soft Wanderlust Sky Cloud */
+  --color-background-subtle: #e7eff8;    /* Hover Sky Cloud */
   --color-sidebar-bg: #ffffff;
 
   /* Zero Card Shadow Rule (Popover shadow allowed strictly on floating menus) */
   --shadow-card: none;
-  --shadow-popover: 0 6px 20px 0 rgba(0, 0, 0, 0.14);
-  --shadow-booking-widget: 0 6px 16px rgba(0, 0, 0, 0.12);
+  --shadow-popover: 0 6px 20px 0 rgba(15, 29, 48, 0.12);
+  --shadow-booking-widget: 0 6px 16px rgba(15, 29, 48, 0.1);
 
-  /* Warm Charcoal Ink Tokens (Airbnb --palette-hof & --palette-foggy) */
-  --color-text-primary: #222222;
-  --color-text-secondary: #6a6a6a;
-  --color-text-tertiary: #8c8c8c;
-  --color-text-disabled: #c1c1c1;
-  --color-text-accent: #222222;
+  /* Calm Slate-Navy Ink Tokens */
+  --color-text-primary: #182334;
+  --color-text-secondary: #5c6b80;
+  --color-text-tertiary: #8492a6;
+  --color-text-disabled: #b8c4d4;
+  --color-text-accent: #1e78d6;
 
-  /* Soft 1px Hairline Dividers (Airbnb --palette-bebe #EBEBEB & --palette-deco #DDDDDD) */
-  --color-border-subtle: #f0f0f0;
-  --color-border: #ebebeb;
-  --color-border-emphasized: #dddddd;
-  --color-overlay-hover: rgba(0, 0, 0, 0.04);
-  --color-overlay-pressed: rgba(0, 0, 0, 0.08);
+  /* Soft 1px Hairline Dividers */
+  --color-border-subtle: #edf2f8;
+  --color-border: #e3ebf4;
+  --color-border-emphasized: #cedbe9;
+  --color-overlay-hover: rgba(24, 35, 52, 0.04);
+  --color-overlay-pressed: rgba(24, 35, 52, 0.08);
 
   /* Custom Scrollbar Tokens */
-  --color-scrollbar-thumb: rgba(34, 34, 34, 0.22);
-  --color-scrollbar-thumb-hover: rgba(34, 34, 34, 0.38);
-  --color-scrollbar-thumb-active: rgba(34, 34, 34, 0.55);
+  --color-scrollbar-thumb: rgba(24, 35, 52, 0.22);
+  --color-scrollbar-thumb-hover: rgba(24, 35, 52, 0.38);
+  --color-scrollbar-thumb-active: rgba(24, 35, 52, 0.55);
 
   /* Airbnb Earthy Semantic Tokens (Spruce #008A05, Arches #C13515, Ondo #E07912) */
   --color-success: #008a05;
-  --color-success-muted: #f7f7f7;
+  --color-success-muted: #f3f7fc;
   --color-on-success: #ffffff;
 
   --color-error: #c13515;
-  --color-error-muted: #f7f7f7;
+  --color-error-muted: #f3f7fc;
   --color-on-error: #ffffff;
 
   --color-warning: #e07912;
-  --color-warning-muted: #f7f7f7;
-  --color-on-warning: #222222;
+  --color-warning-muted: #f3f7fc;
+  --color-on-warning: #182334;
 
   /* Standardized Layout & Right Drawer Dimensions */
   --feed-max-width: 1120px;
@@ -88,12 +88,12 @@
   --cgr-safe-bottom: clamp(0px, env(safe-area-inset-bottom, 0px), 20px);
   --cgr-mobile-nav-h: calc(56px + var(--cgr-safe-bottom));
 
-  /* Clean Architectural Squircle Radii (Airbnb DLS 8 / 12 / 16 / 20) */
-  --radius-inner: 10px;
-  --radius-button: 12px;
-  --radius-element: 12px;
-  --radius-container: 16px;
-  --radius-page: 20px;
+  /* Modern Super-Rounded Squircle Radii + Full-Round Pill Buttons */
+  --radius-inner: 12px;
+  --radius-button: 9999px;
+  --radius-element: 14px;
+  --radius-container: 20px;
+  --radius-page: 24px;
   --radius-full: 9999px;
 
   /* ==========================================================================
@@ -139,46 +139,47 @@
    ============================================================================ */
 html.dark {
   color-scheme: dark;
-  --color-accent: #f5f5f5;
-  --color-accent-hover: #e5e5e5;
-  --color-accent-muted: #2a2a2a;
-  --color-on-accent: #222222;
-  --color-tiktok-accent: #f5f5f5;
-  --color-tiktok-accent-hover: #e5e5e5;
-  --color-tiktok-on-accent: #222222;
-  --color-tiktok-gray: #2a2a2a;
-  --color-tiktok-gray-hover: #363636;
-  --color-fastwork: #f5f5f5;
+  --color-accent: #4ca3f5;
+  --color-accent-hover: #6ab5f8;
+  --color-accent-muted: #1b2a3d;
+  --color-on-accent: #0f1722;
+  --color-tiktok-accent: #4ca3f5;
+  --color-tiktok-accent-hover: #6ab5f8;
+  --color-tiktok-on-accent: #0f1722;
+  --color-tiktok-gray: #1e2836;
+  --color-tiktok-gray-hover: #283547;
+  --color-fastwork: #4ca3f5;
+  --color-on-fastwork: #0f1722;
   --color-neutral: rgba(255, 255, 255, 0.08);
 
   --color-promo: #e60023;
   --color-promo-hover: #ff1f40;
   --color-on-promo: #ffffff;
-  --color-promo-muted: #2a2a2a;
-  --color-promo-border: #444444;
-  --color-promo-text: #f5f5f5;
+  --color-promo-muted: #1e2836;
+  --color-promo-border: #384960;
+  --color-promo-text: #f1f5fa;
 
-  --color-background-body: #161616;
-  --color-background-surface: #222222;
-  --color-background-card: #222222;
-  --color-background-popover: #262626;
-  --color-background-muted: #2c2c2c;
-  --color-background-subtle: #383838;
-  --color-sidebar-bg: #161616;
+  --color-background-body: #11161d;
+  --color-background-surface: #18202b;
+  --color-background-card: #18202b;
+  --color-background-popover: #1e2734;
+  --color-background-muted: #1e2836;
+  --color-background-subtle: #283547;
+  --color-sidebar-bg: #11161d;
 
   --shadow-card: none;
   --shadow-popover: 0 12px 28px 0 rgba(0, 0, 0, 0.55);
   --shadow-booking-widget: 0 12px 28px rgba(0, 0, 0, 0.5);
 
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a8a8a8;
-  --color-text-tertiary: #7a7a7a;
-  --color-text-disabled: #5c5c5c;
-  --color-text-accent: #f5f5f5;
+  --color-text-primary: #f1f5fa;
+  --color-text-secondary: #9aa9bd;
+  --color-text-tertiary: #728399;
+  --color-text-disabled: #516175;
+  --color-text-accent: #5eb0fa;
 
-  --color-border-subtle: #2c2c2c;
-  --color-border: #333333;
-  --color-border-emphasized: #4d4d4d;
+  --color-border-subtle: #202b38;
+  --color-border: #263344;
+  --color-border-emphasized: #384960;
   --color-overlay-hover: rgba(255, 255, 255, 0.08);
   --color-overlay-pressed: rgba(255, 255, 255, 0.14);
 
@@ -187,12 +188,12 @@ html.dark {
   --color-scrollbar-thumb-active: rgba(255, 255, 255, 0.6);
 
   --color-success: #4ade80;
-  --color-success-muted: #2a2a2a;
+  --color-success-muted: #1e2836;
   --color-on-success: #052e16;
   --color-error: #f87171;
-  --color-error-muted: #2a2a2a;
+  --color-error-muted: #1e2836;
   --color-warning: #fbbf24;
-  --color-warning-muted: #2a2a2a;
+  --color-warning-muted: #1e2836;
 }
 
 @theme inline {

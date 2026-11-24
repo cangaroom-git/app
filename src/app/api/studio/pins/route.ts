@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         coverImageUrl: parsed.data.coverImageUrl,
         mediaUrls: allMediaUrls,
         videoUrl: null,
-        aspectRatio: parsed.data.aspectRatio || "aspect-[3/4]",
+        aspectRatio: parsed.data.aspectRatio || "aspect-square",
         provinceId: hotel.provinceId,
         stayStyles: styles,
         semanticTags: styles,

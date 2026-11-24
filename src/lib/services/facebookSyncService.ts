@@ -190,7 +190,7 @@ export async function runFacebookPageSyncBatch(params: {
         coverImageUrl: coverUrl,
         mediaUrls: [coverUrl],
         videoUrl: post.videoUrl || null,
-        aspectRatio: post.videoUrl ? "aspect-[9/16]" : "aspect-[4/5]",
+        aspectRatio: "aspect-square",
         provinceId: hotel.provinceId,
         stayStyles: triage.extractedStyles,
         semanticTags: triage.extractedTags,
