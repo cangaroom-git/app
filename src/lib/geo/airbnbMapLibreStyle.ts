@@ -11,7 +11,11 @@ export const THAILAND_DEFAULT_ZOOM = 5.4;
  * Enable ultra-smooth Apple-Maps-grade 1-finger pan inertia, smooth wheel/trackpad zoom,
  * and 2-finger pinch-to-zoom while disabling accidental map rotation or 3D pitch.
  */
-export function configureThailandMapInteractions(map: MapLibreMap): void {
+export function configureThailandMapInteractions(
+  map: MapLibreMap,
+  options?: { allowScrollZoom?: boolean }
+): void {
+  const allowScrollZoom = options?.allowScrollZoom ?? true;
   try {
     map.dragPan?.enable({
       linearity: 0.12,
@@ -19,9 +23,13 @@ export function configureThailandMapInteractions(map: MapLibreMap): void {
       maxSpeed: 2200,
       deceleration: 1650,
     });
-    map.scrollZoom?.enable();
-    map.scrollZoom?.setWheelZoomRate(1 / 320);
-    map.scrollZoom?.setZoomRate(1 / 85);
+    if (allowScrollZoom) {
+      map.scrollZoom?.enable();
+      map.scrollZoom?.setWheelZoomRate(1 / 320);
+      map.scrollZoom?.setZoomRate(1 / 85);
+    } else {
+      map.scrollZoom?.disable();
+    }
     map.touchZoomRotate?.enable();
     map.touchZoomRotate?.disableRotation();
     map.dragRotate?.disable();

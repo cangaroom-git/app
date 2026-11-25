@@ -1263,7 +1263,7 @@ export function DealNearbyPlacesModal({
       : 132;
 
     const padding = isMediumUp
-      ? { top: 76, right: 72, bottom: 68, left: 380 }
+      ? { top: 76, right: 72, bottom: 68, left: 320 }
       : { top: 96, right: 56, bottom: mobileBottomPad, left: 32 };
 
     if (
@@ -1496,6 +1496,7 @@ export function DealNearbyPlacesModal({
     place: NearbyPlaceItem,
     variant: "desktop" | "mobile"
   ) => {
+    const isDesktop = variant === "desktop";
     const visual = resolveCategoryPinVisual(place);
     const activePhotoUrl = selectedPhotoUrls[detailPhotoIdx] ?? null;
 
@@ -1524,14 +1525,14 @@ export function DealNearbyPlacesModal({
     };
 
     return (
-      <div className="p-2.5 flex flex-col min-h-0">
+      <div className={isDesktop ? "p-2 flex flex-col min-h-0" : "p-2.5 flex flex-col min-h-0"}>
         {/* Rounded Photo Stage With Top-Right Close × + Swipeable Carousel */}
         <div
           onTouchStart={handlePhotoTouchStart}
           onTouchEnd={handlePhotoTouchEnd}
-          className={`relative w-full ${
-            variant === "mobile" ? "h-[188px]" : "aspect-[16/10]"
-          } rounded-[16px] bg-[var(--color-background-muted)] overflow-hidden shrink-0`}
+          className={`relative w-full aspect-square ${
+            isDesktop ? "rounded-[18px]" : "rounded-[20px]"
+          } bg-[var(--color-background-muted)] overflow-hidden shrink-0`}
         >
           {activePhotoUrl ? (
             <img
@@ -1549,7 +1550,9 @@ export function DealNearbyPlacesModal({
             <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-[var(--color-text-secondary)]">
               <span
                 style={{ backgroundColor: visual.bgHex }}
-                className="h-12 w-12 rounded-[14px] text-white inline-flex items-center justify-center"
+                className={`${
+                  isDesktop ? "h-10 w-10" : "h-12 w-12"
+                } rounded-full text-white inline-flex items-center justify-center`}
                 dangerouslySetInnerHTML={{ __html: visual.iconSvg }}
               />
               <span className="text-[12px] font-medium">
@@ -1563,9 +1566,11 @@ export function DealNearbyPlacesModal({
             type="button"
             onClick={() => setSelectedPlaceId(null)}
             aria-label={isTh ? "ปิดรายละเอียด" : "Close details"}
-            className="absolute top-2.5 right-2.5 z-10 h-8 w-8 rounded-[10px] bg-white/92 hover:bg-white dark:bg-[#222222]/92 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors"
+            className={`absolute ${
+              isDesktop ? "top-2 right-2 h-7 w-7" : "top-2.5 right-2.5 h-8 w-8"
+            } z-10 rounded-full bg-white/92 hover:bg-white dark:bg-[#222222]/92 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors`}
           >
-            <X className="w-4 h-4" strokeWidth={2.3} />
+            <X className={isDesktop ? "w-3.5 h-3.5" : "w-4 h-4"} strokeWidth={2.3} />
           </button>
 
           {selectedPhotoUrls.length > 1 && (
@@ -1577,9 +1582,11 @@ export function DealNearbyPlacesModal({
                     setDetailPhotoIdx((i) => Math.max(0, i - 1))
                   }
                   aria-label={isTh ? "รูปก่อนหน้า" : "Previous photo"}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-[9px] bg-white/88 hover:bg-white dark:bg-[#222222]/88 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors"
+                  className={`absolute ${
+                    isDesktop ? "left-2 h-7 w-7" : "left-2.5 h-8 w-8"
+                  } top-1/2 -translate-y-1/2 rounded-full bg-white/88 hover:bg-white dark:bg-[#222222]/88 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors`}
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className={isDesktop ? "w-3.5 h-3.5" : "w-4 h-4"} />
                 </button>
               )}
               {detailPhotoIdx < selectedPhotoUrls.length - 1 && (
@@ -1591,12 +1598,14 @@ export function DealNearbyPlacesModal({
                     )
                   }
                   aria-label={isTh ? "รูปถัดไป" : "Next photo"}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-[9px] bg-white/88 hover:bg-white dark:bg-[#222222]/88 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors"
+                  className={`absolute ${
+                    isDesktop ? "right-2 h-7 w-7" : "right-2.5 h-8 w-8"
+                  } top-1/2 -translate-y-1/2 rounded-full bg-white/88 hover:bg-white dark:bg-[#222222]/88 dark:hover:bg-[#2c2c2c] text-[var(--color-text-primary)] backdrop-blur-sm inline-flex items-center justify-center cursor-pointer transition-colors`}
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className={isDesktop ? "w-3.5 h-3.5" : "w-4 h-4"} />
                 </button>
               )}
-              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1 rounded-[8px] bg-black/45">
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/45">
                 {selectedPhotoUrls.map((_, idx) => (
                   <span
                     key={idx}
@@ -1613,11 +1622,25 @@ export function DealNearbyPlacesModal({
         </div>
 
         {/* Clean Centered Place Title & Category (Never Clipped on Mobile!) */}
-        <div className="px-2 pt-3 pb-1.5 text-center space-y-0.5">
-          <h3 className="text-[16px] font-semibold text-[var(--color-text-primary)] leading-snug line-clamp-2">
+        <div
+          className={
+            isDesktop
+              ? "px-1.5 pt-2 pb-1 text-center space-y-0.5"
+              : "px-2 pt-3 pb-1.5 text-center space-y-0.5"
+          }
+        >
+          <h3
+            className={`${
+              isDesktop ? "text-[14px]" : "text-[16px]"
+            } font-semibold text-[var(--color-text-primary)] leading-snug line-clamp-2`}
+          >
             {isTh ? place.nameTh : place.nameEn || place.nameTh}
           </h3>
-          <p className="text-[13px] text-[var(--color-text-secondary)] truncate">
+          <p
+            className={`${
+              isDesktop ? "text-[12px]" : "text-[13px]"
+            } text-[var(--color-text-secondary)] truncate`}
+          >
             {isTh ? place.subcategoryLabelTh : place.subcategoryLabelEn}
           </p>
         </div>
@@ -1628,9 +1651,13 @@ export function DealNearbyPlacesModal({
   const renderResultsList = (isMobileList = false) => {
     if (isFetchingPlaces) {
       return (
-        <div className="py-10 px-4 flex flex-col items-center justify-center gap-2 text-[var(--color-text-secondary)]">
+        <div
+          className={`${
+            isMobileList ? "py-10 px-4" : "py-7 px-3.5"
+          } flex flex-col items-center justify-center gap-2 text-[var(--color-text-secondary)]`}
+        >
           <Loader2 className="w-5 h-5 animate-spin" />
-          <p className="text-[13px]">
+          <p className={isMobileList ? "text-[13px]" : "text-[12px]"}>
             {isTh ? "กำลังค้นหาสถานที่รอบที่พัก..." : "Finding nearby places..."}
           </p>
         </div>
@@ -1639,13 +1666,25 @@ export function DealNearbyPlacesModal({
 
     if (displayedPlaces.length === 0) {
       return (
-        <div className="py-10 px-4 text-center space-y-2">
-          <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+        <div
+          className={`${
+            isMobileList ? "py-10 px-4" : "py-7 px-3.5"
+          } text-center space-y-2`}
+        >
+          <p
+            className={`${
+              isMobileList ? "text-[14px]" : "text-[13px]"
+            } font-semibold text-[var(--color-text-primary)]`}
+          >
             {isTh
               ? "ไม่พบสถานที่ในบริเวณนี้"
               : "No places found in this area"}
           </p>
-          <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+          <p
+            className={`${
+              isMobileList ? "text-[12.5px]" : "text-[11.5px]"
+            } text-[var(--color-text-secondary)]`}
+          >
             {isTh
               ? "ลองซูมแผนที่ออกแล้วกด \"ค้นหาในพื้นที่นี้\" หรือลองคำค้นอื่น"
               : "Try zooming out and tapping \"Search this area\" or another term."}
@@ -1653,7 +1692,9 @@ export function DealNearbyPlacesModal({
           <button
             type="button"
             onClick={handleClearSearch}
-            className="mt-1 h-8 px-3.5 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer"
+            className={`mt-1 ${
+              isMobileList ? "h-8 px-4 text-[12.5px]" : "h-7 px-3.5 text-[12px]"
+            } rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] font-semibold text-[var(--color-text-primary)] cursor-pointer`}
           >
             {isTh ? "เลือกหมวดหมู่อื่น" : "Choose another category"}
           </button>
@@ -1662,7 +1703,11 @@ export function DealNearbyPlacesModal({
     }
 
     return (
-      <div className="divide-y divide-[var(--color-border)] px-3.5">
+      <div
+        className={`divide-y divide-[var(--color-border)] ${
+          isMobileList ? "px-3.5" : "px-3"
+        }`}
+      >
         {displayedPlaces.map((place, idx) => {
           const visual = resolveCategoryPinVisual(place);
           const isHovered = hoveredPlaceId === place.id;
@@ -1686,7 +1731,11 @@ export function DealNearbyPlacesModal({
               }}
               onMouseEnter={() => setHoveredPlaceId(place.id)}
               onMouseLeave={() => setHoveredPlaceId(null)}
-              className={`w-full py-3 px-2 -mx-2 rounded-[12px] flex items-center gap-3.5 text-left cursor-pointer transition-colors ${
+              className={`w-full ${
+                isMobileList
+                  ? "py-3 px-2 -mx-2 rounded-[12px] gap-3.5"
+                  : "py-2 px-2 -mx-2 rounded-[10px] gap-2.5"
+              } flex items-center text-left cursor-pointer transition-colors ${
                 isHovered
                   ? "bg-[var(--color-background-muted)]"
                   : "hover:bg-[var(--color-background-muted)]/70"
@@ -1705,30 +1754,46 @@ export function DealNearbyPlacesModal({
                     }))
                   }
                   className={`${
-                    isMobileList ? "h-14 w-14 rounded-[12px]" : "h-12 w-12 rounded-[11px]"
-                  } object-cover bg-[var(--color-background-muted)] shrink-0`}
+                    isMobileList
+                      ? "h-14 w-14 rounded-[12px]"
+                      : "h-9 w-9 rounded-[9px]"
+                  } aspect-square object-cover bg-[var(--color-background-muted)] shrink-0`}
                 />
               ) : (
                 <span
                   style={{ backgroundColor: visual.bgHex }}
                   className={`${
-                    isMobileList ? "h-14 w-14 rounded-[12px]" : "h-11 w-11 rounded-[11px]"
-                  } text-white inline-flex items-center justify-center shrink-0`}
+                    isMobileList
+                      ? "h-14 w-14 rounded-[12px]"
+                      : "h-9 w-9 rounded-[9px]"
+                  } aspect-square text-white inline-flex items-center justify-center shrink-0`}
                   dangerouslySetInnerHTML={{ __html: visual.iconSvg }}
                 />
               )}
 
               <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-semibold text-[var(--color-text-primary)] leading-snug line-clamp-2">
+                <p
+                  className={`${
+                    isMobileList ? "text-[14px]" : "text-[12.5px]"
+                  } font-semibold text-[var(--color-text-primary)] leading-snug line-clamp-2`}
+                >
                   {isTh ? place.nameTh : place.nameEn || place.nameTh}
                 </p>
-                <p className="text-[12.5px] text-[var(--color-text-secondary)] truncate mt-0.5">
+                <p
+                  className={`${
+                    isMobileList ? "text-[12.5px]" : "text-[11.5px]"
+                  } text-[var(--color-text-secondary)] truncate mt-0.5`}
+                >
                   {isTh ? place.subcategoryLabelTh : place.subcategoryLabelEn}
                 </p>
               </div>
 
               {place.distanceKm > 0 && (
-                <span className="shrink-0 text-[12.5px] font-medium text-[var(--color-text-secondary)] tabular-nums">
+                <span
+                  className={`shrink-0 ${
+                    isMobileList ? "text-[12.5px]" : "text-[11.5px]"
+                  } font-medium text-[var(--color-text-secondary)] tabular-nums`}
+                >
                   {formatDistanceLabel(place.distanceKm, language)}
                 </span>
               )}
@@ -1740,7 +1805,7 @@ export function DealNearbyPlacesModal({
   };
 
   const renderCategoryMenu = () => (
-    <div className="py-1.5 divide-y divide-[var(--color-border)]">
+    <div className="py-1 divide-y divide-[var(--color-border)]">
       {visibleCategories.map((cat) => {
         const Icon = cat.icon;
         return (
@@ -1748,21 +1813,21 @@ export function DealNearbyPlacesModal({
             key={cat.id}
             type="button"
             onClick={() => handleSelectCategory(cat.id)}
-            className="w-full px-4 py-2.5 flex items-center justify-between gap-3 hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors"
+            className="w-full px-3.5 py-2 flex items-center justify-between gap-2.5 hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors"
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <span
                 style={{ backgroundColor: cat.color }}
-                className="h-8 w-8 rounded-full text-white inline-flex items-center justify-center shrink-0"
+                className="h-6 w-6 rounded-full text-white inline-flex items-center justify-center shrink-0"
               >
-                <Icon className="w-4 h-4" strokeWidth={2.1} />
+                <Icon className="w-3.5 h-3.5" strokeWidth={2.1} />
               </span>
-              <span className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate">
+              <span className="text-[12.5px] font-semibold text-[var(--color-text-primary)] truncate">
                 {isTh ? cat.th : cat.en}
               </span>
             </div>
             <ChevronRight
-              className="w-4 h-4 text-[var(--color-text-tertiary)] shrink-0"
+              className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] shrink-0"
               strokeWidth={2.2}
             />
           </button>
@@ -1771,17 +1836,27 @@ export function DealNearbyPlacesModal({
     </div>
   );
 
-  const renderAutocompleteList = () => (
-    <div className="py-1.5 divide-y divide-[var(--color-border)]">
+  const renderAutocompleteList = (isCompact = false) => (
+    <div className={`${isCompact ? "py-1" : "py-1.5"} divide-y divide-[var(--color-border)]`}>
       <button
         type="button"
         onClick={() => void runTextSearch(searchInput)}
-        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors"
+        className={`w-full ${
+          isCompact ? "px-3.5 py-2 gap-2.5" : "px-4 py-3 gap-3"
+        } flex items-center hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors`}
       >
-        <span className="h-9 w-9 rounded-[10px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0">
-          <Search className="w-4 h-4" />
+        <span
+          className={`${
+            isCompact ? "h-7 w-7 rounded-[8px]" : "h-9 w-9 rounded-[10px]"
+          } bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0`}
+        >
+          <Search className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
         </span>
-        <span className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
+        <span
+          className={`${
+            isCompact ? "text-[12.5px]" : "text-[14px]"
+          } font-semibold text-[var(--color-text-primary)] truncate`}
+        >
           {isTh
             ? `ค้นหา "${searchInput.trim()}"`
             : `Search for "${searchInput.trim()}"`}
@@ -1789,8 +1864,12 @@ export function DealNearbyPlacesModal({
       </button>
 
       {isAutocompleteLoading ? (
-        <div className="px-4 py-3.5 flex items-center gap-2 text-[13px] text-[var(--color-text-secondary)]">
-          <Loader2 className="w-4 h-4 animate-spin" />
+        <div
+          className={`${
+            isCompact ? "px-3.5 py-2.5 text-[12px]" : "px-4 py-3.5 text-[13px]"
+          } flex items-center gap-2 text-[var(--color-text-secondary)]`}
+        >
+          <Loader2 className={isCompact ? "w-3.5 h-3.5 animate-spin" : "w-4 h-4 animate-spin"} />
           <span>{isTh ? "กำลังแนะนำสถานที่..." : "Finding suggestions..."}</span>
         </div>
       ) : (
@@ -1799,20 +1878,32 @@ export function DealNearbyPlacesModal({
             key={sug.placeId}
             type="button"
             onClick={() => void runTextSearch(sug.mainText)}
-            className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors"
+            className={`w-full ${
+              isCompact ? "px-3.5 py-2 gap-2.5" : "px-4 py-3 gap-3"
+            } flex items-center hover:bg-[var(--color-background-muted)] text-left cursor-pointer transition-colors`}
           >
             <span
               style={{ backgroundColor: resolveCategoryPinColor(sug.category) }}
-              className="h-9 w-9 rounded-full text-white inline-flex items-center justify-center shrink-0"
+              className={`${
+                isCompact ? "h-7 w-7" : "h-9 w-9"
+              } rounded-full text-white inline-flex items-center justify-center shrink-0`}
             >
-              <MapPin className="w-4 h-4" />
+              <MapPin className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
+              <p
+                className={`${
+                  isCompact ? "text-[12.5px]" : "text-[14px]"
+                } font-semibold text-[var(--color-text-primary)] truncate`}
+              >
                 {sug.mainText}
               </p>
               {sug.secondaryText && (
-                <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
+                <p
+                  className={`${
+                    isCompact ? "text-[11px]" : "text-[12px]"
+                  } text-[var(--color-text-secondary)] truncate`}
+                >
                   {sug.secondaryText}
                 </p>
               )}
@@ -1922,12 +2013,12 @@ export function DealNearbyPlacesModal({
             type="button"
             onClick={onClose}
             aria-label={isTh ? "ปิดแผนที่" : "Close map"}
-            className="h-10 w-10 rounded-[12px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
+            className="h-10 w-10 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" strokeWidth={2.3} />
           </button>
 
-          <div className="hidden md:flex flex-col rounded-[11px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden">
+          <div className="hidden md:flex flex-col rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden">
             <button
               type="button"
               onClick={() => handleZoom(1)}
@@ -1951,7 +2042,7 @@ export function DealNearbyPlacesModal({
             onClick={handleRecenter}
             title={isTh ? "กลับไปตำแหน่งที่พัก" : "Center on property"}
             aria-label={isTh ? "กลับไปตำแหน่งที่พัก" : "Center on property"}
-            className="h-10 w-10 md:h-9 md:w-9 rounded-[12px] md:rounded-[11px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
+            className="h-10 w-10 md:h-9 md:w-9 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
           >
             <LocateFixed className="w-4 h-4" />
           </button>
@@ -2058,7 +2149,7 @@ export function DealNearbyPlacesModal({
                       setIsTravelDropdownOpen(true);
                     }}
                     aria-label={isTh ? "เลือกวิธีเดินทาง" : "Change travel mode"}
-                    className="h-9 px-3 rounded-[12px] bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors tabular-nums"
+                    className="h-9 px-3.5 rounded-full bg-[var(--color-background-popover)] hover:bg-[var(--color-background-muted)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors tabular-nums"
                   >
                     <ActiveIcon
                       className="w-3.5 h-3.5 shrink-0"
@@ -2079,16 +2170,16 @@ export function DealNearbyPlacesModal({
         {/* ===================================================================
             TABLET & DESKTOP (>= md / 768px): AIRBNB FLOATING TOP-LEFT CARD
         ==================================================================== */}
-        <div className="hidden md:flex flex-col absolute top-4 left-4 z-30 w-[326px] lg:w-[356px] max-h-[calc(100%-32px)] pointer-events-none">
+        <div className="hidden md:flex flex-col absolute top-4 left-4 z-30 w-[268px] lg:w-[292px] max-h-[calc(100%-32px)] pointer-events-none">
           <div className="flex items-center gap-2 pointer-events-auto">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 void runTextSearch(searchInput);
               }}
-              className="flex-1 h-12 rounded-[14px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] px-3.5 flex items-center gap-2.5 focus-within:border-[var(--color-text-primary)]"
+              className="flex-1 h-10 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] px-3.5 flex items-center gap-2 focus-within:border-[var(--color-text-primary)]"
             >
-              <Search className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+              <Search className="w-3.5 h-3.5 text-[var(--color-text-secondary)] shrink-0" />
               <input
                 type="text"
                 value={searchInput}
@@ -2108,10 +2199,10 @@ export function DealNearbyPlacesModal({
                     ? "ค้นหาร้านอาหาร คาเฟ่ 7-Eleven ปั๊ม EV..."
                     : "Search restaurants, cafes, 7-Eleven..."
                 }
-                className="flex-1 min-w-0 bg-transparent border-0 text-[14px] font-medium text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent border-0 text-[13px] font-medium text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
               />
               {(isFetchingPlaces || isLoadingBasePlace) && (
-                <Loader2 className="w-4 h-4 animate-spin text-[var(--color-text-secondary)] shrink-0" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-text-secondary)] shrink-0" />
               )}
             </form>
 
@@ -2120,9 +2211,9 @@ export function DealNearbyPlacesModal({
                 type="button"
                 onClick={handleClearSearch}
                 aria-label={isTh ? "ล้างการค้นหา" : "Clear search"}
-                className="h-12 w-12 rounded-[14px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                className="h-10 w-10 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.12] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -2130,14 +2221,14 @@ export function DealNearbyPlacesModal({
           {desktopPanelPresence.shouldRender && (
             <div
               data-state={desktopPanelPresence.dataState}
-              className="cgr-popover-motion mt-2.5 rounded-[20px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden flex flex-col min-h-0"
+              className="cgr-popover-motion mt-2 rounded-[20px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden flex flex-col min-h-0"
             >
               {!selectedPlace && !showAutocompleteDropdown && !hasActiveFilter && (
-                <div className="px-4 pt-3 pb-2 border-b border-[var(--color-border)]">
-                  <p className="text-[13px] font-semibold text-[var(--color-text-primary)] truncate">
+                <div className="px-3.5 pt-2.5 pb-1.5 border-b border-[var(--color-border)]">
+                  <p className="text-[12.5px] font-semibold text-[var(--color-text-primary)] truncate">
                     {hotelName}
                   </p>
-                  <p className="text-[11.5px] text-[var(--color-text-secondary)] truncate">
+                  <p className="text-[11px] text-[var(--color-text-secondary)] truncate">
                     {isTh
                       ? "เลือกหมวดที่สนใจ หรือพิมพ์ค้นหาสถานที่รอบที่พัก"
                       : "Pick a category or search places nearby"}
@@ -2145,18 +2236,18 @@ export function DealNearbyPlacesModal({
                 </div>
               )}
 
-              <div className="flex-1 min-h-0 overflow-y-auto max-h-[min(480px,calc(88vh-150px))]">
+              <div className="flex-1 min-h-0 overflow-y-auto max-h-[min(360px,calc(88vh-160px))]">
                 {activeDetailPlace && (selectedPlace || !desktopPanelOpen)
                   ? renderPlaceDetailCard(activeDetailPlace, "desktop")
                   : showAutocompleteDropdown
-                  ? renderAutocompleteList()
+                  ? renderAutocompleteList(true)
                   : hasActiveFilter
                   ? renderResultsList(false)
                   : renderCategoryMenu()}
               </div>
 
               {providerNotice === "osm" && hasActiveFilter && !selectedPlace && (
-                <div className="px-4 py-1.5 border-t border-[var(--color-border)] text-[10.5px] text-[var(--color-text-tertiary)]">
+                <div className="px-3.5 py-1 border-t border-[var(--color-border)] text-[10px] text-[var(--color-text-tertiary)]">
                   © OpenStreetMap contributors
                 </div>
               )}
@@ -2177,7 +2268,7 @@ export function DealNearbyPlacesModal({
           {mobilePoiPresence.shouldRender && activeDetailPlace && (
             <div
               data-state={mobilePoiPresence.dataState}
-              className="cgr-floating-card-motion absolute left-3.5 right-3.5 bottom-[max(26px,env(safe-area-inset-bottom))] z-40 rounded-[24px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden"
+              className="cgr-floating-card-motion absolute left-3.5 right-3.5 mx-auto max-w-[320px] bottom-[max(26px,env(safe-area-inset-bottom))] z-40 rounded-[24px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden"
             >
               {renderPlaceDetailCard(activeDetailPlace, "mobile")}
             </div>
@@ -2218,7 +2309,7 @@ export function DealNearbyPlacesModal({
                   mobileSearchInputRef.current?.blur();
                   void runTextSearch(searchInput);
                 }}
-                className={`flex-1 min-w-0 h-12 rounded-[14px] bg-[var(--color-background-card)] border px-3.5 flex items-center gap-2.5 transition-colors duration-200 ${
+                className={`flex-1 min-w-0 h-12 rounded-full bg-[var(--color-background-card)] border px-4 flex items-center gap-2.5 transition-colors duration-200 ${
                   isSearchFocused
                     ? "border-[var(--color-text-primary)]"
                     : "border-[var(--color-border-emphasized)]"
@@ -2264,7 +2355,7 @@ export function DealNearbyPlacesModal({
                       mobileSearchInputRef.current?.focus({ preventScroll: true });
                     }}
                     aria-label={isTh ? "ล้างข้อความ" : "Clear text"}
-                    className="h-6 w-6 rounded-[7px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer"
+                    className="h-6 w-6 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -2299,7 +2390,7 @@ export function DealNearbyPlacesModal({
                       ? "ล้างการค้นหา"
                       : "Clear search"
                   }
-                  className="h-12 w-12 rounded-[14px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                  className="h-12 w-12 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
                 >
                   <X className="w-4 h-4" strokeWidth={2.2} />
                 </button>
@@ -2326,7 +2417,7 @@ export function DealNearbyPlacesModal({
                             mobileSearchInputRef.current?.blur();
                             handleSelectCategory(cat.id);
                           }}
-                          className="h-12 pl-2 pr-4 rounded-[14px] bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2.5 cursor-pointer transition-colors"
+                          className="h-12 pl-2 pr-4 rounded-full bg-[var(--color-background-card)] border border-[var(--color-border-emphasized)] hover:bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2.5 cursor-pointer transition-colors"
                         >
                           <span
                             style={{ backgroundColor: cat.color }}
@@ -2362,7 +2453,7 @@ export function DealNearbyPlacesModal({
                       key={cat.id}
                       type="button"
                       onClick={() => handleSelectCategory(cat.id)}
-                      className="h-11 pl-1.5 pr-3.5 rounded-[13px] bg-[var(--color-background-card)] border border-black/[0.07] dark:border-white/[0.12] hover:bg-[var(--color-background-muted)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 shrink-0 whitespace-nowrap cursor-pointer transition-colors"
+                      className="h-11 pl-1.5 pr-4 rounded-full bg-[var(--color-background-card)] border border-black/[0.07] dark:border-white/[0.12] hover:bg-[var(--color-background-muted)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 shrink-0 whitespace-nowrap cursor-pointer transition-colors"
                     >
                       <span
                         style={{ backgroundColor: cat.color }}

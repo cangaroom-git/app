@@ -86,10 +86,7 @@ for (const absPath of files) {
 
     // 4. Non-square aspect ratios (exempt Video players, Map containers, and Hero mosaic aspect-[2/1])
     const isMediaHelper = rel === "src/lib/mediaUtils.ts";
-    const isMapContainer =
-      rel === "src/components/hotel/HotelLocationMap.tsx" ||
-      (rel === "src/components/home/DealNearbyPlacesModal.tsx" &&
-        line.includes("aspect-[16/10]"));
+    const isMapContainer = rel === "src/components/hotel/HotelLocationMap.tsx";
     const isFacebookAspectPicker =
       rel === "src/components/studio/StudioPinsAndFacebookTab.tsx" &&
       line.includes("label:");

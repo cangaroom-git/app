@@ -8,7 +8,9 @@ import {
   Compass,
   MapPin,
   Maximize2,
+  Minus,
   Navigation,
+  Plus,
   Search,
   ShoppingBag,
   ShoppingCart,
@@ -227,7 +229,17 @@ export function HotelLocationMap({
 
   const [isPreviewMapMounted, setIsPreviewMapMounted] = useState(false);
 
-  // Mount MapLibre preview map ONCE per (latitude, longitude, isDark) — NEVER tear down mid-load when async curatedPlaces arrive!
+  const handlePreviewZoom = (delta: number) => {
+    const map = previewMapRef.current;
+    if (!map) return;
+    const nextZoom = Math.max(
+      WORLD_MIN_ZOOM,
+      Math.min(THAILAND_MAX_ZOOM, map.getZoom() + delta)
+    );
+    map.zoomTo(nextZoom, { duration: 240 });
+  };
+
+  // Mount MapLibre preview map ONCE per (latitude, longitude, isDark, isTh) — NEVER tear down mid-load when async curatedPlaces arrive!
   useEffect(() => {
     if (!hasCoords || !previewContainerRef.current) return;
 
@@ -247,10 +259,33 @@ export function HotelLocationMap({
         zoom: 13.7,
         minZoom: WORLD_MIN_ZOOM,
         maxZoom: THAILAND_MAX_ZOOM,
-        interactive: false,
+        interactive: true,
+        scrollZoom: false,
+        cooperativeGestures: true,
+        dragRotate: false,
+        touchPitch: false,
         attributionControl: false,
+        locale: isTh
+          ? {
+              "CooperativeGesturesHandler.WindowsHelpText":
+                "ใช้ Ctrl + เลื่อนเพื่อซูมแผนที่",
+              "CooperativeGesturesHandler.MacHelpText":
+                "ใช้ ⌘ + เลื่อนเพื่อซูมแผนที่",
+              "CooperativeGesturesHandler.MobileHelpText":
+                "ใช้ 2 นิ้วเพื่อเลื่อนแผนที่",
+            }
+          : {
+              "CooperativeGesturesHandler.WindowsHelpText":
+                "Use Ctrl + scroll to zoom the map",
+              "CooperativeGesturesHandler.MacHelpText":
+                "Use ⌘ + scroll to zoom the map",
+              "CooperativeGesturesHandler.MobileHelpText":
+                "Use two fingers to move the map",
+            },
       });
-      configureThailandMapInteractions(mapInstance);
+      configureThailandMapInteractions(mapInstance, {
+        allowScrollZoom: false,
+      });
       previewMapRef.current = mapInstance;
       setIsPreviewMapMounted(true);
 
@@ -320,7 +355,7 @@ export function HotelLocationMap({
       }
       previewMapRef.current = null;
     };
-  }, [hasCoords, latitude, longitude, hotelName, isDark]);
+  }, [hasCoords, latitude, longitude, hotelName, isDark, isTh]);
 
   // Sync curated nearby markers cleanly onto the already-mounted preview map (ZERO map teardown!)
   useEffect(() => {
@@ -363,31 +398,20 @@ export function HotelLocationMap({
     <div className="space-y-4">
       {hasCoords && (
         <div
-          role="button"
-          tabIndex={0}
-          onClick={() => openExplorer()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openExplorer();
-            }
-          }}
+          role="region"
           aria-label={
-            isTh ? "เปิดแผนที่สำรวจสถานที่ใกล้เคียง" : "Open nearby places explorer"
+            isTh ? `แผนที่ตำแหน่ง ${hotelName}` : `Location map for ${hotelName}`
           }
-          className="relative isolate w-full aspect-square sm:aspect-[16/10] lg:aspect-auto lg:h-[420px] rounded-[16px] overflow-hidden bg-[#F6F4EF] dark:bg-[#191919] cursor-pointer select-none"
+          className="relative isolate w-full aspect-square sm:aspect-[16/10] lg:aspect-auto lg:h-[420px] rounded-[16px] overflow-hidden bg-[#F6F4EF] dark:bg-[#191919] select-none"
         >
-          <div ref={previewContainerRef} className="w-full h-full" />
+          <div ref={previewContainerRef} className="relative z-0 w-full h-full" />
 
-          {/* Airbnb-Style Floating Top-Left Search Trigger + Top-Right Expand */}
-          <div className="absolute top-3.5 inset-x-3.5 z-20 flex items-center justify-between gap-2.5 pointer-events-none">
+          {/* Airbnb-Style Floating Top-Left Search Trigger */}
+          <div className="absolute top-3.5 left-3.5 right-[60px] z-20 pointer-events-none">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openExplorer({ focusSearch: true });
-              }}
-              className="pointer-events-auto h-11 px-4 rounded-[14px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[13.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-2.5 max-w-[calc(100%-56px)] sm:w-[320px] cursor-pointer transition-colors"
+              onClick={() => openExplorer({ focusSearch: true })}
+              className="pointer-events-auto h-11 px-4 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[13.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-2.5 max-w-full sm:w-[320px] cursor-pointer transition-colors"
             >
               <Search className="w-4 h-4 shrink-0" />
               <span className="truncate">
@@ -396,18 +420,37 @@ export function HotelLocationMap({
                   : "Find restaurants, cafes, 7-Eleven..."}
               </span>
             </button>
+          </div>
 
+          {/* Airbnb-Style Top-Right Expand + Grouped Zoom Controls */}
+          <div className="absolute top-3.5 right-3.5 z-20 flex flex-col items-end gap-2 pointer-events-none">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                openExplorer();
-              }}
+              onClick={() => openExplorer()}
               aria-label={isTh ? "ขยายแผนที่เต็มจอ" : "Expand map"}
-              className="pointer-events-auto h-10 w-10 rounded-[12px] bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+              className="pointer-events-auto h-10 w-10 rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
             >
               <Maximize2 className="w-4 h-4" />
             </button>
+
+            <div className="pointer-events-auto flex flex-col rounded-full bg-[var(--color-background-popover)] border border-black/[0.06] dark:border-white/[0.1] shadow-[var(--shadow-popover)] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => handlePreviewZoom(1)}
+                aria-label={isTh ? "ซูมเข้า" : "Zoom in"}
+                className="h-9 w-9 inline-flex items-center justify-center text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] border-b border-[var(--color-border)] cursor-pointer transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePreviewZoom(-1)}
+                aria-label={isTh ? "ซูมออก" : "Zoom out"}
+                className="h-9 w-9 inline-flex items-center justify-center text-[var(--color-text-primary)] hover:bg-[var(--color-background-muted)] cursor-pointer transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Bottom-Left Soft Warm Round Airbnb Category Medallions (Zero API cost until clicked!) */}

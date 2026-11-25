@@ -1085,6 +1085,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeTab === "board" ||
     activeTab === "wishlist";
   const isExploreFullBleed = activeTab === "explore";
+  const isTripHeroFullBleed = pathname === "/trip";
 
   const contextValue: PlatformAppContextValue = useMemo(
     () => ({
@@ -1283,13 +1284,15 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             className={
               isExploreFullBleed
                 ? "pt-0 lg:pt-16 pb-0 lg:pl-[72px]"
+                : isTripHeroFullBleed
+                ? "pt-0 lg:pt-16 pb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:pb-12 lg:pl-[72px]"
                 : "pt-[env(safe-area-inset-top,0px)] lg:pt-16 pb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:pb-12 lg:pl-[72px]"
             }
           >
             <div
               data-cgr-app-inner="true"
               className={
-                isExploreFullBleed
+                isExploreFullBleed || isTripHeroFullBleed
                   ? "p-0"
                   : "px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5"
               }

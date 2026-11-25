@@ -1509,6 +1509,20 @@ html.dark .border-stone-300 {
   outline: none !important;
 }
 
+.maplibregl-cooperative-gesture-screen {
+  font-family: var(--font-family-body) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-align: center !important;
+  background: rgba(24, 35, 52, 0.42) !important;
+  transition: opacity 0.35s ease 0.55s !important;
+  z-index: 15 !important;
+}
+
+.maplibregl-cooperative-gesture-screen.maplibregl-show {
+  transition: opacity 0.08s ease !important;
+}
+
 /* ============================================================================
    AIRBNB HOSTING SIDE PANEL SMOOTH SLIDE + FADE DRILL-DOWN TRANSITIONS
    Calibrated to Airbnb Hosting pacing (simultaneous micro-slide + cross-fade)
@@ -2334,7 +2348,37 @@ html.dark .cgr-map-floating-label {
   animation: cgrSkeletonBreathe 1.55s ease-in-out infinite;
 }
 
+/* Trip Storytelling Hero & Popular Province Scrapbook Stage */
+.cgr-trip-hero-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.cgr-trip-hero-scrim {
+  background: linear-gradient(
+    to top,
+    rgba(16, 36, 62, 0.94) 0%,
+    rgba(22, 48, 82, 0.72) 34%,
+    rgba(30, 74, 124, 0.16) 62%,
+    rgba(30, 74, 124, 0) 100%
+  );
+}
+
+.cgr-trip-scrapbook-sky {
+  background-color: #eef5fc;
+}
+
+html.dark .cgr-trip-scrapbook-sky {
+  background-color: #16202e;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .cgr-trip-hero-runway {
+    height: auto !important;
+  }
+  .cgr-trip-hero-layer {
+    transform: none !important;
+  }
   .cgr-skeleton-block {
     animation: none !important;
   }
