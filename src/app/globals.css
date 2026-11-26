@@ -235,6 +235,15 @@ body {
   transition: color 0.18s ease;
 }
 
+/* Mobile-only live root background for iOS 26 Safari status-bar reliability (`/` #5FAEE9, `/trip` #2986D6, others #fffffe).
+   Bottom overscroll on `/` and `/trip` is masked in solid `--color-background-body` by the z-[15] bottom white shield. */
+@media (max-width: 1023px) {
+  html,
+  body {
+    background-color: var(--cgr-mobile-chrome-bg, var(--color-background-body));
+  }
+}
+
 h1, h2, h3, h4, .font-serif {
   font-family: var(--font-family-heading);
   letter-spacing: -0.01em;

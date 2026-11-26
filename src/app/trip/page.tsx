@@ -81,11 +81,12 @@ export default function TripPlannerPage() {
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(true);
   const tripSheetRef = useRef<HTMLDivElement | null>(null);
   const [isTripSheetPinned, setIsTripSheetPinned] = useState(false);
+  const [showBottomWhiteShield, setShowBottomWhiteShield] = useState(false);
 
-  // Match Home (`/`)'s zero-scroll-listener `z-[60]` solid-white cover pattern:
-  // when the white Trip sheet reaches the top edge on mobile, mount a solid 6px white cover
-  // above the `z-[55]` blue sentinel so Safari samples white; hide via `display: none` when
-  // scrolling back up so Safari seamlessly restores `#2986D6` with zero stutter.
+  // Match Home (`/`)'s zero-scroll-listener `z-[60]` top white cover + `z-[15]` bottom white shield:
+  // - Top `z-[60]` flips Safari's status bar to white when the white Trip sheet reaches top:0,
+  //   and hides via `display: none` when scrolling back up so `#2986D6` restores cleanly.
+  // - Bottom `z-[15]` masks blue `body` whenever the user rubber-bands past the bottom of `/trip`.
   useEffect(() => {
     if (
       typeof window === "undefined" ||
@@ -97,7 +98,7 @@ export default function TripPlannerPage() {
     const sheetEl = tripSheetRef.current;
     if (!sheetEl) return;
 
-    const observer = new IntersectionObserver(
+    const topObserver = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
@@ -105,8 +106,20 @@ export default function TripPlannerPage() {
       },
       { rootMargin: "0px 0px -98% 0px", threshold: 0 }
     );
-    observer.observe(sheetEl);
-    return () => observer.disconnect();
+    const midObserver = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        setShowBottomWhiteShield(entry.isIntersecting);
+      },
+      { rootMargin: "0px 0px -55% 0px", threshold: 0 }
+    );
+    topObserver.observe(sheetEl);
+    midObserver.observe(sheetEl);
+    return () => {
+      topObserver.disconnect();
+      midObserver.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -217,12 +230,19 @@ export default function TripPlannerPage() {
 
   return (
     <div className="lg:pb-12">
-      {/* Mobile Solid-White Top Cover (z-[60] > z-[55] blue sentinel) when scrolled into white Trip sheet;
-          uses `hidden` (`display: none`) while Hero is visible so Safari seamlessly restores `#2986D6`. */}
+      {/* Mobile Solid-White Top Cover (z-[60]) + Bottom Overscroll White Shield (z-[15] behind z-20 sheet):
+          keeps iOS Safari status bar white when scrolled, cleanly restores `#2986D6` on scroll up,
+          and masks blue `body` completely during bottom rubber-band overscroll. */}
       <div
         aria-hidden="true"
         className={`lg:hidden fixed top-0 inset-x-0 z-[60] h-[max(6px,env(safe-area-inset-top,0px))] bg-[var(--color-background-body)] pointer-events-none ${
           isTripSheetPinned ? "block" : "hidden"
+        }`}
+      />
+      <div
+        aria-hidden="true"
+        className={`lg:hidden fixed bottom-0 inset-x-0 z-[15] h-[55vh] bg-[var(--color-background-body)] pointer-events-none ${
+          showBottomWhiteShield ? "block" : "hidden"
         }`}
       />
 

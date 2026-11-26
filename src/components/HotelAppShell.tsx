@@ -1197,6 +1197,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   // Note: `#fffffe` is visually identical to pure white `#ffffff` (1/255th off) while bypassing
   // Safari's optimization that ignores resets from a colored bar back to `#ffffff`.
   const hasActiveHomeSearch = globalSearchQuery.trim().length > 0;
+  const isMobileBlueHeroRoute =
+    (pathname === "/" && !hasActiveHomeSearch) || pathname === "/trip";
   const mobileTopChromeColor =
     pathname === "/" && !hasActiveHomeSearch
       ? "#5FAEE9"
@@ -1209,9 +1211,14 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined" || !document.head) return;
 
-    // 1. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
-    // Note: `html`/`body` stay pure `--color-background-body` so bottom overscroll bounce on
-    // `/` and `/trip` is always clean white/dark (never blue); top chrome uses Priority-1 `z-[55]` 5px sentinel.
+    // 1. Update live mobile `html`/`body` background CSS variable (required by iOS 26 Safari
+    //    so returning to `/` or `/trip` top ALWAYS restores blue cleanly without getting stuck white).
+    document.documentElement.style.setProperty(
+      "--cgr-mobile-chrome-bg",
+      mobileTopChromeColor
+    );
+
+    // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
     const existing = document.head.querySelectorAll('meta[name="theme-color"]');
     if (
       existing.length !== 1 ||
@@ -1225,7 +1232,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       document.head.appendChild(meta);
     }
 
-    // 2. Gently wake WebKit's `PageColorSampler` strictly on route switch (never during scroll)
+    // 3. Gently wake WebKit's `PageColorSampler` strictly on route switch (never during scroll)
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       const rafId = window.requestAnimationFrame(() => {
         window.scrollTo(window.scrollX, window.scrollY);
@@ -1268,12 +1275,15 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
       {/* Top-edge 5px fixed sentinel (>= 3px WebKit PageColorSampler minimum threshold).
-          Keyed strictly by route color so iOS 26 Safari locks onto the route's exact status-bar
-          color across both scrolling and SPA route switches (0 scroll/touch work). */}
+          - On Hero routes (`/` & `/trip`): placed at `z-[1]` (above Hero `z-0`, BELOW white sheet `z-20`)
+            so the white sheet covers it cleanly without ever showing a stray 5px blue line over white content.
+          - On standard white routes (`/explore`, `/account`, `/studio`, `/admin`): `z-[55]` cleanly pins white. */}
       <div
         key={mobileTopChromeColor}
         aria-hidden="true"
-        className="lg:hidden fixed top-0 inset-x-0 z-[55] h-[5px] pointer-events-none"
+        className={`lg:hidden fixed top-0 inset-x-0 h-[5px] pointer-events-none ${
+          isMobileBlueHeroRoute ? "z-[1]" : "z-[55]"
+        }`}
         style={{ backgroundColor: mobileTopChromeColor }}
       />
       {isDedicatedShellPage ? (

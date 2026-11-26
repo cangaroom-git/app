@@ -151,11 +151,6 @@ export function TripStoryParallaxHero({
       ref={runwayRef}
       className="cgr-trip-hero-runway relative w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] lg:mx-auto h-[134svh] lg:h-[155vh]"
     >
-      {/* Seamless sky extension above top:0 so iOS top rubber-band pull stays #2986D6 while bottom stays pure white */}
-      <div
-        aria-hidden="true"
-        className="lg:hidden pointer-events-none absolute -top-[40vh] inset-x-0 h-[40vh] bg-[#2986D6]"
-      />
       <section
         ref={stickyStageRef}
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
