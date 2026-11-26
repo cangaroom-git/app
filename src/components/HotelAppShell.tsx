@@ -1191,13 +1191,62 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const todayFormatted = formatDateStr(today);
   void todayFormatted;
 
-  // Lightweight zero-listener iOS Safari status-bar sync on SPA `<Link>` navigation.
-  // Runs ONLY when `pathname`, `theme`, or active home search changes (0 scroll/touch listeners, 0 timers).
+  // Zero-scroll-listener iOS Safari (iOS 15–18 & iOS 26+ Liquid Glass) status-bar sync.
+  // Uses IntersectionObserver (0 scroll/touch listeners) to flip the hero status bar cleanly
+  // to white/dark when the white sheet covers the top, and resets immediately on route change.
   const hasActiveHomeSearch = globalSearchQuery.trim().length > 0;
+  const isMobileHeroRoute =
+    (pathname === "/" && !hasActiveHomeSearch) || pathname === "/trip";
+  const [isMobileHeroCovered, setIsMobileHeroCovered] = useState(false);
+
+  useEffect(() => {
+    setIsMobileHeroCovered(false);
+    if (!isMobileHeroRoute || typeof window === "undefined") return;
+    if (window.innerWidth >= 1024 || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    let io: IntersectionObserver | null = null;
+    let mo: MutationObserver | null = null;
+
+    const attachObserver = (el: Element) => {
+      io = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+          const covered = !entry.isIntersecting && entry.boundingClientRect.top <= 16;
+          setIsMobileHeroCovered((prev) => (prev === covered ? prev : covered));
+        },
+        { rootMargin: "-16px 0px 0px 0px", threshold: 0 }
+      );
+      io.observe(el);
+    };
+
+    const existingSentinel = document.querySelector('[data-cgr-hero-sheet-top="true"]');
+    if (existingSentinel) {
+      attachObserver(existingSentinel);
+    } else {
+      mo = new MutationObserver(() => {
+        const found = document.querySelector('[data-cgr-hero-sheet-top="true"]');
+        if (found) {
+          mo?.disconnect();
+          mo = null;
+          attachObserver(found);
+        }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+
+    return () => {
+      io?.disconnect();
+      mo?.disconnect();
+    };
+  }, [isMobileHeroRoute, pathname]);
+
   const mobileTopChromeColor =
-    pathname === "/" && !hasActiveHomeSearch
+    pathname === "/" && !hasActiveHomeSearch && !isMobileHeroCovered
       ? "#5FAEE9"
-      : pathname === "/trip"
+      : pathname === "/trip" && !isMobileHeroCovered
         ? "#2986D6"
         : theme === "dark"
           ? "#11161d"
@@ -1205,6 +1254,14 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof document === "undefined" || !document.head) return;
+
+    // 1. Update live mobile `html`/`body` background CSS variable (iOS 26 Safari Live Observer)
+    document.documentElement.style.setProperty(
+      "--cgr-mobile-chrome-bg",
+      mobileTopChromeColor
+    );
+
+    // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
     const existing = document.head.querySelectorAll('meta[name="theme-color"]');
     if (
       existing.length === 1 &&
@@ -1212,8 +1269,6 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     ) {
       return;
     }
-    // Replace our own `<meta name="theme-color">` node cleanly so iOS Safari repaints immediately
-    // on soft SPA `<Link>` navigation (Next.js `export const viewport` does not re-emit on soft nav).
     existing.forEach((node) => node.remove());
     const meta = document.createElement("meta");
     meta.name = "theme-color";
@@ -1255,11 +1310,13 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   return (
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
-      {/* Static 1px top-edge anchor (zero animation, zero JS listeners) so iOS 26 Safari Liquid Glass
-          re-samples the exact route status-bar color immediately on SPA `<Link>` navigation */}
+      {/* Top-edge 5px fixed sentinel (>= 3px WebKit PageColorSampler minimum threshold).
+          Keyed by color so iOS 26 Safari commits a fresh fixed layer on every SPA route switch
+          with zero scroll/touch listeners and zero CSS transitions. */}
       <div
+        key={mobileTopChromeColor}
         aria-hidden="true"
-        className="lg:hidden fixed top-0 inset-x-0 z-[55] h-[1px] pointer-events-none"
+        className="lg:hidden fixed top-0 inset-x-0 z-[55] h-[5px] pointer-events-none"
         style={{ backgroundColor: mobileTopChromeColor }}
       />
       {isDedicatedShellPage ? (

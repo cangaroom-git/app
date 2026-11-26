@@ -203,6 +203,11 @@ export default function TripPlannerPage() {
 
       {/* Main Content Container — Airbnb-style rounded white sheet overlapping straight-edge Hero on Mobile */}
       <div className="relative z-20 -mt-7 lg:mt-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 lg:pt-0">
+        <span
+          data-cgr-hero-sheet-top="true"
+          aria-hidden="true"
+          className="lg:hidden pointer-events-none absolute top-0 inset-x-0 h-px"
+        />
         <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section 2: Cute Popular Province Groups (Scrapbook Clusters) */}
         <TripProvinceGroupsSection

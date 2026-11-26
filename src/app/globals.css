@@ -235,17 +235,24 @@ body {
   transition: background-color 0.18s ease, color 0.18s ease;
 }
 
-/* Pure-CSS zero-JS bottom edge guard for iOS 26+ Safari Liquid Glass URL bar:
-   ensures the bottom edge always samples the solid canvas surface even while
-   the mobile bottom navigation bar auto-hides during scroll (0 JS, 0 listeners). */
+/* Pure-CSS zero-JS iOS 26+ Safari Liquid Glass edge chrome synchronization:
+   - Live mobile root background follows `--cgr-mobile-chrome-bg` (Priority 2 WebKit live observer)
+     while Desktop (`>= 1024px`) stays pure `--color-background-body`.
+   - Bottom `5px` fixed guard (`>= 3px` WebKit `PageColorSampler` minimum height) guarantees
+     Safari's bottom URL bar ALWAYS locks onto the solid canvas surface and never bleeds blue. */
 @media (max-width: 1023px) {
+  html,
+  body {
+    background-color: var(--cgr-mobile-chrome-bg, var(--color-background-body));
+  }
+
   body::after {
     content: "";
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 2px;
+    height: 5px;
     background-color: var(--color-background-body);
     pointer-events: none;
     z-index: 65;

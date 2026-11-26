@@ -135,6 +135,12 @@ function RouteProgressBarInner() {
     };
   }, [beginProgress, clearTimers]);
 
+  // Unmount completely when idle so no `fixed top-0 opacity-0` element lingers
+  // where WebKit's iOS 26 PageColorSampler inspects top-edge fixed containers.
+  if (!isVisible && progress === 0) {
+    return null;
+  }
+
   return (
     <div
       aria-hidden="true"
