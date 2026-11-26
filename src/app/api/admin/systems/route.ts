@@ -16,7 +16,7 @@ const DEFAULT_SYSTEM_CONFIGS: Record<string, Record<string, unknown>> = {
     metaTitle: "Nondii — ศูนย์รวมโปรเที่ยวไทย · ที่พัก คาเฟ่ ร้านอาหาร & บาร์",
     metaDescription:
       "แหล่งรวมโปรโมชั่นสำหรับนักท่องเที่ยวทั่วไทย ทั้งที่พักจองตรง 0% GP คาเฟ่ ร้านอาหาร บาร์ แบรนด์ดัง และบัตรเครดิต",
-    ogImageUrl: "/brand/hero-slider/opt/bg-desktop.webp",
+    ogImageUrl: "/brand/hero-slider/opt/sky-cloud-bg-desktop.webp",
   },
 };
 

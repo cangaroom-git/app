@@ -155,7 +155,7 @@ export function TripStoryParallaxHero({
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
         className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2a629a] flex flex-col justify-end select-none"
       >
-        {/* Layer 0: Uninterrupted Mountain & Sky Panorama (Optimized WebP + Compositor Dolly-Out) */}
+        {/* Layer 0: Uninterrupted Mountain & Sky Panorama (4K AVIF + WebP + Compositor Dolly-Out) */}
         <div
           ref={bgLayerRef}
           className="cgr-trip-hero-layer cgr-trip-hero-bg pointer-events-none absolute -inset-6 lg:-inset-9"
@@ -163,11 +163,20 @@ export function TripStoryParallaxHero({
           <picture className="block w-full h-full">
             <source
               media="(max-width: 1023px)"
-              srcSet="/brand/nondii-trip-bg-mobile-opt.webp"
+              srcSet="/brand/nondii-trip-bg-4k-mobile.avif"
+              type="image/avif"
+            />
+            <source
+              media="(max-width: 1023px)"
+              srcSet="/brand/nondii-trip-bg-4k-mobile.webp"
               type="image/webp"
             />
+            <source
+              srcSet="/brand/nondii-trip-bg-4k-desktop.avif"
+              type="image/avif"
+            />
             <img
-              src="/brand/nondii-trip-bg-desktop-opt.webp"
+              src="/brand/nondii-trip-bg-4k-desktop.webp"
               alt=""
               aria-hidden="true"
               fetchPriority="high"
@@ -192,7 +201,7 @@ export function TripStoryParallaxHero({
           />
         </div>
 
-        {/* Layer 1: Traveller Standing On Summit Ground Ledge (Optimized Mobile/Desktop WebP) */}
+        {/* Layer 1: Ultra-Sharp 5.5K Traveller Standing On Summit Ground Ledge (AVIF + WebP) */}
         <div
           ref={travellerLayerRef}
           className="cgr-trip-hero-layer cgr-trip-hero-fg pointer-events-none absolute inset-x-0 top-0 bottom-0 flex items-end justify-center"
@@ -200,11 +209,20 @@ export function TripStoryParallaxHero({
           <picture className="block w-full h-full">
             <source
               media="(max-width: 1023px)"
-              srcSet="/brand/nondii-trip-girl-mobile-opt.webp"
+              srcSet="/brand/nondii-trip-girl-4k-mobile.avif"
+              type="image/avif"
+            />
+            <source
+              media="(max-width: 1023px)"
+              srcSet="/brand/nondii-trip-girl-4k-mobile.webp"
               type="image/webp"
             />
+            <source
+              srcSet="/brand/nondii-trip-girl-4k-desktop.avif"
+              type="image/avif"
+            />
             <img
-              src="/brand/nondii-trip-girl-desktop-opt.webp"
+              src="/brand/nondii-trip-girl-4k-desktop.webp"
               alt={
                 isTh
                   ? "นักเดินทางยืนบนยอดผาถือกล้องมองวิวภูเขา"
