@@ -1243,6 +1243,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     };
   }, [isMobileHeroRoute, pathname]);
 
+  // Note: `#fffffe` is visually identical to pure white `#ffffff` (1/255th off)
+  // while bypassing iOS Safari's known optimization that ignores resets back to `#ffffff`.
   const mobileTopChromeColor =
     pathname === "/" && !hasActiveHomeSearch && !isMobileHeroCovered
       ? "#5FAEE9"
@@ -1250,7 +1252,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
         ? "#2986D6"
         : theme === "dark"
           ? "#11161d"
-          : "#ffffff";
+          : "#fffffe";
 
   useEffect(() => {
     if (typeof document === "undefined" || !document.head) return;
@@ -1264,17 +1266,24 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
     const existing = document.head.querySelectorAll('meta[name="theme-color"]');
     if (
-      existing.length === 1 &&
-      existing[0].getAttribute("content") === mobileTopChromeColor
+      existing.length !== 1 ||
+      existing[0].getAttribute("content") !== mobileTopChromeColor
     ) {
-      return;
+      existing.forEach((node) => node.remove());
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = mobileTopChromeColor;
+      meta.setAttribute("data-cgr-theme-color", "1");
+      document.head.appendChild(meta);
     }
-    existing.forEach((node) => node.remove());
-    const meta = document.createElement("meta");
-    meta.name = "theme-color";
-    meta.content = mobileTopChromeColor;
-    meta.setAttribute("data-cgr-theme-color", "1");
-    document.head.appendChild(meta);
+
+    // 3. Gently wake WebKit's `PageColorSampler` on mobile SPA route switches with zero visual jump
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      const rafId = window.requestAnimationFrame(() => {
+        window.scrollTo(window.scrollX, window.scrollY);
+      });
+      return () => window.cancelAnimationFrame(rafId);
+    }
   }, [mobileTopChromeColor, pathname]);
 
   // Sticky mount flags so dynamic modal/overlay chunks stay 0 KB on initial load

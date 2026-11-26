@@ -232,7 +232,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: normal;
-  transition: background-color 0.18s ease, color 0.18s ease;
+  transition: color 0.18s ease;
 }
 
 /* Pure-CSS zero-JS iOS 26+ Safari Liquid Glass edge chrome synchronization:
@@ -2516,33 +2516,33 @@ html.dark .cgr-map-floating-label {
 
 /* Default initial poses (top-anchored sky so #2986D6 blends seamlessly into iPhone Status Bar!) */
 .cgr-trip-hero-bg {
-  transform: translate3d(0, 0px, 0) scale(1.22);
+  transform: translate3d(0, 0px, 0) scale(1.16);
   transform-origin: 50% 0%;
 }
 
 .cgr-trip-hero-logo {
   opacity: 0;
-  transform: translate3d(0, 56px, 0) scale(0.92);
+  transform: translate3d(0, 28px, 0) scale(0.95);
   will-change: transform, opacity;
 }
 
 .cgr-trip-hero-fg {
-  transform: translate3d(0, 34px, 0) scale(1.13);
+  transform: translate3d(0, 24px, 0) scale(1.09);
   transform-origin: 50% 100%;
 }
 
 @media (min-width: 1024px) {
   .cgr-trip-hero-bg {
-    transform: translate3d(0, 0px, 0) scale(1.42);
+    transform: translate3d(0, 0px, 0) scale(1.28);
   }
   .cgr-trip-hero-fg {
-    transform: translate3d(0, 54px, 0) scale(1.22);
+    transform: translate3d(0, 38px, 0) scale(1.15);
   }
 }
 
 @keyframes cgrTripBgDollyMobile {
   from {
-    transform: translate3d(0, 0px, 0) scale(1.22);
+    transform: translate3d(0, 0px, 0) scale(1.16);
   }
   to {
     transform: translate3d(0, 0px, 0) scale(1);
@@ -2551,7 +2551,7 @@ html.dark .cgr-map-floating-label {
 
 @keyframes cgrTripBgDollyDesktop {
   from {
-    transform: translate3d(0, 0px, 0) scale(1.42);
+    transform: translate3d(0, 0px, 0) scale(1.28);
   }
   to {
     transform: translate3d(0, 0px, 0) scale(1);
@@ -2559,21 +2559,19 @@ html.dark .cgr-map-floating-label {
 }
 
 @keyframes cgrTripLogoRise {
-  0%,
-  12% {
+  0% {
     opacity: 0;
-    transform: translate3d(0, 56px, 0) scale(0.92);
+    transform: translate3d(0, 28px, 0) scale(0.95);
   }
-  84%,
   100% {
-    opacity: 0.92;
-    transform: translate3d(0, 0px, 0) scale(1.02);
+    opacity: 0.94;
+    transform: translate3d(0, 0px, 0) scale(1);
   }
 }
 
 @keyframes cgrTripFgDollyMobile {
   from {
-    transform: translate3d(0, 34px, 0) scale(1.13);
+    transform: translate3d(0, 24px, 0) scale(1.09);
   }
   to {
     transform: translate3d(0, 0px, 0) scale(1);
@@ -2582,7 +2580,7 @@ html.dark .cgr-map-floating-label {
 
 @keyframes cgrTripFgDollyDesktop {
   from {
-    transform: translate3d(0, 54px, 0) scale(1.22);
+    transform: translate3d(0, 38px, 0) scale(1.15);
   }
   to {
     transform: translate3d(0, 0px, 0) scale(1);
@@ -2594,7 +2592,7 @@ html.dark .cgr-map-floating-label {
     transform: translate3d(0, 0px, 0);
   }
   to {
-    transform: translate3d(0, -14px, 0);
+    transform: translate3d(0, -24px, 0);
   }
 }
 
@@ -2602,13 +2600,13 @@ html.dark .cgr-map-floating-label {
   0% {
     opacity: 1;
   }
-  26%,
+  45%,
   100% {
     opacity: 0;
   }
 }
 
-/* Native GPU Compositor Scroll-Driven Parallax (0ms JS during scroll!) */
+/* Native GPU Compositor Scroll-Driven Parallax (continuous 1:1 finger glide, zero dead-zone hitch!) */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .cgr-trip-hero-runway {
@@ -2623,25 +2621,25 @@ html.dark .cgr-map-floating-label {
     }
 
     .cgr-trip-hero-bg {
-      animation: cgrTripBgDollyMobile cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: cgrTripBgDollyMobile linear both;
       animation-timeline: --cgr-trip-runway;
       animation-range: contain 0% contain 100%;
     }
 
     .cgr-trip-hero-logo {
-      animation: cgrTripLogoRise cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: cgrTripLogoRise ease-out both;
       animation-timeline: --cgr-trip-runway;
       animation-range: contain 0% contain 100%;
     }
 
     .cgr-trip-hero-fg {
-      animation: cgrTripFgDollyMobile cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: cgrTripFgDollyMobile linear both;
       animation-timeline: --cgr-trip-runway;
       animation-range: contain 0% contain 100%;
     }
 
     .cgr-trip-hero-copy {
-      animation: cgrTripCopyLift cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: cgrTripCopyLift linear both;
       animation-timeline: --cgr-trip-runway;
       animation-range: contain 0% contain 100%;
     }

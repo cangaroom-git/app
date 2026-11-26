@@ -76,43 +76,40 @@ export function TripStoryParallaxHero({
         0,
         Math.min(1, scrollDelta / cachedScrubRange)
       );
-      const eased = 1 - Math.pow(1 - rawProgress, 1.45);
+      const logoEased = 1 - Math.pow(1 - rawProgress, 1.35);
 
       if (bgLayerRef.current) {
         const bgScale = cachedIsDesktop
-          ? 1.42 - eased * 0.42
-          : 1.22 - eased * 0.22;
+          ? 1.28 - rawProgress * 0.28
+          : 1.16 - rawProgress * 0.16;
         bgLayerRef.current.style.transform = `translate3d(0, 0px, 0) scale(${bgScale.toFixed(4)})`;
       }
 
       if (brandLogoLayerRef.current) {
-        const logoProgress = Math.max(
-          0,
-          Math.min(1, (rawProgress - 0.12) / 0.72)
-        );
-        const logoEased = 1 - Math.pow(1 - logoProgress, 1.75);
-        const logoOpacity = logoEased * 0.92;
-        const logoY = 56 - logoEased * 56;
-        const logoScale = 0.92 + logoEased * 0.1;
+        const logoOpacity = logoEased * 0.94;
+        const logoY = 28 - logoEased * 28;
+        const logoScale = 0.95 + logoEased * 0.05;
         brandLogoLayerRef.current.style.opacity = logoOpacity.toFixed(3);
         brandLogoLayerRef.current.style.transform = `translate3d(0, ${logoY.toFixed(1)}px, 0) scale(${logoScale.toFixed(4)})`;
       }
 
       if (travellerLayerRef.current) {
         const fgScale = cachedIsDesktop
-          ? 1.22 - eased * 0.22
-          : 1.13 - eased * 0.13;
-        const fgY = cachedIsDesktop ? 54 - eased * 54 : 34 - eased * 34;
+          ? 1.15 - rawProgress * 0.15
+          : 1.09 - rawProgress * 0.09;
+        const fgY = cachedIsDesktop
+          ? 38 - rawProgress * 38
+          : 24 - rawProgress * 24;
         travellerLayerRef.current.style.transform = `translate3d(0, ${fgY.toFixed(1)}px, 0) scale(${fgScale.toFixed(4)})`;
       }
 
       if (contentLayerRef.current) {
-        const contentY = -eased * 14;
+        const contentY = -rawProgress * 24;
         contentLayerRef.current.style.transform = `translate3d(0, ${contentY.toFixed(1)}px, 0)`;
       }
 
       if (scrollHintRef.current) {
-        const hintOpacity = Math.max(0, Math.min(1, 1 - rawProgress * 4));
+        const hintOpacity = Math.max(0, Math.min(1, 1 - rawProgress * 2.2));
         scrollHintRef.current.style.opacity = hintOpacity.toFixed(3);
       }
     };
@@ -147,7 +144,7 @@ export function TripStoryParallaxHero({
   return (
     <div
       ref={runwayRef}
-      className="cgr-trip-hero-runway relative w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] lg:mx-auto h-[175svh] lg:h-[195vh]"
+      className="cgr-trip-hero-runway relative w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] lg:mx-auto h-[128svh] lg:h-[142vh]"
     >
       <section
         ref={stickyStageRef}
@@ -195,7 +192,7 @@ export function TripStoryParallaxHero({
             src="/brand/nondii-text-white.svg"
             alt=""
             aria-hidden="true"
-            decoding="async"
+            decoding="sync"
             className="w-[82%] sm:w-[70%] lg:w-[58%] max-w-[780px] h-auto"
           />
         </div>
