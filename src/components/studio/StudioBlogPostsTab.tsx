@@ -203,7 +203,7 @@ export function StudioBlogPostsTab({
           <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
             บทความคู่มือเที่ยว & SEO Blog ({data.posts.length})
           </h2>
-          <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+          <p className="text-[14px] text-[var(--color-text-secondary)]">
             สร้างหน้า SEO พร้อม Schema.org BlogPosting และการ์ดจองตรง 0% GP ท้ายบทความ
           </p>
         </div>
@@ -211,7 +211,7 @@ export function StudioBlogPostsTab({
         <div className="flex items-center gap-2.5">
           <Link
             href={`/${data.hotel.slug}/posts`}
-            className="h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 transition-colors"
+            className="h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 transition-colors"
           >
             <span>ดูหน้าบทความ</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -230,10 +230,10 @@ export function StudioBlogPostsTab({
       {data.posts.length === 0 ? (
         <div className="rounded-[16px] bg-[var(--color-background-muted)] py-10 px-6 text-center space-y-2">
           <BookOpen className="w-7 h-7 mx-auto text-[var(--color-text-secondary)]" />
-          <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+          <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
             ยังไม่มีบทความ SEO Blog
           </p>
-          <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+          <p className="text-[14px] text-[var(--color-text-secondary)]">
             เขียนคู่มือเที่ยวรอบที่พักหรือรีวิวห้องพักเพื่อดึงทราฟฟิกจาก Google เข้าหน้าร้านฟรี
           </p>
         </div>
@@ -270,7 +270,7 @@ export function StudioBlogPostsTab({
                       · <Eye className="w-3.5 h-3.5" /> {post.viewsCount}
                     </span>
                   </div>
-                  <h3 className="text-[15.5px] font-semibold text-[var(--color-text-primary)] line-clamp-1">
+                  <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)] line-clamp-1">
                     {post.titleTh}
                   </h3>
                   {post.excerptTh && (
@@ -331,7 +331,7 @@ export function StudioBlogPostsTab({
               <button
                 type="button"
                 onClick={() => handleDeletePost(editingPostId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
+                className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
               >
                 ลบบทความนี้
               </button>
@@ -350,7 +350,7 @@ export function StudioBlogPostsTab({
                 type="submit"
                 form="studio-blog-form"
                 disabled={isSubmitting || isUploadingCover}
-                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting
                   ? "กำลังบันทึก..."
@@ -437,7 +437,7 @@ export function StudioBlogPostsTab({
                   className="h-14 w-22 rounded-[10px] object-cover bg-[var(--color-background-muted)] shrink-0"
                 />
               )}
-              <label className="min-h-[56px] px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors">
+              <label className="min-h-[56px] px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0 transition-colors">
                 <Upload className="w-4 h-4" />
                 <span>{isUploadingCover ? "กำลังอัปโหลด..." : "อัปโหลดรูปปก"}</span>
                 <input

@@ -51,7 +51,7 @@ export function AdminTableFooter({
                 onPageSizeChange(size);
                 onPageChange(1);
               }}
-              className={`h-6 px-2 rounded-full text-[11.5px] font-semibold tabular-nums cursor-pointer transition-colors ${
+              className={`h-6 px-2 rounded-full text-[12px] font-semibold tabular-nums cursor-pointer transition-colors ${
                 pageSize === size
                   ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                   : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"

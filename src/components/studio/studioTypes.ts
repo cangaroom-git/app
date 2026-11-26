@@ -67,6 +67,10 @@ export interface StudioHotelRecord {
   propertyType: PropertyTypeDto;
   placeCategory: PlaceCategoryDto;
   merchantMode: MerchantModeDto;
+  locationScope?: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE";
+  branchSummaryTh?: string;
+  branchSummaryEn?: string;
+  eligibleProvinceIds?: string[];
   externalWebsiteUrl: string;
   primaryCtaLabelTh: string;
   openingHoursJson?: PlaceOpeningHoursDayDto[] | null;
@@ -77,6 +81,31 @@ export interface StudioHotelRecord {
   ratingAvg: number;
   reviewCount: number;
   verificationStatus: VerificationStatusDto;
+}
+
+export interface StudioBranchRecord {
+  id: string;
+  branchNameTh: string;
+  branchNameEn: string;
+  provinceId: string;
+  districtTh: string;
+  addressTh: string;
+  latitude: number | null;
+  longitude: number | null;
+  googleMapsUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface StudioMerchantSettingsExtras {
+  taxInvoiceEnabled: boolean;
+  taxLegalName: string;
+  taxId: string;
+  taxBranchCode: string;
+  taxAddress: string;
+  allowSearchIndexing: boolean;
+  seoMetaTitle: string;
+  seoMetaDescription: string;
 }
 
 export interface StudioRoomRecord {
@@ -150,7 +179,12 @@ export interface StudioPayload {
     estimatedOtaGpSavedThb: number;
     pendingBookingsCount: number;
     pendingSyncPinsCount: number;
+    totalPinViews?: number;
+    totalExternalClicks?: number;
+    activePromosCount?: number;
   };
+  branches?: StudioBranchRecord[];
+  merchantSettings?: StudioMerchantSettingsExtras;
   rooms: StudioRoomRecord[];
   dateOverrides: RoomDateOverrideDto[];
   bookedUnitsByRoomDate: Record<string, number>;

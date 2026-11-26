@@ -472,7 +472,7 @@ export function StudioSeasonalPricingSection({
           <button
             type="button"
             onClick={() => setIsReportOpen(true)}
-            className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-medium inline-flex items-center gap-2 cursor-pointer transition-colors"
+            className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-2 cursor-pointer transition-colors"
           >
             <BarChart3 className="w-4 h-4" />
             <span>ภาพรวมทั้งปี</span>
@@ -481,7 +481,7 @@ export function StudioSeasonalPricingSection({
           <button
             type="button"
             onClick={() => openCreateNewRuleModal()}
-            className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+            className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>สร้างช่วงราคาใหม่</span>
@@ -549,7 +549,7 @@ export function StudioSeasonalPricingSection({
                   {/* Center: Title + Price/Rate + Minimal Icon Specs */}
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-baseline gap-2 min-w-0">
-                      <h3 className="text-[16px] sm:text-[17px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                      <h3 className="text-[16px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
                         {rule.name}
                       </h3>
                       {isTemplate && (
@@ -564,7 +564,7 @@ export function StudioSeasonalPricingSection({
                       <span>{priceRangeText ? `${priceRangeText} / คืน` : "ยังไม่ได้ตั้งราคา"}</span>
                       {diffPct !== null && diffPct !== 0 && (
                         <span
-                          className={`text-[12.5px] font-semibold ${
+                          className={`text-[13px] font-semibold ${
                             diffPct < 0
                               ? "text-[var(--color-success)]"
                               : "text-[var(--color-text-secondary)]"
@@ -576,7 +576,7 @@ export function StudioSeasonalPricingSection({
                     </p>
 
                     {/* Minimal Icon Metadata Row */}
-                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[var(--color-text-secondary)] tabular-nums">
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-[var(--color-text-secondary)] tabular-nums">
                       <span className="inline-flex items-center gap-1">
                         <CalendarRange className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
                         <span>
@@ -625,7 +625,7 @@ export function StudioSeasonalPricingSection({
                     className="flex items-center gap-2.5 shrink-0"
                   >
                     <span
-                      className={`hidden sm:inline text-[12.5px] font-medium ${
+                      className={`hidden sm:inline text-[13px] font-medium ${
                         rule.isActive
                           ? "text-[var(--color-text-primary)]"
                           : "text-[var(--color-text-tertiary)]"
@@ -703,7 +703,7 @@ export function StudioSeasonalPricingSection({
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2.5 text-[15.5px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+              <span className="px-2.5 text-[15px] font-semibold text-[var(--color-text-primary)] tabular-nums">
                 ปี พ.ศ. {gaugeYear + 543}{" "}
                 <span className="text-[13px] font-normal text-[var(--color-text-secondary)]">
                   ({gaugeYear})
@@ -744,10 +744,10 @@ export function StudioSeasonalPricingSection({
           {gaugeSummary && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="rounded-[12px] bg-[var(--color-background-muted)]/65 px-3.5 py-3 space-y-0.5">
-                <p className="text-[11.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[12px] text-[var(--color-text-secondary)]">
                   เฉลี่ยทั้งปี (ปกติ ฿{gaugeSummary.baselineYear.toLocaleString()})
                 </p>
-                <p className="text-[17px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                <p className="text-[15px] font-semibold text-[var(--color-text-primary)] tabular-nums">
                   ฿{gaugeSummary.avgYear.toLocaleString()}
                   <span className="text-[12px] font-normal text-[var(--color-text-secondary)]">
                     {" "}
@@ -757,7 +757,7 @@ export function StudioSeasonalPricingSection({
               </div>
 
               <div className="rounded-[12px] bg-[var(--color-background-muted)]/65 px-3.5 py-3 space-y-0.5">
-                <p className="text-[11.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[12px] text-[var(--color-text-secondary)]">
                   เดือนราคาสูงสุด
                 </p>
                 <p className="text-[16px] font-semibold text-[var(--color-text-primary)] tabular-nums">
@@ -768,7 +768,7 @@ export function StudioSeasonalPricingSection({
               </div>
 
               <div className="rounded-[12px] bg-[var(--color-background-muted)]/65 px-3.5 py-3 space-y-0.5">
-                <p className="text-[11.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[12px] text-[var(--color-text-secondary)]">
                   เดือนโปรโมชั่นประหยัดสุด
                 </p>
                 <p className="text-[16px] font-semibold text-[#16a34a] tabular-nums">
@@ -801,7 +801,7 @@ export function StudioSeasonalPricingSection({
           </div>
 
           {/* Day Ruler Header aligned over the 12 Timeline Bars */}
-          <div className="flex items-center gap-3 sm:gap-4 px-2 text-[11px] font-medium text-[var(--color-text-tertiary)] tabular-nums">
+          <div className="flex items-center gap-3 sm:gap-4 px-2 text-[12px] font-medium text-[var(--color-text-tertiary)] tabular-nums">
             <span className="w-9 sm:w-11 shrink-0">เดือน</span>
             <div className="flex-1 flex items-center justify-between">
               <span>1</span>
@@ -834,7 +834,7 @@ export function StudioSeasonalPricingSection({
                     className="w-full py-1.5 px-2 -mx-2 rounded-[12px] hover:bg-[var(--color-background-muted)]/60 flex items-center gap-3 sm:gap-4 text-left cursor-pointer transition-colors"
                   >
                     {/* Month Label */}
-                    <span className="w-9 sm:w-11 text-[13.5px] font-semibold text-[var(--color-text-primary)] shrink-0">
+                    <span className="w-9 sm:w-11 text-[14px] font-semibold text-[var(--color-text-primary)] shrink-0">
                       {m.monthShortTh}
                     </span>
 
@@ -869,7 +869,7 @@ export function StudioSeasonalPricingSection({
 
                     {/* Right Price & Delta */}
                     <div className="w-[106px] sm:w-[132px] flex items-center justify-end gap-2 shrink-0 tabular-nums">
-                      <span className="text-[13px] sm:text-[13.5px] font-semibold text-[var(--color-text-primary)]">
+                      <span className="text-[13px] sm:text-[14px] font-semibold text-[var(--color-text-primary)]">
                         ฿{m.effectiveAvgThb.toLocaleString()}
                       </span>
                       <span
@@ -900,7 +900,7 @@ export function StudioSeasonalPricingSection({
                   {isExpanded && (
                     <div className="mt-2 ml-9 sm:ml-11 rounded-[12px] bg-[var(--color-background-muted)]/70 p-3.5 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-[12.5px]">
+                        <div className="text-[13px]">
                           <p className="font-semibold text-[var(--color-text-primary)]">
                             {m.monthFullTh} {gaugeYear + 543} · เฉลี่ย ฿
                             {m.effectiveAvgThb.toLocaleString()}/คืน
@@ -937,7 +937,7 @@ export function StudioSeasonalPricingSection({
                       </div>
 
                       {/* Segment-by-Segment Colored Breakdown */}
-                      <div className="divide-y divide-[var(--color-border-subtle)] text-[12.5px]">
+                      <div className="divide-y divide-[var(--color-border-subtle)] text-[13px]">
                         {m.segments.map((seg, idx) => (
                           <div
                             key={`seg-detail-${m.monthIndex}-${idx}`}
@@ -1006,7 +1006,7 @@ export function StudioSeasonalPricingSection({
                   await handleDeleteRule(target);
                   setIsEditorOpen(false);
                 }}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
+                className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
               >
                 {deletingRuleId === editingRuleId ? "กำลังลบ..." : "ลบช่วงราคานี้"}
               </button>
@@ -1075,7 +1075,7 @@ export function StudioSeasonalPricingSection({
             {overlappingActiveRules.length > 0 && (
               <div className="rounded-[12px] bg-[var(--color-background-muted)] p-3.5 flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
-                <p className="text-[12.5px] leading-relaxed text-[var(--color-text-secondary)]">
+                <p className="text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
                   ช่วงวันนี้ทับซ้อนกับ{" "}
                   <strong className="font-semibold text-[var(--color-text-primary)]">
                     {overlappingActiveRules
@@ -1099,10 +1099,10 @@ export function StudioSeasonalPricingSection({
             {/* Days of Week */}
             <div className="space-y-2.5 pt-1">
               <div className="flex items-center justify-between">
-                <span className="text-[13.5px] font-medium text-[var(--color-text-secondary)]">
+                <span className="text-[14px] font-medium text-[var(--color-text-secondary)]">
                   ใช้กับวันในสัปดาห์
                 </span>
-                <div className="flex items-center gap-3 text-[12.5px]">
+                <div className="flex items-center gap-3 text-[13px]">
                   <button
                     type="button"
                     onClick={() => setDaysOfWeek([0, 1, 2, 3, 4, 5, 6])}
@@ -1132,7 +1132,7 @@ export function StudioSeasonalPricingSection({
                       type="button"
                       aria-pressed={selected}
                       onClick={() => toggleDayOfWeek(dp.dow)}
-                      className={`h-11 first:rounded-l-[11px] last:rounded-r-[11px] text-[13.5px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)] ${
+                      className={`h-11 first:rounded-l-[11px] last:rounded-r-[11px] text-[14px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-accent)] ${
                         selected
                           ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                           : "bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
@@ -1158,7 +1158,7 @@ export function StudioSeasonalPricingSection({
                     key={pct}
                     type="button"
                     onClick={() => applyQuickPercent(pct)}
-                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
                   >
                     {pct > 0 ? `+${pct}%` : `${pct}%`} ทุกห้อง
                   </button>
@@ -1217,7 +1217,7 @@ export function StudioSeasonalPricingSection({
                           }
                           className="min-w-0 cursor-pointer"
                         >
-                          <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                          <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
                             {rm.nameTh}
                           </p>
                           <p className="text-[12px] text-[var(--color-text-secondary)] tabular-nums">

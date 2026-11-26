@@ -81,6 +81,8 @@ export function PrimaryNavigation({
   const shouldHideMobileBottomNav =
     activeTab !== "explore" &&
     activeTab !== "board" &&
+    !pathname.startsWith("/account") &&
+    !pathname.startsWith("/bookings") &&
     isMobileNavHidden &&
     !isMobileProfileDrawerOpen &&
     !isFloatingSearchOpen;
@@ -353,9 +355,9 @@ export function PrimaryNavigation({
           className="h-12 w-12 rounded-[16px] hover:bg-[var(--color-background-muted)] flex items-center justify-center text-[var(--color-text-primary)] transition-colors"
         >
           <img
-            src="/brand/nondii-icon-square-black.svg"
+            src="/brand/round-icon-blue.svg"
             alt="Nondii"
-            className="w-[38px] h-[38px] object-contain dark:invert"
+            className="w-[36px] h-[36px] rounded-full object-contain"
           />
         </Link>
 
@@ -793,7 +795,6 @@ export function PrimaryNavigation({
             <button
               type="button"
               onClick={() => {
-                onRefreshProfile();
                 setIsFloatingSearchOpen(false);
                 setIsMobileProfileDrawerOpen((prev) => !prev);
               }}

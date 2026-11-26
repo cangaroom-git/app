@@ -14,6 +14,7 @@ export default function StudioListingsPage() {
       key={data.hotel.id}
       data={data}
       initialSection={defaultSection}
+      startOnMobileList
       buildHref={buildHref}
       onReload={reload}
       onNotify={notify}

@@ -1,29 +1,29 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import {
   Ban,
   Check,
-  ExternalLink,
   Loader2,
   Plus,
   RefreshCw,
-  Search,
+  Save,
   X,
 } from "lucide-react";
 import {
-  StandardButton,
+  AdminDataTable,
+  type AdminColumn,
+} from "@/components/admin/ui/AdminDataTable";
+import { AdminFilterDropdown } from "@/components/admin/ui/AdminFilterDropdown";
+import { AdminSlideSheet } from "@/components/admin/ui/AdminSlideSheet";
+import {
+  StandardCheckbox,
   StandardFieldGroup,
   StandardInput,
   StandardSelectField,
 } from "@/components/ui/standards";
-import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
-import { AdminTableFooter } from "@/components/admin/AdminTableFooter";
-import { useModalPresence } from "@/lib/useModalPresence";
-import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { WorkspaceCompactToolbar } from "@/components/workspace/WorkspacePrimitives";
 import {
   formatPlaceLocationScopeLabel,
   getPlaceCategoryMeta,
@@ -38,6 +38,7 @@ interface AdminPlaceRow {
   slug: string;
   nameTh: string;
   nameEn: string;
+  coverImageUrl: string | null;
   provinceId: string;
   placeCategory: "STAY" | "CAFE" | "RESTAURANT" | "ATTRACTION" | "WELLNESS";
   locationScope: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE";
@@ -54,18 +55,7 @@ interface AdminPlaceRow {
   };
 }
 
-type PlaceFilter =
-  | "ALL"
-  | "SINGLE_LOCATION"
-  | "MULTI_BRANCH"
-  | "NATIONWIDE_ONLINE"
-  | "PENDING_REVIEW";
-
-const SCOPE_SELECT_OPTIONS = [
-  { value: "SINGLE_LOCATION", label: "ร้านเดี่ยว" },
-  { value: "MULTI_BRANCH", label: "หลายสาขา" },
-  { value: "NATIONWIDE_ONLINE", label: "ทั่วไทย/ออนไลน์" },
-];
+const BATCH_SIZE = 50;
 
 const CATEGORY_OPTIONS = [
   { value: "STAY", label: "ที่พัก & โรงแรม" },
@@ -75,40 +65,61 @@ const CATEGORY_OPTIONS = [
   { value: "ATTRACTION", label: "กิจกรรม & ที่เที่ยว" },
 ];
 
+const SCOPE_OPTIONS = [
+  { value: "SINGLE_LOCATION", label: "ร้านเดี่ยว" },
+  { value: "MULTI_BRANCH", label: "หลายสาขา" },
+  { value: "NATIONWIDE_ONLINE", label: "ทั่วไทย / ออนไลน์" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "VERIFIED", label: "ยืนยันแล้ว" },
+  { value: "PENDING_REVIEW", label: "รอตรวจสอบ" },
+  { value: "SUSPENDED", label: "ระงับชั่วคราว" },
+];
+
+/**
+ * 1:1 WeGlobal Products-Style Table + Right Slide-Over Sheet for `/admin/places`
+ */
 export function AdminPlacesClient() {
   const searchParams = useSearchParams();
-  const initialFilter: PlaceFilter =
-    searchParams.get("status") === "PENDING_REVIEW" ? "PENDING_REVIEW" : "ALL";
+  const initialStatus =
+    searchParams.get("status") === "PENDING_REVIEW" ? ["PENDING_REVIEW"] : [];
 
   const [places, setPlaces] = useState<AdminPlaceRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<PlaceFilter>(initialFilter);
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] =
+    useState<string[]>(initialStatus);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Create Brand / Place Modal
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newNameTh, setNewNameTh] = useState("");
-  const [newNameEn, setNewNameEn] = useState("");
-  const [newSlug, setNewSlug] = useState("");
-  const [newCategory, setNewCategory] = useState<
+  // Slide-over Sheet State (Edit existing OR Create new)
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [editingPlace, setEditingPlace] = useState<AdminPlaceRow | null>(null);
+
+  // Form fields
+  const [nameTh, setNameTh] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [slug, setSlug] = useState("");
+  const [category, setCategory] = useState<
     "STAY" | "CAFE" | "RESTAURANT" | "ATTRACTION" | "WELLNESS"
   >("CAFE");
-  const [newScope, setNewScope] = useState<
+  const [scope, setScope] = useState<
     "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE"
   >("MULTI_BRANCH");
-  const [newProvinceId, setNewProvinceId] = useState("nationwide");
-  const [newBranchSummary, setNewBranchSummary] = useState("");
-  const [newTagline, setNewTagline] = useState("");
-  const [newWebsiteUrl, setNewWebsiteUrl] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-
-  const { shouldRender: renderCreate, dataState: createState } =
-    useModalPresence(isCreateOpen, 250);
-  useBodyScrollLock(renderCreate);
+  const [provinceId, setProvinceId] = useState("nationwide");
+  const [branchSummary, setBranchSummary] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [verificationStatus, setVerificationStatus] = useState<
+    "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED"
+  >("VERIFIED");
+  const [isPublished, setIsPublished] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const showToast = (msg: string) => {
     setNotice(msg);
@@ -144,37 +155,147 @@ export function AdminPlacesClient() {
         sublabel: p.nameEn,
       })),
     ],
-    []
+    [],
   );
 
-  const counts = useMemo(
-    () => ({
-      ALL: places.length,
-      SINGLE_LOCATION: places.filter((p) => p.locationScope === "SINGLE_LOCATION")
-        .length,
-      MULTI_BRANCH: places.filter((p) => p.locationScope === "MULTI_BRANCH")
-        .length,
-      NATIONWIDE_ONLINE: places.filter(
-        (p) => p.locationScope === "NATIONWIDE_ONLINE"
-      ).length,
-      PENDING_REVIEW: places.filter(
-        (p) => p.verificationStatus === "PENDING_REVIEW"
-      ).length,
-    }),
-    [places]
-  );
+  const openCreate = () => {
+    setEditingPlace(null);
+    setNameTh("");
+    setNameEn("");
+    setSlug("");
+    setCategory("CAFE");
+    setScope("MULTI_BRANCH");
+    setProvinceId("nationwide");
+    setBranchSummary("");
+    setTagline("");
+    setWebsiteUrl("");
+    setVerificationStatus("VERIFIED");
+    setIsPublished(true);
+    setIsSheetOpen(true);
+  };
+
+  const openEdit = (place: AdminPlaceRow) => {
+    setEditingPlace(place);
+    setNameTh(place.nameTh);
+    setNameEn(place.nameEn || "");
+    setSlug(place.slug);
+    setCategory(place.placeCategory);
+    setScope(place.locationScope);
+    setProvinceId(place.provinceId || "nationwide");
+    setBranchSummary(place.branchSummaryTh || "");
+    setVerificationStatus(place.verificationStatus);
+    setIsPublished(place.isPublished);
+    setIsSheetOpen(true);
+  };
+
+  const handleSaveSheet = async () => {
+    if (editingPlace) {
+      setIsSaving(true);
+      try {
+        const res = await fetch("/api/super-admin/hotels", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hotelId: editingPlace.id,
+            verificationStatus,
+            isPublished,
+            locationScope: scope,
+            placeCategory: category,
+            branchSummaryTh: branchSummary.trim(),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "อัปเดตไม่สำเร็จ");
+        showToast(`บันทึก "${editingPlace.nameTh}" แล้ว`);
+        setIsSheetOpen(false);
+        await loadPlaces();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "อัปเดตไม่สำเร็จ");
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    if (!nameTh.trim() || !slug.trim()) {
+      showToast("กรุณากรอกชื่อแบรนด์/สถานที่ และ URL slug");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/super-admin/hotels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nameTh: nameTh.trim(),
+          nameEn: nameEn.trim(),
+          slug: slug.trim(),
+          placeCategory: category,
+          locationScope: scope,
+          provinceId:
+            scope === "NATIONWIDE_ONLINE" ? "nationwide" : provinceId,
+          branchSummaryTh: branchSummary.trim(),
+          taglineTh: tagline.trim(),
+          externalWebsiteUrl: websiteUrl.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "สร้างแบรนด์ไม่สำเร็จ");
+      showToast(`เพิ่ม "${nameTh.trim()}" (/${json.hotel?.slug}) แล้ว`);
+      setIsSheetOpen(false);
+      await loadPlaces();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "สร้างแบรนด์ไม่สำเร็จ");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBulkVerify = async (nextStatus: "VERIFIED" | "SUSPENDED") => {
+    if (selectedIds.length === 0) return;
+    setBusyId("bulk");
+    try {
+      for (const hotelId of selectedIds) {
+        await fetch("/api/super-admin/hotels", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hotelId,
+            verificationStatus: nextStatus,
+            isPublished: nextStatus === "VERIFIED",
+          }),
+        });
+      }
+      setSelectedIds([]);
+      showToast(
+        nextStatus === "VERIFIED"
+          ? `อนุมัติ ${selectedIds.length} รายการแล้ว`
+          : `ระงับ ${selectedIds.length} รายการแล้ว`,
+      );
+      await loadPlaces();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const filteredPlaces = useMemo(() => {
     const q = query.trim().toLowerCase();
     return places.filter((p) => {
-      if (filter === "PENDING_REVIEW" && p.verificationStatus !== "PENDING_REVIEW") {
+      if (
+        selectedCategories.length > 0 &&
+        !selectedCategories.includes(p.placeCategory)
+      ) {
         return false;
       }
       if (
-        (filter === "SINGLE_LOCATION" ||
-          filter === "MULTI_BRANCH" ||
-          filter === "NATIONWIDE_ONLINE") &&
-        p.locationScope !== filter
+        selectedScopes.length > 0 &&
+        !selectedScopes.includes(p.locationScope)
+      ) {
+        return false;
+      }
+      if (
+        selectedStatuses.length > 0 &&
+        !selectedStatuses.includes(p.verificationStatus)
       ) {
         return false;
       }
@@ -183,540 +304,471 @@ export function AdminPlacesClient() {
         .toLowerCase()
         .includes(q);
     });
-  }, [places, filter, query]);
+  }, [places, query, selectedCategories, selectedScopes, selectedStatuses]);
 
-  const pagedPlaces = useMemo(
-    () => filteredPlaces.slice((page - 1) * pageSize, page * pageSize),
-    [filteredPlaces, page, pageSize]
+  const visiblePlaces = useMemo(
+    () => filteredPlaces.slice(0, visibleCount),
+    [filteredPlaces, visibleCount],
   );
+  const hasMore = visiblePlaces.length < filteredPlaces.length;
 
-  const patchPlace = async (
-    hotelId: string,
-    payload: {
-      verificationStatus?: "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
-      isPublished?: boolean;
-      locationScope?: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE";
-    },
-    successMsg: string
-  ) => {
-    setBusyId(hotelId);
-    try {
-      const res = await fetch("/api/super-admin/hotels", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hotelId, ...payload }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "อัปเดตไม่สำเร็จ");
-      showToast(successMsg);
-      await loadPlaces();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "อัปเดตไม่สำเร็จ");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleCreatePlace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNameTh.trim() || !newSlug.trim()) {
-      showToast("กรุณากรอกชื่อแบรนด์/สถานที่ และ URL slug");
-      return;
-    }
-    setIsCreating(true);
-    try {
-      const res = await fetch("/api/super-admin/hotels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nameTh: newNameTh.trim(),
-          nameEn: newNameEn.trim(),
-          slug: newSlug.trim(),
-          placeCategory: newCategory,
-          locationScope: newScope,
-          provinceId:
-            newScope === "NATIONWIDE_ONLINE" ? "nationwide" : newProvinceId,
-          branchSummaryTh: newBranchSummary.trim(),
-          taglineTh: newTagline.trim(),
-          externalWebsiteUrl: newWebsiteUrl.trim(),
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "สร้างแบรนด์ไม่สำเร็จ");
-      setIsCreateOpen(false);
-      setNewNameTh("");
-      setNewNameEn("");
-      setNewSlug("");
-      setNewBranchSummary("");
-      setNewTagline("");
-      setNewWebsiteUrl("");
-      showToast(`เพิ่ม "${newNameTh.trim()}" (/${json.hotel?.slug}) แล้ว`);
-      await loadPlaces();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "สร้างแบรนด์ไม่สำเร็จ");
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const columns: AdminColumn<AdminPlaceRow>[] = useMemo(
+    () => [
+      {
+        header: "รูป",
+        accessorKey: "coverImageUrl",
+        className: "w-[58px]",
+        stickyLeft: true,
+        cell: (item) => (
+          <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden border border-gray-100 shrink-0">
+            {item.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.coverImageUrl}
+                alt={item.nameTh}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[var(--color-text-secondary)] ws-badge">
+                —
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        header: "สถานที่ / แบรนด์",
+        accessorKey: "nameTh",
+        className: "min-w-[260px]",
+        cell: (item) => (
+          <div className="min-w-0">
+            <p className="ws-body-medium truncate">{item.nameTh}</p>
+            <p className="ws-caption truncate">/{item.slug}</p>
+          </div>
+        ),
+      },
+      {
+        header: "หมวดหมู่",
+        accessorKey: "placeCategory",
+        className: "whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-caption">
+            {getPlaceCategoryMeta(item.placeCategory).shortLabelTh}
+          </span>
+        ),
+      },
+      {
+        header: "พื้นที่",
+        accessorKey: "locationScope",
+        className: "whitespace-nowrap",
+        cell: (item) => {
+          const prov = getProvinceById(item.provinceId);
+          return (
+            <span className="ws-caption">
+              {formatPlaceLocationScopeLabel(
+                {
+                  locationScope: item.locationScope,
+                  branchSummaryTh: item.branchSummaryTh,
+                  provinceId: item.provinceId,
+                  provinceNameTh: prov
+                    ? prov.nameTh.split("(")[0].trim()
+                    : item.provinceId,
+                  provinceNameEn: prov ? prov.nameEn : item.provinceId,
+                },
+                "th",
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        header: "จำนวนโปร",
+        className: "w-[80px] text-center whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-body tabular-nums">{item._count.pins}</span>
+        ),
+      },
+      {
+        header: "สถานะ",
+        accessorKey: "verificationStatus",
+        className: "whitespace-nowrap text-center",
+        cell: (item) => {
+          if (item.verificationStatus === "PENDING_REVIEW") {
+            return (
+              <span className="inline-flex px-2.5 py-1 rounded-full bg-[var(--color-accent-yellow)] text-[#182334] ws-badge">
+                รอตรวจ
+              </span>
+            );
+          }
+          if (item.verificationStatus === "SUSPENDED") {
+            return (
+              <span className="inline-flex px-2.5 py-1 rounded-full bg-red-50 text-red-600 ws-badge">
+                ระงับชั่วคราว
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex px-2.5 py-1 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] ws-badge">
+              {item.isPublished ? "เผยแพร่แล้ว" : "ฉบับร่าง"}
+            </span>
+          );
+        },
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="cgr-admin-page">
-      {/* Single Compact Toolbar */}
-      <div className="cgr-admin-toolbar">
-        <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto no-scrollbar">
-          <h1 className="text-[14.5px] font-bold text-[var(--color-text-primary)] whitespace-nowrap">
-            สถานที่ &amp; แบรนด์
-          </h1>
-          <span className="w-px h-4 bg-[var(--color-border)] shrink-0" />
-          <div className="flex items-center gap-1">
-            {(
-              [
-                { id: "ALL", label: "ทั้งหมด" },
-                { id: "SINGLE_LOCATION", label: "ร้านเดี่ยว" },
-                { id: "MULTI_BRANCH", label: "หลายสาขา" },
-                { id: "NATIONWIDE_ONLINE", label: "ทั่วไทย" },
-                { id: "PENDING_REVIEW", label: "รอตรวจ" },
-              ] as const
-            ).map((pill) => {
-              const active = filter === pill.id;
-              return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  onClick={() => {
-                    setFilter(pill.id);
-                    setPage(1);
-                  }}
-                  className={`h-7 px-2.5 rounded-full text-[12px] font-semibold inline-flex items-center gap-1 whitespace-nowrap cursor-pointer transition-colors ${
-                    active
-                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                      : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  <span>{pill.label}</span>
-                  <span
-                    className={`text-[11px] tabular-nums ${
-                      active
-                        ? "opacity-90"
-                        : pill.id === "PENDING_REVIEW" && counts[pill.id] > 0
-                        ? "text-[#e60023] font-bold"
-                        : "text-[var(--color-text-tertiary)]"
-                    }`}
-                  >
-                    {counts[pill.id]}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <div className="relative w-[190px] sm:w-[220px]">
-            <Search className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
+      {/* ═══ SINGLE-ROW COMPACT TOOLBAR (Mobile & Desktop) ═══ */}
+      <WorkspaceCompactToolbar
+        searchValue={query}
+        onSearchChange={(val) => {
+          setQuery(val);
+          setVisibleCount(BATCH_SIZE);
+        }}
+        searchPlaceholder="ค้นหาชื่อสถานที่ แบรนด์ หรือจังหวัด..."
+        filters={
+          <>
+            <AdminFilterDropdown
+              label="หมวดหมู่"
+              options={CATEGORY_OPTIONS}
+              selected={selectedCategories}
+              onChange={(vals) => {
+                setSelectedCategories(vals);
+                setVisibleCount(BATCH_SIZE);
               }}
-              placeholder="ค้นหาชื่อร้าน, slug, อีเมล..."
-              className="w-full h-7.5 pl-8 pr-3 rounded-full bg-[var(--color-background-muted)] text-[12.5px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+              multiple
             />
-          </div>
+            <AdminFilterDropdown
+              label="พื้นที่"
+              options={SCOPE_OPTIONS}
+              selected={selectedScopes}
+              onChange={(vals) => {
+                setSelectedScopes(vals);
+                setVisibleCount(BATCH_SIZE);
+              }}
+              multiple
+            />
+            <AdminFilterDropdown
+              label="สถานะ"
+              options={STATUS_OPTIONS}
+              selected={selectedStatuses}
+              onChange={(vals) => {
+                setSelectedStatuses(vals);
+                setVisibleCount(BATCH_SIZE);
+              }}
+              multiple={false}
+            />
+          </>
+        }
+        actions={
+          <>
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-0.5 bg-[var(--color-accent-muted)] px-2 py-0.5 rounded-full">
+                <span className="ws-badge text-[var(--color-accent)] mx-1">
+                  {selectedIds.length}
+                </span>
+                <button
+                  type="button"
+                  disabled={busyId === "bulk"}
+                  onClick={() => handleBulkVerify("VERIFIED")}
+                  title="อนุมัติที่เลือก"
+                  className="p-1.5 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 rounded-full cursor-pointer"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === "bulk"}
+                  onClick={() => handleBulkVerify("SUSPENDED")}
+                  title="ระงับที่เลือก"
+                  className="p-1.5 text-red-600 hover:bg-red-100 rounded-full cursor-pointer"
+                >
+                  <Ban size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  aria-label="ยกเลิกการเลือก"
+                  className="p-1.5 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 rounded-full cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
-          <button
-            type="button"
-            onClick={loadPlaces}
-            aria-label="รีเฟรช"
-            className="h-7.5 w-7.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors shrink-0"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
+            <button
+              type="button"
+              onClick={loadPlaces}
+              title="รีเฟรช"
+              className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+            >
+              <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} />
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="h-7.5 px-3 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>เพิ่มแบรนด์</span>
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={openCreate}
+              title="เพิ่มแบรนด์ / สถานที่"
+              className="h-9 w-9 sm:w-auto sm:px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ws-body-strong inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <Plus size={17} />
+              <span className="hidden sm:inline">เพิ่มสถานที่</span>
+            </button>
+          </>
+        }
+      />
 
       {notice && (
-        <div className="px-4 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-background-muted)] flex items-center justify-between gap-2 text-[12.5px] font-medium text-[var(--color-text-primary)] shrink-0">
+        <div className="max-w-[1160px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2 border-b border-[var(--color-border)] bg-[var(--color-accent-muted)] text-[var(--color-accent)] ws-caption-medium flex items-center justify-between gap-2 shrink-0">
           <span className="truncate">{notice}</span>
           <button
             type="button"
             onClick={() => setNotice(null)}
-            aria-label="ปิด"
-            className="h-5 w-5 rounded-full hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center cursor-pointer"
+            className="p-1 rounded-full hover:bg-[var(--color-accent)]/10 cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Full-Bleed Single-Row Table (Zero Images, Pure border-b) */}
-      <div className="cgr-admin-body">
-        <table className="w-full text-left border-collapse min-w-[960px]">
-          <thead className="sticky top-0 z-10 bg-[var(--color-background-body)]">
-            <tr className="h-[34px] border-b border-[var(--color-border)] text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)]">
-              <th className="px-4 w-[24%]">ชื่อสถานที่ / แบรนด์</th>
-              <th className="px-3 whitespace-nowrap">Slug</th>
-              <th className="px-3 whitespace-nowrap">หมวด</th>
-              <th className="px-3 whitespace-nowrap">พื้นที่</th>
-              <th className="px-3 whitespace-nowrap">Scope</th>
-              <th className="px-3 text-right whitespace-nowrap">โปร / คูปอง / ห้อง</th>
-              <th className="px-3 whitespace-nowrap">สถานะ</th>
-              <th className="px-4 text-right whitespace-nowrap">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={8} className="py-10 text-center text-[13px] text-[var(--color-text-secondary)]">
-                  กำลังโหลดข้อมูล...
-                </td>
-              </tr>
-            ) : pagedPlaces.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-10 text-center text-[13px] text-[var(--color-text-secondary)] border-b border-[var(--color-border)]">
-                  ไม่พบสถานที่หรือแบรนด์ในตัวกรองนี้
-                </td>
-              </tr>
-            ) : (
-              pagedPlaces.map((place) => {
-                const cat = getPlaceCategoryMeta(place.placeCategory);
-                const prov = getProvinceById(place.provinceId);
-                const scopeText = formatPlaceLocationScopeLabel(
-                  {
-                    locationScope: place.locationScope,
-                    branchSummaryTh: place.branchSummaryTh,
-                    provinceId: place.provinceId,
-                    provinceNameTh: prov
-                      ? prov.nameTh.split("(")[0].trim()
-                      : place.provinceId,
-                    provinceNameEn: prov ? prov.nameEn : place.provinceId,
-                  },
-                  "th"
-                );
-                const isBusy = busyId === place.id;
-
-                return (
-                  <tr
-                    key={place.id}
-                    className="h-[38px] border-b border-[var(--color-border)] hover:bg-[var(--color-background-muted)]/60 transition-colors text-[13px]"
+      {/* ═══ TABLE BODY (Aligned 1:1 with 1160px Toolbar & Top Bar) ═══ */}
+      <div
+        className="cgr-admin-body md:!overflow-hidden py-3"
+        style={{ overflowX: "clip" }}
+      >
+        {isLoading && places.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-gray-400 gap-2 text-sm">
+            <Loader2 size={18} className="animate-spin" />
+            <span>Loading places...</span>
+          </div>
+        ) : (
+          <AdminDataTable
+            data={visiblePlaces}
+            columns={columns}
+            keyField="id"
+            onRowClick={openEdit}
+            enableMultiSelect
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            getViewUrl={(item) => `/${encodeURIComponent(item.slug)}`}
+            emptyLabel="No places found"
+            footer={
+              <div className="border-t border-gray-100 p-2 flex items-center justify-center gap-3 text-xs text-gray-500 shrink-0">
+                <span>
+                  Showing {visiblePlaces.length} of {filteredPlaces.length}{" "}
+                  places
+                </span>
+                {hasMore && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + BATCH_SIZE)}
+                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md font-medium text-gray-700 transition-colors cursor-pointer"
                   >
-                    <td className="px-4 font-semibold text-[var(--color-text-primary)] max-w-[240px] truncate">
-                      <Link
-                        href={`/${place.slug}`}
-                        target="_blank"
-                        className="hover:text-[var(--color-accent)] transition-colors"
-                      >
-                        {place.nameTh}
-                      </Link>
-                    </td>
-                    <td className="px-3 text-[12px] text-[var(--color-text-secondary)] max-w-[160px] truncate font-mono">
-                      /{place.slug}
-                    </td>
-                    <td className="px-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cat.crestBgHex }}
-                        />
-                        <span>{cat.shortLabelTh}</span>
-                      </span>
-                    </td>
-                    <td className="px-3 whitespace-nowrap text-[12px] text-[var(--color-text-secondary)] max-w-[130px] truncate">
-                      {scopeText}
-                    </td>
-                    <td className="px-3 whitespace-nowrap">
-                      <div className="w-[126px]">
-                        <ResponsiveSelect
-                          value={place.locationScope}
-                          onChange={(nextScopeVal) =>
-                            patchPlace(
-                              place.id,
-                              {
-                                locationScope: nextScopeVal as
-                                  | "SINGLE_LOCATION"
-                                  | "MULTI_BRANCH"
-                                  | "NATIONWIDE_ONLINE",
-                              },
-                              `อัปเดต Scope "${place.nameTh}" แล้ว`
-                            )
-                          }
-                          options={SCOPE_SELECT_OPTIONS}
-                          sheetTitle={`ขอบเขตพื้นที่: ${place.nameTh}`}
-                          triggerClassName="w-full h-6.5 px-2.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[11.5px] font-semibold text-[var(--color-text-primary)]"
-                          dropdownClassName="min-w-[180px] right-0"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 text-right whitespace-nowrap text-[12px] tabular-nums text-[var(--color-text-secondary)]">
-                      {place._count.pins} · {place._count.coupons} · {place._count.rooms}
-                    </td>
-                    <td className="px-3 whitespace-nowrap text-[12px]">
-                      <span className="inline-flex items-center gap-1.5 font-medium">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            place.verificationStatus === "VERIFIED"
-                              ? "bg-emerald-500"
-                              : place.verificationStatus === "PENDING_REVIEW"
-                              ? "bg-amber-500"
-                              : "bg-[#e60023]"
-                          }`}
-                        />
-                        <span>
-                          {place.verificationStatus === "VERIFIED"
-                            ? "Verified"
-                            : place.verificationStatus === "PENDING_REVIEW"
-                            ? "รอตรวจ"
-                            : "ระงับ"}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-4 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
-                        <Link
-                          href={`/studio?hotelId=${place.id}`}
-                          className="h-6.5 px-2.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[11.5px] font-semibold inline-flex items-center transition-colors"
-                        >
-                          Studio
-                        </Link>
-                        {place.verificationStatus !== "VERIFIED" ? (
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() =>
-                              patchPlace(
-                                place.id,
-                                { verificationStatus: "VERIFIED", isPublished: true },
-                                `อนุมัติ "${place.nameTh}" แล้ว`
-                              )
-                            }
-                            className="h-6.5 px-2.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <Check className="w-3 h-3" />
-                            <span>อนุมัติ</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() =>
-                              patchPlace(
-                                place.id,
-                                { verificationStatus: "SUSPENDED", isPublished: false },
-                                `ระงับ "${place.nameTh}" แล้ว`
-                              )
-                            }
-                            title="ระงับชั่วคราว"
-                            className="h-6.5 px-2.5 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[#e60023] text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <Ban className="w-3 h-3" />
-                            <span>ระงับ</span>
-                          </button>
-                        )}
-                        <Link
-                          href={`/${place.slug}`}
-                          target="_blank"
-                          title="เปิดหน้าโปรไฟล์"
-                          className="h-6.5 w-6.5 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                    Load More (
+                    {Math.min(
+                      BATCH_SIZE,
+                      filteredPlaces.length - visiblePlaces.length,
+                    )}{" "}
+                    more)
+                  </button>
+                )}
+              </div>
+            }
+          />
+        )}
       </div>
 
-      <AdminTableFooter
-        totalItems={filteredPlaces.length}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
-
-      {/* Create New Brand / Chain / Place Sheet */}
-      {renderCreate &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="เพิ่มแบรนด์ / เชน / สถานที่ใหม่"
-            data-state={createState}
-            onClick={() => setIsCreateOpen(false)}
-            className="cgr-modal-backdrop fixed inset-0 z-[95] bg-black/45 backdrop-blur-[2px] flex items-end sm:items-center justify-center sm:p-4"
-          >
-            <form
-              data-state={createState}
-              onClick={(e) => e.stopPropagation()}
-              onSubmit={handleCreatePlace}
-              className="cgr-modal-surface-md w-full sm:max-w-[540px] max-h-[90dvh] rounded-t-[24px] sm:rounded-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden"
-            >
-              <div
-                aria-hidden="true"
-                className="sm:hidden h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto mt-3 shrink-0"
-              />
-              <div className="px-5 py-3.5 border-b border-[var(--color-border)] flex items-center justify-between shrink-0">
-                <h3 className="text-[15.5px] font-bold text-[var(--color-text-primary)]">
-                  เพิ่มแบรนด์ / เชน / สถานที่ใหม่
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  aria-label="ปิด"
-                  className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer"
+      {/* ═══ NONDII CENTERED-DESKTOP / MOBILE BOTTOM-SHEET EDITOR ═══ */}
+      <AdminSlideSheet
+        isOpen={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        thumbnailUrl={editingPlace ? editingPlace.coverImageUrl : undefined}
+        title={editingPlace ? editingPlace.nameTh : "New Place / Brand"}
+        subtitle={
+          editingPlace
+            ? `/${editingPlace.slug}`
+            : "เพิ่มแบรนด์หรือสถานที่ใหม่เข้าสู่ระบบ Nondii"
+        }
+        footerAction={
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              {editingPlace && (
+                <a
+                  href={`/${encodeURIComponent(editingPlace.slug)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ws-body-strong !text-[var(--color-text-secondary)] hover:!text-[var(--color-text-primary)] underline underline-offset-2 transition-colors"
                 >
-                  <X className="w-4 h-4" />
-                </button>
+                  ดูหน้าร้านจริง
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSheetOpen(false)}
+                className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleSaveSheet}
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Save size={15} />
+                )}
+                <span>{isSaving ? "กำลังบันทึก..." : "บันทึก"}</span>
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex-1 overflow-y-auto cgr-scroll-autohide px-5 py-5 space-y-5">
+          <div className="space-y-3">
+            <h3 className="ws-subtitle">ข้อมูลพื้นฐาน</h3>
+
+            <StandardFieldGroup>
+              <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                <StandardInput
+                  grouped
+                  label="ชื่อแบรนด์ / สถานที่ (ไทย) *"
+                  value={nameTh}
+                  disabled={Boolean(editingPlace)}
+                  onChange={(e) => setNameTh(e.target.value)}
+                  placeholder="เช่น Café Amazon, KTC, Centara"
+                />
+                <StandardInput
+                  grouped
+                  label="URL Slug *"
+                  value={slug}
+                  disabled={Boolean(editingPlace)}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                  placeholder="cafe-amazon"
+                />
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-3.5">
-                <StandardFieldGroup>
+              {!editingPlace && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
                   <StandardInput
                     grouped
-                    required
-                    label="ชื่อแบรนด์ / ร้าน (ภาษาไทย)"
-                    value={newNameTh}
-                    onChange={(e) => setNewNameTh(e.target.value)}
-                    placeholder="เช่น บัตรเครดิต KTC, KFC ประเทศไทย, Café Amazon"
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                    <StandardInput
-                      grouped
-                      label="ชื่อภาษาอังกฤษ"
-                      value={newNameEn}
-                      onChange={(e) => setNewNameEn(e.target.value)}
-                      placeholder="เช่น KTC Travel"
-                    />
-                    <StandardInput
-                      grouped
-                      required
-                      label="URL Slug"
-                      value={newSlug}
-                      onChange={(e) =>
-                        setNewSlug(
-                          e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-")
-                        )
-                      }
-                      placeholder="เช่น ktc-travel"
-                    />
-                  </div>
-                </StandardFieldGroup>
-
-                <StandardFieldGroup>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                    <StandardSelectField
-                      grouped
-                      label="หมวดหลัก"
-                      value={newCategory}
-                      onChange={(v) =>
-                        setNewCategory(
-                          v as "STAY" | "CAFE" | "RESTAURANT" | "ATTRACTION" | "WELLNESS"
-                        )
-                      }
-                      options={CATEGORY_OPTIONS}
-                    />
-                    <StandardSelectField
-                      grouped
-                      label="ขอบเขตพื้นที่ (LocationScope)"
-                      value={newScope}
-                      onChange={(v) => {
-                        const next = v as
-                          | "SINGLE_LOCATION"
-                          | "MULTI_BRANCH"
-                          | "NATIONWIDE_ONLINE";
-                        setNewScope(next);
-                        if (next === "NATIONWIDE_ONLINE") {
-                          setNewProvinceId("nationwide");
-                        }
-                      }}
-                      options={SCOPE_SELECT_OPTIONS}
-                    />
-                  </div>
-
-                  {newScope !== "NATIONWIDE_ONLINE" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                      <StandardSelectField
-                        grouped
-                        label="จังหวัดหลัก"
-                        value={newProvinceId}
-                        onChange={setNewProvinceId}
-                        options={provinceOptions}
-                        searchPlaceholder="ค้นหาจังหวัด..."
-                      />
-                      <StandardInput
-                        grouped
-                        label="สรุปสาขา"
-                        value={newBranchSummary}
-                        onChange={(e) => setNewBranchSummary(e.target.value)}
-                        placeholder="เช่น กว่า 400 สาขาทั่วไทย"
-                      />
-                    </div>
-                  )}
-                </StandardFieldGroup>
-
-                <StandardFieldGroup>
-                  <StandardInput
-                    grouped
-                    label="คำโปรยสั้นๆ"
-                    value={newTagline}
-                    onChange={(e) => setNewTagline(e.target.value)}
-                    placeholder="เช่น รวมดีลที่พักและร้านอาหาร"
+                    label="ชื่อภาษาอังกฤษ (ไม่บังคับ)"
+                    value={nameEn}
+                    onChange={(e) => setNameEn(e.target.value)}
+                    placeholder="Optional English Name"
                   />
                   <StandardInput
                     grouped
-                    label="เว็บไซต์ทางการ / ลิงก์พาร์ทเนอร์"
-                    value={newWebsiteUrl}
-                    onChange={(e) => setNewWebsiteUrl(e.target.value)}
+                    type="url"
+                    label="เว็บไซต์ทางการ"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
                     placeholder="https://..."
                   />
-                </StandardFieldGroup>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                <StandardSelectField
+                  grouped
+                  label="หมวดหมู่"
+                  value={category}
+                  onChange={(v) =>
+                    setCategory(
+                      v as
+                        | "STAY"
+                        | "CAFE"
+                        | "RESTAURANT"
+                        | "ATTRACTION"
+                        | "WELLNESS",
+                    )
+                  }
+                  options={CATEGORY_OPTIONS}
+                  sheetTitle="เลือกหมวดหมู่"
+                />
+                <StandardSelectField
+                  grouped
+                  label="ขอบเขตพื้นที่ให้บริการ"
+                  value={scope}
+                  onChange={(v) =>
+                    setScope(
+                      v as
+                        | "SINGLE_LOCATION"
+                        | "MULTI_BRANCH"
+                        | "NATIONWIDE_ONLINE",
+                    )
+                  }
+                  options={SCOPE_OPTIONS}
+                  sheetTitle="ขอบเขตพื้นที่ให้บริการ"
+                />
               </div>
 
-              <div className="px-5 py-3.5 border-t border-[var(--color-border)] flex items-center justify-end gap-2 shrink-0 pb-[max(14px,env(safe-area-inset-bottom))]">
-                <StandardButton
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsCreateOpen(false)}
-                >
-                  ยกเลิก
-                </StandardButton>
-                <StandardButton
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={isCreating}
-                >
-                  {isCreating ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>กำลังสร้าง...</span>
-                    </>
-                  ) : (
-                    <span>สร้างแบรนด์ทันที</span>
-                  )}
-                </StandardButton>
+              <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                {!editingPlace && scope !== "NATIONWIDE_ONLINE" && (
+                  <StandardSelectField
+                    grouped
+                    label="จังหวัดหลัก"
+                    value={provinceId}
+                    onChange={setProvinceId}
+                    options={provinceOptions}
+                    sheetTitle="เลือกจังหวัดหลัก"
+                  />
+                )}
+                <StandardInput
+                  grouped
+                  label="สรุปจำนวนสาขา"
+                  value={branchSummary}
+                  onChange={(e) => setBranchSummary(e.target.value)}
+                  placeholder="เช่น กว่า 4,000 สาขาทั่วไทย"
+                />
               </div>
-            </form>
-          </div>,
-          document.body
-        )}
+
+              {!editingPlace && (
+                <StandardInput
+                  grouped
+                  label="คำโปรยสั้นๆ"
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  placeholder="คำโปรยสั้นๆ สำหรับหน้าโปรไฟล์"
+                />
+              )}
+            </StandardFieldGroup>
+          </div>
+
+          {editingPlace && (
+            <div className="border-t border-[var(--color-border)] pt-5 space-y-4">
+              <h3 className="ws-subtitle">การตรวจสอบและการเผยแพร่</h3>
+
+              <StandardSelectField
+                label="สถานะการตรวจสอบ"
+                value={verificationStatus}
+                onChange={(v) =>
+                  setVerificationStatus(
+                    v as "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED",
+                  )
+                }
+                options={STATUS_OPTIONS}
+                sheetTitle="สถานะการตรวจสอบ"
+              />
+
+              <div className="pt-1">
+                <StandardCheckbox
+                  checked={isPublished}
+                  onChange={setIsPublished}
+                  label="เผยแพร่บน Nondii สาธารณะ"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </AdminSlideSheet>
     </div>
   );
 }

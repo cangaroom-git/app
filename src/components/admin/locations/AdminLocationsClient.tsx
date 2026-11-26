@@ -15,22 +15,23 @@ export function AdminLocationsClient() {
   };
 
   return (
-    <div className="cgr-admin-page">
-      {notice && (
-        <div className="px-4 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-background-muted)] flex items-center justify-between gap-2 text-[12.5px] font-medium shrink-0">
-          <span className="truncate">{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            aria-label="ปิด"
-            className="h-5 w-5 rounded-full hover:bg-[var(--color-background-subtle)] inline-flex items-center justify-center cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      <SuperAdminLocationsManager onNotice={handleNotice} />
-    </div>
+    <SuperAdminLocationsManager
+      onNotice={handleNotice}
+      topBanner={
+        notice ? (
+          <div className="max-w-[1160px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2 border-b border-[var(--color-border)] bg-[var(--color-accent-muted)] text-[var(--color-accent)] ws-caption-medium flex items-center justify-between gap-2 shrink-0">
+            <span className="truncate">{notice}</span>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              aria-label="ปิดการแจ้งเตือน"
+              className="p-1 rounded-full hover:bg-[var(--color-accent)]/10 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : undefined
+      }
+    />
   );
 }

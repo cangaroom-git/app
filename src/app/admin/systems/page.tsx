@@ -8,8 +8,8 @@ export default function AdminSystemsPage() {
     <Suspense
       fallback={
         <div className="cgr-admin-page">
-          <div className="cgr-admin-body p-6">
-            <div className="max-w-[1360px] mx-auto h-72 rounded-[22px] bg-[var(--color-background-muted)] cgr-skeleton-block" />
+          <div className="cgr-admin-body py-6">
+            <div className="h-72 rounded-[22px] bg-[var(--color-background-muted)] cgr-skeleton-block" />
           </div>
         </div>
       }

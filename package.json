@@ -8,6 +8,7 @@
     "postinstall": "mkdir -p public && cp node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs public/maplibre-gl-worker.js && prisma generate",
     "start": "next start -p 3004",
     "lint": "eslint",
+    "audit:design": "node scripts/audit-design-tokens.mjs",
     "db:seed": "node --env-file=.env prisma/seed.ts",
     "places:sync": "npx tsx scripts/sync-thailand-places.ts"
   },

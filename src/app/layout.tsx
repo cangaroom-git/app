@@ -20,13 +20,17 @@ const anuphan = Anuphan({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
-  title: "Nondii — ค้นหาที่พักสวยทั่วไทย & จองตรงฟรีค่า GP 0%",
+  title: "Nondii — โปรเที่ยวไทย แหล่งรวมโปรโมชั่นที่เที่ยวในไทย & จองตรง 0% GP",
   description:
-    "Nondii แพลตฟอร์มรวมที่พักไทยสไตล์ Pinterest ทั้งภูเขา ทะเล พูลวิลล่า แกลมปิ้ง พร้อมเก็บคูปองส่วนลดและจองห้องพักตรงกับโรงแรม 0% GP",
+    "Nondii แพลตฟอร์มรวมโปรโมชั่นที่พัก คาเฟ่ ร้านอาหาร บาร์ สปา และกิจกรรมทั่วไทย พร้อมวางแผนทริปและจองห้องพักตรงกับโรงแรม 0% GP",
+  icons: {
+    icon: [{ url: "/brand/round-icon-blue.svg", type: "image/svg+xml" }],
+    shortcut: "/brand/round-icon-blue.svg",
+    apple: "/brand/round-icon-blue.svg",
+  },
 };
 
 export default function RootLayout({

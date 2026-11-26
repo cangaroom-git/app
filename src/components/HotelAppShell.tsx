@@ -40,6 +40,7 @@ import {
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
 import { RouteProgressBar } from "@/components/navigation/RouteProgressBar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
+import { useGlobalAutoHideScrollbars } from "@/components/workspace/WorkspaceSplitLayout";
 import type { BoardSaveToastState } from "@/components/board/BoardActionModals";
 
 const PlaceCardFlipOverlay = dynamic(
@@ -191,6 +192,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const activeTab: PlatformNavTabId = getTabIdFromPathname(pathname);
+  useGlobalAutoHideScrollbars();
 
   // Persistent Cross-Route 3D Card Flip state (survives Next.js route transitions at 120fps!)
   const flipSeqRef = useRef(0);
@@ -1087,6 +1089,11 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     activeTab === "wishlist";
   const isExploreFullBleed = activeTab === "explore";
   const isTripHeroFullBleed = pathname === "/trip";
+  const isAccountSplitPage =
+    pathname === "/account" ||
+    pathname.startsWith("/account/") ||
+    pathname === "/bookings" ||
+    pathname.startsWith("/bookings/");
 
   const contextValue: PlatformAppContextValue = useMemo(
     () => ({
@@ -1285,6 +1292,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             className={
               isExploreFullBleed
                 ? "pt-0 lg:pt-16 pb-0 lg:pl-[72px]"
+                : isAccountSplitPage
+                ? "pt-[env(safe-area-inset-top,0px)] lg:pt-16 pb-[var(--cgr-mobile-nav-h)] lg:pb-0 lg:pl-[72px] h-[100dvh] flex flex-col overflow-hidden"
                 : isTripHeroFullBleed
                 ? "pt-0 lg:pt-16 pb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:pb-12 lg:pl-[72px]"
                 : "pt-[env(safe-area-inset-top,0px)] lg:pt-16 pb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:pb-12 lg:pl-[72px]"
@@ -1293,7 +1302,9 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
             <div
               data-cgr-app-inner="true"
               className={
-                isExploreFullBleed || isTripHeroFullBleed
+                isAccountSplitPage
+                  ? "flex-1 min-h-0 flex flex-col p-0"
+                  : isExploreFullBleed || isTripHeroFullBleed
                   ? "p-0"
                   : "px-4 sm:px-6 lg:px-8 pt-4 sm:pt-5"
               }

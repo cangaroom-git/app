@@ -682,7 +682,7 @@ export function StudioGrowthTab({
             <button
               type="button"
               onClick={() => openCreateRuleModal()}
-              className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13.5px] font-medium inline-flex items-center gap-2 cursor-pointer transition-colors"
+              className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-medium inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>เพิ่มส่วนลดอัตโนมัติ</span>
@@ -691,7 +691,7 @@ export function StudioGrowthTab({
             <button
               type="button"
               onClick={openCreateCouponModal}
-              className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+              className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>สร้างคูปองใหม่</span>
@@ -710,7 +710,7 @@ export function StudioGrowthTab({
                 key={tab.id}
                 type="button"
                 onClick={() => setSubTab(tab.id)}
-                className={`h-12 border-b-2 inline-flex items-center gap-2 text-[14.5px] whitespace-nowrap cursor-pointer transition-colors ${
+                className={`h-12 border-b-2 inline-flex items-center gap-2 text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
                   active
                     ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] font-semibold"
                     : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
@@ -738,10 +738,10 @@ export function StudioGrowthTab({
           <section className="py-6 first:pt-2 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   คูปองโค้ดส่วนลด
                 </h3>
-                <span className="text-[13.5px] text-[var(--color-text-secondary)] tabular-nums">
+                <span className="text-[14px] text-[var(--color-text-secondary)] tabular-nums">
                   ({orderedCoupons.length})
                 </span>
               </div>
@@ -749,7 +749,7 @@ export function StudioGrowthTab({
                 <button
                   type="button"
                   onClick={openCreateCouponModal}
-                  className="h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-4 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>สร้างคูปองใหม่</span>
@@ -776,17 +776,17 @@ export function StudioGrowthTab({
                     <p className="text-[12px] font-semibold text-[var(--color-text-primary)]">
                       ลด ฿300
                     </p>
-                    <p className="font-mono text-[10px] text-[var(--color-text-tertiary)]">
+                    <p className="font-mono text-[12px] text-[var(--color-text-tertiary)]">
                       DIRECT300
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                     ยังไม่มีคูปองส่วนลด
                   </p>
-                  <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                  <p className="text-[14px] text-[var(--color-text-secondary)]">
                     คูปองที่เปิดใช้งานจะแสดงบนหน้าร้านของคุณและหน้า /deal ฟรี
                   </p>
                 </div>
@@ -794,7 +794,7 @@ export function StudioGrowthTab({
                 <button
                   type="button"
                   onClick={openCreateCouponModal}
-                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>สร้างคูปองแรก</span>
@@ -869,7 +869,7 @@ export function StudioGrowthTab({
                                 }`}
                               />
                             ) : (
-                              <span className="h-full w-full flex items-center justify-center text-[13px] font-bold text-[var(--color-text-primary)]">
+                              <span className="h-full w-full flex items-center justify-center text-[13px] font-semibold text-[var(--color-text-primary)]">
                                 {hotel.nameTh[0] || "N"}
                               </span>
                             )}
@@ -883,10 +883,10 @@ export function StudioGrowthTab({
 
                           {/* Ticket Value + Monospace Code */}
                           <div className="flex-1 min-w-0 px-2.5 py-1.5 flex flex-col justify-center">
-                            <p className="text-[14px] sm:text-[15.5px] font-extrabold tracking-tight text-[var(--color-text-primary)] leading-tight truncate tabular-nums">
+                            <p className="text-[14px] sm:text-[15px] font-extrabold tracking-tight text-[var(--color-text-primary)] leading-tight truncate tabular-nums">
                               {discountText}
                             </p>
-                            <span className="mt-1 inline-block font-mono text-[10.5px] sm:text-[11px] font-semibold text-[var(--color-text-secondary)] truncate">
+                            <span className="mt-1 inline-block font-mono text-[12px] sm:text-[12px] font-semibold text-[var(--color-text-secondary)] truncate">
                               {c.code}
                             </span>
                           </div>
@@ -895,7 +895,7 @@ export function StudioGrowthTab({
                         {/* Center: Title + Minimal Icon Metadata Row */}
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex items-baseline gap-2 min-w-0">
-                            <h4 className="text-[15.5px] sm:text-[16.5px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                            <h4 className="text-[15px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
                               {c.titleTh}
                             </h4>
                             {c.isFeaturedDeal && (
@@ -905,7 +905,7 @@ export function StudioGrowthTab({
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[var(--color-text-secondary)] tabular-nums">
+                          <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-[var(--color-text-secondary)] tabular-nums">
                             <span>
                               {c.minSpendThb > 0
                                 ? `ขั้นต่ำ ฿${c.minSpendThb.toLocaleString()}`
@@ -939,7 +939,7 @@ export function StudioGrowthTab({
                           className="flex items-center gap-2.5 shrink-0"
                         >
                           <span
-                            className={`hidden sm:inline text-[12.5px] font-medium ${
+                            className={`hidden sm:inline text-[13px] font-medium ${
                               c.isActive
                                 ? "text-[var(--color-text-primary)]"
                                 : "text-[var(--color-text-tertiary)]"
@@ -986,10 +986,10 @@ export function StudioGrowthTab({
           <section className="py-7 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-baseline gap-2">
-                <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   ส่วนลดอัตโนมัติ (ไม่ต้องกรอกโค้ด)
                 </h3>
-                <span className="text-[13.5px] text-[var(--color-text-secondary)] tabular-nums">
+                <span className="text-[14px] text-[var(--color-text-secondary)] tabular-nums">
                   (เปิดใช้ {activeAutoDiscountsCount})
                 </span>
               </div>
@@ -997,7 +997,7 @@ export function StudioGrowthTab({
                 <button
                   type="button"
                   onClick={() => openCreateRuleModal()}
-                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   <span>เพิ่มกฎส่วนลด</span>
@@ -1051,7 +1051,7 @@ export function StudioGrowthTab({
                       {/* Center: Title + Template Tag + Condition Metadata */}
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-baseline gap-2 min-w-0">
-                          <h4 className="text-[15.5px] sm:text-[16.5px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                          <h4 className="text-[15px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
                             {rule.titleTh}
                           </h4>
                           {rule.isTemplate && (
@@ -1060,7 +1060,7 @@ export function StudioGrowthTab({
                             </span>
                           )}
                         </div>
-                        <p className="text-[12.5px] text-[var(--color-text-secondary)] inline-flex items-center gap-1.5">
+                        <p className="text-[13px] text-[var(--color-text-secondary)] inline-flex items-center gap-1.5">
                           {rule.ruleType === "LENGTH_OF_STAY" ? (
                             <Moon className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] stroke-[1.75]" />
                           ) : (
@@ -1077,7 +1077,7 @@ export function StudioGrowthTab({
                         className="flex items-center gap-2.5 shrink-0"
                       >
                         <span
-                          className={`hidden sm:inline text-[12.5px] font-medium ${
+                          className={`hidden sm:inline text-[13px] font-medium ${
                             rule.isActive
                               ? "text-[var(--color-text-primary)]"
                               : "text-[var(--color-text-tertiary)]"
@@ -1159,7 +1159,7 @@ export function StudioGrowthTab({
                 type="button"
                 disabled={deletingCouponId === editingCouponId}
                 onClick={() => void handleDeleteCoupon(editingCouponId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
+                className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
               >
                 {deletingCouponId === editingCouponId
                   ? "กำลังลบ..."
@@ -1180,7 +1180,7 @@ export function StudioGrowthTab({
                 type="submit"
                 form="studio-coupon-form"
                 disabled={isSavingCoupon}
-                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingCoupon ? "กำลังบันทึก..." : "บันทึกคูปอง"}
               </button>
@@ -1337,7 +1337,7 @@ export function StudioGrowthTab({
                 type="button"
                 disabled={deletingRuleId === editingRuleId}
                 onClick={() => void handleDeleteRule(editingRuleId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
+                className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer disabled:opacity-40"
               >
                 {deletingRuleId === editingRuleId ? "กำลังลบ..." : "ลบกฎนี้"}
               </button>
@@ -1356,7 +1356,7 @@ export function StudioGrowthTab({
                 type="submit"
                 form="studio-rule-form"
                 disabled={isSavingRule}
-                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingRule ? "กำลังบันทึก..." : "บันทึกกฎส่วนลด"}
               </button>

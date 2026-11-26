@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef } from "react";
 import { Camera, ChevronDown, Users } from "lucide-react";
-import { useHeroThemeColor } from "@/lib/useHeroThemeColor";
 import type { PublicCommunityTripDto } from "@/lib/services/boardService";
 
 interface TripStoryParallaxHeroProps {
@@ -23,19 +22,10 @@ export function TripStoryParallaxHero({
   const runwayRef = useRef<HTMLDivElement | null>(null);
   const stickyStageRef = useRef<HTMLElement | null>(null);
   const bgLayerRef = useRef<HTMLDivElement | null>(null);
-  const bgImgRef = useRef<HTMLImageElement | null>(null);
   const brandLogoLayerRef = useRef<HTMLDivElement | null>(null);
   const travellerLayerRef = useRef<HTMLDivElement | null>(null);
   const contentLayerRef = useRef<HTMLDivElement | null>(null);
   const scrollHintRef = useRef<HTMLDivElement | null>(null);
-
-  // Automatically learn the real visible top-edge sky color from /trip background & sync iOS Safari status bar
-  const learnedTopColor = useHeroThemeColor(
-    "#2985D7",
-    1.55,
-    bgImgRef,
-    stickyStageRef
-  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -92,8 +82,7 @@ export function TripStoryParallaxHero({
         const bgScale = cachedIsDesktop
           ? 1.42 - eased * 0.42
           : 1.22 - eased * 0.22;
-        const bgY = cachedIsDesktop ? 28 - eased * 50 : 18 - eased * 32;
-        bgLayerRef.current.style.transform = `translate3d(0, ${bgY.toFixed(1)}px, 0) scale(${bgScale.toFixed(4)})`;
+        bgLayerRef.current.style.transform = `translate3d(0, 0px, 0) scale(${bgScale.toFixed(4)})`;
       }
 
       if (brandLogoLayerRef.current) {
@@ -162,52 +151,39 @@ export function TripStoryParallaxHero({
     >
       <section
         ref={stickyStageRef}
-        style={
-          {
-            backgroundColor: learnedTopColor,
-            "--cgr-hero-top-color": learnedTopColor,
-          } as React.CSSProperties
-        }
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
-        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] flex flex-col justify-end select-none"
+        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2986D6] flex flex-col justify-end select-none"
       >
-        {/* Layer 0: Uninterrupted Mountain & Sky Panorama (4K AVIF + WebP + Compositor Dolly-Out) */}
+        {/* Layer 0: Uninterrupted Mountain & Sky Panorama (Flush top #2986D6 into iPhone Status Bar) */}
         <div
           ref={bgLayerRef}
-          className="cgr-trip-hero-layer cgr-trip-hero-bg pointer-events-none absolute -inset-6 lg:-inset-9"
+          className="cgr-trip-hero-layer cgr-trip-hero-bg pointer-events-none absolute -inset-x-6 top-0 -bottom-8 lg:-inset-x-9 lg:top-0 lg:-bottom-10"
         >
           <picture className="block w-full h-full">
             <source
               media="(max-width: 1023px)"
-              srcSet="/brand/nondii-trip-bg-4k-mobile.avif"
+              srcSet="/brand/nondii-trip-bg-v3-mobile.avif"
               type="image/avif"
             />
             <source
               media="(max-width: 1023px)"
-              srcSet="/brand/nondii-trip-bg-4k-mobile.webp"
+              srcSet="/brand/nondii-trip-bg-v3-mobile.webp"
               type="image/webp"
             />
             <source
-              srcSet="/brand/nondii-trip-bg-4k-desktop.avif"
+              srcSet="/brand/nondii-trip-bg-v3-desktop.avif"
               type="image/avif"
             />
             <img
-              ref={bgImgRef}
-              src="/brand/nondii-trip-bg-4k-desktop.webp"
+              src="/brand/nondii-trip-bg-v3-desktop.webp"
               alt=""
               aria-hidden="true"
               fetchPriority="high"
               decoding="async"
-              className="w-full h-full object-cover object-center"
+              className="w-full h-full object-cover object-top"
             />
           </picture>
         </div>
-
-        {/* Seamless 36px Mobile Status-Bar Edge Feather */}
-        <div
-          aria-hidden="true"
-          className="cgr-hero-status-feather lg:hidden pointer-events-none absolute top-0 inset-x-0 h-[36px] z-10"
-        />
 
         {/* Layer 0.5: Pure White Nondii Wordmark SVG (Zero CSS filter/drop-shadow overhead!) */}
         <div

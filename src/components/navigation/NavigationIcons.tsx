@@ -61,6 +61,7 @@ export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
   if (
     pathname.startsWith("/bookings") ||
     pathname.startsWith("/trips") ||
+    pathname.startsWith("/account") ||
     pathname.startsWith("/setting")
   ) {
     return "trips";

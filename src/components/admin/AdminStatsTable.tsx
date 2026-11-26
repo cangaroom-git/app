@@ -1,19 +1,25 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ExternalLink,
-  Search,
+  ChevronRight,
+  Eye,
+  Heart,
+  MousePointerClick,
   X,
 } from "lucide-react";
-import { AdminTableFooter } from "@/components/admin/AdminTableFooter";
+import {
+  AdminDataTable,
+  type AdminColumn,
+} from "@/components/admin/ui/AdminDataTable";
+import { AdminFilterDropdown } from "@/components/admin/ui/AdminFilterDropdown";
+import { WorkspaceCompactToolbar } from "@/components/workspace/WorkspacePrimitives";
 import {
   formatPlaceLocationScopeLabel,
-  formatPromoDateRangeLabel,
   getPlaceCategoryMeta,
 } from "@/lib/placeCategories";
 import type { AdminPerformanceRow } from "@/lib/services/adminDashboardService";
@@ -26,18 +32,41 @@ interface AdminStatsTableProps {
 
 type SortField = "viewsCount" | "savesCount" | "externalClickCount";
 
+const BATCH_SIZE = 50;
+
+const CATEGORY_OPTIONS = [
+  { value: "STAY", label: "ที่พัก" },
+  { value: "CAFE", label: "คาเฟ่" },
+  { value: "RESTAURANT", label: "อาหาร & บาร์" },
+  { value: "WELLNESS", label: "สปา & เวลเนส" },
+  { value: "ATTRACTION", label: "กิจกรรม & ที่เที่ยว" },
+];
+
+const SCOPE_OPTIONS = [
+  { value: "SINGLE_LOCATION", label: "ร้านเดี่ยว" },
+  { value: "MULTI_BRANCH", label: "หลายสาขา" },
+  { value: "NATIONWIDE_ONLINE", label: "ทั่วไทย / ออนไลน์" },
+];
+
+/**
+ * 1:1 WeGlobal ProductStatsTable (Overview bottom card)
+ * - Compact white Search input + white pill FilterDropdowns (`Category`, `Scope`)
+ * - Rounded-2xl pure white `<AdminDataTable />` (`md:h-[500px] lg:h-[580px]`)
+ * - `w-10 h-10 bg-gray-100 rounded-lg` thumbnail + Name + Promo + Category + Saves/Clicks/Views + Eye
+ * - Centered `"50 of N  [Load More]"` footer
+ */
 export function AdminStatsTable({
   rows,
   selectedProvinceId,
   onClearProvince,
 }: AdminStatsTableProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
-  const [scopeFilter, setScopeFilter] = useState<string>("ALL");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortField>("viewsCount");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
 
   const toggleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -46,7 +75,6 @@ export function AdminStatsTable({
       setSortBy(field);
       setSortOrder("desc");
     }
-    setPage(1);
   };
 
   const filtered = useMemo(() => {
@@ -56,10 +84,16 @@ export function AdminStatsTable({
         if (selectedProvinceId && r.provinceId !== selectedProvinceId) {
           return false;
         }
-        if (categoryFilter !== "ALL" && r.placeCategory !== categoryFilter) {
+        if (
+          selectedCategories.length > 0 &&
+          !selectedCategories.includes(r.placeCategory)
+        ) {
           return false;
         }
-        if (scopeFilter !== "ALL" && r.locationScope !== scopeFilter) {
+        if (
+          selectedScopes.length > 0 &&
+          !selectedScopes.includes(r.locationScope)
+        ) {
           return false;
         }
         if (!q) return true;
@@ -74,264 +108,315 @@ export function AdminStatsTable({
         const diff = a[sortBy] - b[sortBy];
         return sortOrder === "desc" ? -diff : diff;
       });
-  }, [rows, search, categoryFilter, scopeFilter, selectedProvinceId, sortBy, sortOrder]);
+  }, [
+    rows,
+    search,
+    selectedCategories,
+    selectedScopes,
+    selectedProvinceId,
+    sortBy,
+    sortOrder,
+  ]);
 
-  const pagedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  const visibleRows = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
+  const hasMore = visibleRows.length < filtered.length;
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortBy !== field) {
-      return <ArrowUpDown className="w-3 h-3 text-[var(--color-text-tertiary)]" />;
+      return <ArrowUpDown size={12} className="text-gray-300" />;
     }
     return sortOrder === "desc" ? (
-      <ArrowDown className="w-3 h-3 text-[var(--color-accent)]" />
+      <ArrowDown size={12} className="text-[var(--color-accent)]" />
     ) : (
-      <ArrowUp className="w-3 h-3 text-[var(--color-accent)]" />
+      <ArrowUp size={12} className="text-[var(--color-accent)]" />
     );
   };
 
-  return (
-    <div className="flex-1 min-h-0 flex flex-col bg-[var(--color-background-body)]">
-      {/* Compact Inline Filter Strip (border-b, zero outer cards) */}
-      <div className="px-4 py-1.5 border-b border-[var(--color-border)] flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <div className="flex flex-wrap items-center gap-1">
-          {[
-            { id: "ALL", label: "ทุกหมวด" },
-            { id: "STAY", label: "ที่พัก" },
-            { id: "CAFE", label: "คาเฟ่" },
-            { id: "RESTAURANT", label: "อาหาร & บาร์" },
-            { id: "WELLNESS", label: "สปา" },
-            { id: "ATTRACTION", label: "กิจกรรม" },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => {
-                setCategoryFilter(cat.id);
-                setPage(1);
-              }}
-              className={`h-7 px-2.5 rounded-full text-[12px] font-semibold cursor-pointer transition-colors ${
-                categoryFilter === cat.id
-                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-
-          <span className="hidden sm:inline-block w-px h-4 bg-[var(--color-border)] mx-1" />
-
-          {[
-            { id: "ALL", label: "ทุกพื้นที่" },
-            { id: "SINGLE_LOCATION", label: "ร้านเดี่ยว" },
-            { id: "MULTI_BRANCH", label: "หลายสาขา" },
-            { id: "NATIONWIDE_ONLINE", label: "ทั่วไทย/ออนไลน์" },
-          ].map((sc) => (
-            <button
-              key={sc.id}
-              type="button"
-              onClick={() => {
-                setScopeFilter(sc.id);
-                setPage(1);
-              }}
-              className={`h-7 px-2.5 rounded-full text-[11.5px] font-semibold cursor-pointer transition-colors ${
-                scopeFilter === sc.id
-                  ? "bg-[var(--color-text-primary)] text-[var(--color-background-body)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              {sc.label}
-            </button>
-          ))}
-
-          {selectedProvinceId && (
-            <button
-              type="button"
-              onClick={onClearProvince}
-              className="h-7 px-2.5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)] text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer ml-1"
-            >
-              <span>จังหวัด: {selectedProvinceId}</span>
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        <div className="relative w-full sm:w-[220px]">
-          <Search className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="กรองชื่อร้าน, โปร, จังหวัด..."
-            className="w-full h-7.5 rounded-full bg-[var(--color-background-muted)] pl-8 pr-3 text-[12.5px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
-          />
-        </div>
-      </div>
-
-      {/* Full-Bleed Scrollable Single-Row Table (Zero Images, Pure border-b) */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-left border-collapse min-w-[820px]">
-          <thead className="sticky top-0 z-10 bg-[var(--color-background-body)]">
-            <tr className="h-[34px] border-b border-[var(--color-border)] text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)]">
-              <th className="px-4 w-[24%]">สถานที่ / แบรนด์</th>
-              <th className="px-3 w-[24%]">โปรโมชั่น</th>
-              <th className="px-3 whitespace-nowrap">หมวด</th>
-              <th className="px-3 whitespace-nowrap">พื้นที่</th>
-              <th className="px-3 whitespace-nowrap">อายุโปร</th>
-              <th className="px-3 text-right whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("viewsCount")}
-                  className="inline-flex items-center gap-1 cursor-pointer hover:text-[var(--color-text-primary)]"
-                >
-                  <span>วิว</span>
-                  <SortIcon field="viewsCount" />
-                </button>
-              </th>
-              <th className="px-3 text-right whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("savesCount")}
-                  className="inline-flex items-center gap-1 cursor-pointer hover:text-[var(--color-text-primary)]"
-                >
-                  <span>บันทึก</span>
-                  <SortIcon field="savesCount" />
-                </button>
-              </th>
-              <th className="px-3 text-right whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("externalClickCount")}
-                  className="inline-flex items-center gap-1 cursor-pointer hover:text-[var(--color-text-primary)]"
-                >
-                  <span>คลิก</span>
-                  <SortIcon field="externalClickCount" />
-                </button>
-              </th>
-              <th className="px-4 text-right whitespace-nowrap">ดู</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedRows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={9}
-                  className="py-10 text-center text-[13px] text-[var(--color-text-secondary)] border-b border-[var(--color-border)]"
-                >
-                  ไม่พบรายการที่ตรงกับตัวกรอง
-                </td>
-              </tr>
+  const columns: AdminColumn<AdminPerformanceRow>[] = useMemo(
+    () => [
+      {
+        header: "รูป",
+        accessorKey: "coverImageUrl",
+        className: "w-[60px]",
+        stickyLeft: true,
+        cell: (item) => (
+          <div className="w-10 h-10 relative bg-[var(--color-background-muted)] rounded-lg overflow-hidden shrink-0">
+            {item.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.coverImageUrl}
+                alt={item.hotelNameTh}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
             ) : (
-              pagedRows.map((row) => {
-                const cat = getPlaceCategoryMeta(row.placeCategory);
-                const scopeLabel = formatPlaceLocationScopeLabel(
-                  {
-                    locationScope: row.locationScope,
-                    provinceId: row.provinceId,
-                    provinceNameTh: row.provinceNameTh,
-                    provinceNameEn: row.provinceNameTh,
-                  },
-                  "th"
-                );
-                const dateInfo = formatPromoDateRangeLabel(
-                  null,
-                  row.promoExpiresAt,
-                  "th"
-                );
-
-                return (
-                  <tr
-                    key={row.id}
-                    className="h-[38px] border-b border-[var(--color-border)] hover:bg-[var(--color-background-muted)]/60 transition-colors text-[13px]"
-                  >
-                    <td className="px-4 font-semibold text-[var(--color-text-primary)] max-w-[240px] truncate">
-                      <Link
-                        href={`/${encodeURIComponent(row.hotelSlug)}`}
-                        target="_blank"
-                        className="hover:text-[var(--color-accent)] transition-colors"
-                      >
-                        {row.hotelNameTh}
-                      </Link>
-                    </td>
-                    <td className="px-3 text-[var(--color-text-secondary)] max-w-[240px] truncate">
-                      {row.promoHeadlineTh ? (
-                        <span className="font-medium text-[var(--color-accent)]">
-                          {row.promoHeadlineTh}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-text-tertiary)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-text-primary)]">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cat.crestBgHex }}
-                        />
-                        <span>{cat.shortLabelTh}</span>
-                      </span>
-                    </td>
-                    <td className="px-3 whitespace-nowrap text-[12px] text-[var(--color-text-secondary)] max-w-[140px] truncate">
-                      {scopeLabel}
-                    </td>
-                    <td className="px-3 whitespace-nowrap text-[12px] tabular-nums">
-                      {dateInfo ? (
-                        <span
-                          className={
-                            dateInfo.isExpired
-                              ? "text-[#e60023] font-semibold"
-                              : dateInfo.isExpiringSoon
-                              ? "text-[var(--color-accent)] font-semibold"
-                              : "text-[var(--color-text-secondary)]"
-                          }
-                        >
-                          {dateInfo.label}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--color-text-tertiary)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 text-right tabular-nums text-[12.5px] font-medium text-[var(--color-text-primary)]">
-                      {row.viewsCount.toLocaleString()}
-                    </td>
-                    <td className="px-3 text-right tabular-nums text-[12.5px] text-[var(--color-text-secondary)]">
-                      {row.savesCount.toLocaleString()}
-                    </td>
-                    <td className="px-3 text-right tabular-nums text-[12.5px] text-[var(--color-text-secondary)]">
-                      {row.externalClickCount.toLocaleString()}
-                    </td>
-                    <td className="px-4 text-right whitespace-nowrap">
-                      <Link
-                        href={`/${encodeURIComponent(row.hotelSlug)}`}
-                        target="_blank"
-                        title="เปิดหน้าโปรไฟล์"
-                        className="h-6.5 w-6.5 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
+              <div className="w-full h-full flex items-center justify-center text-[var(--color-text-secondary)] ws-badge">
+                —
+              </div>
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        ),
+      },
+      {
+        header: "สถานที่ / แบรนด์",
+        accessorKey: "hotelNameTh",
+        className: "min-w-[240px]",
+        cell: (item) => (
+          <span className="ws-body-medium line-clamp-2">
+            {item.hotelNameTh}
+          </span>
+        ),
+      },
+      {
+        header: "โปรโมชั่น",
+        accessorKey: "promoHeadlineTh",
+        className: "min-w-[160px] max-w-[240px]",
+        cell: (item) => (
+          <span className="ws-caption line-clamp-1">
+            {item.promoHeadlineTh || "—"}
+          </span>
+        ),
+      },
+      {
+        header: "หมวดหมู่",
+        accessorKey: "placeCategory",
+        className: "whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-caption">
+            {getPlaceCategoryMeta(item.placeCategory).shortLabelTh}
+          </span>
+        ),
+      },
+      {
+        header: "พื้นที่",
+        accessorKey: "locationScope",
+        className: "whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-caption">
+            {formatPlaceLocationScopeLabel(
+              {
+                locationScope: item.locationScope,
+                provinceId: item.provinceId,
+                provinceNameTh: item.provinceNameTh,
+                provinceNameEn: item.provinceNameTh,
+              },
+              "th",
+            )}
+          </span>
+        ),
+      },
+      {
+        header: () => (
+          <button
+            type="button"
+            onClick={() => toggleSort("savesCount")}
+            className="inline-flex items-center gap-1 hover:text-[var(--color-text-primary)] transition-colors whitespace-nowrap cursor-pointer"
+          >
+            บันทึก <SortIcon field="savesCount" />
+          </button>
+        ),
+        accessorKey: "savesCount",
+        className: "w-[72px] text-center whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-body tabular-nums">
+            {item.savesCount.toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        header: () => (
+          <button
+            type="button"
+            onClick={() => toggleSort("externalClickCount")}
+            className="inline-flex items-center gap-1 hover:text-[var(--color-text-primary)] transition-colors whitespace-nowrap cursor-pointer"
+          >
+            คลิก <SortIcon field="externalClickCount" />
+          </button>
+        ),
+        accessorKey: "externalClickCount",
+        className: "w-[72px] text-center whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-body tabular-nums">
+            {item.externalClickCount.toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        header: () => (
+          <button
+            type="button"
+            onClick={() => toggleSort("viewsCount")}
+            className="inline-flex items-center gap-1 hover:text-[var(--color-text-primary)] transition-colors whitespace-nowrap cursor-pointer"
+          >
+            เข้าชม <SortIcon field="viewsCount" />
+          </button>
+        ),
+        accessorKey: "viewsCount",
+        className: "w-[72px] text-center whitespace-nowrap",
+        cell: (item) => (
+          <span className="ws-body-medium tabular-nums">
+            {item.viewsCount.toLocaleString()}
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sortBy, sortOrder],
+  );
 
-      {/* Sticky Compact Pagination Bar */}
-      <AdminTableFooter
-        totalItems={filtered.length}
-        page={page}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+  return (
+    <div className="space-y-3">
+      {/* Single-Row Compact Toolbar (Mobile expandable search icon + horizontal filters) */}
+      <WorkspaceCompactToolbar
+        bordered={false}
+        compactPadding
+        searchValue={search}
+        onSearchChange={(val) => {
+          setSearch(val);
+          setVisibleCount(BATCH_SIZE);
+        }}
+        searchPlaceholder="ค้นหาชื่อสถานที่ โปร หรือจังหวัด..."
+        filters={
+          <>
+            <AdminFilterDropdown
+              label="หมวดหมู่"
+              options={CATEGORY_OPTIONS}
+              selected={selectedCategories}
+              onChange={(vals) => {
+                setSelectedCategories(vals);
+                setVisibleCount(BATCH_SIZE);
+              }}
+              multiple
+            />
+
+            <AdminFilterDropdown
+              label="พื้นที่"
+              options={SCOPE_OPTIONS}
+              selected={selectedScopes}
+              onChange={(vals) => {
+                setSelectedScopes(vals);
+                setVisibleCount(BATCH_SIZE);
+              }}
+              multiple
+            />
+
+            {selectedProvinceId && (
+              <button
+                type="button"
+                onClick={onClearProvince}
+                className="h-9 inline-flex items-center gap-1.5 px-3 rounded-full ws-badge bg-[var(--color-accent-muted)] text-[var(--color-accent)] whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <span>จังหวัด: {selectedProvinceId}</span>
+                <X size={12} />
+              </button>
+            )}
+          </>
+        }
       />
+
+      {/* Pure White Hairline DataTable (Desktop Table / Mobile Native List Rows) */}
+      <div className="md:h-[500px] lg:h-[560px]">
+        <AdminDataTable
+          data={visibleRows}
+          columns={columns}
+          keyField="id"
+          onRowClick={(item) =>
+            router.push(`/${encodeURIComponent(item.hotelSlug)}`)
+          }
+          getViewUrl={(item) => `/${encodeURIComponent(item.hotelSlug)}`}
+          renderMobileRow={(item) => {
+            const scopeLabel = formatPlaceLocationScopeLabel(
+              {
+                locationScope: item.locationScope,
+                provinceId: item.provinceId,
+                provinceNameTh: item.provinceNameTh,
+                provinceNameEn: item.provinceNameTh,
+              },
+              "th",
+            );
+            return (
+              <div className="py-3.5 flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-[14px] overflow-hidden bg-[var(--color-background-muted)] flex items-center justify-center shrink-0">
+                  {item.coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.coverImageUrl}
+                      alt={item.hotelNameTh}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="ws-badge text-[var(--color-text-secondary)]">
+                      —
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="ws-subtitle truncate">{item.hotelNameTh}</p>
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--color-background-muted)] ws-badge text-[var(--color-text-secondary)] shrink-0">
+                      {getPlaceCategoryMeta(item.placeCategory).shortLabelTh}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 min-w-0">
+                    {item.promoHeadlineTh && (
+                      <span className="ws-caption-medium !text-[var(--color-accent)] truncate">
+                        {item.promoHeadlineTh}
+                      </span>
+                    )}
+                    {item.promoHeadlineTh && scopeLabel && (
+                      <span className="ws-caption shrink-0">·</span>
+                    )}
+                    {scopeLabel && (
+                      <span className="ws-caption shrink-0">{scopeLabel}</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 ws-caption tabular-nums">
+                    <span className="inline-flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5" />
+                      {item.viewsCount.toLocaleString()}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Heart className="w-3.5 h-3.5" />
+                      {item.savesCount.toLocaleString()}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <MousePointerClick className="w-3.5 h-3.5" />
+                      {item.externalClickCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <ChevronRight className="w-4 h-4 text-[var(--color-text-secondary)] shrink-0" />
+              </div>
+            );
+          }}
+          emptyLabel="ไม่พบรายการที่ตรงกับตัวกรอง"
+          footer={
+            <div className="border-t border-[var(--color-border)] py-3 flex items-center justify-center gap-3 text-xs text-[var(--color-text-secondary)] shrink-0">
+              <span>
+                แสดง {visibleRows.length} จาก {filtered.length} รายการ
+              </span>
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((c) => c + BATCH_SIZE)}
+                  className="px-4 py-1.5 bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] rounded-full font-semibold text-[var(--color-text-primary)] transition-colors cursor-pointer"
+                >
+                  โหลดเพิ่ม (
+                  {Math.min(BATCH_SIZE, filtered.length - visibleRows.length)})
+                </button>
+              )}
+            </div>
+          }
+        />
+      </div>
     </div>
   );
 }

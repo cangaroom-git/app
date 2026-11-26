@@ -19,8 +19,8 @@ import {
 } from "@/lib/calendarAvailability";
 import { formatShortDate } from "@/lib/dateFormatters";
 import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
+import { StudioDateRangePicker } from "@/components/ui/StudioDateRangePicker";
 import {
-  StandardFieldGroup,
   StandardInput,
   StandardStepperRow,
 } from "@/components/ui/standards";
@@ -48,6 +48,14 @@ function formatCompactBaht(price: number): string {
     return `฿${(price / 1000).toFixed(price % 1000 === 0 ? 0 : 1)}k`;
   }
   return `฿${price.toLocaleString()}`;
+}
+
+function formatMobileBaht(price: number): string {
+  if (price >= 1000) {
+    const k = price / 1000;
+    return Number.isInteger(k) ? `${k}k` : `${k.toFixed(1)}k`;
+  }
+  return String(price);
 }
 
 export function StudioCalendarTab({
@@ -88,6 +96,7 @@ export function StudioCalendarTab({
     return rooms.length >= 2 ? "matrix" : "month";
   });
   const [matrixStartDate, setMatrixStartDate] = useState(todayStr);
+  const [selectedMobileDate, setSelectedMobileDate] = useState(todayStr);
   const [monthCursor, setMonthCursor] = useState(() => ({
     year: todayDate.getFullYear(),
     month: todayDate.getMonth(),
@@ -96,14 +105,27 @@ export function StudioCalendarTab({
     matchedInitialRoom?.id || rooms[0]?.id || ""
   );
 
+  // On mobile (< 768px), default to Single-Room Month Grid instead of wide 14-day Matrix
   useEffect(() => {
     if (matchedInitialRoom) {
       setActiveRoomId(matchedInitialRoom.id);
       setViewMode("month");
-    } else if (!initialRoomCode && rooms.length >= 2) {
-      setViewMode("matrix");
+      return;
+    }
+    if (!initialRoomCode && rooms.length >= 2) {
+      const isNarrow =
+        typeof window !== "undefined" && window.innerWidth < 768;
+      setViewMode(isNarrow ? "month" : "matrix");
     }
   }, [matchedInitialRoom, initialRoomCode, rooms.length]);
+
+  // Keep mobile selected date within the active 7-day strip when navigating weeks
+  useEffect(() => {
+    const stripEnd = addDaysToDate(matrixStartDate, 6);
+    if (selectedMobileDate < matrixStartDate || selectedMobileDate > stripEnd) {
+      setSelectedMobileDate(matrixStartDate);
+    }
+  }, [matrixStartDate, selectedMobileDate]);
 
   const activeRoom = useMemo(
     () => rooms.find((r) => r.id === activeRoomId) ?? rooms[0] ?? null,
@@ -368,211 +390,233 @@ export function StudioCalendarTab({
 
   if (rooms.length === 0) {
     return (
-      <div className="flex-1 w-full px-4 sm:px-8 lg:px-10 py-16">
-        <div className="max-w-[420px] mx-auto text-center space-y-4">
-          <p className="text-[20px] font-semibold text-[var(--color-text-primary)]">
-            ยังไม่มีห้องพักในระบบ
-          </p>
-          <p className="text-[14.5px] text-[var(--color-text-secondary)]">
-            กรุณาเพิ่มประเภทห้องพักอย่างน้อย 1 แบบในหน้า &ldquo;ที่พัก&rdquo; เพื่อเริ่มจัดการปฏิทินและราคา
-          </p>
-          <Link
-            href={buildHref("/studio/listings/rooms")}
-            className="inline-flex items-center h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold transition-colors"
-          >
-            ไปเพิ่มห้องพัก
-          </Link>
+      <div className="cgr-admin-page">
+        <div className="cgr-admin-body py-16">
+          <div className="max-w-[420px] mx-auto text-center space-y-4">
+            <p className="ws-title">ยังไม่มีห้องพักในระบบ</p>
+            <p className="ws-body text-[var(--color-text-secondary)]">
+              กรุณาเพิ่มประเภทห้องพักอย่างน้อย 1 แบบในหน้า &ldquo;ห้องพัก&rdquo; เพื่อเริ่มจัดการปฏิทินและราคา
+            </p>
+            <Link
+              href={buildHref("/studio/listings/rooms")}
+              className="inline-flex items-center h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ws-body-strong transition-colors"
+            >
+              ไปเพิ่มห้องพัก
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
+  const mobileStripDays = matrixDays.slice(0, 7);
+  const selectedMobileTotals = rooms.reduce(
+    (acc, rm) => {
+      const m = getCellMetrics(rm, selectedMobileDate);
+      return { free: acc.free + m.free, total: acc.total + rm.totalUnits };
+    },
+    { free: 0, total: 0 }
+  );
+
   // =========================================================================
-  // PURE FULL-WIDTH CALM CALENDAR CANVAS (Unified max-w-[1360px] — NO Side Menu!)
+  // UNIFIED 1160px CALENDAR STAGE (Mobile-First Month Grid + 7-Day Agenda / Desktop Matrix)
   // =========================================================================
   return (
-    <div className="flex-1 w-full px-4 sm:px-8 lg:px-10 py-8 lg:py-10 bg-[var(--color-background-body)]">
-      <div className="max-w-[1360px] mx-auto flex flex-col">
-        {/* Top Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-7">
-          <div className="flex items-center gap-3 min-w-0">
-            {viewMode === "month" ? (
-              <>
-                <div className="min-w-[190px]">
-                  <ResponsiveSelect
-                    value={`${monthCursor.year}-${monthCursor.month}`}
-                    onChange={(val) => {
-                      const [y, m] = val.split("-").map(Number);
-                      if (Number.isFinite(y) && Number.isFinite(m)) {
-                        setMonthCursor({ year: y, month: m });
-                      }
-                    }}
-                    sheetTitle="เลือกเดือน"
-                    triggerClassName="h-11 px-2 -ml-2 rounded-[10px] bg-transparent hover:bg-[var(--color-background-muted)] text-[26px] sm:text-[28px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]"
-                    options={monthDropdownOptions}
-                  />
-                </div>
-
-                <div className="hidden sm:flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMonthCursor((prev) =>
-                        prev.month === 0
-                          ? { year: prev.year - 1, month: 11 }
-                          : { year: prev.year, month: prev.month - 1 }
-                      )
-                    }
-                    aria-label="เดือนก่อนหน้า"
-                    className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMonthCursor((prev) =>
-                        prev.month === 11
-                          ? { year: prev.year + 1, month: 0 }
-                          : { year: prev.year, month: prev.month + 1 }
-                      )
-                    }
-                    aria-label="เดือนถัดไป"
-                    className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2">
-                <h1 className="text-[26px] sm:text-[28px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                  ปฏิทินรวมทุกห้อง
-                </h1>
-                <div className="flex items-center gap-1 ml-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMatrixStartDate((prev) => addDaysToDate(prev, -7))
-                    }
-                    aria-label="ย้อน 7 วัน"
-                    className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMatrixStartDate(todayStr)}
-                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
-                  >
-                    วันนี้
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMatrixStartDate((prev) => addDaysToDate(prev, 7))
-                    }
-                    aria-label="ถัดไป 7 วัน"
-                    className="h-9 w-9 rounded-[10px] hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Calm Controls */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {viewMode === "month" && rooms.length >= 2 && activeRoom && (
-              <div className="w-[200px] sm:w-[230px]">
+    <div className="cgr-admin-page">
+      {/* ═══ SINGLE-ROW COMPACT TOP TOOLBAR (Matches 1160px /admin & /studio) ═══ */}
+      <div className="cgr-admin-toolbar">
+        {/* Left: Month Picker OR Date Navigation */}
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+          {viewMode === "month" ? (
+            <>
+              <div className="min-w-[138px] sm:min-w-[175px]">
                 <ResponsiveSelect
-                  value={activeRoom.id}
-                  onChange={(nextId) => {
-                    const rm = rooms.find((r) => r.id === nextId);
-                    if (rm) handleSelectRoomForMonth(rm);
+                  value={`${monthCursor.year}-${monthCursor.month}`}
+                  onChange={(val) => {
+                    const [y, m] = val.split("-").map(Number);
+                    if (Number.isFinite(y) && Number.isFinite(m)) {
+                      setMonthCursor({ year: y, month: m });
+                    }
                   }}
-                  sheetTitle="เลือกห้องพักที่ต้องการดู"
-                  triggerClassName="w-full h-10 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)]"
-                  options={rooms.map((r) => ({
-                    value: r.id,
-                    label: `${r.code} · ${r.nameTh}`,
-                    sublabel: `฿${r.weekdayPriceThb.toLocaleString()}/คืน · ${r.totalUnits} ยูนิต`,
-                  }))}
+                  sheetTitle="เลือกเดือน"
+                  triggerClassName="h-9 px-2 -ml-1 rounded-full bg-transparent hover:bg-[var(--color-background-muted)] ws-subtitle sm:!text-[20px] !font-semibold whitespace-nowrap"
+                  options={monthDropdownOptions}
                 />
               </div>
-            )}
 
-            {rooms.length >= 2 && (
-              <div className="inline-flex items-center rounded-[12px] bg-[var(--color-background-muted)] p-1">
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMonthCursor((prev) =>
+                      prev.month === 0
+                        ? { year: prev.year - 1, month: 11 }
+                        : { year: prev.year, month: prev.month - 1 }
+                    )
+                  }
+                  aria-label="เดือนก่อนหน้า"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMonthCursor((prev) =>
+                      prev.month === 11
+                        ? { year: prev.year + 1, month: 0 }
+                        : { year: prev.year, month: prev.month + 1 }
+                    )
+                  }
+                  aria-label="เดือนถัดไป"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+              <h1 className="hidden md:block ws-title truncate">
+                ปฏิทินรวมทุกห้อง
+              </h1>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMatrixStartDate((prev) => addDaysToDate(prev, -7))
+                  }
+                  aria-label="ย้อน 7 วัน"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeRoom) handleSelectRoomForMonth(activeRoom);
+                    setMatrixStartDate(todayStr);
+                    setSelectedMobileDate(todayStr);
                   }}
-                  className={`h-8 px-3.5 rounded-[9px] text-[13px] font-medium cursor-pointer transition-colors ${
-                    viewMode === "month"
-                      ? "bg-[var(--color-background-card)] text-[var(--color-text-primary)] font-semibold"
-                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                  }`}
+                  className="h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ws-badge text-[var(--color-text-primary)] cursor-pointer transition-colors whitespace-nowrap"
                 >
-                  รายเดือน
+                  วันนี้
                 </button>
                 <button
                   type="button"
-                  onClick={handleSwitchToMatrix}
-                  className={`h-8 px-3.5 rounded-[9px] text-[13px] font-medium cursor-pointer transition-colors ${
-                    viewMode === "matrix"
-                      ? "bg-[var(--color-background-card)] text-[var(--color-text-primary)] font-semibold"
-                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                  }`}
+                  onClick={() =>
+                    setMatrixStartDate((prev) => addDaysToDate(prev, 7))
+                  }
+                  aria-label="ถัดไป 7 วัน"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-[var(--color-background-muted)] inline-flex items-center justify-center cursor-pointer transition-colors"
                 >
-                  รวมทุกห้อง
+                  <ChevronRight className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Compact Mode Toggle + Bulk Price + Seasonal */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {rooms.length >= 2 && (
+            <div className="inline-flex items-center rounded-full bg-[var(--color-background-muted)] p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeRoom) handleSelectRoomForMonth(activeRoom);
+                }}
+                className={`h-8 px-2.5 sm:px-3 rounded-full ws-badge whitespace-nowrap cursor-pointer transition-colors ${
+                  viewMode === "month"
+                    ? "bg-[var(--color-accent)] !text-white"
+                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                รายเดือน
+              </button>
+              <button
+                type="button"
+                onClick={handleSwitchToMatrix}
+                className={`h-8 px-2.5 sm:px-3 rounded-full ws-badge whitespace-nowrap cursor-pointer transition-colors ${
+                  viewMode === "matrix"
+                    ? "bg-[var(--color-accent)] !text-white"
+                    : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                }`}
+              >
+                รวมห้อง
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (viewMode === "month" && activeRoom) {
+                setBulkRoomIds([activeRoom.id]);
+              } else {
+                setBulkRoomIds(rooms.map((r) => r.id));
+              }
+              setIsBulkModalOpen(true);
+            }}
+            title="ปรับราคาช่วงวัน / ปิดห้องหลายวัน"
+            className="h-9 w-9 sm:w-auto sm:px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ws-caption-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+          >
+            <CalendarRange className="w-4 h-4 text-[var(--color-accent)]" />
+            <span className="hidden sm:inline">ปรับช่วงวัน</span>
+          </button>
+
+          <Link
+            href={buildHref("/studio/listings/seasonal")}
+            title="ตั้งราคาฤดูกาล"
+            className="hidden sm:inline-flex h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ws-caption-medium items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-[var(--color-accent)]" />
+            <span className="hidden lg:inline">ฤดูกาล</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* ═══ MAIN SCROLLABLE CALENDAR BODY (1160px Aligned + Auto-Hide Scrollbar) ═══ */}
+      <div className="cgr-admin-body py-4 sm:py-6">
+        {/* VIEW 1: MOBILE-OPTIMIZED & DESKTOP SPACIOUS MONTH GRID */}
+        {viewMode === "month" && activeRoom ? (
+          <div className="flex flex-col space-y-4">
+            {/* 1-Tap Horizontal Room Switcher Pills (Zero dropdown hunt on mobile!) */}
+            {rooms.length >= 2 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar pb-0.5">
+                {rooms.map((rm) => {
+                  const picked = rm.id === activeRoom.id;
+                  return (
+                    <button
+                      key={rm.id}
+                      type="button"
+                      onClick={() => handleSelectRoomForMonth(rm)}
+                      className={`h-9 px-3.5 rounded-full ws-caption-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                        picked
+                          ? "bg-[var(--color-accent)] !text-white font-semibold"
+                          : "bg-[var(--color-background-muted)] !text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                      }`}
+                    >
+                      {rm.code} · {rm.nameTh}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                if (viewMode === "month" && activeRoom) {
-                  setBulkRoomIds([activeRoom.id]);
-                } else {
-                  setBulkRoomIds(rooms.map((r) => r.id));
-                }
-                setIsBulkModalOpen(true);
-              }}
-              className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors"
-            >
-              <CalendarRange className="w-4 h-4" />
-              <span>ปรับราคาช่วงวัน</span>
-            </button>
-
-            <Link
-              href={buildHref("/studio/listings/seasonal")}
-              className="h-10 px-4 rounded-[12px] hover:bg-[var(--color-background-muted)] text-[13.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-1.5 transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:inline">ตั้งราคาฤดูกาล</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* VIEW 1: AIRBNB SPACIOUS FULL-WIDTH MONTH GRID */}
-        {viewMode === "month" && activeRoom ? (
-          <div className="flex flex-col">
-            <div className="grid grid-cols-7 gap-2.5 sm:gap-3 pb-3 border-b border-[var(--color-border)]">
+            {/* 7-Column Weekday Header */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2.5 pb-2 border-b border-[var(--color-border)]">
               {SUNDAY_FIRST_WEEKDAYS_TH.map((wd) => (
                 <div
                   key={wd}
-                  className="text-center text-[13px] font-medium text-[var(--color-text-secondary)]"
+                  className="text-center ws-badge font-medium text-[var(--color-text-secondary)]"
                 >
                   {wd}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-2.5 sm:gap-3.5 pt-4">
+            {/* 7-Column Responsive Month Grid (Tight 4px gap on mobile = 45px+ clean touch cells!) */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2.5">
               {buildSundayFirstMonthCells(
                 monthCursor.year,
                 monthCursor.month
@@ -581,7 +625,7 @@ export function StudioCalendarTab({
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="h-[88px] sm:h-[112px] xl:h-[126px]"
+                      className="min-h-[68px] sm:h-[104px] lg:h-[116px]"
                     />
                   );
                 }
@@ -590,6 +634,7 @@ export function StudioCalendarTab({
                 const isToday = cell.dateStr === todayStr;
                 const m = getCellMetrics(activeRoom, cell.dateStr);
                 const isClosed = m.free === 0;
+                const isPartiallyBooked = !isClosed && m.booked > 0;
 
                 return (
                   <button
@@ -597,22 +642,24 @@ export function StudioCalendarTab({
                     type="button"
                     disabled={isPast}
                     onClick={() => openDayEditor(activeRoom, cell.dateStr)}
-                    className={`h-[88px] sm:h-[112px] xl:h-[126px] rounded-[14px] p-3 sm:p-4 flex flex-col justify-between text-left transition-colors ${
+                    className={`min-h-[68px] sm:h-[104px] lg:h-[116px] rounded-[12px] sm:rounded-[14px] p-1.5 sm:p-3 flex flex-col justify-between text-left transition-colors ${
                       isPast
-                        ? "bg-[var(--color-background-muted)]/70 text-[var(--color-text-tertiary)] cursor-not-allowed"
+                        ? "bg-[var(--color-background-muted)]/60 text-[var(--color-text-tertiary)] cursor-not-allowed"
                         : isClosed
-                        ? "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-secondary)] cursor-pointer"
-                        : "bg-[var(--color-background-card)] border border-[var(--color-border)] hover:border-[var(--color-text-primary)] text-[var(--color-text-primary)] cursor-pointer"
+                          ? "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-secondary)] cursor-pointer"
+                          : isPartiallyBooked
+                            ? "bg-[#edf5fd]/75 border border-[var(--color-accent)]/30 hover:border-[var(--color-accent)] text-[var(--color-text-primary)] cursor-pointer"
+                            : "bg-[var(--color-background-card)] border border-[var(--color-border)] hover:border-[var(--color-text-primary)] text-[var(--color-text-primary)] cursor-pointer"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-1 w-full">
+                    <div className="flex items-center justify-between gap-0.5 w-full">
                       <span
-                        className={`text-[14.5px] sm:text-[15.5px] font-semibold tabular-nums leading-none ${
+                        className={`text-[13px] sm:text-[14px] font-semibold tabular-nums leading-none ${
                           isToday
-                            ? "inline-flex items-center justify-center min-w-[28px] h-[28px] px-1.5 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                            ? "inline-flex items-center justify-center min-w-[22px] h-[22px] sm:min-w-[26px] sm:h-[26px] px-1 rounded-full bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : isPast || isClosed
-                            ? "line-through opacity-75"
-                            : ""
+                              ? "line-through opacity-70"
+                              : ""
                         }`}
                       >
                         {cell.dayNumber}
@@ -621,36 +668,67 @@ export function StudioCalendarTab({
                       {!isPast && m.hasCustomPrice && (
                         <span
                           title={m.ov?.note || "ราคาพิเศษเฉพาะวัน"}
-                          className="h-1.5 w-1.5 rounded-full bg-[var(--color-text-primary)] shrink-0"
+                          className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] shrink-0"
                         />
                       )}
                     </div>
 
-                    <div className="space-y-0.5 min-w-0">
+                    <div className="space-y-0.5 min-w-0 w-full">
+                      {/* Mobile compact price (never truncates!) */}
                       <span
-                        className={`block text-[13.5px] sm:text-[15px] tabular-nums leading-tight truncate ${
+                        className={`sm:hidden block text-[12px] tabular-nums leading-none ${
+                          isPast
+                            ? "text-[var(--color-text-tertiary)] font-normal"
+                            : isClosed
+                              ? "text-[var(--color-text-secondary)] font-normal"
+                              : m.hasCustomPrice
+                                ? "text-[var(--color-accent)] font-semibold"
+                                : "text-[var(--color-text-primary)] font-medium"
+                        }`}
+                      >
+                        {isClosed
+                          ? m.booked > 0
+                            ? "เต็ม"
+                            : "ปิด"
+                          : formatMobileBaht(m.price)}
+                      </span>
+
+                      {/* Desktop full price */}
+                      <span
+                        className={`hidden sm:block text-[14px] tabular-nums leading-tight truncate ${
                           isPast
                             ? "text-[var(--color-text-tertiary)] font-normal"
                             : m.hasCustomPrice
-                            ? "text-[var(--color-text-primary)] font-semibold"
-                            : "text-[var(--color-text-secondary)] font-medium"
+                              ? "text-[var(--color-accent)] font-semibold"
+                              : "text-[var(--color-text-secondary)] font-medium"
                         }`}
                       >
                         {formatCompactBaht(m.price)}
                       </span>
 
+                      {/* Mobile booking sub-indicator when partially booked */}
+                      {!isPast && isPartiallyBooked && (
+                        <span className="sm:hidden block text-[12px] leading-none font-medium text-[var(--color-accent)] tabular-nums">
+                          {m.free}/{activeRoom.totalUnits}
+                        </span>
+                      )}
+
+                      {/* Desktop status / note line */}
                       {!isPast &&
-                        (isClosed || m.booked > 0 || m.minNights > 1 || m.ov?.note) && (
-                          <span className="hidden sm:block text-[11.5px] text-[var(--color-text-tertiary)] truncate leading-none">
+                        (isClosed ||
+                          m.booked > 0 ||
+                          m.minNights > 1 ||
+                          m.ov?.note) && (
+                          <span className="hidden sm:block ws-badge font-normal text-[var(--color-text-secondary)] truncate leading-none">
                             {isClosed
                               ? m.booked > 0
                                 ? "จองเต็ม"
                                 : "ปิดขาย"
                               : m.ov?.note
-                              ? m.ov.note
-                              : m.booked > 0
-                              ? `จอง ${m.booked}/${activeRoom.totalUnits}`
-                              : `ขั้นต่ำ ${m.minNights} คืน`}
+                                ? m.ov.note
+                                : m.booked > 0
+                                  ? `ว่าง ${m.free}/${activeRoom.totalUnits}`
+                                  : `ขั้นต่ำ ${m.minNights} คืน`}
                           </span>
                         )}
                     </div>
@@ -659,130 +737,288 @@ export function StudioCalendarTab({
               })}
             </div>
 
-            <p className="text-[13px] text-[var(--color-text-tertiary)] pt-5">
-              คลิกที่วันใดก็ได้เพื่อปรับราคาเฉพาะคืน ปิดรับจอง หรือกำหนดคืนขั้นต่ำ
-            </p>
+            {/* Compact Legend & Hint */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--color-border)] ws-caption">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]" />
+                  <span>ราคาพิเศษ</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-[#edf5fd] border border-[var(--color-accent)]/30" />
+                  <span>มีจองแล้ว</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-[var(--color-background-muted)]" />
+                  <span>เต็ม / ปิดขาย</span>
+                </span>
+              </div>
+              <span className="hidden sm:inline">
+                คลิกที่วันใดก็ได้เพื่อปรับราคา ปิดรับจอง หรือกำหนดคืนขั้นต่ำ
+              </span>
+            </div>
           </div>
         ) : (
-          /* VIEW 2: WIDE BREATHABLE 14-DAY MULTI-ROOM MATRIX */
+          /* VIEW 2: MOBILE 7-DAY AGENDA STRIP + DESKTOP 14-DAY MATRIX */
           <div className="flex flex-col space-y-5">
-            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-              <table className="w-full min-w-[920px] border-collapse">
-                <thead>
-                  <tr className="border-b border-[var(--color-border)]">
-                    <th className="sticky left-0 z-10 bg-[var(--color-background-body)] text-left py-3.5 pr-5 w-[250px] text-[13.5px] font-medium text-[var(--color-text-secondary)]">
-                      ประเภทห้องพัก
-                    </th>
-                    {matrixDays.map((day) => (
-                      <th
-                        key={day.dateStr}
-                        className={`py-3 px-1 text-center font-normal ${
-                          day.isWeekend ? "bg-[var(--color-background-muted)]/45" : ""
+            {/* ─── MOBILE (< md): Native 7-Day Date Strip + Vertical Room Cards (Zero horizontal table scroll!) ─── */}
+            <div className="md:hidden space-y-4">
+              {/* 7-Day Date Selector Strip */}
+              <div className="grid grid-cols-7 gap-1 pb-3 border-b border-[var(--color-border)]">
+                {mobileStripDays.map((day) => {
+                  const isSelected = day.dateStr === selectedMobileDate;
+                  const freeAll = rooms.reduce(
+                    (sum, rm) => sum + getCellMetrics(rm, day.dateStr).free,
+                    0
+                  );
+                  return (
+                    <button
+                      key={day.dateStr}
+                      type="button"
+                      onClick={() => setSelectedMobileDate(day.dateStr)}
+                      className={`py-2 px-1 rounded-[14px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+                        isSelected
+                          ? "bg-[var(--color-accent)] !text-white"
+                          : day.isToday
+                            ? "bg-[#edf5fd] text-[var(--color-accent)]"
+                            : "bg-[var(--color-background-muted)]/65 text-[var(--color-text-primary)]"
+                      }`}
+                    >
+                      <span
+                        className={`text-[12px] leading-none ${
+                          isSelected
+                            ? "text-white/85"
+                            : "text-[var(--color-text-secondary)]"
                         }`}
                       >
-                        <span className="block text-[11.5px] text-[var(--color-text-tertiary)]">
-                          {day.weekdayLabel}
-                        </span>
-                        <span
-                          className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1 rounded-full text-[13.5px] font-semibold tabular-nums mt-0.5 ${
-                            day.isToday
-                              ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                              : "text-[var(--color-text-primary)]"
-                          }`}
-                        >
-                          {day.dayNum}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
-                  {rooms.map((room) => (
-                    <tr key={room.id}>
-                      <td className="sticky left-0 z-10 bg-[var(--color-background-body)] py-4 pr-5 align-middle">
-                        <button
-                          type="button"
-                          onClick={() => handleSelectRoomForMonth(room)}
-                          className="flex items-center gap-3.5 text-left group cursor-pointer"
-                        >
-                          {room.galleryUrls[0] ? (
-                            <img
-                              src={room.galleryUrls[0]}
-                              alt={room.nameTh}
-                              className="h-11 w-14 rounded-[10px] object-cover bg-[var(--color-background-muted)] shrink-0"
-                            />
-                          ) : (
-                            <span className="h-11 w-14 rounded-[10px] bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[12px] font-semibold text-[var(--color-text-secondary)] shrink-0">
-                              {room.code}
-                            </span>
-                          )}
-                          <div className="min-w-0">
-                            <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate group-hover:underline">
-                              {room.code} · {room.nameTh}
-                            </p>
-                            <p className="text-[12.5px] text-[var(--color-text-secondary)]">
-                              {room.totalUnits} ยูนิต · ดูรายเดือน →
-                            </p>
-                          </div>
-                        </button>
-                      </td>
+                        {day.weekdayLabel}
+                      </span>
+                      <span className="text-[15px] font-semibold tabular-nums leading-none">
+                        {day.dayNum}
+                      </span>
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          freeAll > 0
+                            ? isSelected
+                              ? "bg-[var(--color-accent-yellow)]"
+                              : "bg-[var(--color-accent)]"
+                            : isSelected
+                              ? "bg-white/40"
+                              : "bg-[var(--color-border-emphasized)]"
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
 
-                      {matrixDays.map((day) => {
-                        const m = getCellMetrics(room, day.dateStr);
-                        const isClosed = m.free === 0;
+              {/* Selected Day Summary Line */}
+              <div className="flex items-center justify-between gap-2">
+                <p className="ws-subtitle">
+                  {formatShortDate(selectedMobileDate, "th")}
+                </p>
+                <span className="ws-caption tabular-nums">
+                  ว่างรวม {selectedMobileTotals.free}/{selectedMobileTotals.total}{" "}
+                  ห้อง
+                </span>
+              </div>
 
-                        return (
-                          <td
-                            key={day.dateStr}
-                            className={`py-2.5 px-1 text-center align-middle ${
-                              day.isWeekend
-                                ? "bg-[var(--color-background-muted)]/35"
-                                : ""
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => openDayEditor(room, day.dateStr)}
-                              className={`w-full h-[58px] rounded-[11px] px-1 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+              {/* Vertical Room List for Selected Date */}
+              <div className="divide-y divide-[var(--color-border)]">
+                {rooms.map((room) => {
+                  const m = getCellMetrics(room, selectedMobileDate);
+                  const isClosed = m.free === 0;
+                  return (
+                    <div
+                      key={room.id}
+                      onClick={() => openDayEditor(room, selectedMobileDate)}
+                      className="py-3.5 flex items-center justify-between gap-3 cursor-pointer active:bg-[var(--color-background-muted)]/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {room.galleryUrls[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={room.galleryUrls[0]}
+                            alt={room.nameTh}
+                            className="h-12 w-12 aspect-square rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                          />
+                        ) : (
+                          <span className="h-12 w-12 aspect-square rounded-[12px] bg-[var(--color-background-muted)] inline-flex items-center justify-center ws-badge text-[var(--color-text-secondary)] shrink-0">
+                            {room.code}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <p className="ws-body-medium truncate">
+                            {room.code} · {room.nameTh}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full ws-badge ${
                                 isClosed
-                                  ? "bg-[var(--color-background-muted)] text-[var(--color-text-tertiary)]"
-                                  : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                                  ? "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
+                                  : m.booked > 0
+                                    ? "bg-[#edf5fd] text-[var(--color-accent)]"
+                                    : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
                               }`}
                             >
-                              <span
-                                className={`text-[12.5px] font-semibold tabular-nums leading-none ${
-                                  isClosed ? "line-through" : ""
-                                }`}
-                              >
-                                {m.free}/{room.totalUnits}
-                              </span>
-                              <span
-                                className={`text-[11.5px] tabular-nums leading-none ${
-                                  m.hasCustomPrice
-                                    ? "font-semibold text-[var(--color-text-primary)] underline decoration-[var(--color-border-emphasized)] underline-offset-2"
-                                    : "text-[var(--color-text-secondary)]"
-                                }`}
-                              >
-                                ฿
-                                {m.price >= 1000
-                                  ? `${(m.price / 1000).toFixed(
-                                      m.price % 1000 === 0 ? 0 : 1
-                                    )}k`
-                                  : m.price}
-                              </span>
+                              {isClosed
+                                ? m.booked > 0
+                                  ? "จองเต็ม"
+                                  : "ปิดขาย"
+                                : `ว่าง ${m.free}/${room.totalUnits}`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectRoomForMonth(room);
+                              }}
+                              className="ws-badge text-[var(--color-accent)] hover:underline cursor-pointer"
+                            >
+                              ดูรายเดือน →
                             </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <p
+                          className={`ws-subtitle tabular-nums ${
+                            m.hasCustomPrice ? "!text-[var(--color-accent)]" : ""
+                          }`}
+                        >
+                          ฿{m.price.toLocaleString()}
+                        </p>
+                        <p className="ws-caption">ต่อคืน</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="ws-caption pt-1">
+                แตะที่ห้องเพื่อปรับราคาหรือปิด–เปิดขายสำหรับวันนี้
+              </p>
             </div>
 
-            <p className="text-[13px] text-[var(--color-text-tertiary)]">
-              คลิกชื่อห้องด้านซ้ายเพื่อดูปฏิทินรายเดือนเต็ม · คลิกที่ช่องวันเพื่อปรับราคาหรือปิด-เปิดห้อง
-            </p>
+            {/* ─── DESKTOP (>= md): Breathable 14-Day Multi-Room Matrix ─── */}
+            <div className="hidden md:block space-y-4">
+              <div className="overflow-x-auto cgr-scroll-autohide">
+                <table className="w-full min-w-[920px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border)]">
+                      <th className="sticky left-0 z-10 bg-[var(--color-background-body)] text-left py-3.5 pr-5 w-[240px] ws-caption-medium">
+                        ประเภทห้องพัก
+                      </th>
+                      {matrixDays.map((day) => (
+                        <th
+                          key={day.dateStr}
+                          className={`py-3 px-1 text-center font-normal ${
+                            day.isWeekend
+                              ? "bg-[var(--color-background-muted)]/45"
+                              : ""
+                          }`}
+                        >
+                          <span className="block ws-badge font-normal text-[var(--color-text-secondary)]">
+                            {day.weekdayLabel}
+                          </span>
+                          <span
+                            className={`inline-flex items-center justify-center min-w-[26px] h-[26px] px-1 rounded-full text-[14px] font-semibold tabular-nums mt-0.5 ${
+                              day.isToday
+                                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                                : "text-[var(--color-text-primary)]"
+                            }`}
+                          >
+                            {day.dayNum}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border)]">
+                    {rooms.map((room) => (
+                      <tr key={room.id}>
+                        <td className="sticky left-0 z-10 bg-[var(--color-background-body)] py-3.5 pr-5 align-middle">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectRoomForMonth(room)}
+                            className="flex items-center gap-3 text-left group cursor-pointer"
+                          >
+                            {room.galleryUrls[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={room.galleryUrls[0]}
+                                alt={room.nameTh}
+                                className="h-11 w-11 aspect-square rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                              />
+                            ) : (
+                              <span className="h-11 w-11 aspect-square rounded-[12px] bg-[var(--color-background-muted)] inline-flex items-center justify-center ws-badge text-[var(--color-text-secondary)] shrink-0">
+                                {room.code}
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="ws-body-strong truncate group-hover:underline">
+                                {room.code} · {room.nameTh}
+                              </p>
+                              <p className="ws-caption">
+                                {room.totalUnits} ยูนิต · ดูรายเดือน →
+                              </p>
+                            </div>
+                          </button>
+                        </td>
+
+                        {matrixDays.map((day) => {
+                          const m = getCellMetrics(room, day.dateStr);
+                          const isClosed = m.free === 0;
+
+                          return (
+                            <td
+                              key={day.dateStr}
+                              className={`py-2.5 px-1 text-center align-middle ${
+                                day.isWeekend
+                                  ? "bg-[var(--color-background-muted)]/35"
+                                  : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => openDayEditor(room, day.dateStr)}
+                                className={`w-full h-[58px] rounded-[12px] px-1 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+                                  isClosed
+                                    ? "bg-[var(--color-background-muted)] text-[var(--color-text-tertiary)]"
+                                    : "hover:bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                                }`}
+                              >
+                                <span
+                                  className={`text-[13px] font-semibold tabular-nums leading-none ${
+                                    isClosed ? "line-through" : ""
+                                  }`}
+                                >
+                                  {m.free}/{room.totalUnits}
+                                </span>
+                                <span
+                                  className={`text-[12px] tabular-nums leading-none ${
+                                    m.hasCustomPrice
+                                      ? "font-semibold text-[var(--color-accent)]"
+                                      : "text-[var(--color-text-secondary)]"
+                                  }`}
+                                >
+                                  ฿{formatMobileBaht(m.price)}
+                                </span>
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="ws-caption">
+                คลิกชื่อห้องด้านซ้ายเพื่อดูปฏิทินรายเดือนเต็ม · คลิกที่ช่องวันเพื่อปรับราคาหรือปิด–เปิดห้อง
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -813,7 +1049,7 @@ export function StudioCalendarTab({
                   type="button"
                   disabled={isSavingDay}
                   onClick={() => handleSaveSingleDay(true)}
-                  className="text-[13.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
+                  className="text-[14px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
                 >
                   คืนค่าปกติ
                 </button>
@@ -825,7 +1061,7 @@ export function StudioCalendarTab({
                 <button
                   type="button"
                   onClick={() => setSelectedCell(null)}
-                  className="h-11 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                  className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ws-body-strong cursor-pointer transition-colors"
                 >
                   ยกเลิก
                 </button>
@@ -847,10 +1083,10 @@ export function StudioCalendarTab({
             {/* Section 1: Open / Close */}
             <div className="pb-6 flex items-center justify-between gap-4">
               <div>
-                <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   เปิดรับจองคืนนี้
                 </p>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)] mt-0.5">
+                <p className="text-[14px] text-[var(--color-text-secondary)] mt-0.5">
                   ว่างพร้อมขาย{" "}
                   {Math.max(
                     0,
@@ -924,7 +1160,7 @@ export function StudioCalendarTab({
                     key={pct}
                     type="button"
                     onClick={() => applyQuickPercent(pct)}
-                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-medium text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                    className="h-8 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ws-caption-medium !text-[var(--color-text-primary)] cursor-pointer transition-colors"
                   >
                     {pct > 0 ? `+${pct}%` : `${pct}%`}
                   </button>
@@ -933,7 +1169,7 @@ export function StudioCalendarTab({
                   <button
                     type="button"
                     onClick={() => setEditPriceThb("")}
-                    className="h-8 px-2.5 text-[12.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
+                    className="h-8 px-2.5 text-[13px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
                   >
                     ใช้ราคาปกติ
                   </button>
@@ -1040,7 +1276,7 @@ export function StudioCalendarTab({
                         : rooms.map((r) => r.id)
                     )
                   }
-                  className="text-[12.5px] font-medium underline underline-offset-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                  className="text-[13px] font-medium underline underline-offset-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
                 >
                   {bulkRoomIds.length === rooms.length
                     ? "เลือกห้องเดียว"
@@ -1075,34 +1311,17 @@ export function StudioCalendarTab({
             </div>
           )}
 
-          {/* Date Range */}
+          {/* Date Range (Airbnb 2-Month Picker / Mobile Bottom Sheet) */}
           <div className="py-6 first:pt-0 space-y-4">
-            <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
-              ช่วงวันที่
-            </h3>
-            <StandardFieldGroup>
-              <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                <StandardInput
-                  grouped
-                  label="ตั้งแต่วันที่"
-                  type="date"
-                  value={bulkStartDate}
-                  onChange={(e) => {
-                    setBulkStartDate(e.target.value);
-                    if (e.target.value > bulkEndDate) {
-                      setBulkEndDate(e.target.value);
-                    }
-                  }}
-                />
-                <StandardInput
-                  grouped
-                  label="ถึงวันที่"
-                  type="date"
-                  value={bulkEndDate}
-                  onChange={(e) => setBulkEndDate(e.target.value)}
-                />
-              </div>
-            </StandardFieldGroup>
+            <h3 className="ws-subtitle">ช่วงวันที่</h3>
+            <StudioDateRangePicker
+              startDate={bulkStartDate}
+              endDate={bulkEndDate}
+              onChange={(nextStart, nextEnd) => {
+                setBulkStartDate(nextStart);
+                setBulkEndDate(nextEnd);
+              }}
+            />
 
             <div className="grid grid-cols-7 gap-1.5">
               {DAY_OF_WEEK_PILLS.map((item) => {

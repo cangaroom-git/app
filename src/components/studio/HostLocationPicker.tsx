@@ -353,7 +353,7 @@ export function HostLocationPicker({
               type="button"
               disabled={isResolving || lookupInput.trim().length < 2}
               onClick={() => void resolveQueryOrLink(lookupInput)}
-              className="min-h-[56px] px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
+              className="min-h-[56px] px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
             >
               {isResolving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -396,7 +396,7 @@ export function HostLocationPicker({
                 className="w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 hover:bg-[var(--color-background-muted)] cursor-pointer transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                  <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
                     {cand.label}
                   </p>
                   {cand.sublabel && (
@@ -416,13 +416,13 @@ export function HostLocationPicker({
 
       {/* Feedback / Error Notices */}
       {feedbackMessage && (
-        <p className="text-[12.5px] font-medium text-[var(--color-success)] flex items-center gap-1.5">
+        <p className="text-[13px] font-medium text-[var(--color-success)] flex items-center gap-1.5">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{feedbackMessage}</span>
         </p>
       )}
       {errorMessage && (
-        <p className="text-[12.5px] font-medium text-[var(--color-error)]">
+        <p className="text-[13px] font-medium text-[var(--color-error)]">
           {errorMessage}
         </p>
       )}
@@ -502,7 +502,7 @@ export function HostLocationPicker({
         <div className="rounded-[12px] bg-[var(--color-background-muted)] p-3.5 flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-start gap-2.5 min-w-0 flex-1">
             <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
-            <p className="text-[12.5px] font-semibold text-[var(--color-text-primary)]">
+            <p className="text-[13px] font-semibold text-[var(--color-text-primary)]">
               {pinValidation.messageTh}
             </p>
           </div>
@@ -594,7 +594,7 @@ export function HostLocationPicker({
                 hasUserPinnedRef.current = false;
                 onChangeCoordinates(null, null);
               }}
-              className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-text-secondary)] cursor-pointer transition-colors"
+              className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-secondary)] cursor-pointer transition-colors"
             >
               ล้างจุดปักหมุด
             </button>

@@ -14,12 +14,18 @@ import {
   ChevronUp,
   DoorOpen,
   Edit3,
+  FileText,
   Images,
+  Landmark,
+  MapPin,
   Maximize2,
   PawPrint,
   Plus,
   Save,
+  Sparkles,
   Star,
+  Store,
+  TicketPercent,
   Trash2,
   Upload,
   Users,
@@ -59,6 +65,7 @@ import {
 import { StudioGrowthTab } from "@/components/studio/StudioGrowthTab";
 import { StudioSeasonalPricingSection } from "@/components/studio/StudioSeasonalPricingSection";
 import { StudioSheetModal } from "@/components/studio/StudioSheetModal";
+import { WorkspaceSplitLayout } from "@/components/workspace/WorkspaceSplitLayout";
 import { getPlaceCategoryMeta } from "@/lib/placeCategories";
 import type {
   HotelAddonDto,
@@ -194,18 +201,23 @@ function parseArray<T>(val: unknown): T[] {
 export function StudioPropertyTab({
   data,
   initialSection = "rooms",
+  startOnMobileList = false,
   buildHref = (p) => p,
   onReload,
   onNotify,
 }: {
   data: StudioPayload;
   initialSection?: ListingSectionId;
+  startOnMobileList?: boolean;
   buildHref?: (path: string) => string;
   onReload: () => Promise<void>;
   onNotify: (msg: string) => void;
 }) {
   const { hotel, rooms, addons, coupons, discountRules = [], posts } = data;
   const [section, setSection] = useState<ListingSectionId>(initialSection);
+  const [mobileView, setMobileView] = useState<"list" | "detail">(
+    startOnMobileList ? "list" : "detail",
+  );
   const [orderedRoomIds, setOrderedRoomIds] = useState<string[] | null>(null);
 
   useEffect(() => {
@@ -256,16 +268,39 @@ export function StudioPropertyTab({
     setSection(initialSection);
   }, [initialSection]);
 
-  // Sync section cleanly with browser back/forward navigation
+  useEffect(() => {
+    if (startOnMobileList) {
+      setMobileView("list");
+    }
+  }, [startOnMobileList]);
+
+  // Listen for mobile bottom-bar "ห้องพัก" tap so it always returns to the root list menu first
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResetToList = () => {
+      setMobileView("list");
+    };
+    window.addEventListener("cgr:studio-listings-reset", onResetToList);
+    return () => {
+      window.removeEventListener("cgr:studio-listings-reset", onResetToList);
+    };
+  }, []);
+
+  // Sync section & mobile drill-down state cleanly with browser back/forward navigation
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onPopState = () => {
       const pathMatch = window.location.pathname.match(
         /\/studio\/listings\/([a-z0-9-]+)/i
       );
-      const nextSec = resolveListingSection(pathMatch?.[1] ?? "rooms");
+      if (!pathMatch) {
+        setMobileView("list");
+        return;
+      }
+      const nextSec = resolveListingSection(pathMatch[1]);
       runStudioTransition("back", () => {
         setSection(nextSec);
+        setMobileView("detail");
       });
     };
     window.addEventListener("popstate", onPopState);
@@ -273,6 +308,7 @@ export function StudioPropertyTab({
   }, []);
 
   const handleSelectSection = (nextSection: ListingSectionId) => {
+    setMobileView("detail");
     if (nextSection === section) return;
     runStudioTransition("swap", () => {
       setSection(nextSection);
@@ -874,6 +910,7 @@ export function StudioPropertyTab({
       id: ListingSectionId;
       label: string;
       sublabel: string;
+      icon: typeof BedDouble;
     }>;
   }> = isDirectBooking
     ? [
@@ -884,6 +921,7 @@ export function StudioPropertyTab({
               id: "rooms",
               label: "ห้องพัก",
               sublabel: roomPriceSummary,
+              icon: BedDouble,
             },
             {
               id: "seasonal",
@@ -892,11 +930,13 @@ export function StudioPropertyTab({
                 activeSeasonalRulesCount > 0
                   ? `เปิดใช้ ${activeSeasonalRulesCount} ช่วงราคา`
                   : "ปีใหม่ · สงกรานต์ · ไฮซีซั่น",
+              icon: Calendar,
             },
             {
               id: "promotions",
               label: "โปรโมชั่น & ส่วนลด",
               sublabel: `${discountRules.filter((r) => r.isActive).length} ส่วนลดอัตโนมัติ · ${coupons.length} คูปอง`,
+              icon: TicketPercent,
             },
             {
               id: "addons",
@@ -905,6 +945,7 @@ export function StudioPropertyTab({
                 addons.length > 0
                   ? `${addons.length} รายการ (หมูกระทะ / เตียงเสริม)`
                   : "เพิ่มยอดต่อบิลในหน้าชำระเงิน",
+              icon: Sparkles,
             },
           ],
         },
@@ -918,21 +959,25 @@ export function StudioPropertyTab({
                 highlights.length > 0
                   ? `${highlights.length} จุดเด่น · ${hotel.nameTh}`
                   : hotel.nameTh,
+              icon: Store,
             },
             {
               id: "location",
               label: "ทำเล & สถานที่ใกล้เคียง",
               sublabel: `${nearbySpots.length} จุดเช็กอินใกล้เคียง`,
+              icon: MapPin,
             },
             {
               id: "policies",
               label: "กฎที่พัก & คำถามพบบ่อย",
               sublabel: `เช็กอิน ${hotel.checkInTime} · ${faqs.length} FAQ`,
+              icon: FileText,
             },
             {
               id: "content",
               label: "Pins / Facebook & บทความ",
               sublabel: `${data.pins.length} Pins · ${posts.length} บทความ`,
+              icon: Images,
             },
             {
               id: "payout",
@@ -940,6 +985,7 @@ export function StudioPropertyTab({
               sublabel: promptPayId
                 ? `PromptPay ${promptPayId}`
                 : "ยังไม่ได้ตั้งค่ารับเงิน",
+              icon: Landmark,
             },
           ],
         },
@@ -952,138 +998,55 @@ export function StudioPropertyTab({
               id: "about",
               label: "ข้อมูลร้าน เวลาเปิด–ปิด & ติดต่อ",
               sublabel: hotel.nameTh,
+              icon: Store,
             },
             {
               id: "location",
               label: "พิกัดแผนที่ & สถานที่ใกล้เคียง",
               sublabel: `${nearbySpots.length} จุดใกล้เคียง`,
+              icon: MapPin,
             },
             {
               id: "promotions",
               label: "โปรโมชั่น & สิทธิพิเศษ",
               sublabel: `${coupons.length} โปรโมชั่น`,
+              icon: TicketPercent,
             },
             {
               id: "content",
               label: "โพสต์อัปเดต Facebook & บทความ",
               sublabel: `${data.pins.length} การ์ด · ${posts.length} โพสต์`,
+              icon: Images,
             },
           ],
         },
       ];
 
   const flatNavItems = navGroups.flatMap((g) => g.items);
+  const activeNavMeta = flatNavItems.find((i) => i.id === section);
 
   return (
-    <div className="flex-1 w-full bg-[var(--color-background-body)]">
-      {/* =====================================================================
-          MOBILE STICKY UNDERLINE SECTION TABS (< lg)
-          Exact Airbnb Underline Tab Standard (Matches HotelStorefrontClient L1520-1538)
-      ====================================================================== */}
-      <nav
-        aria-label="หมวดหมู่จัดการที่พัก"
-        className="lg:hidden sticky top-16 z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6"
+    <>
+      <WorkspaceSplitLayout
+        title={isDirectBooking ? "จัดการที่พัก" : `จัดการ${catMeta.shortLabelTh}`}
+        subtitle={`${hotel.nameTh} · ${isDirectBooking ? "0% GP" : catMeta.labelTh}`}
+        activeId={section}
+        onSelect={(id) => handleSelectSection(id as ListingSectionId)}
+        mobileView={mobileView}
+        onMobileBack={() => setMobileView("list")}
+        mobileDetailTitle={activeNavMeta?.label}
+        contentWidth="wide"
+        navGroups={navGroups.map((group) => ({
+          title: group.groupTitle,
+          items: group.items.map((item) => ({
+            id: item.id,
+            label: item.label,
+            description: item.sublabel,
+            icon: item.icon,
+          })),
+        }))}
       >
-        <div className="flex items-center gap-6 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-y-none no-scrollbar">
-          {flatNavItems.map((item) => {
-            const active = section === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={(e) => {
-                  e.currentTarget.scrollIntoView({
-                    behavior: "smooth",
-                    inline: "center",
-                    block: "nearest",
-                  });
-                  handleSelectSection(item.id);
-                }}
-                className={`h-12 border-b-2 inline-flex items-center text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
-                  active
-                    ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] font-semibold"
-                    : "border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] font-medium"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* =====================================================================
-          UNIFIED 1360PX STUDIO CONTAINER (Matches /studio & /studio/calendar!)
-      ====================================================================== */}
-      <div className="max-w-[1360px] mx-auto w-full px-4 sm:px-8 lg:px-10 py-8 lg:py-10">
-        <div className="flex flex-col lg:flex-row lg:items-start gap-10 xl:gap-14">
-          {/* =================================================================
-              DESKTOP LEFT AIRBNB BORDERLESS `divide-y` SIDE MENU (Exact Screenshot 1!)
-              ZERO 4-sided borders — divided strictly by 1px horizontal hairlines
-          ================================================================== */}
-          <aside className="hidden lg:block w-[300px] xl:w-[320px] shrink-0 lg:sticky lg:top-[90px] max-h-[calc(100vh-106px)] overflow-y-auto pr-4">
-            <div className="space-y-8">
-              <div className="space-y-1">
-                <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-                  {isDirectBooking ? "จัดการที่พัก" : `จัดการ${catMeta.shortLabelTh}`}
-                </h1>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)] truncate">
-                  {hotel.nameTh} · {isDirectBooking ? "0% GP" : catMeta.labelTh}
-                </p>
-              </div>
-
-              {navGroups.map((group) => (
-                <div key={group.groupTitle} className="space-y-1">
-                  <p className="text-[12px] font-semibold text-[var(--color-text-tertiary)] pb-1">
-                    {group.groupTitle}
-                  </p>
-                  <div className="divide-y divide-[var(--color-border)]">
-                    {group.items.map((item) => {
-                      const active = section === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSelectSection(item.id)}
-                          className="group w-full py-4 flex items-center justify-between gap-3 text-left cursor-pointer transition-colors"
-                        >
-                          <div className="min-w-0 space-y-0.5">
-                            <p
-                              className={`text-[15px] truncate transition-colors ${
-                                active
-                                  ? "font-semibold text-[var(--color-text-primary)]"
-                                  : "font-medium text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]"
-                              }`}
-                            >
-                              {item.label}
-                            </p>
-                            <p className="text-[13px] text-[var(--color-text-tertiary)] truncate">
-                              {item.sublabel}
-                            </p>
-                          </div>
-                          <span
-                            className={`h-8 w-8 rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
-                              active
-                                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                                : "bg-[var(--color-background-muted)] group-hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-                            }`}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          {/* =================================================================
-              RIGHT SPACIOUS WORKSPACE (Clean, Breathable + Straight Slide & Fade)
-          ================================================================== */}
-          <section className="flex-1 min-w-0">
-            <div style={{ viewTransitionName: "cgr-studio-pane" }}>
+        <div style={{ viewTransitionName: "cgr-studio-pane" }}>
               {/* =============================================================
                   SECTION 1: ROOMS — HORIZONTAL AUDIT-READY EDITORIAL ROWS
               ============================================================== */}
@@ -1100,7 +1063,7 @@ export function StudioPropertyTab({
                           type="button"
                           onClick={() => setShowRoomDetails((v) => !v)}
                           aria-pressed={showRoomDetails}
-                          className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          className="h-10 sm:h-11 px-3.5 sm:px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                         >
                           {showRoomDetails ? (
                             <ChevronUp className="w-4 h-4" />
@@ -1116,7 +1079,7 @@ export function StudioPropertyTab({
                       <button
                         type="button"
                         onClick={openCreateRoomModal}
-                        className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+                        className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <Plus className="w-4 h-4" />
                         <span>เพิ่มประเภทห้องพัก</span>
@@ -1127,7 +1090,7 @@ export function StudioPropertyTab({
                   {rooms.length === 0 ? (
                     <div className="rounded-[20px] bg-[var(--color-background-muted)]/60 py-16 px-6 text-center space-y-3">
                       <BedDouble className="w-8 h-8 mx-auto text-[var(--color-text-tertiary)]" />
-                      <p className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                      <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                         ยังไม่มีประเภทห้องพักในระบบ
                       </p>
                       <p className="text-[14px] text-[var(--color-text-secondary)]">
@@ -1204,10 +1167,10 @@ export function StudioPropertyTab({
                               {/* Center: Minimal Title + Price + Icon Specs */}
                               <div className="flex-1 min-w-0 space-y-1.5">
                                 <div className="flex items-baseline gap-2 min-w-0">
-                                  <h3 className="text-[16px] sm:text-[17.5px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
+                                  <h3 className="text-[16px] sm:text-[15px] font-semibold text-[var(--color-text-primary)] leading-snug truncate">
                                     {rm.nameTh}
                                   </h3>
-                                  <span className="hidden sm:inline text-[12.5px] text-[var(--color-text-tertiary)] truncate shrink-0">
+                                  <span className="hidden sm:inline text-[13px] text-[var(--color-text-tertiary)] truncate shrink-0">
                                     {normalizeRoomCategoryValue(rm.categoryTh)}
                                   </span>
                                 </div>
@@ -1221,14 +1184,14 @@ export function StudioPropertyTab({
                                       – ฿{rm.weekendPriceThb.toLocaleString()}
                                     </span>
                                   )}
-                                  <span className="text-[12.5px] font-normal text-[var(--color-text-secondary)]">
+                                  <span className="text-[13px] font-normal text-[var(--color-text-secondary)]">
                                     {" "}
                                     / คืน
                                   </span>
                                 </p>
 
                                 {/* Ultra-Minimal Icon Specs Row */}
-                                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[var(--color-text-secondary)] tabular-nums">
+                                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[13px] text-[var(--color-text-secondary)] tabular-nums">
                                   <span
                                     title={`${rm.totalUnits} ยูนิต`}
                                     className="inline-flex items-center gap-1"
@@ -1297,7 +1260,7 @@ export function StudioPropertyTab({
                                 className="flex items-center gap-2.5 shrink-0"
                               >
                                 <span
-                                  className={`hidden sm:inline text-[12.5px] font-medium ${
+                                  className={`hidden sm:inline text-[13px] font-medium ${
                                     isRoomActive
                                       ? "text-[var(--color-text-primary)]"
                                       : "text-[var(--color-text-tertiary)]"
@@ -1369,7 +1332,7 @@ export function StudioPropertyTab({
                                 )}
 
                                 {rm.amenities.length > 0 && (
-                                  <p className="text-[12.5px] text-[var(--color-text-tertiary)]">
+                                  <p className="text-[13px] text-[var(--color-text-tertiary)]">
                                     {rm.amenities.slice(0, 6).join(" · ")}
                                     {rm.amenities.length > 6
                                       ? ` +${rm.amenities.length - 6}`
@@ -1440,7 +1403,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={openCreateAddonModal}
-                className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
+                className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] sm:text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>เพิ่มบริการเสริม</span>
@@ -1449,10 +1412,10 @@ export function StudioPropertyTab({
 
             {addons.length === 0 ? (
               <div className="rounded-[16px] bg-[var(--color-background-muted)] py-10 px-6 text-center space-y-2">
-                <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   ยังไม่มีบริการเสริม
                 </p>
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[14px] text-[var(--color-text-secondary)]">
                   เพิ่มชุดหมูกระทะ อาหารเช้าลอยน้ำ หรือเตียงเสริม เพื่อให้แขกเลือกเพิ่มตอนจองได้ทันที
                 </p>
               </div>
@@ -1485,7 +1448,7 @@ export function StudioPropertyTab({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                        <p className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
                           {a.nameTh}
                           {!a.isActive && (
                             <span className="ml-2 text-[12px] font-normal text-[var(--color-text-secondary)]">
@@ -1582,9 +1545,9 @@ export function StudioPropertyTab({
                               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                           }`}
                         >
-                          <p className="text-[14.5px] font-semibold">{opt.label}</p>
+                          <p className="text-[14px] font-semibold">{opt.label}</p>
                           <p
-                            className={`text-[12.5px] mt-0.5 ${
+                            className={`text-[13px] mt-0.5 ${
                               active ? "opacity-85" : "text-[var(--color-text-secondary)]"
                             }`}
                           >
@@ -1601,10 +1564,10 @@ export function StudioPropertyTab({
               {hotel.placeCategory === "STAY" && (
                 <div className="rounded-[18px] bg-[var(--color-background-muted)] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="space-y-0.5">
-                    <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                       โหมดการขายหน้าโปรไฟล์ ({merchantMode === "DIRECT_BOOKING" ? "เปิดระบบจองตรง 0% GP" : "หน้าโปรไฟล์ & ลิงก์จองภายนอก"})
                     </p>
-                    <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                    <p className="text-[13px] text-[var(--color-text-secondary)]">
                       สลับได้ตลอดเวลาหากต้องการเปิด/ปิดปฏิทินห้องว่างบน Nondii
                     </p>
                   </div>
@@ -1614,7 +1577,7 @@ export function StudioPropertyTab({
                         key={modeVal}
                         type="button"
                         onClick={() => setMerchantMode(modeVal)}
-                        className={`h-9 px-3 rounded-[10px] text-[12.5px] font-semibold cursor-pointer transition-colors ${
+                        className={`h-9 px-3 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-colors ${
                           merchantMode === modeVal
                             ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                             : "bg-[var(--color-background-card)] text-[var(--color-text-primary)]"
@@ -1690,7 +1653,7 @@ export function StudioPropertyTab({
                         className="w-11 h-11 rounded-full object-cover bg-[var(--color-background-muted)] shrink-0"
                       />
                     )}
-                    <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0">
+                    <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0">
                       <Upload className="w-4 h-4" />
                       <span>{isUploadingBrand ? "อัปโหลด..." : "อัปโหลดโลโก้"}</span>
                       <input
@@ -1724,7 +1687,7 @@ export function StudioPropertyTab({
                         className="w-16 h-11 rounded-[10px] object-cover bg-[var(--color-background-muted)] shrink-0"
                       />
                     )}
-                    <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0">
+                    <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors shrink-0">
                       <Upload className="w-4 h-4" />
                       <span>{isUploadingBrand ? "อัปโหลด..." : "อัปโหลดภาพปก"}</span>
                       <input
@@ -1788,7 +1751,7 @@ export function StudioPropertyTab({
             <div className="py-8 space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                     จุดเด่นของที่พัก (Highlights)
                   </h2>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -1813,7 +1776,7 @@ export function StudioPropertyTab({
               </div>
 
               {highlights.length === 0 ? (
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[14px] text-[var(--color-text-secondary)]">
                   ยังไม่มีจุดเด่น — กดปุ่ม “เพิ่มจุดเด่น” เช่น วิวทะเลหมอก 180 องศา, สระน้ำเกลือส่วนตัว
                 </p>
               ) : (
@@ -1985,7 +1948,7 @@ export function StudioPropertyTab({
                                       )
                                     )
                                   }
-                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[13.5px] tabular-nums"
+                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[14px] tabular-nums"
                                 />
                                 <span className="text-[var(--color-text-secondary)]">–</span>
                                 <input
@@ -2000,7 +1963,7 @@ export function StudioPropertyTab({
                                       )
                                     )
                                   }
-                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[13.5px] tabular-nums"
+                                  className="h-9 px-2.5 rounded-[10px] border border-[#b0b0b0] dark:border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] text-[14px] tabular-nums"
                                 />
                               </div>
                             )}
@@ -2016,7 +1979,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกข้อมูลหน้าร้าน"}</span>
@@ -2104,7 +2067,7 @@ export function StudioPropertyTab({
             <div className="py-8 space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                     สถานที่ท่องเที่ยว & คาเฟ่ใกล้เคียง
                   </h2>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2129,7 +2092,7 @@ export function StudioPropertyTab({
               </div>
 
               {nearbySpots.length === 0 ? (
-                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[14px] text-[var(--color-text-secondary)]">
                   ยังไม่มีรายการสถานที่ใกล้เคียง — กด “เพิ่มสถานที่” เช่น หาดกะตะ · 5 นาที
                 </p>
               ) : (
@@ -2194,7 +2157,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกทำเลที่ตั้ง"}</span>
@@ -2256,7 +2219,7 @@ export function StudioPropertyTab({
                     <p className="text-[15px] font-medium text-[var(--color-text-primary)]">
                       อนุญาตสัตว์เลี้ยงเข้าพัก (Pet-friendly)
                     </p>
-                    <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                    <p className="text-[13px] text-[var(--color-text-secondary)]">
                       แสดงป้ายต้อนรับสัตว์เลี้ยงบนหน้าร้านและผลการค้นหา
                     </p>
                   </div>
@@ -2295,7 +2258,7 @@ export function StudioPropertyTab({
             <div className="py-8 space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                     คำถามที่พบบ่อย (Common Questions / FAQ)
                   </h2>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2316,7 +2279,7 @@ export function StudioPropertyTab({
 
               {/* 1-Click Thai Resort FAQ Templates */}
               <div className="space-y-2">
-                <span className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] block">
+                <span className="text-[13px] font-semibold text-[var(--color-text-secondary)] block">
                   แตะเพื่อเพิ่มจากคำถามยอดฮิตของที่พักไทย:
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -2328,7 +2291,7 @@ export function StudioPropertyTab({
                         type="button"
                         disabled={exists}
                         onClick={() => setFaqs((prev) => [...prev, { ...tpl }])}
-                        className={`h-8 px-3 rounded-[9px] text-[12.5px] font-semibold transition-colors ${
+                        className={`h-8 px-3 rounded-[9px] text-[13px] font-semibold transition-colors ${
                           exists
                             ? "bg-[var(--color-background-muted)] text-[var(--color-text-disabled)] cursor-not-allowed"
                             : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] cursor-pointer"
@@ -2343,7 +2306,7 @@ export function StudioPropertyTab({
               </div>
 
               {faqs.length === 0 ? (
-                <div className="rounded-[14px] bg-[var(--color-background-muted)] p-6 text-center text-[13.5px] text-[var(--color-text-secondary)]">
+                <div className="rounded-[14px] bg-[var(--color-background-muted)] p-6 text-center text-[14px] text-[var(--color-text-secondary)]">
                   ยังไม่มีคำถามที่พบบ่อย — เลือกจากคำถามยอดฮิตด้านบนหรือกด “เพิ่มคำถามเอง” ได้เลยครับ
                 </div>
               ) : (
@@ -2402,7 +2365,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกกฎ & คำถามที่พบบ่อย"}</span>
@@ -2485,7 +2448,7 @@ export function StudioPropertyTab({
 
             <div className="py-8 space-y-5">
               <div className="space-y-0.5">
-                <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+                <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
                   ช่องทางติดต่อตรง & สถานะหน้าร้าน
                 </h2>
                 <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2530,7 +2493,7 @@ export function StudioPropertyTab({
 
               <div className="pt-2 flex items-center justify-between gap-4 rounded-[14px] bg-[var(--color-background-muted)] p-4">
                 <div>
-                  <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                     เผยแพร่หน้าร้านบน Nondii
                   </p>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2562,7 +2525,7 @@ export function StudioPropertyTab({
                 <button
                   type="submit"
                   disabled={isSavingHotel}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isSavingHotel ? "กำลังบันทึก..." : "บันทึกบัญชี & ช่องทางติดต่อ"}</span>
@@ -2571,10 +2534,8 @@ export function StudioPropertyTab({
             </div>
           </form>
         )}
-            </div>
-          </section>
         </div>
-      </div>
+      </WorkspaceSplitLayout>
 
       {/* =====================================================================
           ROOM FULL EDITOR MODAL — Multi-Page Drill-Down Inside ONE Modal
@@ -2607,7 +2568,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={handleRoomModalBack}
-                className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors"
+                className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2 cursor-pointer transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>
@@ -2623,7 +2584,7 @@ export function StudioPropertyTab({
                   setRoomModalPage("details");
                   roomModalBodyRef.current?.scrollTo({ top: 0 });
                 }}
-                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold cursor-pointer transition-colors"
+                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors"
               >
                 เสร็จสิ้น
               </button>
@@ -2634,7 +2595,7 @@ export function StudioPropertyTab({
                 <button
                   type="button"
                   onClick={() => handleDeleteRoom(editingRoomId)}
-                  className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
+                  className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
                 >
                   ลบห้องพักนี้
                 </button>
@@ -2653,7 +2614,7 @@ export function StudioPropertyTab({
                   type="submit"
                   form="studio-room-editor-form"
                   disabled={isSavingRoom || isUploadingRoomPhoto}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {isSavingRoom ? "กำลังบันทึก..." : "บันทึกห้องพัก"}
                 </button>
@@ -2703,7 +2664,7 @@ export function StudioPropertyTab({
           <section className="pb-7 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+                <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   รูปภาพห้องพัก ({rmPhotos.length}/{MAX_PHOTOS_PER_ROOM})
                 </h3>
                 <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2742,7 +2703,7 @@ export function StudioPropertyTab({
                     onClick={() => {
                       cancelRoomUploadRef.current = true;
                     }}
-                    className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer shrink-0"
+                    className="text-[13px] font-semibold text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer shrink-0"
                   >
                     หยุดที่เหลือ
                   </button>
@@ -2804,7 +2765,7 @@ export function StudioPropertyTab({
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                  <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                     ลากรูปห้องพักมาวางที่นี่ หรือกดอัปโหลดรูปภาพ
                   </p>
                   <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -2814,7 +2775,7 @@ export function StudioPropertyTab({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-                  <label className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors">
+                  <label className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors">
                     <Upload className="w-4 h-4" />
                     <span>
                       {isUploadingRoomPhoto
@@ -2834,7 +2795,7 @@ export function StudioPropertyTab({
                   <button
                     type="button"
                     onClick={openModalPhotoPage}
-                    className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="h-10 px-4 rounded-[12px] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <span>เปิดทัวร์รูป & SEO</span>
                     <ChevronRight className="w-4 h-4" />
@@ -2877,7 +2838,7 @@ export function StudioPropertyTab({
                         className="w-full h-full object-cover group-hover:brightness-[0.94] transition"
                       />
                     </button>
-                    <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-[7px] bg-white/94 dark:bg-[#222222]/92 backdrop-blur-sm text-[11px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1 pointer-events-none">
+                    <span className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-[7px] bg-white/94 dark:bg-[#222222]/92 backdrop-blur-sm text-[12px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1 pointer-events-none">
                       <Star className="w-3 h-3 fill-current" />
                       ภาพปกหลัก
                     </span>
@@ -2958,7 +2919,7 @@ export function StudioPropertyTab({
 
                 {/* Clean Action Bar under Collage */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                  <p className="text-[13px] text-[var(--color-text-secondary)]">
                     คลิกที่รูปเพื่อจัดเรียง แยกโซนห้อง หรือแก้ไขคำอธิบาย SEO
                   </p>
                   {rmPhotos.length < MAX_PHOTOS_PER_ROOM && (
@@ -2987,7 +2948,7 @@ export function StudioPropertyTab({
           {/* 2. ROOM IDENTITY (Auto System Code · System Category Dropdown) */}
           <section className="py-7 space-y-4">
             <div className="space-y-0.5">
-              <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 ข้อมูลพื้นฐานห้องพัก
               </h3>
               <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -3044,7 +3005,7 @@ export function StudioPropertyTab({
           {/* 3. PRICING & INVENTORY */}
           <section className="py-7 space-y-4">
             <div className="space-y-0.5">
-              <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 ราคาและจำนวนห้องพัก
               </h3>
               <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -3103,7 +3064,7 @@ export function StudioPropertyTab({
           {/* 4. SPACE & CAPACITY (Airbnb Counter Steppers — Screenshot 5!) */}
           <section className="py-7 space-y-4">
             <div className="space-y-0.5">
-              <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 ขนาดห้องและความจุผู้เข้าพัก
               </h3>
               <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -3169,7 +3130,7 @@ export function StudioPropertyTab({
           {/* 5. RULES & AMENITIES (Curated + Custom up to 25 items) */}
           <section className="pt-7 space-y-5">
             <div className="space-y-0.5">
-              <h3 className="text-[17px] font-semibold text-[var(--color-text-primary)]">
+              <h3 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 สิทธิ์และสิ่งอำนวยความสะดวก ({rmAmenities.length}/
                 {MAX_ROOM_AMENITIES})
               </h3>
@@ -3184,7 +3145,7 @@ export function StudioPropertyTab({
                 <p className="text-[15px] font-medium text-[var(--color-text-primary)]">
                   อนุญาตให้นำสัตว์เลี้ยงเข้าพักในห้องนี้
                 </p>
-                <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[13px] text-[var(--color-text-secondary)]">
                   แสดงสัญลักษณ์ Pet-Friendly ประจำห้องนี้
                 </p>
               </div>
@@ -3302,7 +3263,7 @@ export function StudioPropertyTab({
               <button
                 type="button"
                 onClick={() => handleDeleteAddon(editingAddonId)}
-                className="text-[13.5px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
+                className="text-[14px] font-semibold text-[var(--color-error)] underline underline-offset-2 cursor-pointer"
               >
                 ลบบริการเสริม
               </button>
@@ -3321,7 +3282,7 @@ export function StudioPropertyTab({
                 type="submit"
                 form="studio-addon-form"
                 disabled={isSavingAddon || isUploadingAddon}
-                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+                className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer disabled:opacity-50"
               >
                 {isSavingAddon ? "กำลังบันทึก..." : "บันทึก"}
               </button>
@@ -3385,7 +3346,7 @@ export function StudioPropertyTab({
                   className="h-14 w-14 aspect-square rounded-[16px] object-cover bg-[var(--color-background-muted)] shrink-0"
                 />
               )}
-              <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer">
+              <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer">
                 <Upload className="w-4 h-4" />
                 <span>{isUploadingAddon ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}</span>
                 <input
@@ -3419,6 +3380,6 @@ export function StudioPropertyTab({
           )}
         </form>
       </StudioSheetModal>
-    </div>
+    </>
   );
 }

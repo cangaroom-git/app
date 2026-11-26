@@ -1,9 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { LayoutGrid, Sparkles } from "lucide-react";
+import { Globe } from "lucide-react";
+import { useHotelApp } from "@/components/HotelAppShell";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import {
+  SuperAdminAvatarCircle,
+  UserAvatarCircle,
+} from "@/components/navigation/UserProfileDropdown";
+import { AirbnbMenuDrawer } from "@/components/navigation/AirbnbMenuDrawer";
+import { useGlobalAutoHideScrollbars } from "@/components/workspace/WorkspaceSplitLayout";
 import type { AdminSidebarCounts } from "@/lib/services/adminDashboardService";
 
 interface AdminShellProps {
@@ -13,80 +20,134 @@ interface AdminShellProps {
   children: React.ReactNode;
 }
 
+/**
+ * Unified Nondii Clean Minimal Shell (`/admin` — Admin Crimson Red Theme)
+ * - Scopes `--color-accent` to Admin Crimson Red (`#dc2626`) across all `/admin/*` UI and portals
+ *   so Super Admins can distinguish Admin Center from Merchant Studio (Travel-Blue) at a glance
+ * - Identical top bar height (`h-14`), width (`max-w-[1160px]`), borders, and typography to `StudioShell`
+ */
 export function AdminShell({
   adminName,
   adminEmail,
   counts,
   children,
 }: AdminShellProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const initial = (adminName || adminEmail || "A").trim().charAt(0).toUpperCase();
+  useGlobalAutoHideScrollbars();
+  const { user, refreshMe, signOutUser, lang, setLang, theme, toggleTheme } =
+    useHotelApp();
+  const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
+
+  // Scope document-level Admin Red tokens so portaled modals, sheets, and dropdowns inherit Red
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.workspaceTheme = "admin";
+    return () => {
+      delete document.documentElement.dataset.workspaceTheme;
+    };
+  }, []);
 
   return (
-    <div className="flex h-[100dvh] w-full overflow-hidden bg-[var(--color-background-body)] text-[var(--color-text-primary)]">
-      {/* Flex-Docked Left Sidebar (never overlaps table content) */}
-      <AdminSidebar
-        counts={counts}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-      />
+    <div className="cgr-admin-theme flex flex-col h-[100dvh] overflow-hidden font-sans text-[var(--color-text-primary)] bg-[var(--color-background-body)]">
+      {/* Left Vertical Hover-Expand Icon Rail (`60px -> 200px`) */}
+      <AdminSidebar counts={counts} />
 
-      {/* Right Main Column */}
-      <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden">
-        {/* Ultra-Compact 46px Top Header */}
-        <header className="h-[46px] shrink-0 border-b border-[var(--color-border)] bg-[var(--color-background-body)] px-4 flex items-center justify-between gap-3 z-30">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Link href="/admin" className="lg:hidden inline-flex items-center shrink-0">
+      {/* Unified Clean Top Bar (`h-14`, matches StudioShell 1:1) */}
+      <header className="sticky top-0 z-40 bg-[var(--color-background-body)]/90 backdrop-blur-md border-b border-[var(--color-border)] lg:pl-[60px] shrink-0">
+        <div className="relative w-full max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14 gap-3">
+          {/* Left: Horizontal Nondii Logo + Admin Center Red Pill */}
+          <div className="flex items-center gap-3 min-w-0 z-30">
+            <Link
+              href="/"
+              aria-label="Nondii Home"
+              className="flex items-center shrink-0"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/nondii-icon-square-black.svg"
+                src="/brand/nondi-icon-with-text-black.svg"
                 alt="Nondii"
-                className="w-5 h-5 dark:invert"
+                className="h-6 sm:h-7 w-auto object-contain shrink-0"
               />
             </Link>
-            <span className="text-[13.5px] font-bold tracking-[-0.01em] text-[var(--color-text-primary)] whitespace-nowrap">
-              Admin Center
-            </span>
-            <span
-              aria-hidden="true"
-              className="hidden sm:inline-block w-px h-3.5 bg-[var(--color-border)]"
-            />
-            <span className="hidden sm:inline text-[12.5px] text-[var(--color-text-secondary)] truncate">
-              {adminName}
-            </span>
+
+            <div className="w-px h-5 bg-[var(--color-border)] hidden sm:block shrink-0" />
+
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] ws-badge"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+              <span>Admin Center</span>
+            </Link>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/admin/promos?drop=1"
-              className="h-7.5 px-3 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">โยนโปรให้ AI แกะ</span>
-              <span className="sm:hidden">AI โปร</span>
-            </Link>
-
+          {/* Right: Studio Switch + Language + Single Profile Photo Trigger */}
+          <div className="flex items-center gap-2.5 shrink-0 z-30">
             <Link
               href="/studio"
-              className="hidden md:inline-flex h-7.5 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12px] font-semibold items-center gap-1.5 whitespace-nowrap transition-colors"
+              className="hidden xl:inline-flex items-center h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-text-primary)] transition-colors"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Studio</span>
+              Merchant Studio
             </Link>
 
-            <div
-              title={adminEmail}
-              className="h-7 w-7 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] text-[11.5px] font-bold inline-flex items-center justify-center shrink-0"
+            <button
+              type="button"
+              onClick={() => setLang(lang === "th" ? "en" : "th")}
+              className="hidden sm:flex items-center gap-1.5 text-right leading-tight text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer px-1"
+              title="เปลี่ยนภาษา"
             >
-              {initial}
-            </div>
-          </div>
-        </header>
+              <div className="ws-badge font-normal">
+                <div className="font-medium text-[var(--color-text-primary)]">
+                  {lang === "th" ? "ไทย" : "EN"}
+                </div>
+                <div className="text-[var(--color-text-secondary)]">THB</div>
+              </div>
+              <Globe className="w-4 h-4" strokeWidth={1.75} />
+            </button>
 
-        {/* Full-Bleed Independent Workspace */}
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col pb-[54px] lg:pb-0">
-          {children}
+            <button
+              type="button"
+              onClick={() => setIsMenuDrawerOpen(true)}
+              aria-label="โปรไฟล์และเมนู"
+              aria-expanded={isMenuDrawerOpen}
+              aria-haspopup="dialog"
+              className={`relative inline-flex h-9 w-9 rounded-full items-center justify-center hover:bg-[var(--color-background-muted)] transition-colors cursor-pointer shrink-0 ${
+                isMenuDrawerOpen
+                  ? "ring-2 ring-[var(--color-text-primary)]"
+                  : ""
+              }`}
+            >
+              {user ? (
+                <UserAvatarCircle
+                  user={user}
+                  sizeClass="h-9 w-9"
+                  iconSizeClass="w-4 h-4"
+                />
+              ) : (
+                <SuperAdminAvatarCircle sizeClass="h-9 w-9" />
+              )}
+            </button>
+
+            <AirbnbMenuDrawer
+              isOpen={isMenuDrawerOpen}
+              onClose={() => setIsMenuDrawerOpen(false)}
+              variant="admin"
+              user={user}
+              adminFallback={{ name: adminName, email: adminEmail }}
+              onRefreshProfile={refreshMe}
+              onSignOut={signOutUser}
+              language={lang}
+              onToggleLanguage={() => setLang(lang === "th" ? "en" : "th")}
+              isDarkTheme={theme === "dark"}
+              onToggleTheme={toggleTheme}
+            />
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content Stage */}
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:pl-[60px] relative bg-[var(--color-background-body)] pb-[56px] lg:pb-0">
+        {children}
+      </main>
     </div>
   );
 }

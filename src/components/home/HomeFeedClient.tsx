@@ -942,7 +942,7 @@ export function HomeFeedClient({
         <nav
           aria-label={isTh ? "ลัดไปหมวดโปรโมชั่น" : "Jump to promotion category"}
           aria-hidden={!isTabsPinned}
-          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
+          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
             isTabsPinned
               ? "opacity-100 translate-y-0 pointer-events-auto"
               : "opacity-0 -translate-y-2 pointer-events-none"

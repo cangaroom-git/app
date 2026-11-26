@@ -64,15 +64,15 @@ export function StudioReviewsPanel({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3 pb-4 border-b border-[var(--color-border)]">
-        <div className="space-y-0.5">
-          <h1 className="text-[22px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2">
-            <Star className="w-5 h-5 fill-current" />
+      <div className="flex flex-wrap items-end justify-between gap-3 pb-6 border-b border-[var(--color-border)]">
+        <div className="space-y-1">
+          <h1 className="ws-display inline-flex items-center gap-2">
+            <Star className="w-5 h-5 fill-current text-[var(--color-accent)]" />
             <span>
               {hotel.ratingAvg.toFixed(1)} · รีวิวจากผู้เข้าพัก ({reviews.length})
             </span>
           </h1>
-          <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+          <p className="ws-caption">
             ตอบกลับคำชมหรือข้อเสนอแนะเพื่อสร้างความน่าเชื่อถือบนหน้าร้าน nondii.com/{hotel.slug}
           </p>
         </div>
@@ -87,7 +87,7 @@ export function StudioReviewsPanel({
           <p className="text-[16px] font-semibold text-[var(--color-text-primary)]">
             ยังไม่มีรีวิวสำหรับที่พักนี้
           </p>
-          <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+          <p className="text-[14px] text-[var(--color-text-secondary)]">
             เมื่อมีแขกเข้าพักและรีวิว คะแนนและข้อความจะแสดงที่นี่เพื่อให้คุณตอบกลับได้ทันที
           </p>
         </div>
@@ -108,7 +108,7 @@ export function StudioReviewsPanel({
                       <p className="text-[15px] font-semibold text-[var(--color-text-primary)] truncate">
                         {rv.authorName}
                       </p>
-                      <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                      <p className="text-[13px] text-[var(--color-text-secondary)]">
                         {rv.roomCode ? `ห้อง ${rv.roomCode} · ` : ""}
                         {formatShortDate(rv.createdAt, "th")}
                       </p>
@@ -184,7 +184,7 @@ export function StudioReviewsPanel({
                       }));
                       setOpenReplyId(rv.id);
                     }}
-                    className="text-[13.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer hover:opacity-75"
+                    className="text-[14px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer hover:opacity-75"
                   >
                     {rv.ownerReplyTh ? "แก้ไขคำตอบกลับ" : "ตอบกลับรีวิวนี้"}
                   </button>
@@ -262,7 +262,7 @@ export function StudioMobileMenuTab({
             value={data.hotel.slug}
             onChange={onSwitchHotel}
             sheetTitle="เลือกที่พักที่ต้องการจัดการ"
-            triggerClassName="w-full h-11 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] text-[14.5px] font-semibold text-[var(--color-text-primary)]"
+            triggerClassName="w-full h-11 px-3.5 rounded-[12px] bg-[var(--color-background-muted)] text-[14px] font-semibold text-[var(--color-text-primary)]"
             options={ownedHotels.map((item) => ({
               value: item.slug,
               label: item.nameTh,
@@ -282,7 +282,7 @@ export function StudioMobileMenuTab({
           onClick={() => setShowReviews(true)}
           className="w-full py-4 flex items-center justify-between text-left cursor-pointer"
         >
-          <span className="flex items-center gap-3 text-[15.5px] font-medium text-[var(--color-text-primary)]">
+          <span className="flex items-center gap-3 text-[15px] font-medium text-[var(--color-text-primary)]">
             <Star className="w-5 h-5" />
             <span>รีวิวจากผู้เข้าพัก ({data.reviews.length})</span>
           </span>
@@ -293,7 +293,7 @@ export function StudioMobileMenuTab({
 
         <Link
           href={`/${data.hotel.slug}`}
-          className="w-full py-4 flex items-center justify-between text-[15.5px] font-medium text-[var(--color-text-primary)]"
+          className="w-full py-4 flex items-center justify-between text-[15px] font-medium text-[var(--color-text-primary)]"
         >
           <span className="flex items-center gap-3">
             <Building2 className="w-5 h-5" />
@@ -304,7 +304,7 @@ export function StudioMobileMenuTab({
 
         <Link
           href="/register-hotel"
-          className="w-full py-4 flex items-center justify-between text-[15.5px] font-medium text-[var(--color-text-primary)]"
+          className="w-full py-4 flex items-center justify-between text-[15px] font-medium text-[var(--color-text-primary)]"
         >
           <span className="flex items-center gap-3">
             <Plus className="w-5 h-5" />
@@ -315,7 +315,7 @@ export function StudioMobileMenuTab({
         {user.role === "SUPER_ADMIN" && (
           <Link
             href="/admin"
-            className="w-full py-4 flex items-center justify-between text-[15.5px] font-medium text-[var(--color-text-primary)]"
+            className="w-full py-4 flex items-center justify-between text-[15px] font-medium text-[var(--color-text-primary)]"
           >
             <span className="flex items-center gap-3">
               <Crown className="w-5 h-5" />
@@ -329,7 +329,7 @@ export function StudioMobileMenuTab({
           onClick={onToggleTheme}
           className="w-full py-4 flex items-center justify-between text-left cursor-pointer"
         >
-          <span className="flex items-center gap-3 text-[15.5px] font-medium text-[var(--color-text-primary)]">
+          <span className="flex items-center gap-3 text-[15px] font-medium text-[var(--color-text-primary)]">
             {theme === "dark" ? (
               <Moon className="w-5 h-5" />
             ) : (
@@ -347,7 +347,7 @@ export function StudioMobileMenuTab({
           onClick={onToggleLang}
           className="w-full py-4 flex items-center justify-between text-left cursor-pointer"
         >
-          <span className="flex items-center gap-3 text-[15.5px] font-medium text-[var(--color-text-primary)]">
+          <span className="flex items-center gap-3 text-[15px] font-medium text-[var(--color-text-primary)]">
             <Globe className="w-5 h-5" />
             <span>ภาษา (Language)</span>
           </span>

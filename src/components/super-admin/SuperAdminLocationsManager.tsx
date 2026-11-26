@@ -21,10 +21,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  ChevronRight,
+  Globe,
   GripVertical,
   MapPin,
   Pencil,
-  Search,
   Star,
   X,
 } from "lucide-react";
@@ -39,11 +40,14 @@ import {
   StandardFieldGroup,
   StandardInput,
 } from "@/components/ui/standards";
+import { WorkspaceCompactToolbar } from "@/components/workspace/WorkspacePrimitives";
+import { WorkspaceSplitLayout } from "@/components/workspace/WorkspaceSplitLayout";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { useModalPresence } from "@/lib/useModalPresence";
 
 interface SuperAdminLocationsManagerProps {
   onNotice: (msg: string) => void;
+  topBanner?: React.ReactNode;
 }
 
 type SortScopeMode = "region" | "national";
@@ -53,12 +57,14 @@ function SortableRegionRow({
   isSelected,
   provinceCount,
   placeCount,
+  isMobile,
   onSelect,
 }: {
   region: RegionConfigDto;
   isSelected: boolean;
   provinceCount: number;
   placeCount: number;
+  isMobile?: boolean;
   onSelect: () => void;
 }) {
   const {
@@ -80,12 +86,12 @@ function SortableRegionRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`h-[38px] px-3 border-b border-[var(--color-border)] flex items-center gap-2 transition-colors ${
+      className={`rounded-[14px] px-2.5 py-2.5 flex items-center gap-2 transition-colors ${
         isDragging
           ? "bg-[var(--color-background-muted)] opacity-90"
-          : isSelected
-          ? "bg-[var(--color-accent)]/8"
-          : "hover:bg-[var(--color-background-muted)]/60"
+          : isSelected && !isMobile
+            ? "bg-[var(--color-background-muted)]"
+            : "hover:bg-[var(--color-background-muted)]/60"
       }`}
     >
       <button
@@ -93,7 +99,7 @@ function SortableRegionRow({
         aria-label={`ลากจัดลำดับ ${region.labelTh}`}
         {...attributes}
         {...listeners}
-        className="h-6 w-5 inline-flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing touch-none shrink-0"
+        className="h-7 w-5 inline-flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing touch-none shrink-0"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>
@@ -103,18 +109,34 @@ function SortableRegionRow({
         onClick={onSelect}
         className="flex-1 min-w-0 text-left flex items-center justify-between gap-2 cursor-pointer"
       >
-        <span
-          className={`text-[13px] truncate ${
-            isSelected
-              ? "font-semibold text-[var(--color-accent)]"
-              : "font-medium text-[var(--color-text-primary)]"
-          }`}
-        >
-          {region.labelTh}
-        </span>
-        <span className="text-[11.5px] text-[var(--color-text-secondary)] tabular-nums shrink-0">
-          {provinceCount} · {placeCount}
-        </span>
+        <div className="min-w-0">
+          <span
+            className={`block truncate ${
+              isMobile
+                ? "ws-subtitle"
+                : isSelected
+                  ? "ws-body-strong !text-[var(--color-accent)]"
+                  : "ws-body-medium"
+            }`}
+          >
+            {region.labelTh}
+          </span>
+          {isMobile && (
+            <span className="ws-caption block mt-0.5">
+              {provinceCount} จังหวัด · {placeCount} แห่ง
+            </span>
+          )}
+        </div>
+        {!isMobile ? (
+          <span className="ws-badge text-[var(--color-text-secondary)] tabular-nums shrink-0">
+            {provinceCount}
+          </span>
+        ) : (
+          <ChevronRight
+            size={16}
+            className="text-[var(--color-text-secondary)] shrink-0"
+          />
+        )}
       </button>
     </div>
   );
@@ -152,10 +174,10 @@ function SortableProvinceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`h-[38px] px-4 border-b border-[var(--color-border)] flex items-center gap-3 text-[13px] transition-colors ${
+      className={`py-3.5 px-2 sm:px-3 border-b border-[var(--color-border)] flex items-center gap-2.5 sm:gap-3 transition-colors ${
         isDragging
           ? "bg-[var(--color-background-muted)] opacity-90"
-          : "hover:bg-[var(--color-background-muted)]/60"
+          : "hover:bg-[var(--color-background-muted)]/55"
       }`}
     >
       <button
@@ -164,7 +186,7 @@ function SortableProvinceRow({
         aria-label={`ลากจัดลำดับ ${province.nameTh}`}
         {...attributes}
         {...listeners}
-        className={`h-6 w-5 inline-flex items-center justify-center shrink-0 touch-none ${
+        className={`h-7 w-5 inline-flex items-center justify-center shrink-0 touch-none ${
           disableDrag
             ? "text-[var(--color-border-emphasized)] cursor-not-allowed"
             : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing"
@@ -173,37 +195,29 @@ function SortableProvinceRow({
         <GripVertical className="w-3.5 h-3.5" />
       </button>
 
-      <span className="w-6 text-[11.5px] font-semibold text-[var(--color-text-tertiary)] tabular-nums shrink-0 text-right">
+      <span className="w-6 ws-caption-medium tabular-nums shrink-0 text-right">
         {rankIndex + 1}
       </span>
 
       <div className="min-w-0 flex-1 flex items-center gap-2">
-        <span className="font-semibold text-[var(--color-text-primary)] truncate">
-          {province.shortNameTh}
-        </span>
-        <span className="hidden md:inline text-[12px] text-[var(--color-text-tertiary)] truncate">
+        <span className="ws-body-medium truncate">{province.shortNameTh}</span>
+        <span className="hidden md:inline ws-caption truncate">
           {province.nameEn}
         </span>
         {!province.isActive && (
-          <span className="text-[11px] font-semibold text-[#e60023] shrink-0">
-            ซ่อน
-          </span>
+          <span className="ws-badge text-[#e60023] shrink-0">ซ่อน</span>
         )}
       </div>
 
-      <span className="hidden xl:inline text-[11.5px] font-mono text-[var(--color-text-secondary)] tabular-nums shrink-0 w-[140px] text-right">
+      <span className="hidden xl:inline ws-caption tabular-nums shrink-0 w-[132px] text-right">
         {province.centerLat.toFixed(3)}, {province.centerLng.toFixed(3)}
       </span>
 
-      <span className="hidden sm:inline text-[11.5px] text-[var(--color-text-secondary)] tabular-nums shrink-0 w-[44px] text-right">
-        z{province.defaultZoom}
-      </span>
-
-      <span className="text-[12px] font-medium text-[var(--color-text-primary)] tabular-nums shrink-0 w-[56px] text-right">
+      <span className="ws-caption tabular-nums shrink-0 w-[56px] text-right">
         {province.placeCount} แห่ง
       </span>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
         <button
           type="button"
           onClick={() => onToggleTouristHub(province)}
@@ -212,14 +226,14 @@ function SortableProvinceRow({
               ? "นำออกจากเมืองท่องเที่ยวเด่น"
               : "ตั้งเป็นเมืองท่องเที่ยวเด่น"
           }
-          className={`h-6.5 px-2.5 rounded-full text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+          className={`h-8 px-3 rounded-full ws-badge inline-flex items-center gap-1 cursor-pointer transition-colors ${
             province.isTouristHub
               ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
               : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-secondary)]"
           }`}
         >
           <Star
-            className="w-3 h-3"
+            className="w-3.5 h-3.5"
             fill={province.isTouristHub ? "currentColor" : "none"}
           />
           <span className="hidden sm:inline">เด่น</span>
@@ -229,9 +243,9 @@ function SortableProvinceRow({
           type="button"
           onClick={() => onEditGeo(province)}
           title="แก้ไขพิกัด lat/lng"
-          className="h-6.5 px-2.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
+          className="h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] ws-badge inline-flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <Pencil className="w-3 h-3" />
+          <Pencil className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">พิกัด</span>
         </button>
       </div>
@@ -241,6 +255,7 @@ function SortableProvinceRow({
 
 export function SuperAdminLocationsManager({
   onNotice,
+  topBanner,
 }: SuperAdminLocationsManagerProps) {
   const [regions, setRegions] = useState<RegionConfigDto[]>([]);
   const [provinces, setProvinces] = useState<ProvinceConfigDto[]>([]);
@@ -250,6 +265,7 @@ export function SuperAdminLocationsManager({
   const [scopeMode, setScopeMode] = useState<SortScopeMode>("region");
   const [selectedRegionId, setSelectedRegionId] =
     useState<ThailandRegionId>("north");
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const [searchQuery, setSearchQuery] = useState("");
 
   const [editingProvince, setEditingProvince] =
@@ -529,122 +545,160 @@ export function SuperAdminLocationsManager({
   };
 
   const modalProvince = editingProvince ?? cachedEditingProvince;
+  const activeRegionLabel =
+    scopeMode === "national"
+      ? `ทั่วประเทศ (${provinces.length})`
+      : sortedRegions.find((r) => r.id === selectedRegionId)?.labelTh ??
+        "ภูมิภาค";
+
+  const renderRegionList = (isMobile: boolean) => (
+    <div className="space-y-4">
+      {/* National Scope Quick Entry */}
+      <button
+        type="button"
+        onClick={() => {
+          setScopeMode("national");
+          setMobileView("detail");
+        }}
+        className={`w-full flex items-center gap-3 px-3 py-3 rounded-[14px] text-left cursor-pointer transition-colors ${
+          scopeMode === "national" && !isMobile
+            ? "bg-[var(--color-background-muted)] ws-body-strong !text-[var(--color-accent)]"
+            : "hover:bg-[var(--color-background-muted)]/60 ws-body-medium"
+        }`}
+      >
+        <span
+          className={`w-8 h-8 rounded-full inline-flex items-center justify-center shrink-0 ${
+            scopeMode === "national"
+              ? "bg-[var(--color-accent)] !text-white"
+              : "bg-[var(--color-background-muted)] text-[var(--color-accent)]"
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <span className={isMobile ? "ws-subtitle block" : "block truncate"}>
+            ทั่วประเทศ (77 จังหวัด)
+          </span>
+          {isMobile && (
+            <span className="ws-caption block mt-0.5">
+              จัดลำดับรวมทุกจังหวัดทั่วไทย
+            </span>
+          )}
+        </div>
+        {isMobile ? (
+          <ChevronRight
+            size={16}
+            className="text-[var(--color-text-secondary)] shrink-0"
+          />
+        ) : (
+          <span className="ws-badge text-[var(--color-text-secondary)] tabular-nums">
+            {provinces.length}
+          </span>
+        )}
+      </button>
+
+      <div className="space-y-1">
+        <p className="ws-badge text-[var(--color-text-secondary)] px-3 pb-1">
+          เรียงตามภูมิภาค (ลากสลับลำดับได้)
+        </p>
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleRegionDragEnd}
+        >
+          <SortableContext
+            items={sortedRegions.map((r) => r.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className={isMobile ? "divide-y divide-[var(--color-border)]" : "space-y-0.5"}>
+              {sortedRegions.map((reg) => {
+                const regProvs = provinces.filter((p) => p.regionId === reg.id);
+                const regPlaces = regProvs.reduce(
+                  (acc, p) => acc + p.placeCount,
+                  0,
+                );
+                return (
+                  <SortableRegionRow
+                    key={reg.id}
+                    region={reg}
+                    isMobile={isMobile}
+                    isSelected={
+                      scopeMode === "region" && selectedRegionId === reg.id
+                    }
+                    provinceCount={regProvs.length}
+                    placeCount={regPlaces}
+                    onSelect={() => {
+                      setScopeMode("region");
+                      setSelectedRegionId(reg.id);
+                      setMobileView("detail");
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* Single Compact Flush Toolbar */}
-      <div className="cgr-admin-toolbar">
-        <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto no-scrollbar">
-          <h1 className="text-[14.5px] font-bold text-[var(--color-text-primary)] whitespace-nowrap">
-            จังหวัด &amp; ภูมิภาค
-          </h1>
-          <span className="w-px h-4 bg-[var(--color-border)] shrink-0" />
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setScopeMode("region")}
-              className={`h-7.5 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                scopeMode === "region"
-                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              เรียงตามภาค (6)
-            </button>
-            <button
-              type="button"
-              onClick={() => setScopeMode("national")}
-              className={`h-7.5 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
-                scopeMode === "national"
-                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              ทั่วประเทศ (77)
-            </button>
+      <WorkspaceSplitLayout
+        title="จังหวัด & ภูมิภาค"
+        subtitle={`${sortedRegions.length} ภูมิภาค · ${provinces.length} จังหวัด`}
+        activeId={scopeMode === "national" ? "national" : selectedRegionId}
+        mobileView={mobileView}
+        onMobileBack={() => setMobileView("list")}
+        mobileDetailTitle={activeRegionLabel}
+        contentWidth="full"
+        fullHeightRightPane
+        topBanner={topBanner}
+        customDesktopSidebarList={renderRegionList(false)}
+        customMobileSidebarList={renderRegionList(true)}
+      >
+        {isLoading ? (
+          <div className="py-12 text-center ws-caption">
+            กำลังโหลดข้อมูล 77 จังหวัด...
           </div>
-        </div>
-
-        <div className="relative w-[190px] sm:w-[220px]">
-          <Search className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="กรองชื่อจังหวัด..."
-            className="w-full h-7.5 pl-8 pr-3 rounded-full bg-[var(--color-background-muted)] text-[12.5px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
-          />
-        </div>
-      </div>
-
-      {/* Full-Bleed 2-Pane Split (Zero Outer Boxes, Pure border-b + border-r) */}
-      {isLoading ? (
-        <div className="p-6 text-[13px] text-[var(--color-text-secondary)]">
-          กำลังโหลดข้อมูล 77 จังหวัด...
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-border)] overflow-y-auto lg:overflow-hidden">
-          {/* Left: Sortable Regions */}
-          <section className="lg:col-span-3 flex flex-col min-h-0">
-            <div className="h-[34px] px-3 border-b border-[var(--color-border)] flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)] shrink-0">
-              <span>ภูมิภาค (ลากสลับได้)</span>
-              <span>จ. · ร้าน</span>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="hidden md:flex items-end justify-between gap-3 pb-4 border-b border-[var(--color-border)] shrink-0">
+              <div className="space-y-0.5 min-w-0">
+                <h2 className="ws-title truncate">{activeRegionLabel}</h2>
+                <p className="ws-caption">
+                  ลากไอคอนด้านซ้ายเพื่อจัดลำดับ ({displayedProvinces.length}{" "}
+                  จังหวัด)
+                </p>
+              </div>
+              <div className="w-60 shrink-0">
+                <WorkspaceCompactToolbar
+                  bordered={false}
+                  compactPadding
+                  searchValue={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  searchPlaceholder="กรองชื่อจังหวัด..."
+                />
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleRegionDragEnd}
-              >
-                <SortableContext
-                  items={sortedRegions.map((r) => r.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {sortedRegions.map((reg) => {
-                    const regProvs = provinces.filter(
-                      (p) => p.regionId === reg.id
-                    );
-                    const regPlaces = regProvs.reduce(
-                      (acc, p) => acc + p.placeCount,
-                      0
-                    );
-                    return (
-                      <SortableRegionRow
-                        key={reg.id}
-                        region={reg}
-                        isSelected={
-                          scopeMode === "region" && selectedRegionId === reg.id
-                        }
-                        provinceCount={regProvs.length}
-                        placeCount={regPlaces}
-                        onSelect={() => {
-                          setScopeMode("region");
-                          setSelectedRegionId(reg.id);
-                        }}
-                      />
-                    );
-                  })}
-                </SortableContext>
-              </DndContext>
-            </div>
-          </section>
-
-          {/* Right: Compact Single-Row Sortable Provinces */}
-          <section className="lg:col-span-9 flex flex-col min-h-0">
-            <div className="h-[34px] px-4 border-b border-[var(--color-border)] flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)] shrink-0">
-              <span>
-                {scopeMode === "national"
-                  ? `จังหวัดทั่วประเทศ (${displayedProvinces.length})`
-                  : `${
-                      sortedRegions.find((r) => r.id === selectedRegionId)
-                        ?.labelTh ?? ""
-                    } (${displayedProvinces.length} จังหวัด)`}
-              </span>
-              <span>พิกัด / จำนวนร้าน / จัดการ</span>
+            <div className="md:hidden pb-2 border-b border-[var(--color-border)] shrink-0">
+              <WorkspaceCompactToolbar
+                bordered={false}
+                compactPadding
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="กรองชื่อจังหวัด..."
+                filters={
+                  <span className="ws-caption whitespace-nowrap pl-1">
+                    {displayedProvinces.length} จังหวัด · ลากจัดลำดับได้
+                  </span>
+                }
+              />
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto cgr-scroll-autohide pb-12">
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -667,9 +721,9 @@ export function SuperAdminLocationsManager({
                 </SortableContext>
               </DndContext>
             </div>
-          </section>
-        </div>
-      )}
+          </div>
+        )}
+      </WorkspaceSplitLayout>
 
       {/* Edit Province Geo & Coordinates Sheet */}
       {editPresence.shouldRender &&
@@ -681,21 +735,21 @@ export function SuperAdminLocationsManager({
             onClick={(e) => {
               if (e.target === e.currentTarget) setEditingProvince(null);
             }}
-            className="cgr-modal-backdrop fixed inset-0 z-[95] bg-black/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center sm:p-4"
+            className="cgr-modal-backdrop fixed inset-0 z-[95] bg-black/48 flex items-end md:items-center justify-center md:p-4"
           >
             <form
               onSubmit={handleSaveProvinceGeo}
               data-state={editPresence.dataState}
-              className="cgr-modal-surface-md w-full sm:max-w-[520px] max-h-[88dvh] rounded-t-[24px] sm:rounded-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden"
+              className="cgr-modal-surface-md w-full md:max-w-[720px] max-h-[92dvh] md:max-h-[86dvh] rounded-t-[24px] md:rounded-[20px] bg-[var(--color-background-popover)] border-t md:border border-[var(--color-border)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden"
             >
-              <div className="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+              <div className="md:hidden flex justify-center pt-3 shrink-0">
                 <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
               </div>
 
               <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[var(--color-border)] shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <MapPin className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
-                  <h3 className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                  <MapPin className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
+                  <h3 className="ws-title truncate">
                     ตั้งค่าพิกัด · {modalProvince.nameTh}
                   </h3>
                 </div>
@@ -703,13 +757,13 @@ export function SuperAdminLocationsManager({
                   type="button"
                   onClick={() => setEditingProvince(null)}
                   aria-label="ปิดหน้าต่าง"
-                  className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer"
+                  className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer transition-colors shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3.5">
+              <div className="flex-1 min-h-0 overflow-y-auto cgr-scroll-autohide px-5 py-4 space-y-3.5">
                 <StandardFieldGroup>
                   <StandardInput
                     label="ชื่อย่อที่แสดงบนหน้าเว็บ"

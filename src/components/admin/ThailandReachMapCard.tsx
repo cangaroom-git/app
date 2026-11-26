@@ -1,11 +1,55 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { X } from "lucide-react";
-import type { ProvinceReachMetric } from "@/lib/services/adminDashboardService";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Globe, RefreshCw, Users, X } from "lucide-react";
+import { ResponsiveSelect } from "@/components/ui/ResponsiveSelect";
+import type {
+  AdminPerformanceRow,
+  ProvinceReachMetric,
+} from "@/lib/services/adminDashboardService";
+
+interface ThailandGeoProvince {
+  id: string;
+  code: string;
+  nameTh: string;
+  nameEn: string;
+  d: string;
+}
+
+interface ThailandGeoPayload {
+  width: number;
+  height: number;
+  provinces: ThailandGeoProvince[];
+}
+
+// Module-level cache so the 74KB static SVG map loads once per browser session
+let cachedThailandGeo: ThailandGeoPayload | null = null;
+let inflightGeoPromise: Promise<ThailandGeoPayload> | null = null;
+
+function loadThailandGeo(): Promise<ThailandGeoPayload> {
+  if (cachedThailandGeo) return Promise.resolve(cachedThailandGeo);
+  if (!inflightGeoPromise) {
+    inflightGeoPromise = fetch("/geo/thailand-provinces-svg.json")
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load Thailand map geometry");
+        return res.json() as Promise<ThailandGeoPayload>;
+      })
+      .then((data) => {
+        cachedThailandGeo = data;
+        return data;
+      })
+      .catch((err) => {
+        inflightGeoPromise = null;
+        throw err;
+      });
+  }
+  return inflightGeoPromise;
+}
 
 interface ThailandReachMapCardProps {
   provinces: ProvinceReachMetric[];
+  performanceRows: AdminPerformanceRow[];
   provincesCoveredCount: number;
   activePromosCount: number;
   totalEngagementCount: number;
@@ -15,61 +59,87 @@ interface ThailandReachMapCardProps {
 
 type MetricMode = "places" | "promos" | "engagement";
 
-const LNG_MIN = 97.2;
-const LNG_MAX = 105.8;
-const LAT_MIN = 5.4;
-const LAT_MAX = 20.6;
-const SVG_W = 400;
-const SVG_H = 620;
-
-function projectThailand(lat: number, lng: number): { x: number; y: number } {
-  const x = 32 + ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * (SVG_W - 64);
-  const y = 26 + ((LAT_MAX - lat) / (LAT_MAX - LAT_MIN)) * (SVG_H - 52);
-  return { x, y };
-}
-
-const THAILAND_CONTOUR_COORDS: Array<[number, number]> = [
-  [20.42, 99.88], [20.25, 100.42], [19.55, 100.48], [19.45, 101.25],
-  [18.18, 101.18], [17.55, 101.65], [18.22, 102.95], [18.38, 103.95],
-  [17.55, 104.78], [16.25, 105.12], [15.25, 105.62], [14.32, 105.12],
-  [14.42, 103.55], [13.65, 102.68], [12.22, 102.82], [11.65, 102.56],
-  [12.52, 101.85], [12.65, 100.88], [13.48, 100.55], [13.38, 100.02],
-  [12.15, 99.96], [10.95, 99.52], [9.25, 99.88], [7.85, 100.38],
-  [6.92, 101.35], [6.22, 102.08], [5.65, 101.15], [6.42, 100.12],
-  [7.35, 99.42], [8.08, 98.32], [9.85, 98.58], [11.35, 99.22],
-  [13.25, 99.25], [15.12, 98.35], [16.75, 98.52], [17.85, 97.72],
-  [19.42, 97.88], [19.88, 98.95],
+/* Admin Center Crimson Red Heat Scale (Soft Rose -> Admin Crimson #dc2626) */
+const COLOR_SCALE = [
+  "#fef2f2", // very low
+  "#fee2e2", // low
+  "#fecaca", // medium
+  "#fca5a5", // high
+  "#ef4444", // very high
+  "#dc2626", // highest (Admin Crimson Red)
 ];
 
-const THAILAND_SVG_PATH =
-  THAILAND_CONTOUR_COORDS.map(([lat, lng], idx) => {
-    const pt = projectThailand(lat, lng);
-    return `${idx === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
-  }).join(" ") + " Z";
+const METRIC_OPTIONS = [
+  { value: "places", label: "จำนวนสถานที่ทั้งหมด" },
+  { value: "promos", label: "โปรโมชั่นที่เผยแพร่อยู่" },
+  { value: "engagement", label: "ยอดเข้าชมสะสม" },
+];
 
-function formatCompact(n: number): string {
+function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
 }
 
-function getHeatFill(val: number, maxVal: number): string {
-  if (val <= 0 || maxVal <= 0) return "#dce7f4";
-  const ratio = Math.log(val + 1) / Math.log(maxVal + 1);
-  if (ratio > 0.8) return "#1e78d6";
-  if (ratio > 0.55) return "#3d93eb";
-  if (ratio > 0.3) return "#74b6f6";
-  return "#a8d2fa";
+function getProvinceColor(
+  count: number | undefined,
+  maxCount: number,
+): string {
+  if (!count || count <= 0 || maxCount <= 0) return "#f1f5f9";
+  const logCount = Math.log(count + 1);
+  const logMax = Math.log(maxCount + 1);
+  const ratio = Math.min(logCount / logMax, 1);
+  const index = Math.min(
+    Math.floor(ratio * COLOR_SCALE.length),
+    COLOR_SCALE.length - 1,
+  );
+  return COLOR_SCALE[index];
 }
 
+/**
+ * 1:1 WeGlobal WorldMapCard — Official 77-Province Thailand Choropleth Map
+ * - Real DOPA 77-province Mercator polygon boundaries (including Phuket, Samui, Koh Chang, etc.)
+ * - Nondii `#f1f5f9` neutral land, `#747474` hairline borders, Travel-Blue `#eaf3fc → #1e78d6` heat scale + `#FEF211` selected stroke
+ * - Rich floating tooltip showing Top 5 places/promos inside each hovered province with thumbnails
+ */
 export function ThailandReachMapCard({
   provinces,
+  performanceRows,
   provincesCoveredCount,
+  totalEngagementCount,
   selectedProvinceId,
   onSelectProvince,
 }: ThailandReachMapCardProps) {
+  const router = useRouter();
+  const [geo, setGeo] = useState<ThailandGeoPayload | null>(cachedThailandGeo);
   const [metric, setMetric] = useState<MetricMode>("places");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [containerSize, setContainerSize] = useState({ w: 720, h: 480 });
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const mountedAtRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    let alive = true;
+    if (!geo) {
+      loadThailandGeo()
+        .then((data) => {
+          if (alive) setGeo(data);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [geo]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedSec(Math.round((Date.now() - mountedAtRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const getMetricValue = (p: ProvinceReachMetric) => {
     if (metric === "promos") return p.activePromosCount;
@@ -77,176 +147,394 @@ export function ThailandReachMapCard({
     return p.placesCount;
   };
 
-  const { maxVal, topProvinces } = useMemo(() => {
+  const { provinceMap, maxVal, topProvinces } = useMemo(() => {
+    const map = new Map<string, ProvinceReachMetric>();
     let max = 0;
     for (const p of provinces) {
+      map.set(p.provinceId, p);
       const v = getMetricValue(p);
       if (v > max) max = v;
     }
     const ranked = [...provinces]
       .filter((p) => getMetricValue(p) > 0)
-      .sort((a, b) => getMetricValue(b) - getMetricValue(a))
-      .slice(0, 8);
-    return { maxVal: max, topProvinces: ranked };
+      .sort((a, b) => getMetricValue(b) - getMetricValue(a));
+    return { provinceMap: map, maxVal: max, topProvinces: ranked };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provinces, metric]);
 
-  const hoveredProvince = useMemo(
-    () => provinces.find((p) => p.provinceId === hoveredId) ?? null,
-    [provinces, hoveredId]
-  );
+  // Pre-group Top 5 Places/Promos per province for instant 0ms WeGlobal rich tooltip
+  const topPlacesByProvince = useMemo(() => {
+    const grouped = new Map<string, AdminPerformanceRow[]>();
+    for (const row of performanceRows) {
+      if (!row.provinceId || row.provinceId === "nationwide") continue;
+      const list = grouped.get(row.provinceId);
+      if (list) list.push(row);
+      else grouped.set(row.provinceId, [row]);
+    }
+    const result = new Map<
+      string,
+      Array<{ id: string; name: string; image: string; views: number; pct: number }>
+    >();
+    for (const [provId, list] of grouped.entries()) {
+      const sorted = [...list].sort((a, b) => b.viewsCount - a.viewsCount);
+      const totalViews = sorted.reduce(
+        (sum, r) => sum + Math.max(1, r.viewsCount),
+        0,
+      );
+      result.set(
+        provId,
+        sorted.slice(0, 5).map((r) => ({
+          id: r.id,
+          name: r.hotelNameTh,
+          image: r.coverImageUrl,
+          views: r.viewsCount,
+          pct: Math.max(
+            1,
+            Math.round((Math.max(1, r.viewsCount) / totalViews) * 100),
+          ),
+        })),
+      );
+    }
+    return result;
+  }, [performanceRows]);
 
-  const selectedProvince = useMemo(
-    () => provinces.find((p) => p.provinceId === selectedProvinceId) ?? null,
-    [provinces, selectedProvinceId]
-  );
+  const hoveredProvince = hoveredId ? provinceMap.get(hoveredId) ?? null : null;
+  const hoveredPlaces = hoveredId ? topPlacesByProvince.get(hoveredId) ?? [] : [];
+  const selectedProvince = selectedProvinceId
+    ? provinceMap.get(selectedProvinceId) ?? null
+    : null;
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    mountedAtRef.current = Date.now();
+    setElapsedSec(0);
+    router.refresh();
+    window.setTimeout(() => setIsRefreshing(false), 600);
+  };
+
+  const tooltipW = 240;
+  const tooltipH = hoveredPlaces.length > 0 ? 220 : 72;
+  const tooltipLeft =
+    tooltipPos.x + tooltipW + 20 > containerSize.w
+      ? Math.max(8, tooltipPos.x - tooltipW - 8)
+      : tooltipPos.x + 14;
+  const tooltipTop =
+    tooltipPos.y + tooltipH + 10 > containerSize.h
+      ? Math.max(8, tooltipPos.y - tooltipH - 8)
+      : tooltipPos.y + 10;
 
   return (
-    <section className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-background-body)] grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-border)]">
-      {/* Left: Compact Border-b Top Provinces List */}
-      <div className="lg:col-span-5 xl:col-span-4 flex flex-col">
-        <div className="h-[36px] px-4 border-b border-[var(--color-border)] flex items-center justify-between gap-2">
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)]">
-            ความครอบคลุม ({provincesCoveredCount}/77 จังหวัด)
-          </span>
-          <div className="flex items-center gap-1">
-            {(
-              [
-                { id: "places", label: "ร้าน" },
-                { id: "promos", label: "โปร" },
-                { id: "engagement", label: "ยอดวิว" },
-              ] as const
-            ).map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMetric(m.id)}
-                className={`h-6 px-2 rounded-full text-[11px] font-semibold cursor-pointer transition-colors ${
-                  metric === m.id
-                    ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)]"
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+    <div className="bg-[var(--color-background-body)]">
+      <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+        {/* ── Left Panel: Clean Minimal Stats Rail ── */}
+        <div className="w-full md:w-[260px] shrink-0 flex flex-col justify-between">
+          <div className="space-y-5">
+            {/* Province Reached */}
+            <div>
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)] mb-1">
+                <Globe className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                <span>ความครอบคลุมรายจังหวัด</span>
+              </div>
+              <p className="text-[28px] font-semibold text-[var(--color-text-primary)] tracking-tight tabular-nums">
+                {provincesCoveredCount}{" "}
+                <span className="text-[14px] font-normal text-[var(--color-text-secondary)]">
+                  / 77 จังหวัด
+                </span>
+              </p>
+            </div>
+
+            {/* User Reached */}
+            <div>
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)] mb-1">
+                <Users className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                <span>การเข้าชมสะสม</span>
+              </div>
+              <p className="text-[28px] font-semibold text-[var(--color-text-primary)] tracking-tight tabular-nums">
+                {formatNumber(totalEngagementCount)}{" "}
+                <span className="text-[14px] font-normal text-[var(--color-text-secondary)]">
+                  ครั้ง
+                </span>
+              </p>
+            </div>
+
+            {/* Clean Flat Dropdown */}
+            <div>
+              <p className="text-[12px] font-semibold text-[var(--color-text-secondary)] mb-1.5">
+                ตัวชี้วัดบนแผนที่
+              </p>
+              <ResponsiveSelect
+                value={metric}
+                onChange={(v) => setMetric(v as MetricMode)}
+                options={METRIC_OPTIONS}
+                sheetTitle="เลือกตัวชี้วัด"
+                triggerClassName="w-full h-10 px-3.5 rounded-[12px] bg-[var(--color-background-card)] border border-[#b0b0b0] hover:border-[var(--color-text-primary)] text-[14px] text-[var(--color-text-primary)] font-medium"
+                dropdownClassName="min-w-[220px]"
+              />
+            </div>
+
+            {/* Top Provinces List: Mobile horizontal pill strip (zero nested vertical scroll!) / Desktop ranked list */}
+            {topProvinces.length > 0 && (
+              <div className="flex flex-col">
+                <p className="text-[12px] font-semibold text-[var(--color-text-secondary)] mb-2">
+                  จังหวัดยอดนิยม
+                </p>
+
+                {/* Mobile (< md): Single-row horizontal pills so vertical page scroll is never hijacked */}
+                <div className="flex md:hidden items-center gap-1.5 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar py-0.5">
+                  {topProvinces.map((p) => {
+                    const val = getMetricValue(p);
+                    const color = getProvinceColor(val, maxVal);
+                    const isSel = selectedProvinceId === p.provinceId;
+                    return (
+                      <button
+                        key={p.provinceId}
+                        type="button"
+                        onClick={() =>
+                          onSelectProvince(isSel ? null : p.provinceId)
+                        }
+                        className={`h-8 px-3 rounded-full inline-flex items-center gap-1.5 ws-caption-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                          isSel
+                            ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)] font-semibold"
+                            : "bg-[var(--color-background-muted)] !text-[var(--color-text-primary)] active:bg-[var(--color-background-subtle)]"
+                        }`}
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10"
+                          style={{
+                            backgroundColor: isSel ? "#ffffff" : color,
+                          }}
+                        />
+                        <span>{p.nameTh}</span>
+                        <span
+                          className={`ws-badge tabular-nums ${
+                            isSel
+                              ? "text-white/85"
+                              : "text-[var(--color-text-secondary)]"
+                          }`}
+                        >
+                          {formatNumber(val)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop (>= md): Ranked vertical list with auto-hide scrollbar */}
+                <div className="hidden md:block space-y-1 max-h-[240px] overflow-y-auto cgr-scroll-autohide pr-1">
+                  {topProvinces.map((p) => {
+                    const val = getMetricValue(p);
+                    const color = getProvinceColor(val, maxVal);
+                    const isSel = selectedProvinceId === p.provinceId;
+                    const isHov = hoveredId === p.provinceId;
+                    return (
+                      <button
+                        key={p.provinceId}
+                        type="button"
+                        onClick={() =>
+                          onSelectProvince(isSel ? null : p.provinceId)
+                        }
+                        onMouseEnter={() => setHoveredId(p.provinceId)}
+                        onMouseLeave={() => setHoveredId(null)}
+                        className={`w-full flex items-center gap-2.5 text-[14px] text-left rounded-[10px] px-2 py-1.5 transition-colors cursor-pointer ${
+                          isSel
+                            ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] font-semibold"
+                            : isHov
+                              ? "bg-[var(--color-background-muted)]"
+                              : "hover:bg-[var(--color-background-muted)]/70"
+                        }`}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full shrink-0 border border-[var(--color-border)]"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-[var(--color-text-primary)] truncate flex-1">
+                          {p.nameTh}
+                        </span>
+                        <span className="text-[var(--color-text-secondary)] font-medium text-xs tabular-nums">
+                          {formatNumber(val)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Color Legend */}
+            <div className="hidden md:block">
+              <p className="text-[12px] text-[var(--color-text-secondary)] mb-1.5">
+                น้อย → มาก
+              </p>
+              <div className="flex h-2 rounded-full overflow-hidden">
+                {COLOR_SCALE.map((color, i) => (
+                  <div
+                    key={i}
+                    className="flex-1"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Last Updated + Refresh */}
+          <div className="mt-5 pt-4 border-t border-[var(--color-border)] hidden md:flex items-center justify-between">
+            <p className="text-[12px] text-[var(--color-text-secondary)]">
+              อัปเดตเมื่อ {elapsedSec} วิที่แล้ว
+            </p>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--color-accent)] hover:opacity-80 cursor-pointer transition-opacity disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              <span>รีเฟรช</span>
+            </button>
           </div>
         </div>
 
-        <div className="divide-y divide-[var(--color-border)] max-h-[216px] overflow-y-auto">
-          {topProvinces.length === 0 ? (
-            <p className="px-4 py-6 text-[12.5px] text-[var(--color-text-secondary)]">
-              ยังไม่มีข้อมูลสถิติรายจังหวัด
-            </p>
+        {/* ── Right Panel: Real 77-Province Thailand Choropleth Map on Clean Pure White Canvas ── */}
+        <div
+          className="flex-1 relative bg-[var(--color-background-muted)]/40 rounded-[24px] min-h-[380px] md:min-h-[500px] select-none flex items-center justify-center py-5 px-3"
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setTooltipPos({
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top,
+            });
+            setContainerSize({ w: rect.width, h: rect.height });
+          }}
+          onMouseLeave={() => setHoveredId(null)}
+        >
+          {/* Active Province Filter Clear Pill */}
+          {selectedProvince && (
+            <button
+              type="button"
+              onClick={() => onSelectProvince(null)}
+              className="absolute top-4 right-4 z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+            >
+              <span>Filter: {selectedProvince.nameTh}</span>
+              <X className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          )}
+
+          {geo ? (
+            <svg
+              viewBox={`0 0 ${geo.width} ${geo.height}`}
+              role="img"
+              aria-label="Thailand 77-Province Choropleth Map"
+              className="h-[380px] md:h-[500px] w-auto max-w-full"
+            >
+              {geo.provinces.map((provGeo) => {
+                const metricRow = provinceMap.get(provGeo.id);
+                const val = metricRow ? getMetricValue(metricRow) : 0;
+                const hasData = val > 0;
+                const isSelected = selectedProvinceId === provGeo.id;
+                const isHovered = hoveredId === provGeo.id;
+
+                const defaultFill = getProvinceColor(val, maxVal);
+                const fill = isSelected
+                  ? "#dc2626"
+                  : isHovered
+                    ? hasData
+                      ? "#b91c1c"
+                      : "#fee2e2"
+                    : defaultFill;
+
+                return (
+                  <path
+                    key={provGeo.id}
+                    d={provGeo.d}
+                    fill={fill}
+                    stroke={
+                      isSelected
+                        ? "#FEF211"
+                        : isHovered
+                          ? "#dc2626"
+                          : "#747474"
+                    }
+                    strokeWidth={isSelected ? 1.8 : isHovered ? 0.9 : 0.45}
+                    strokeLinejoin="round"
+                    onClick={() =>
+                      onSelectProvince(isSelected ? null : provGeo.id)
+                    }
+                    onMouseEnter={() => setHoveredId(provGeo.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    className="cursor-pointer transition-colors duration-150 outline-none"
+                  />
+                );
+              })}
+            </svg>
           ) : (
-            topProvinces.map((prov) => {
-              const val = getMetricValue(prov);
-              const isSel = selectedProvinceId === prov.provinceId;
-              const fill = getHeatFill(val, maxVal);
-              return (
-                <button
-                  key={prov.provinceId}
-                  type="button"
-                  onClick={() => onSelectProvince(isSel ? null : prov.provinceId)}
-                  onMouseEnter={() => setHoveredId(prov.provinceId)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  className={`w-full h-[30px] px-4 flex items-center justify-between gap-3 text-left cursor-pointer transition-colors ${
-                    isSel
-                      ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] font-semibold"
-                      : "hover:bg-[var(--color-background-muted)]/60 text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2 min-w-0 text-[12.5px]">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: fill }}
-                    />
-                    <span className="truncate">{prov.nameTh}</span>
-                  </span>
-                  <span className="text-[12px] font-semibold tabular-nums text-[var(--color-text-secondary)] shrink-0">
-                    {formatCompact(val)}
-                  </span>
-                </button>
-              );
-            })
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Loading Thailand map...</span>
+            </div>
+          )}
+
+          {/* ── Rich WeGlobal Floating Tooltip (with Top 5 Places + Thumbnails) ── */}
+          {hoveredProvince && (
+            <div
+              className="absolute pointer-events-none z-50 bg-white border border-gray-200 rounded-xl shadow-[var(--shadow-popover)] overflow-hidden"
+              style={{
+                left: tooltipLeft,
+                top: tooltipTop,
+                width: tooltipW,
+              }}
+            >
+              {/* Header */}
+              <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {hoveredProvince.nameTh}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {hoveredProvince.placesCount.toLocaleString()} places ·{" "}
+                  {hoveredProvince.activePromosCount.toLocaleString()} promos
+                  {hoveredProvince.totalEngagement > 0
+                    ? ` · ${formatNumber(hoveredProvince.totalEngagement)} visits`
+                    : ""}
+                </p>
+              </div>
+
+              {/* Top Places / Promos inside this province */}
+              {hoveredPlaces.length > 0 && (
+                <div className="px-3 py-2 space-y-1.5">
+                  <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Top Places
+                  </p>
+                  {hoveredPlaces.map((place) => (
+                    <div key={place.id} className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded bg-gray-100 overflow-hidden shrink-0 border border-gray-100">
+                        {place.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={place.image}
+                            alt={place.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-300 text-[12px]">
+                            N/A
+                          </div>
+                        )}
+                      </div>
+                      <span className="flex-1 text-xs text-gray-700 truncate leading-tight">
+                        {place.name}
+                      </span>
+                      <span className="text-xs font-semibold text-gray-500 shrink-0 tabular-nums">
+                        {place.pct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Right: Clean Compact SVG Spatial Map */}
-      <div className="lg:col-span-7 xl:col-span-8 relative px-4 py-2 flex items-center justify-center min-h-[220px] max-h-[252px] overflow-hidden">
-        <svg
-          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-          role="img"
-          aria-label="แผนที่ความหนาแน่นโปรโมชั่น 77 จังหวัดในประเทศไทย"
-          className="h-[225px] w-auto select-none"
-        >
-          <path
-            d={THAILAND_SVG_PATH}
-            className="fill-[var(--color-background-muted)] stroke-[var(--color-border-emphasized)]"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-          />
-          {provinces.map((prov) => {
-            const pt = projectThailand(prov.lat, prov.lng);
-            const val = getMetricValue(prov);
-            const hasData = val > 0;
-            const isSelected = selectedProvinceId === prov.provinceId;
-            const isHovered = hoveredId === prov.provinceId;
-            const ratio =
-              hasData && maxVal > 0
-                ? Math.log(val + 1) / Math.log(maxVal + 1)
-                : 0;
-            const radius = hasData ? 4.5 + ratio * 9 : 2.5;
-            const fill = getHeatFill(val, maxVal);
-            return (
-              <g
-                key={prov.provinceId}
-                onClick={() => onSelectProvince(isSelected ? null : prov.provinceId)}
-                onMouseEnter={() => setHoveredId(prov.provinceId)}
-                onMouseLeave={() => setHoveredId(null)}
-                className="cursor-pointer"
-              >
-                <circle
-                  cx={pt.x}
-                  cy={pt.y}
-                  r={radius}
-                  fill={fill}
-                  stroke={
-                    isSelected || isHovered
-                      ? "var(--color-text-primary)"
-                      : "#ffffff"
-                  }
-                  strokeWidth={isSelected || isHovered ? 2 : hasData ? 1.2 : 0.6}
-                  opacity={hasData ? 0.94 : 0.65}
-                />
-              </g>
-            );
-          })}
-        </svg>
-
-        {/* Inline Hover / Selection Readout */}
-        {(hoveredProvince || selectedProvince) && (
-          <div className="absolute top-2.5 right-4 flex items-center gap-2 text-[12px] text-[var(--color-text-primary)]">
-            <span className="font-semibold">
-              {(hoveredProvince ?? selectedProvince)!.nameTh}
-            </span>
-            <span className="text-[var(--color-text-secondary)] tabular-nums">
-              {(hoveredProvince ?? selectedProvince)!.placesCount} ร้าน ·{" "}
-              {(hoveredProvince ?? selectedProvince)!.activePromosCount} โปร
-            </span>
-            {selectedProvince && (
-              <button
-                type="button"
-                onClick={() => onSelectProvince(null)}
-                className="h-5 px-2 rounded-full bg-[var(--color-background-muted)] text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-              >
-                <span>ล้าง</span>
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </section>
+    </div>
   );
 }

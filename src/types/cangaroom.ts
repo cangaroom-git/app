@@ -167,6 +167,7 @@ export interface PinFeedItemDto {
   savesCount: number;
   commentsCount: number;
   sharesCount: number;
+  viewsCount?: number;
   isLikedByMe: boolean;
   isSavedByMe: boolean;
   createdAt: string;

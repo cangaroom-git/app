@@ -8,8 +8,8 @@ export default function StudioReviewsPage() {
   const { data, reload, notify } = useStudio();
 
   return (
-    <div className="flex-1 w-full px-4 sm:px-8 lg:px-10 py-8 lg:py-10">
-      <div className="max-w-[1360px] mx-auto">
+    <div className="cgr-admin-page">
+      <div className="cgr-admin-body py-6 sm:py-8">
         <StudioReviewsPanel
           key={data.hotel.id}
           data={data}

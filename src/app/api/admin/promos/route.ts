@@ -51,8 +51,37 @@ const CreatePromoSchema = z.object({
 });
 
 const PatchPromoSchema = z.object({
-  inboxId: z.string().trim().min(1),
-  action: z.enum(["APPROVE", "REJECT", "DELETE"]),
+  inboxId: z.string().trim().min(1).optional(),
+  pinId: z.string().trim().min(1).optional(),
+  action: z.enum(["APPROVE", "REJECT", "DELETE", "PUBLISH", "UNPUBLISH"]),
+});
+
+const UpdatePromoSchema = z.object({
+  targetType: z.enum(["PIN", "INBOX"]),
+  id: z.string().trim().min(1),
+  brandNameTh: z.string().trim().min(1).max(120).optional(),
+  titleTh: z.string().trim().min(1).max(140),
+  promoHeadlineTh: z.string().trim().min(1).max(60),
+  descriptionTh: z.string().trim().max(1500).optional().default(""),
+  promoCode: z.string().trim().max(40).optional().default(""),
+  promoCategoryCode: z
+    .enum(["STAY", "CAFE", "RESTAURANT", "WELLNESS", "ATTRACTION"])
+    .default("STAY"),
+  locationScope: z
+    .enum(["SINGLE_LOCATION", "MULTI_BRANCH", "NATIONWIDE_ONLINE"])
+    .optional(),
+  branchSummaryTh: z.string().trim().max(140).optional(),
+  provinceId: z.string().trim().min(1).optional(),
+  originalPriceThb: z.number().int().positive().nullable().optional(),
+  dealPriceThb: z.number().int().positive().nullable().optional(),
+  startsAt: z.string().trim().nullable().optional(),
+  expiresAt: z.string().trim().nullable().optional(),
+  externalUrl: z.string().trim().max(500).optional().default(""),
+  coverImageUrl: z.string().trim().max(1000).optional().default(""),
+  visualMode: z
+    .enum(["OFFICIAL_PHOTO", "BRANDED_CARD", "CATEGORY_FALLBACK"])
+    .optional(),
+  publishStatus: z.enum(["PUBLISHED", "PENDING_APPROVAL", "DISCARDED"]).optional(),
 });
 
 function slugifyBrand(raw: string): string {
@@ -279,13 +308,17 @@ export async function GET() {
           id: true,
           hotelId: true,
           titleTh: true,
+          descriptionTh: true,
           coverImageUrl: true,
           provinceId: true,
           promoHeadlineTh: true,
           promoCode: true,
+          promoOriginalPriceThb: true,
+          promoDealPriceThb: true,
           promoStartsAt: true,
           promoExpiresAt: true,
           promoCategoryCode: true,
+          externalDealUrl: true,
           visualMode: true,
           dealSourceType: true,
           publishStatus: true,
@@ -484,7 +517,40 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "ข้อมูลไม่ถูกต้อง" }, { status: 422 });
     }
 
-    const { inboxId, action } = parsed.data;
+    const { inboxId, pinId, action } = parsed.data;
+
+    // Live Promo Pin Quick Actions (Publish / Unpublish / Delete)
+    if (pinId) {
+      const existingPin = await prisma.pin.findUnique({
+        where: { id: pinId },
+        include: { hotel: { select: { slug: true } } },
+      });
+      if (!existingPin) {
+        return NextResponse.json(
+          { error: "ไม่พบรายการโปรโมชั่น" },
+          { status: 404 }
+        );
+      }
+
+      if (action === "DELETE") {
+        await prisma.pin.delete({ where: { id: pinId } });
+        revalidatePlaceCatalog({ slug: existingPin.hotel.slug, pinId });
+        return NextResponse.json({ success: true });
+      }
+
+      const nextStatus = action === "UNPUBLISH" ? "PENDING_APPROVAL" : "PUBLISHED";
+      const updatedPin = await prisma.pin.update({
+        where: { id: pinId },
+        data: { publishStatus: nextStatus },
+      });
+      revalidatePlaceCatalog({ slug: existingPin.hotel.slug, pinId });
+      return NextResponse.json({ success: true, pin: updatedPin });
+    }
+
+    if (!inboxId) {
+      return NextResponse.json({ error: "ต้องระบุ inboxId หรือ pinId" }, { status: 422 });
+    }
+
     const existing = await prisma.promoInboxItem.findUnique({
       where: { id: inboxId },
     });
@@ -556,6 +622,130 @@ export async function PATCH(request: Request) {
     console.error("[PATCH /api/admin/promos]", err);
     return NextResponse.json(
       { error: "ดำเนินการไม่สำเร็จ" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request) {
+  const guard = await requireSuperAdminApi();
+  if ("error" in guard) return guard.error;
+
+  try {
+    const raw = await request.json();
+    const parsed = UpdatePromoSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "กรุณากรอกข้อมูลโปรโมชั่นให้ครบถ้วน" },
+        { status: 422 }
+      );
+    }
+
+    const d = parsed.data;
+    const startsAt = parseOptionalDate(d.startsAt);
+    const expiresAt = parseOptionalDate(d.expiresAt);
+    const cleanExternalUrl = sanitizeOutboundHttpsUrl(d.externalUrl);
+
+    if (d.targetType === "INBOX") {
+      const updated = await prisma.promoInboxItem.update({
+        where: { id: d.id },
+        data: {
+          ...(d.brandNameTh ? { brandNameTh: d.brandNameTh } : {}),
+          ...(d.locationScope ? { locationScope: d.locationScope } : {}),
+          ...(d.branchSummaryTh !== undefined
+            ? { branchSummaryTh: d.branchSummaryTh }
+            : {}),
+          ...(d.provinceId ? { provinceId: d.provinceId } : {}),
+          promoCategoryCode: d.promoCategoryCode,
+          titleTh: d.titleTh,
+          discountLabelTh: d.promoHeadlineTh,
+          descriptionTh: d.descriptionTh,
+          promoCode: d.promoCode || null,
+          originalPriceThb: d.originalPriceThb ?? null,
+          dealPriceThb: d.dealPriceThb ?? null,
+          startsAt,
+          expiresAt,
+          externalUrl: cleanExternalUrl || null,
+          ...(d.coverImageUrl ? { coverImageUrl: d.coverImageUrl } : {}),
+          ...(d.visualMode ? { visualMode: d.visualMode } : {}),
+        },
+      });
+      return NextResponse.json({ success: true, inboxItem: updated });
+    }
+
+    // Update existing Live Promo Pin
+    const existingPin = await prisma.pin.findUnique({
+      where: { id: d.id },
+      include: { hotel: { select: { id: true, slug: true, nameTh: true, locationScope: true, branchSummaryTh: true } } },
+    });
+    if (!existingPin) {
+      return NextResponse.json({ error: "ไม่พบรายการโปรโมชั่น" }, { status: 404 });
+    }
+
+    const nextScope = d.locationScope ?? existingPin.hotel.locationScope;
+    const nextProvince =
+      nextScope === "NATIONWIDE_ONLINE"
+        ? "nationwide"
+        : d.provinceId || existingPin.provinceId;
+    const nextVisualMode = d.visualMode ?? existingPin.visualMode;
+
+    let nextCover = d.coverImageUrl || existingPin.coverImageUrl;
+    if (nextVisualMode === "BRANDED_CARD") {
+      const prov = getProvinceById(nextProvince);
+      const scopeLabel = formatPlaceLocationScopeLabel(
+        {
+          locationScope: nextScope,
+          branchSummaryTh: d.branchSummaryTh ?? existingPin.hotel.branchSummaryTh,
+          provinceId: nextProvince,
+          provinceNameTh: prov ? prov.nameTh.split("(")[0].trim() : nextProvince,
+          provinceNameEn: prov ? prov.nameEn : nextProvince,
+        },
+        "th"
+      );
+      const dateInfo = formatPromoDateRangeLabel(
+        startsAt ? startsAt.toISOString() : null,
+        expiresAt ? expiresAt.toISOString() : null,
+        "th"
+      );
+      nextCover = buildBrandedCardUrl({
+        headline: d.promoHeadlineTh,
+        brand: d.brandNameTh || existingPin.hotel.nameTh,
+        category: d.promoCategoryCode,
+        scope: scopeLabel,
+        dates: dateInfo?.label ?? null,
+        code: d.promoCode || null,
+      });
+    }
+
+    const updatedPin = await prisma.pin.update({
+      where: { id: d.id },
+      data: {
+        titleTh: d.titleTh,
+        titleEn: d.titleTh,
+        descriptionTh: d.descriptionTh,
+        promoHeadlineTh: d.promoHeadlineTh,
+        promoHeadlineEn: d.promoHeadlineTh,
+        promoCode: d.promoCode || null,
+        promoCategoryCode: d.promoCategoryCode,
+        provinceId: nextProvince,
+        promoOriginalPriceThb: d.originalPriceThb ?? null,
+        promoDealPriceThb: d.dealPriceThb ?? null,
+        promoStartsAt: startsAt,
+        promoExpiresAt: expiresAt,
+        externalDealUrl: cleanExternalUrl || null,
+        dealSourceType: cleanExternalUrl ? "EXTERNAL" : "INTERNAL",
+        visualMode: nextVisualMode,
+        coverImageUrl: nextCover,
+        ...(d.publishStatus ? { publishStatus: d.publishStatus } : {}),
+      },
+    });
+
+    revalidatePlaceCatalog({ slug: existingPin.hotel.slug, pinId: updatedPin.id });
+    return NextResponse.json({ success: true, pin: updatedPin });
+  } catch (err) {
+    console.error("[PUT /api/admin/promos]", err);
+    return NextResponse.json(
+      { error: "บันทึกการแก้ไขโปรโมชั่นไม่สำเร็จ" },
       { status: 500 }
     );
   }

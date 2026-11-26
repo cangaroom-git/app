@@ -91,7 +91,7 @@ export function StudioSheetModal({
               </button>
             )}
             <div className="min-w-0">
-              <h2 className="text-[18px] font-semibold tracking-tight text-[var(--color-text-primary)] truncate">
+              <h2 className="text-[20px] font-semibold tracking-tight text-[var(--color-text-primary)] truncate">
                 {title}
               </h2>
               {subtitle && (

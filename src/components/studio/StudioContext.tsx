@@ -142,21 +142,23 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
   if (isCheckingSession || (isLoading && !studioData)) {
     return (
       <div className="min-h-screen bg-[var(--color-background-body)] flex flex-col">
-        <div className="h-16 border-b border-[var(--color-border)] px-4 sm:px-8 lg:px-10 flex items-center justify-between">
-          <div className="h-6 w-36 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
-          <div className="hidden lg:flex items-center gap-6">
-            <div className="h-5 w-14 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
-            <div className="h-5 w-16 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
-            <div className="h-5 w-14 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
+        <div className="h-14 border-b border-[var(--color-border)] lg:pl-[60px]">
+          <div className="max-w-[1160px] mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div className="h-6 w-32 rounded-full bg-[var(--color-background-muted)] animate-pulse" />
+            <div className="hidden md:flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] animate-pulse" />
+              <div className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] animate-pulse" />
+              <div className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] animate-pulse" />
+            </div>
+            <div className="h-9 w-24 rounded-full bg-[var(--color-background-muted)] animate-pulse" />
           </div>
-          <div className="h-9 w-28 rounded-[10px] bg-[var(--color-background-muted)] animate-pulse" />
         </div>
-        <div className="max-w-[1360px] w-full mx-auto px-6 lg:px-12 py-12 space-y-6 animate-pulse">
+        <div className="max-w-[1160px] w-full mx-auto px-4 sm:px-6 lg:px-8 lg:pl-[calc(60px+2rem)] py-8 space-y-6 animate-pulse">
           <div className="h-8 w-56 rounded-[10px] bg-[var(--color-background-muted)]" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="h-56 rounded-[16px] bg-[var(--color-background-muted)]" />
-            <div className="h-56 rounded-[16px] bg-[var(--color-background-muted)]" />
-            <div className="h-56 rounded-[16px] bg-[var(--color-background-muted)]" />
+            <div className="h-44 rounded-[16px] bg-[var(--color-background-muted)]" />
+            <div className="h-44 rounded-[16px] bg-[var(--color-background-muted)]" />
+            <div className="h-44 rounded-[16px] bg-[var(--color-background-muted)]" />
           </div>
         </div>
       </div>
@@ -174,20 +176,20 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
             <h1 className="text-[24px] font-semibold text-[var(--color-text-primary)]">
               เข้าสู่ระบบเจ้าของสถานที่
             </h1>
-            <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
+            <p className="text-[14px] leading-relaxed text-[var(--color-text-secondary)]">
               จัดการหน้าโปรไฟล์สถานที่ โพสต์ โปรโมชั่น และระบบจองตรง 0% GP ของคุณในที่เดียว
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
               href="/login?next=/studio"
-              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center transition-colors"
             >
               เข้าสู่ระบบ
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
             >
               กลับหน้าหลัก
             </Link>
@@ -210,7 +212,7 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
                 ? "เริ่มต้นเปิดหน้าธุรกิจฟรีกับ Nondii"
                 : "ไม่สามารถเปิด Nondii Studio ได้"}
             </h1>
-            <p className="text-[14.5px] leading-relaxed text-[var(--color-text-secondary)]">
+            <p className="text-[14px] leading-relaxed text-[var(--color-text-secondary)]">
               {errorStatus === 404
                 ? "เปิดหน้าโปรไฟล์โรงแรม คาเฟ่ ร้านอาหาร ที่เที่ยว หรือสปา พร้อมปักหมุดแผนที่และลงโปรโมชั่นได้ฟรีตลอดชีพ"
                 : errorMessage || "กรุณาลองใหม่อีกครั้ง"}
@@ -219,14 +221,14 @@ function StudioProviderInner({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
             <Link
               href="/register"
-              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-2 transition-colors"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>ลงทะเบียนสถานที่ฟรี (0% GP)</span>
             </Link>
             <Link
               href="/"
-              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14.5px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] inline-flex items-center transition-colors"
             >
               กลับโหมดนักเดินทาง
             </Link>
@@ -247,7 +249,7 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[var(--color-background-body)] flex items-center justify-center text-[14.5px] text-[var(--color-text-secondary)]">
+        <div className="min-h-screen bg-[var(--color-background-body)] flex items-center justify-center text-[14px] text-[var(--color-text-secondary)]">
           กำลังโหลด Hotel Studio...
         </div>
       }

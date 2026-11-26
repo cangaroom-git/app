@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { FolderPlus, Heart, LayoutGrid, Layers, LogIn } from "lucide-react";
+import { ArrowLeft, FolderPlus, Heart, LayoutGrid, Layers, LogIn } from "lucide-react";
 import { useHotelApp } from "@/components/HotelAppShell";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import { PlaceCategoryIcon } from "@/components/shared/PlaceCategoryCrest";
@@ -145,6 +145,14 @@ export default function WishlistPage() {
     router.push(`/trip/${encodeURIComponent(slugOrId)}`);
   };
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  };
+
   if (isCheckingSession) {
     return (
       <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
@@ -164,7 +172,17 @@ export default function WishlistPage() {
 
   if (!currentUser) {
     return (
-      <div className="cgr-page-standard px-4 sm:px-6 py-16">
+      <div className="cgr-page-standard px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label={isTh ? "ย้อนกลับ" : "Go back"}
+          className="h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>{isTh ? "ย้อนกลับ" : "Back"}</span>
+        </button>
+
         <div className="max-w-[440px] mx-auto rounded-[24px] bg-[var(--color-background-muted)] px-6 py-12 text-center space-y-4">
           <span className="h-12 w-12 rounded-[14px] bg-[var(--color-background-card)] text-[#e60023] inline-flex items-center justify-center mx-auto">
             <Heart className="w-5 h-5" fill="currentColor" />
@@ -205,16 +223,27 @@ export default function WishlistPage() {
   return (
     <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1 min-w-0">
-          <h1 className="text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)]">
-            {isTh ? "Wishlist ที่ถูกใจ" : "My Wishlist"}
-          </h1>
-          <p className="text-[13.5px] text-[var(--color-text-secondary)]">
-            {isTh
-              ? `สถานที่ที่บันทึกไว้ ${allSavedPins.length} แห่ง · แยกตามหมวดหมู่ให้อัตโนมัติหรือดูตามบอร์ดของคุณ`
-              : `${allSavedPins.length} saved places · auto-grouped by category or organized in your boards`}
-          </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label={isTh ? "ย้อนกลับ" : "Go back"}
+            title={isTh ? "ย้อนกลับ" : "Go back"}
+            className="mt-0.5 h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" strokeWidth={2} />
+          </button>
+          <div className="space-y-1 min-w-0">
+            <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+              {isTh ? "Wishlist ที่ถูกใจ" : "My Wishlist"}
+            </h1>
+            <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+              {isTh
+                ? `สถานที่ที่บันทึกไว้ ${allSavedPins.length} แห่ง · แยกตามหมวดหมู่ให้อัตโนมัติหรือดูตามบอร์ดของคุณ`
+                : `${allSavedPins.length} saved places · auto-grouped by category or organized in your boards`}
+            </p>
+          </div>
         </div>
 
         <button

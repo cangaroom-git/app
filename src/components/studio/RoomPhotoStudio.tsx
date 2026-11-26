@@ -723,7 +723,7 @@ export function RoomPhotoStudio({
       {level === "gallery" && photos.length > 0 && pendingAiCount === 0 && (
         <span
           title="รูปภาพทั้งหมดจัดหมวดหมู่ มีคำอธิบาย SEO และบีบอัด WebP ครบแล้ว"
-          className="hidden sm:inline-flex h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)]/60 text-[12.5px] font-medium text-[var(--color-text-secondary)] items-center gap-1.5 shrink-0"
+          className="hidden sm:inline-flex h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)]/60 text-[13px] font-medium text-[var(--color-text-secondary)] items-center gap-1.5 shrink-0"
         >
           <Check className="w-3.5 h-3.5 text-[var(--color-success)]" />
           <span>AI ครบทุกภาพแล้ว</span>
@@ -822,7 +822,7 @@ export function RoomPhotoStudio({
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-[22px] sm:text-[25px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] truncate">
+                <h2 className="text-[20px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] truncate">
                   {level === "detail"
                     ? "รายละเอียดรูปภาพ"
                     : `รูปภาพห้องพัก · ${room.nameTh}`}
@@ -831,7 +831,7 @@ export function RoomPhotoStudio({
                   {room.code}
                 </span>
               </div>
-              <p className="text-[13.5px] text-[var(--color-text-secondary)] mt-0.5 flex flex-wrap items-center gap-2">
+              <p className="text-[14px] text-[var(--color-text-secondary)] mt-0.5 flex flex-wrap items-center gap-2">
                 <span>
                   {photos.length}/{MAX_PHOTOS_PER_ROOM} รูป
                   {captionedCount > 0
@@ -881,7 +881,7 @@ export function RoomPhotoStudio({
               onClick={() => {
                 cancelUploadRef.current = true;
               }}
-              className="text-[12.5px] font-semibold text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer shrink-0"
+              className="text-[13px] font-semibold text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer shrink-0"
             >
               หยุดที่เหลือ
             </button>
@@ -911,13 +911,13 @@ export function RoomPhotoStudio({
             <div className="space-y-2 min-w-0">
               {uploadFeedback.blocked.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-[13.5px] font-semibold text-[var(--color-error)] flex items-center gap-1.5">
+                  <p className="text-[14px] font-semibold text-[var(--color-error)] flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>
                       ไม่สามารถอัปโหลดได้ {uploadFeedback.blocked.length} รูป
                     </span>
                   </p>
-                  <ul className="space-y-1 text-[12.5px] text-[var(--color-text-secondary)]">
+                  <ul className="space-y-1 text-[13px] text-[var(--color-text-secondary)]">
                     {uploadFeedback.blocked.map((item, i) => (
                       <li key={`${item.fileName}-${i}`}>
                         <span className="font-medium text-[var(--color-text-primary)]">
@@ -938,7 +938,7 @@ export function RoomPhotoStudio({
                   {uploadFeedback.warnings.map((w, i) => (
                     <p
                       key={i}
-                      className="text-[12.5px] text-[var(--color-text-secondary)]"
+                      className="text-[13px] text-[var(--color-text-secondary)]"
                     >
                       · {w}
                     </p>
@@ -1031,7 +1031,7 @@ export function RoomPhotoStudio({
                             : "stroke-[1.7]"
                         }`}
                       />
-                      <span className="text-[13.5px] whitespace-nowrap md:truncate">
+                      <span className="text-[14px] whitespace-nowrap md:truncate">
                         {cat.labelTh}
                       </span>
                     </span>
@@ -1053,7 +1053,7 @@ export function RoomPhotoStudio({
             </div>
 
             {photos.length > 0 && (
-              <p className="hidden md:block text-[11.5px] leading-relaxed text-[var(--color-text-tertiary)] px-3 pt-3">
+              <p className="hidden md:block text-[12px] leading-relaxed text-[var(--color-text-tertiary)] px-3 pt-3">
                 ลากรูปจากฝั่งขวามาวางบนหมวดหมู่ด้านซ้ายเพื่อย้ายกลุ่มได้ทันที
               </p>
             )}
@@ -1067,7 +1067,7 @@ export function RoomPhotoStudio({
             {isSelectMode && (
               <div className="rounded-[14px] bg-[var(--color-background-muted)] p-3 sm:px-4 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex items-center gap-3">
-                  <span className="text-[13.5px] font-semibold text-[var(--color-text-primary)] tabular-nums">
+                  <span className="text-[14px] font-semibold text-[var(--color-text-primary)] tabular-nums">
                     เลือกแล้ว {selectedUrls.size} รูป
                   </span>
                   <button
@@ -1081,7 +1081,7 @@ export function RoomPhotoStudio({
                         );
                       }
                     }}
-                    className="text-[12.5px] font-medium text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer"
+                    className="text-[13px] font-medium text-[var(--color-text-secondary)] underline underline-offset-2 hover:text-[var(--color-text-primary)] cursor-pointer"
                   >
                     {selectedUrls.size === visiblePhotos.length
                       ? "ยกเลิกทั้งหมด"
@@ -1094,7 +1094,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={selectedUrls.size === 0}
                     onClick={() => setIsMoveModalOpen(true)}
-                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <FolderInput className="w-3.5 h-3.5" />
                     <span>ย้ายหมวดหมู่</span>
@@ -1103,7 +1103,7 @@ export function RoomPhotoStudio({
                     type="button"
                     disabled={selectedUrls.size === 0}
                     onClick={() => void handleBulkDelete()}
-                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-semibold text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="h-8.5 px-3.5 rounded-full bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)] text-[13px] font-semibold text-[var(--color-error)] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>ลบ</span>
@@ -1115,7 +1115,7 @@ export function RoomPhotoStudio({
             {visiblePhotos.length === 0 ? (
               <div className="rounded-[16px] bg-[var(--color-background-muted)]/60 py-12 px-5 text-center space-y-2.5">
                 <ImageIcon className="w-7 h-7 mx-auto text-[var(--color-text-tertiary)] stroke-[1.5]" />
-                <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                   ยังไม่มีรูปภาพในหมวด &ldquo;{activeSpaceMeta.labelTh}&rdquo;
                 </p>
                 <p className="text-[13px] text-[var(--color-text-secondary)]">
@@ -1246,7 +1246,7 @@ export function RoomPhotoStudio({
                             )}
                           </span>
                         ) : isCover ? (
-                          <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-white/94 dark:bg-[#222222]/92 backdrop-blur-sm text-[11px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1">
+                          <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-white/94 dark:bg-[#222222]/92 backdrop-blur-sm text-[12px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-1">
                             <Star className="w-3 h-3 fill-current" />
                             ภาพปก
                           </span>
@@ -1257,7 +1257,7 @@ export function RoomPhotoStudio({
                               e.stopPropagation();
                               void handleSetCover(photo.url);
                             }}
-                            className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-black/60 hover:bg-black/80 backdrop-blur-sm text-white text-[11px] font-medium opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                            className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-[7px] bg-black/60 hover:bg-black/80 backdrop-blur-sm text-white text-[12px] font-medium opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
                           >
                             ตั้งปก
                           </button>
@@ -1294,7 +1294,7 @@ export function RoomPhotoStudio({
                         )}
 
                         {activeSpace === "all" && (
-                          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-[6px] bg-black/58 backdrop-blur-sm text-white text-[10.5px] font-medium">
+                          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-[6px] bg-black/58 backdrop-blur-sm text-white text-[12px] font-medium">
                             {getRoomPhotoSpaceDef(photo.space).labelTh}
                           </span>
                         )}
@@ -1309,7 +1309,7 @@ export function RoomPhotoStudio({
                         className="w-full text-left px-0.5 cursor-pointer"
                       >
                         {photo.captionTh ? (
-                          <p className="text-[12.5px] text-[var(--color-text-primary)] line-clamp-1">
+                          <p className="text-[13px] text-[var(--color-text-primary)] line-clamp-1">
                             {photo.captionTh}
                           </p>
                         ) : (
@@ -1365,7 +1365,7 @@ export function RoomPhotoStudio({
                   <button
                     type="button"
                     onClick={() => stepDetailPhoto("prev")}
-                    className="h-8.5 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
+                    className="h-8.5 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>ก่อนหน้า</span>
@@ -1373,7 +1373,7 @@ export function RoomPhotoStudio({
                   <button
                     type="button"
                     onClick={() => stepDetailPhoto("next")}
-                    className="h-8.5 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[12.5px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
+                    className="h-8.5 px-3 rounded-[9px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1 cursor-pointer"
                   >
                     <span>ถัดไป</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1417,7 +1417,7 @@ export function RoomPhotoStudio({
             </div>
 
             <div className="py-5 space-y-2.5">
-              <h4 className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+              <h4 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                 หมวดหมู่พื้นที่
               </h4>
               <StandardSelectField
@@ -1439,10 +1439,10 @@ export function RoomPhotoStudio({
 
             <div className="pt-5 space-y-3">
               <div className="space-y-0.5">
-                <h4 className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                <h4 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                   คำอธิบายรูปภาพ (SEO / AEO)
                 </h4>
-                <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                <p className="text-[13px] text-[var(--color-text-secondary)]">
                   ใช้แสดงเป็น alt text, แคปชันบนหน้าร้าน และ Schema สำหรับ Google / AI
                 </p>
               </div>
@@ -1518,15 +1518,15 @@ export function RoomPhotoStudio({
                     <Icon className="w-4.5 h-4.5 stroke-[1.7]" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-[14px] font-semibold text-[var(--color-text-primary)]">
                       {space.labelTh}
                     </p>
-                    <p className="text-[12.5px] text-[var(--color-text-secondary)] truncate">
+                    <p className="text-[13px] text-[var(--color-text-secondary)] truncate">
                       {space.descriptionTh}
                     </p>
                   </div>
                 </div>
-                <span className="text-[12.5px] text-[var(--color-text-tertiary)] shrink-0 tabular-nums">
+                <span className="text-[13px] text-[var(--color-text-tertiary)] shrink-0 tabular-nums">
                   {existingCount} รูป
                 </span>
               </button>
@@ -1537,7 +1537,7 @@ export function RoomPhotoStudio({
           <button
             type="button"
             onClick={() => setIsMoveModalOpen(false)}
-            className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer"
+            className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-medium text-[var(--color-text-primary)] inline-flex items-center gap-1.5 cursor-pointer"
           >
             <X className="w-4 h-4" />
             <span>ยกเลิก</span>

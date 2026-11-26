@@ -39,6 +39,10 @@ const UpdateHotelSchema = z.object({
     .enum(["STAY", "CAFE", "RESTAURANT", "ATTRACTION", "WELLNESS"])
     .optional(),
   merchantMode: z.enum(["DIRECT_BOOKING", "PROFILE_ONLY"]).optional(),
+  locationScope: z
+    .enum(["SINGLE_LOCATION", "MULTI_BRANCH", "NATIONWIDE_ONLINE"])
+    .optional(),
+  branchSummaryTh: z.string().trim().max(140).optional(),
   externalWebsiteUrl: z.string().trim().max(400).optional(),
   primaryCtaLabelTh: z.string().trim().max(60).optional(),
   featuredCouponId: z.string().trim().max(80).optional().nullable(),
@@ -93,6 +97,18 @@ const UpdateHotelSchema = z.object({
   bankName: z.string().trim().max(80).optional(),
   bankAccountNo: z.string().trim().max(40).optional(),
   isPublished: z.boolean().optional(),
+  merchantSettings: z
+    .object({
+      taxInvoiceEnabled: z.boolean().optional(),
+      taxLegalName: z.string().trim().max(160).optional(),
+      taxId: z.string().trim().max(30).optional(),
+      taxBranchCode: z.string().trim().max(30).optional(),
+      taxAddress: z.string().trim().max(400).optional(),
+      allowSearchIndexing: z.boolean().optional(),
+      seoMetaTitle: z.string().trim().max(140).optional(),
+      seoMetaDescription: z.string().trim().max(320).optional(),
+    })
+    .optional(),
 });
 
 export async function GET(request: Request) {
@@ -123,6 +139,8 @@ export async function GET(request: Request) {
       contactClicksCount,
       boardSavesAgg,
       posts,
+      branches,
+      merchantSettingsRow,
     ] = await Promise.all([
       prisma.hotel.findUniqueOrThrow({ where: { id: hotel.id } }),
       prisma.room.findMany({
@@ -289,6 +307,13 @@ export async function GET(request: Request) {
           },
         },
       }),
+      prisma.placeBranch.findMany({
+        where: { hotelId: hotel.id },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.systemConfig
+        .findUnique({ where: { key: `hotel_studio_settings:${hotel.id}` } })
+        .catch(() => null),
     ]);
 
     const bookedUnitsByRoomDate: Record<string, number> = {};
@@ -332,6 +357,53 @@ export async function GET(request: Request) {
       };
     }
 
+    const totalPinViews = pins.reduce((acc, p) => acc + (p.viewsCount ?? 0), 0);
+    const totalExternalClicks = pins.reduce(
+      (acc, p) => acc + (p.externalClickCount ?? 0),
+      0,
+    );
+    const activePromosCount =
+      pins.filter(
+        (p) =>
+          p.publishStatus === "PUBLISHED" &&
+          Boolean(p.promoHeadlineTh) &&
+          (!p.promoExpiresAt || p.promoExpiresAt > now),
+      ).length +
+      coupons.filter((c) => c.isActive && c.expiresAt > now).length;
+
+    const rawExtras =
+      merchantSettingsRow?.value &&
+      typeof merchantSettingsRow.value === "object" &&
+      !Array.isArray(merchantSettingsRow.value)
+        ? (merchantSettingsRow.value as Record<string, unknown>)
+        : {};
+    const merchantSettings = {
+      taxInvoiceEnabled: Boolean(rawExtras.taxInvoiceEnabled),
+      taxLegalName:
+        typeof rawExtras.taxLegalName === "string"
+          ? rawExtras.taxLegalName
+          : "",
+      taxId: typeof rawExtras.taxId === "string" ? rawExtras.taxId : "",
+      taxBranchCode:
+        typeof rawExtras.taxBranchCode === "string"
+          ? rawExtras.taxBranchCode
+          : "00000",
+      taxAddress:
+        typeof rawExtras.taxAddress === "string" ? rawExtras.taxAddress : "",
+      allowSearchIndexing:
+        typeof rawExtras.allowSearchIndexing === "boolean"
+          ? rawExtras.allowSearchIndexing
+          : true,
+      seoMetaTitle:
+        typeof rawExtras.seoMetaTitle === "string"
+          ? rawExtras.seoMetaTitle
+          : "",
+      seoMetaDescription:
+        typeof rawExtras.seoMetaDescription === "string"
+          ? rawExtras.seoMetaDescription
+          : "",
+    };
+
     return NextResponse.json({
       hotel: hotelResponse,
       stats: {
@@ -347,7 +419,12 @@ export async function GET(request: Request) {
         pendingSyncPinsCount: pins.filter(
           (p) => p.publishStatus === "PENDING_APPROVAL"
         ).length,
+        totalPinViews,
+        totalExternalClicks,
+        activePromosCount,
       },
+      branches,
+      merchantSettings,
       rooms,
       dateOverrides: dateOverrides.map((o) => ({
         id: o.id,
@@ -362,7 +439,7 @@ export async function GET(request: Request) {
       addons,
       coupons,
       discountRules,
-      pins: pins.map((p) => mapPinToDto(p)),
+      pins: pins.map((p) => ({ ...mapPinToDto(p), viewsCount: p.viewsCount })),
       bookings: bookings.map(mapBookingRowToDto),
       reviews: reviews.map((rv) => ({
         id: rv.id,
@@ -412,7 +489,11 @@ export async function PATCH(request: Request) {
     }
 
     const { hotel } = await requireHotelStudioAccess(parsed.data.hotelSlug);
-    const { hotelSlug: _ignored, ...rawUpdateData } = parsed.data;
+    const {
+      hotelSlug: _ignored,
+      merchantSettings: incomingExtras,
+      ...rawUpdateData
+    } = parsed.data;
     void _ignored;
 
     const updateData = { ...rawUpdateData };
@@ -432,10 +513,32 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const updated = await prisma.hotel.update({
-      where: { id: hotel.id },
-      data: updateData,
-    });
+    const updated =
+      Object.keys(updateData).length > 0
+        ? await prisma.hotel.update({
+            where: { id: hotel.id },
+            data: updateData,
+          })
+        : await prisma.hotel.findUniqueOrThrow({ where: { id: hotel.id } });
+
+    if (incomingExtras) {
+      const key = `hotel_studio_settings:${hotel.id}`;
+      const prevRow = await prisma.systemConfig
+        .findUnique({ where: { key } })
+        .catch(() => null);
+      const prevObj =
+        prevRow?.value &&
+        typeof prevRow.value === "object" &&
+        !Array.isArray(prevRow.value)
+          ? (prevRow.value as Record<string, unknown>)
+          : {};
+      const mergedExtras = { ...prevObj, ...incomingExtras };
+      await prisma.systemConfig.upsert({
+        where: { key },
+        create: { key, value: mergedExtras },
+        update: { value: mergedExtras },
+      });
+    }
 
     // Keep canonical Place Card synchronized when core identity fields change
     if (

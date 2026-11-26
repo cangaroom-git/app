@@ -371,7 +371,7 @@ export function StudioPinsAndFacebookTab({
             <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
               Pins หน้าฟีด & ซิงก์เพจ Facebook
             </h2>
-            <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+            <p className="text-[14px] text-[var(--color-text-secondary)]">
               อัปโหลดรูปบรรยากาศแนวตั้ง 3:4 หรือซิงก์จาก Facebook Page ด้วยระบบคัดกรอง AI 1-Click Approve
             </p>
           </div>
@@ -453,7 +453,7 @@ export function StudioPinsAndFacebookTab({
             <button
               type="submit"
               disabled={isSyncingFb}
-              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-4 h-4 ${isSyncingFb ? "animate-spin" : ""}`}
@@ -471,7 +471,7 @@ export function StudioPinsAndFacebookTab({
       {/* 2. AI Smart Triage Queue */}
       {pendingPins.length > 0 && (
         <section className="py-8 space-y-4">
-          <h3 className="text-[18px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2">
+          <h3 className="text-[20px] font-semibold text-[var(--color-text-primary)] inline-flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
             <span>รายการรอยืนยัน 1-Click Approve ({pendingPins.length})</span>
           </h3>
@@ -492,16 +492,16 @@ export function StudioPinsAndFacebookTab({
                   />
                   <div className="flex-1 min-w-0 space-y-3">
                     <div className="space-y-1">
-                      <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                      <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                         {pin.titleTh || "โพสต์รูปบรรยากาศที่พัก"}
                       </p>
                       {pin.descriptionTh && (
-                        <p className="text-[13.5px] text-[var(--color-text-secondary)] line-clamp-2">
+                        <p className="text-[14px] text-[var(--color-text-secondary)] line-clamp-2">
                           {pin.descriptionTh}
                         </p>
                       )}
                       {pin.aiTriageNote && (
-                        <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                        <p className="text-[13px] text-[var(--color-text-secondary)]">
                           AI Note: {pin.aiTriageNote}
                         </p>
                       )}
@@ -560,7 +560,7 @@ export function StudioPinsAndFacebookTab({
       {/* 3. Published Pins Grid (Clean Borderless Editorial Cards) */}
       <section className="py-8 space-y-5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+          <h3 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
             Pin ที่เผยแพร่อยู่ ({publishedPins.length})
           </h3>
           {discardedPins.length > 0 && (
@@ -593,7 +593,7 @@ export function StudioPinsAndFacebookTab({
                     alt={pin.titleTh}
                     className="h-12 w-12 aspect-square rounded-[12px] object-cover shrink-0"
                   />
-                  <p className="text-[13.5px] font-medium truncate">
+                  <p className="text-[14px] font-medium truncate">
                     {pin.titleTh || "Pin ที่ซ่อนอยู่"}
                   </p>
                 </div>
@@ -601,7 +601,7 @@ export function StudioPinsAndFacebookTab({
                   <button
                     type="button"
                     onClick={() => handleTriageAction(pin.id, "PUBLISHED")}
-                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-card)] text-[12.5px] font-semibold cursor-pointer"
+                    className="h-8 px-3 rounded-[9px] bg-[var(--color-background-card)] text-[13px] font-semibold cursor-pointer"
                   >
                     กู้คืน
                   </button>
@@ -636,7 +636,7 @@ export function StudioPinsAndFacebookTab({
                   />
                 </div>
                 <div className="space-y-1 px-0.5">
-                  <p className="text-[13.5px] font-semibold text-[var(--color-text-primary)] line-clamp-1">
+                  <p className="text-[14px] font-semibold text-[var(--color-text-primary)] line-clamp-1">
                     {pin.titleTh || pin.category}
                   </p>
                   <div className="flex items-center justify-between text-[12px] text-[var(--color-text-secondary)]">
@@ -699,7 +699,7 @@ export function StudioPinsAndFacebookTab({
               type="submit"
               form="studio-manual-pin-form"
               disabled={isCreatingPin || isUploadingCover}
-              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer disabled:opacity-50"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer disabled:opacity-50"
             >
               {isCreatingPin ? "กำลังเผยแพร่..." : "เผยแพร่ Pin ขึ้นฟีด"}
             </button>
@@ -716,7 +716,7 @@ export function StudioPinsAndFacebookTab({
               อัปโหลดรูปภาพ (อย่างน้อย 5 รูป เพื่อแสดง 5-Photo Mosaic) *
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
-              <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13.5px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0">
+              <label className="h-10 px-4 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer shrink-0">
                 <Upload className="w-4 h-4" />
                 <span>
                   {isUploadingCover ? "กำลังอัปโหลด..." : "เลือกไฟล์รูปภาพ"}

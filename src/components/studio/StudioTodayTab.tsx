@@ -276,7 +276,7 @@ export function StudioTodayTab({
         <section className="pb-8 lg:pb-10 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="space-y-1">
-              <p className="text-[12.5px] font-semibold text-[var(--color-accent)]">
+              <p className="text-[13px] font-semibold text-[var(--color-accent)]">
                 {catMeta.labelTh} · หน้าโปรไฟล์ธุรกิจ
               </p>
               <h1 className="text-[24px] sm:text-[26px] font-semibold tracking-tight text-[var(--color-text-primary)]">
@@ -305,7 +305,7 @@ export function StudioTodayTab({
               <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
                 {stats.boardSavesCount.toLocaleString()} ครั้ง
               </p>
-              <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+              <p className="text-[13px] text-[var(--color-text-secondary)]">
                 ผู้สนใจเก็บสถานที่ของคุณไว้ดูซ้ำ
               </p>
             </div>
@@ -318,7 +318,7 @@ export function StudioTodayTab({
               <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
                 {stats.contactClicksTotal.toLocaleString()} ครั้ง
               </p>
-              <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+              <p className="text-[13px] text-[var(--color-text-secondary)]">
                 LINE {stats.contactClicksByChannel.LINE} · FB{" "}
                 {stats.contactClicksByChannel.FACEBOOK_MESSENGER} · โทร{" "}
                 {stats.contactClicksByChannel.PHONE}
@@ -336,7 +336,7 @@ export function StudioTodayTab({
               <button
                 type="button"
                 onClick={() => onNavigateTab("growth")}
-                className="text-[12.5px] font-semibold text-[var(--color-accent)] underline underline-offset-2 cursor-pointer hover:opacity-80"
+                className="text-[13px] font-semibold text-[var(--color-accent)] underline underline-offset-2 cursor-pointer hover:opacity-80"
               >
                 จัดการโปรโมชั่น & คูปอง →
               </button>
@@ -345,7 +345,7 @@ export function StudioTodayTab({
         </section>
 
         <section className="py-8 lg:py-10 space-y-4">
-          <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+          <h2 className="text-[20px] font-semibold text-[var(--color-text-primary)]">
             ทางลัดจัดการ{catMeta.shortLabelTh}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -354,7 +354,7 @@ export function StudioTodayTab({
               className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
             >
               <FileText className="w-5 h-5 text-[var(--color-accent)]" />
-              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 โพสต์อัปเดต & ซิงก์ Facebook
               </p>
               <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
@@ -367,7 +367,7 @@ export function StudioTodayTab({
               className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
             >
               <TicketPercent className="w-5 h-5 text-[var(--color-accent)]" />
-              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 โปรโมชั่น & สิทธิพิเศษหน้าการ์ด
               </p>
               <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
@@ -380,7 +380,7 @@ export function StudioTodayTab({
               className="rounded-[20px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] p-5 space-y-2 transition-colors"
             >
               <MapPin className="w-5 h-5 text-[var(--color-accent)]" />
-              <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+              <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                 ข้อมูลร้าน เวลาเปิด–ปิด & พิกัด
               </p>
               <p className="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">
@@ -402,7 +402,7 @@ export function StudioTodayTab({
             <h1 className="text-[24px] sm:text-[26px] font-semibold tracking-tight text-[var(--color-text-primary)]">
               วันนี้ที่ {hotel.nameTh}
             </h1>
-            <p className="text-[14.5px] text-[var(--color-text-secondary)]">
+            <p className="text-[14px] text-[var(--color-text-secondary)]">
               ภาพรวมยอดจองตรง 0% GP และรายการที่ต้องจัดการประจำวัน
             </p>
           </div>
@@ -431,7 +431,7 @@ export function StudioTodayTab({
             <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
               ฿{stats.confirmedRevenueThb.toLocaleString()}
             </p>
-            <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+            <p className="text-[13px] text-[var(--color-text-secondary)]">
               ประหยัดค่า GP OTA แล้ว ~฿
               {stats.estimatedOtaGpSavedThb.toLocaleString()}
             </p>
@@ -448,7 +448,7 @@ export function StudioTodayTab({
             <button
               type="button"
               onClick={() => onNavigateTab("growth")}
-              className="text-[12.5px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer hover:opacity-75"
+              className="text-[13px] font-semibold text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer hover:opacity-75"
             >
               ออกคูปองกระตุ้นยอดจอง →
             </button>
@@ -462,7 +462,7 @@ export function StudioTodayTab({
             <p className="text-[24px] font-semibold tracking-tight text-[var(--color-text-primary)] tabular-nums">
               {stats.contactClicksTotal.toLocaleString()} ครั้ง
             </p>
-            <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+            <p className="text-[13px] text-[var(--color-text-secondary)]">
               LINE {stats.contactClicksByChannel.LINE} · FB{" "}
               {stats.contactClicksByChannel.FACEBOOK_MESSENGER} · โทร{" "}
               {stats.contactClicksByChannel.PHONE}
@@ -483,7 +483,7 @@ export function StudioTodayTab({
                   key={opt.id}
                   type="button"
                   onClick={() => setFilterTab(opt.id)}
-                  className={`h-10 px-4 rounded-full text-[13.5px] font-semibold whitespace-nowrap inline-flex items-center gap-2 cursor-pointer transition-colors ${
+                  className={`h-10 px-4 rounded-full text-[14px] font-semibold whitespace-nowrap inline-flex items-center gap-2 cursor-pointer transition-colors ${
                     active
                       ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
                       : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
@@ -538,7 +538,7 @@ export function StudioTodayTab({
                 ? "ไม่มีรายการเช็กอินในวันนี้"
                 : "ไม่พบรายการจองที่ตรงกับเงื่อนไข"}
             </h3>
-            <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+            <p className="text-[14px] text-[var(--color-text-secondary)]">
               หากมีลูกค้าจองผ่าน LINE หรือโทรศัพท์ สามารถกดบันทึกการจองเองเพื่อตัดโควตาห้องบนปฏิทินได้ทันที
             </p>
           </div>
@@ -565,7 +565,7 @@ export function StudioTodayTab({
                       <span className="px-2 py-0.5 rounded-[7px] bg-[var(--color-background-muted)] text-[12px] font-semibold text-[var(--color-text-primary)]">
                         {b.roomCode} · {b.roomNameTh}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--color-text-primary)]">
+                      <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-primary)]">
                         <span
                           aria-hidden="true"
                           className={`h-1.5 w-1.5 rounded-full ${
@@ -580,7 +580,7 @@ export function StudioTodayTab({
                       </span>
                     </div>
 
-                    <p className="text-[15.5px] font-semibold text-[var(--color-text-primary)]">
+                    <p className="text-[15px] font-semibold text-[var(--color-text-primary)]">
                       {b.guestName} ·{" "}
                       <a
                         href={`tel:${b.guestPhone}`}
@@ -591,7 +591,7 @@ export function StudioTodayTab({
                       {b.guestLine ? ` · LINE: ${b.guestLine}` : ""}
                     </p>
 
-                    <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                    <p className="text-[14px] text-[var(--color-text-secondary)]">
                       {formatShortDate(b.checkInDate, "th")} →{" "}
                       {formatShortDate(b.checkOutDate, "th")} ({b.nights} คืน ·{" "}
                       {b.guests} ท่าน
@@ -712,7 +712,7 @@ export function StudioTodayTab({
                     onClick={() =>
                       handleBookingStatus(slipPreviewBooking.id, "CONFIRMED")
                     }
-                    className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     <span>ยอดตรง · ยืนยันจอง</span>
@@ -771,7 +771,7 @@ export function StudioTodayTab({
               type="submit"
               form="manual-booking-form"
               disabled={isSubmittingManual}
-              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14.5px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
             >
               {isSubmittingManual ? "กำลังบันทึก..." : "บันทึกการจอง"}
             </button>

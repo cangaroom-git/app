@@ -23,23 +23,23 @@ export default function StudioRoomPhotosPage() {
 
   if (!room) {
     return (
-      <div className="max-w-[1360px] mx-auto w-full px-4 sm:px-8 lg:px-10 py-14">
-        <div className="rounded-[20px] bg-[var(--color-background-muted)]/60 py-16 px-6 text-center space-y-3">
-          <BedDouble className="w-8 h-8 mx-auto text-[var(--color-text-tertiary)]" />
-          <p className="text-[17px] font-semibold text-[var(--color-text-primary)]">
-            ไม่พบประเภทห้องพักนี้
-          </p>
-          <p className="text-[14px] text-[var(--color-text-secondary)]">
-            ห้องพักอาจถูกลบออกไปแล้ว หรือลิงก์ไม่ถูกต้อง
-          </p>
-          <div className="pt-2">
-            <Link
-              href={buildHref("/studio/listings/rooms")}
-              className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-2 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>กลับหน้ารายการห้องพัก</span>
-            </Link>
+      <div className="cgr-admin-page">
+        <div className="cgr-admin-body py-12">
+          <div className="rounded-[20px] bg-[var(--color-background-muted)]/60 py-16 px-6 text-center space-y-3">
+            <BedDouble className="w-8 h-8 mx-auto text-[var(--color-text-tertiary)]" />
+            <p className="ws-subtitle">ไม่พบประเภทห้องพักนี้</p>
+            <p className="ws-body text-[var(--color-text-secondary)]">
+              ห้องพักอาจถูกลบออกไปแล้ว หรือลิงก์ไม่ถูกต้อง
+            </p>
+            <div className="pt-2">
+              <Link
+                href={buildHref("/studio/listings/rooms")}
+                className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] ws-body-strong inline-flex items-center gap-2 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>กลับหน้ารายการห้องพัก</span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -47,8 +47,8 @@ export default function StudioRoomPhotosPage() {
   }
 
   return (
-    <div className="flex-1 w-full bg-[var(--color-background-body)]">
-      <div className="max-w-[1360px] mx-auto w-full px-4 sm:px-8 lg:px-10 py-8 lg:py-10 animate-studio-panel-forward">
+    <div className="cgr-admin-page">
+      <div className="cgr-admin-body py-6 sm:py-8 animate-studio-panel-forward">
         <RoomPhotoStudio
           hotelSlug={data.hotel.slug}
           room={room}

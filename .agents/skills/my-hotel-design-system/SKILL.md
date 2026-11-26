@@ -54,7 +54,28 @@ Every UI component, layout, modal, drawer, and page in `my-hotel` **MUST** read 
 
 ### Typography (`Plus Jakarta Sans` + `Anuphan`)
 - Warm balanced semi-bold headings (`font-semibold` / `600`) paired with readable Thai line-heights:
-  - Display: `26px` (`1.625rem`), Title: `22px` (`1.375rem`), Subtitle: `16px` (`1rem`), Body: `15.5px` (`0.96875rem`), Caption: `14px` (`0.875rem`).
+  - Consumer Editorial Scale (`.ty-*`): Display `26px`, Title `22px`, Subtitle `16px`, Body `15.5px`, Caption `14px`.
+  - **Workspace Locked 6-Step Type Scale (`.ws-*` — MANDATORY across `/admin/*`, `/studio/*`, `/account`)**:
+    - **Single Font Stack**: 100% `Plus Jakarta Sans` + `Anuphan` (`--font-family-heading` / `--font-family-body`). Avoid `font-mono` for Thai text or table names.
+    - **Max Weight Cap `600` (`NO font-bold`)**: **NEVER** use `font-bold` (`700`) anywhere inside `/admin/*`, `/studio/*`, or `/account`. Only weights `400` (`font-normal`), `500` (`font-medium`), and `600` (`font-semibold`) are allowed so Thai `Anuphan` renders airy and balanced like Airbnb DLS.
+    - **Zero Arbitrary Off-Scale Sizes**: NEVER write ad-hoc fractional pixel sizes (`text-[10.5px]`, `text-[11px]`, `text-[12.5px]`, `text-[13.5px]`, `text-[14.5px]`, `text-[15.5px]`, `text-[17px]`, `text-[18px]`, `text-[22px]`) in workspace pages. Always use the 6 locked semantic classes from `src/app/globals.css`:
+      - `.ws-display` (`24px` / `sm:26px`, `600`, `1.25`) — Page H1
+      - `.ws-title` (`20px`, `600`, `1.30`) — Section H2 & Modal Titles
+      - `.ws-subtitle` (`15px`, `600`, `1.40`) — Row / Sub-section / Card Titles
+      - `.ws-body` / `.ws-body-medium` / `.ws-body-strong` (`14px`, `400`/`500`/`600`, `1.50`) — Body copy, table primary cells, controls, nav links
+      - `.ws-caption` / `.ws-caption-medium` (`13px`, `400`/`500`, `1.45`, secondary ink) — Subtitles, helper text, table headers (`<th>`)
+      - `.ws-badge` (`12px`, `600`, `1.20`) — Status pills, badges, micro counters ONLY (minimum floor `12px`)
+      - `.ws-kpi` (`28px` / `sm:32px`, `600`, `tabular-nums`) — KPI hero numbers ONLY
+    - **8px Workspace Spatial Rhythm**:
+      - Page sections: `.ws-section` (`py-8` = `32px`) + `border-b border-[var(--color-border)]`
+      - Settings / List rows: `.ws-row` (`py-5` = `20px`) inside `divide-y divide-[var(--color-border)]`
+      - Table header & body cells: `.ws-table-th` / `.ws-table-td` (`14px 12px` = `py-3.5 px-3`) via `<AdminDataTable />`
+    - **Single-Source Workspace Primitives, 2-Column Split Layout & Auto-Hide Scrollbars**:
+      - Always compose `/admin/*` and `/studio/*` pages from `src/components/workspace/WorkspacePrimitives.tsx` (`<WorkspacePageHeader />`, `<WorkspaceKpiBand />`, `<WorkspaceSection />`, `<WorkspaceSearchInput />`, `<WorkspaceStatusPill />`), `<AdminDataTable />`, and `<AdminSlideSheet />` (centered desktop modal `md:max-w-[720px]` / mobile slide-up bottom sheet `rounded-t-[24px]` — NEVER right slide-over drawers and NEVER legacy `bg-gray-100 rounded-2xl` wrappers).
+      - **Unified 2-Column Split Pages (`<WorkspaceSplitLayout />`)**: Every 2-column master-detail page (`/admin/systems`, `/admin/locations`, `/admin/categories`, `/studio/settings`, `/studio/listings/*`) MUST use `<WorkspaceSplitLayout />` (`src/components/workspace/WorkspaceSplitLayout.tsx`) — identical `max-w-[1160px]` + `w-[260px]` left borderless nav on desktop, **auto-hide scrollbars** (`.cgr-scroll-autohide` — invisible when idle, thin thumb visible only while actively scrolling via `useGlobalAutoHideScrollbars()`), and **native iOS mobile horizontal push Slide-In / pop Slide-Out** drill-down animation (`.cgr-split-mobile-stage`).
+      - **Single-Row Compact Mobile Toolbars (`<WorkspaceCompactToolbar />`)**: Every list/table filter bar in `/admin/*` & `/studio/*` MUST stay strictly on **ONE single horizontal row (`h-9`) on mobile** — never wrapping into 2–3 stacked rows! Search collapses to an expandable `h-9 w-9` circular Search icon button, filter pills scroll horizontally (`overflow-x-auto no-scrollbar`), and actions stay pinned on the right.
+      - **100% Airbnb Inset-Label Form Fields**: Every text, number, URL, textarea, select, and checkbox in `/admin/*` & `/studio/*` MUST use `<StandardInput />`, `<StandardTextarea />`, `<StandardSelectField />`, `<StandardFieldGroup />`, and `<StandardCheckbox />` from `src/components/ui/standards.tsx` (matching `/studio/settings`; legacy `wg-input` is banned and enforced by `npm run audit:design`).
+    - **Automated Pre-Ship Check**: After any UI edit in `/admin`, `/studio`, or `/account`, ALWAYS run `npm run audit:design` and verify 0 violations.
 
 ### Minimal Borders & Equal Section Spacing Law (`กฎแบ่ง Section ให้เท่ากัน`)
 1. **Top-Level Page Section Rhythm**: Group consecutive content sections inside `<div className="divide-y divide-[var(--color-border)]">` and apply **uniform vertical padding** to every `<section>`:

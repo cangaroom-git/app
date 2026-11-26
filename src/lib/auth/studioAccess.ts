@@ -11,6 +11,10 @@ export interface AuthorizedHotelContext {
     nameEn: string;
     provinceId: string;
     stayStyles: string[];
+    placeCategory: "STAY" | "CAFE" | "RESTAURANT" | "ATTRACTION" | "WELLNESS";
+    locationScope: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE";
+    branchSummaryTh: string;
+    coverImageUrl: string | null;
     verificationStatus: "PENDING_REVIEW" | "VERIFIED" | "SUSPENDED";
   };
 }
@@ -25,33 +29,30 @@ export async function requireHotelStudioAccess(
 
   const normalizedSlug = requestedHotelSlug?.trim().toLowerCase();
 
+  const hotelSelect = {
+    id: true,
+    slug: true,
+    ownerId: true,
+    nameTh: true,
+    nameEn: true,
+    provinceId: true,
+    stayStyles: true,
+    placeCategory: true,
+    locationScope: true,
+    branchSummaryTh: true,
+    coverImageUrl: true,
+    verificationStatus: true,
+  } as const;
+
   const hotel = normalizedSlug
     ? await prisma.hotel.findUnique({
         where: { slug: normalizedSlug },
-        select: {
-          id: true,
-          slug: true,
-          ownerId: true,
-          nameTh: true,
-          nameEn: true,
-          provinceId: true,
-          stayStyles: true,
-          verificationStatus: true,
-        },
+        select: hotelSelect,
       })
     : await prisma.hotel.findFirst({
         where: user.role === "SUPER_ADMIN" ? {} : { ownerId: user.id },
         orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          slug: true,
-          ownerId: true,
-          nameTh: true,
-          nameEn: true,
-          provinceId: true,
-          stayStyles: true,
-          verificationStatus: true,
-        },
+        select: hotelSelect,
       });
 
   if (!hotel) {

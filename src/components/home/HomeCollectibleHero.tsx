@@ -10,7 +10,10 @@ import {
   Wine,
 } from "lucide-react";
 import type { HomePromoTabId } from "@/lib/placeCategories";
-import { useHeroThemeColor } from "@/lib/useHeroThemeColor";
+import {
+  HeroLensFlareLayer,
+  HeroSunlightSkyLayer,
+} from "./HeroSunlightLayers";
 
 interface HomeCollectibleHeroProps {
   language: "th" | "en";
@@ -39,13 +42,13 @@ const HERO_CATEGORY_ICONS: Array<{
 
 /**
  * Apple-Style Smooth Inertia-Damped Full-Viewport Sticky Hero for Home (`/`):
- * - Uses delta-time exponential damping (`1 - exp(-dt * lambda)`) on GPU `translate3d + scale`
- *   so stepped mouse wheels & quick mobile swipes glide with liquid Apple-keynote silkiness
- *   (and auto-sleeps rAF at 0% idle CPU the moment motion settles!).
- * - Renders the 4K 3D Beachfront Card at `scale(1.0)` 1:1 Retina clarity:
- *   - Mobile `scrollY = 0`: edge-to-edge tropical beach & sea panorama
- *   - Desktop `scrollY = 0`: sea edge anchored cleanly along the bottom of the Hero frame
- *   - On scroll: smoothly scales DOWN & lifts into a complete floating 3D Collectible Card!
+ * - Pure solid `#5FAEE9` sky canvas matching iOS Safari's `#5FAEE9` Status Bar with zero seam
+ *   and zero extra background image network request for instant LCP!
+ * - Uses delta-time exponential damping (`1 - exp(-dt * 10.5)`) on GPU `translate3d + scale`
+ *   so stepped mouse wheels & quick mobile swipes glide like an Apple launch page
+ *   (and auto-sleeps rAF at 0% idle CPU when settled).
+ * - Renders the 4K 3D Beachfront Card at `scale(1.0)` 1:1 Retina clarity, scaling DOWN smoothly
+ *   on scroll to reveal the floating 3D Collectible Travel Card.
  */
 export function HomeCollectibleHero({
   language,
@@ -54,14 +57,14 @@ export function HomeCollectibleHero({
 }: HomeCollectibleHeroProps) {
   const isTh = language === "th";
   const stageRef = useRef<HTMLElement | null>(null);
-  const bgLayerRef = useRef<HTMLDivElement | null>(null);
-  const bgImgRef = useRef<HTMLImageElement | null>(null);
   const headerLayerRef = useRef<HTMLDivElement | null>(null);
   const islandLayerRef = useRef<HTMLDivElement | null>(null);
   const shadowLayerRef = useRef<HTMLDivElement | null>(null);
-
-  // Automatically learn the real visible top-edge sky color from the loaded image & sync iOS Safari status bar
-  const learnedTopColor = useHeroThemeColor("#85b5e3", 0.66, bgImgRef, stageRef);
+  const sunCoreRef = useRef<HTMLDivElement | null>(null);
+  const sunRaysRef = useRef<HTMLDivElement | null>(null);
+  const flareNearRef = useRef<HTMLDivElement | null>(null);
+  const flareMidRef = useRef<HTMLDivElement | null>(null);
+  const flareFarRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -72,31 +75,28 @@ export function HomeCollectibleHero({
     let cachedVh = Math.max(window.innerHeight, 540);
     let cachedIsDesktop = window.innerWidth >= 1024;
     let lastWidth = window.innerWidth;
+    const supportsFinePointer = window.matchMedia(
+      "(hover: hover) and (pointer: fine)",
+    ).matches;
 
-    let targetBg = 0;
-    let currentBg = 0;
     let targetCard = 0;
     let currentCard = 0;
+    let targetPx = 0;
+    let currentPx = 0;
+    let targetPy = 0;
+    let currentPy = 0;
 
     const computeTargets = () => {
       const y = Math.max(0, window.scrollY);
-      const bgRange = cachedVh * (cachedIsDesktop ? 0.56 : 0.48);
       const cardRange = cachedVh * (cachedIsDesktop ? 0.38 : 0.28);
-      targetBg = Math.max(0, Math.min(1, y / bgRange));
       targetCard = Math.max(0, Math.min(1, y / cardRange));
     };
 
-    const renderFrame = (bgP: number, cardP: number) => {
-      const bgEased = 1 - Math.pow(1 - bgP, 1.85);
+    const renderFrame = (cardP: number, px: number, py: number) => {
       const cardEased = 1 - Math.pow(1 - cardP, 1.9);
-
-      if (bgLayerRef.current) {
-        const bgScale = cachedIsDesktop
-          ? 1.26 - bgEased * 0.26
-          : 1.2 - bgEased * 0.2;
-        const bgY = cachedIsDesktop ? 18 - bgEased * 38 : 12 - bgEased * 28;
-        bgLayerRef.current.style.transform = `translate3d(0, ${bgY.toFixed(2)}px, 0) scale(${bgScale.toFixed(4)})`;
-      }
+      // Natural optical flare shimmer peaking gently through mid-scroll
+      const opticalPulse = Math.sin(cardEased * Math.PI);
+      const axisScale = cachedIsDesktop ? 1 : 0.54;
 
       if (headerLayerRef.current) {
         const headerY = cachedIsDesktop
@@ -112,8 +112,6 @@ export function HomeCollectibleHero({
         const islandScale = cachedIsDesktop
           ? 1 - cardEased * 0.3
           : 1 - cardEased * 0.58;
-        // Desktop scrollY=0 anchors the sparkling turquoise sea flush along the bottom edge of the Hero frame,
-        // then smoothly lifts and scales down into a floating 3D card on scroll!
         const startY = cachedIsDesktop ? cachedVh * 0.23 : cachedVh * 0.17;
         const endY = cachedIsDesktop ? -cachedVh * 0.03 : -cachedVh * 0.09;
         const islandY = startY + (endY - startY) * cardEased;
@@ -125,30 +123,77 @@ export function HomeCollectibleHero({
         shadowLayerRef.current.style.opacity = shadowT.toFixed(3);
         shadowLayerRef.current.style.transform = `scale(${(0.75 + shadowT * 0.25).toFixed(3)})`;
       }
+
+      // Optical Sunlight Core: subtle upward & inward camera-tilt glide
+      if (sunCoreRef.current) {
+        const sunX = (-cardEased * 14 - px * 10) * axisScale;
+        const sunY = (-cardEased * 24 - py * 8) * axisScale;
+        const sunScale = 1 + cardEased * 0.09 + opticalPulse * 0.04;
+        sunCoreRef.current.style.transform = `translate3d(${sunX.toFixed(2)}px, ${sunY.toFixed(2)}px, 0) scale(${sunScale.toFixed(4)})`;
+      }
+
+      // Starburst Sunrays: rotate smoothly & shimmer delicately as you scroll down
+      if (sunRaysRef.current) {
+        const rayX = (-cardEased * 14 - px * 10) * axisScale;
+        const rayY = (-cardEased * 24 - py * 8) * axisScale;
+        const rayRot = -4 + cardEased * 20 + px * 5 - py * 3;
+        const rayScale = 0.96 + cardEased * 0.16 + opticalPulse * 0.05;
+        const rayOpacity = 0.7 + opticalPulse * 0.22;
+        sunRaysRef.current.style.transform = `translate3d(${rayX.toFixed(2)}px, ${rayY.toFixed(2)}px, 0) rotate(${rayRot.toFixed(2)}deg) scale(${rayScale.toFixed(4)})`;
+        sunRaysRef.current.style.opacity = rayOpacity.toFixed(3);
+      }
+
+      // Camera-Optics Diagonal Lens-Flare Bokeh (3 differential parallax depth planes)
+      if (flareNearRef.current) {
+        const tx = (-cardEased * 26 + px * 16) * axisScale;
+        const ty = (cardEased * 12 + py * 10) * axisScale;
+        const s = 0.96 + cardEased * 0.1;
+        flareNearRef.current.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+        flareNearRef.current.style.opacity = (0.68 + opticalPulse * 0.22).toFixed(3);
+      }
+
+      if (flareMidRef.current) {
+        const tx = (-cardEased * 62 + px * 36) * axisScale;
+        const ty = (cardEased * 28 + py * 22) * axisScale;
+        const s = 0.92 + cardEased * 0.16;
+        flareMidRef.current.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+        flareMidRef.current.style.opacity = (0.66 + opticalPulse * 0.24).toFixed(3);
+      }
+
+      if (flareFarRef.current) {
+        const tx = (-cardEased * 104 + px * 58) * axisScale;
+        const ty = (cardEased * 44 + py * 32) * axisScale;
+        const s = 0.88 + cardEased * 0.22;
+        flareFarRef.current.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+        flareFarRef.current.style.opacity = (0.6 + opticalPulse * 0.28).toFixed(3);
+      }
     };
 
     const tick = (ts: number) => {
       const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0.016;
       lastTs = ts;
 
-      const factor = 1 - Math.exp(-dt * 10.5);
-      currentBg += (targetBg - currentBg) * factor;
-      currentCard += (targetCard - currentCard) * factor;
+      const cardFactor = 1 - Math.exp(-dt * 10.5);
+      const pointerFactor = 1 - Math.exp(-dt * 6.5);
+      currentCard += (targetCard - currentCard) * cardFactor;
+      currentPx += (targetPx - currentPx) * pointerFactor;
+      currentPy += (targetPy - currentPy) * pointerFactor;
 
-      const settled =
-        Math.abs(targetBg - currentBg) < 0.0004 &&
-        Math.abs(targetCard - currentCard) < 0.0004;
-
-      if (settled) {
-        currentBg = targetBg;
+      if (
+        Math.abs(targetCard - currentCard) < 0.0004 &&
+        Math.abs(targetPx - currentPx) < 0.001 &&
+        Math.abs(targetPy - currentPy) < 0.001
+      ) {
         currentCard = targetCard;
-        renderFrame(currentBg, currentCard);
+        currentPx = targetPx;
+        currentPy = targetPy;
+        renderFrame(currentCard, currentPx, currentPy);
         rafId = null;
         lastTs = 0;
         return;
       }
 
-      renderFrame(currentBg, currentCard);
+      renderFrame(currentCard, currentPx, currentPy);
       rafId = window.requestAnimationFrame(tick);
     };
 
@@ -160,82 +205,80 @@ export function HomeCollectibleHero({
       }
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!stageRef.current || !cachedIsDesktop) return;
+      const rect = stageRef.current.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+      targetPx = Math.max(-1, Math.min(1, nx));
+      targetPy = Math.max(-1, Math.min(1, ny));
+      if (rafId === null) {
+        lastTs = 0;
+        rafId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    const handlePointerLeave = () => {
+      targetPx = 0;
+      targetPy = 0;
+      if (rafId === null) {
+        lastTs = 0;
+        rafId = window.requestAnimationFrame(tick);
+      }
+    };
+
     const handleResize = () => {
       if (Math.abs(window.innerWidth - lastWidth) < 2) return;
       lastWidth = window.innerWidth;
       cachedIsDesktop = window.innerWidth >= 1024;
       cachedVh = Math.max(window.innerHeight, 540);
+      if (!cachedIsDesktop) {
+        targetPx = 0;
+        targetPy = 0;
+      }
       wakeLoop();
     };
 
     computeTargets();
-    currentBg = targetBg;
     currentCard = targetCard;
-    renderFrame(currentBg, currentCard);
+    renderFrame(currentCard, 0, 0);
 
+    const stageEl = stageRef.current;
     window.addEventListener("scroll", wakeLoop, { passive: true });
     window.addEventListener("resize", handleResize, { passive: true });
+    if (supportsFinePointer && stageEl) {
+      stageEl.addEventListener("pointermove", handlePointerMove, {
+        passive: true,
+      });
+      stageEl.addEventListener("pointerleave", handlePointerLeave, {
+        passive: true,
+      });
+    }
 
     return () => {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
       window.removeEventListener("scroll", wakeLoop);
       window.removeEventListener("resize", handleResize);
+      if (supportsFinePointer && stageEl) {
+        stageEl.removeEventListener("pointermove", handlePointerMove);
+        stageEl.removeEventListener("pointerleave", handlePointerLeave);
+      }
     };
   }, []);
 
   return (
     <section
       ref={stageRef}
-      style={
-        {
-          backgroundColor: learnedTopColor,
-          "--cgr-hero-top-color": learnedTopColor,
-        } as React.CSSProperties
-      }
       aria-label={
         isTh
           ? "Nondii โปรเที่ยวไทย — แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
           : "Nondii Thailand Travel Deals"
       }
-      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden flex flex-col items-center justify-center select-none"
+      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#5FAEE9] flex flex-col items-center justify-center select-none"
     >
-      {/* Layer 0: Sky Cloud Background (AVIF 6.6–13.8KB + WebP fallback) */}
-      <div
-        ref={bgLayerRef}
-        className="cgr-home-hero-layer cgr-home-hero-bg pointer-events-none absolute -inset-6 lg:-inset-9"
-      >
-        <picture className="block w-full h-full">
-          <source
-            media="(max-width: 767px)"
-            srcSet="/brand/hero-slider/opt/sky-cloud-bg-mobile.avif"
-            type="image/avif"
-          />
-          <source
-            media="(max-width: 767px)"
-            srcSet="/brand/hero-slider/opt/sky-cloud-bg-mobile.webp"
-            type="image/webp"
-          />
-          <source
-            srcSet="/brand/hero-slider/opt/sky-cloud-bg-desktop.avif"
-            type="image/avif"
-          />
-          <img
-            ref={bgImgRef}
-            src="/brand/hero-slider/opt/sky-cloud-bg-desktop.webp"
-            alt=""
-            aria-hidden="true"
-            fetchPriority="high"
-            decoding="async"
-            className="w-full h-full object-cover object-center"
-          />
-        </picture>
-      </div>
-
-      {/* Seamless 32px Mobile Status-Bar Edge Feather (eliminates hard horizontal cut line on iOS Safari) */}
-      <div
-        aria-hidden="true"
-        className="cgr-hero-status-feather lg:hidden pointer-events-none absolute top-0 inset-x-0 h-[36px] z-10"
-      />
+      {/* Layer 0.25: Optical Sunlight Core + Rotating Starburst Rays (keeps top edge pure #5FAEE9) */}
+      <HeroSunlightSkyLayer sunCoreRef={sunCoreRef} sunRaysRef={sunRaysRef} />
 
       {/* Layer 0.5: White `☁ nondii` Logo + "โปรเที่ยวไทย" + Subtitle + 6 Frosted-Glass Icons with Short Labels */}
       <div
@@ -249,11 +292,11 @@ export function HomeCollectibleHero({
           className="w-[54%] sm:w-[38%] lg:w-[26%] max-w-[330px] h-auto pointer-events-none"
         />
 
-        <p className="mt-1.5 sm:mt-2 text-[21px] sm:text-[25px] lg:text-[27px] font-bold tracking-[-0.02em] text-white leading-tight [text-shadow:0_2px_14px_rgba(12,48,88,0.26)] pointer-events-none">
-          {isTh ? "โปรเที่ยวไทย" : "Thailand Travel Deals"}
+        <p className="mt-1.5 sm:mt-2 text-[21px] sm:text-[25px] lg:text-[27px] font-bold tracking-[-0.02em] text-white leading-tight [text-shadow:0_2px_14px_rgba(12,48,88,0.2)] pointer-events-none">
+          {isTh ? "นอนดิ โปรเที่ยวไทย" : "Thailand Travel Deals"}
         </p>
 
-        <p className="mt-1 text-[13px] sm:text-[14.5px] font-medium text-white/92 tracking-[-0.01em] [text-shadow:0_1px_10px_rgba(12,48,88,0.28)] pointer-events-none">
+        <p className="mt-1 text-[13px] sm:text-[14.5px] font-medium text-white/92 tracking-[-0.01em] [text-shadow:0_1px_10px_rgba(12,48,88,0.2)] pointer-events-none">
           {isTh
             ? "แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
             : "Your hub for Thailand travel promotions"}
@@ -290,7 +333,7 @@ export function HomeCollectibleHero({
                     strokeWidth={2}
                   />
                 </span>
-                <span className="text-[11px] sm:text-[11.5px] font-semibold text-white/95 leading-none whitespace-nowrap [text-shadow:0_1px_8px_rgba(12,48,88,0.32)]">
+                <span className="text-[11px] sm:text-[11.5px] font-semibold text-white/95 leading-none whitespace-nowrap [text-shadow:0_1px_8px_rgba(12,48,88,0.22)]">
                   {label}
                 </span>
               </button>
@@ -343,6 +386,13 @@ export function HomeCollectibleHero({
           </div>
         </div>
       </div>
+
+      {/* Layer 1.5: Multi-Depth Camera-Optics Diagonal Lens-Flare Bokeh (sweeps across lens on scroll) */}
+      <HeroLensFlareLayer
+        flareNearRef={flareNearRef}
+        flareMidRef={flareMidRef}
+        flareFarRef={flareFarRef}
+      />
     </section>
   );
 }

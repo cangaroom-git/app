@@ -4,25 +4,27 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CheckCircle2,
+  ChevronDown,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
   ImagePlus,
   Loader2,
+  Save,
   Sparkles,
   Trash2,
   Upload,
   Wand2,
-  X,
 } from "lucide-react";
+import { AdminSlideSheet } from "@/components/admin/ui/AdminSlideSheet";
+import { StudioDateRangePicker } from "@/components/ui/StudioDateRangePicker";
 import {
-  StandardButton,
   StandardFieldGroup,
   StandardInput,
   StandardSelectField,
   StandardTextarea,
-  StatusPill,
 } from "@/components/ui/standards";
-import { StudioDateRangePicker } from "@/components/ui/StudioDateRangePicker";
-import { useModalPresence } from "@/lib/useModalPresence";
-import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { THAILAND_77_PROVINCES } from "@/data/thailandProvinces";
 import {
   formatPlaceLocationScopeLabel,
@@ -41,29 +43,44 @@ export interface PromoTargetHotelOption {
   coverImageUrl: string | null;
 }
 
+export interface EditablePromoTarget {
+  targetType: "PIN" | "INBOX";
+  id: string;
+  matchedHotelId?: string | null;
+  hotelSlug?: string | null;
+  brandNameTh: string;
+  titleTh: string;
+  promoHeadlineTh: string;
+  descriptionTh: string;
+  promoCode: string;
+  promoCategoryCode: "STAY" | "CAFE" | "RESTAURANT" | "WELLNESS" | "ATTRACTION";
+  locationScope: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE";
+  branchSummaryTh: string;
+  provinceId: string;
+  originalPriceThb?: number | null;
+  dealPriceThb?: number | null;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  externalUrl: string;
+  coverImageUrl: string;
+  visualMode: "OFFICIAL_PHOTO" | "BRANDED_CARD";
+  isPublished: boolean;
+}
+
 interface AiQuickPromoDropSheetProps {
   isOpen: boolean;
   onClose: () => void;
   hotels: PromoTargetHotelOption[];
-  onCreated: (message: string, publishedNow: boolean) => void;
+  editingTarget?: EditablePromoTarget | null;
+  onSaved: (message: string, switchToView?: "active" | "inbox") => void;
 }
 
+type SheetTab = "info" | "schedule" | "media";
+
 const LOCATION_SCOPE_OPTIONS = [
-  {
-    value: "SINGLE_LOCATION",
-    label: "ร้านเดี่ยว / 1 สาขา (ปักหมุดแผนที่)",
-    sublabel: "ที่พัก คาเฟ่ ร้านอาหารที่มีพิกัดชัดเจน",
-  },
-  {
-    value: "MULTI_BRANCH",
-    label: "เชนหลายสาขา (Multi-Branch)",
-    sublabel: "เช่น KFC, Café Amazon, Centara ใช้ได้หลายสาขา",
-  },
-  {
-    value: "NATIONWIDE_ONLINE",
-    label: "ทั่วประเทศ / ออนไลน์ / บัตรเครดิต",
-    sublabel: "ไม่ผูกพิกัดแผนที่ เช่น KTC, SCB, Agoda Code",
-  },
+  { value: "SINGLE_LOCATION", label: "ร้านเดี่ยว / 1 สาขา (ปักหมุดแผนที่)" },
+  { value: "MULTI_BRANCH", label: "เชนหลายสาขา (Multi-Branch)" },
+  { value: "NATIONWIDE_ONLINE", label: "ทั่วประเทศ / ออนไลน์ / บัตรเครดิต" },
 ];
 
 const PROMO_CATEGORY_OPTIONS = [
@@ -74,18 +91,38 @@ const PROMO_CATEGORY_OPTIONS = [
   { value: "ATTRACTION", label: "กิจกรรม & ที่เที่ยว" },
 ];
 
+function toDateInput(val?: string | null): string {
+  if (!val) return "";
+  const d = new Date(val);
+  if (!Number.isFinite(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * 1:1 WeGlobal `ProductFormSheet` Click-Row Slide-Over Editor for Promotions
+ * - Supports BOTH Edit (click any table row) AND Create (`+` button / AI Quick Drop)
+ * - Header: 44×44 thumbnail, title, Ready/Incomplete tooltip, Travel-Blue `Save`, `Actions ⌄` Portal dropdown, `X`
+ * - Supports `Cmd+S / Ctrl+S` save, Publish/Unpublish toggle, Duplicate, View Public Page, and Delete
+ */
 export function AiQuickPromoDropSheet({
   isOpen,
   onClose,
   hotels,
-  onCreated,
+  editingTarget = null,
+  onSaved,
 }: AiQuickPromoDropSheetProps) {
-  const { shouldRender, dataState } = useModalPresence(isOpen, 260);
-  useBodyScrollLock(shouldRender);
-
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const actionsBtnRef = useRef<HTMLDivElement | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Step 1: Raw Input for AI
+  const [activeTab, setActiveTab] = useState<SheetTab>("info");
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+
+  // Active target state (null = creating new; set = editing existing)
+  const [currentTarget, setCurrentTarget] =
+    useState<EditablePromoTarget | null>(null);
+
+  // AI Input
   const [rawText, setRawText] = useState("");
   const [posterPreviewUrl, setPosterPreviewUrl] = useState<string | null>(null);
   const [posterBase64, setPosterBase64] = useState<string | null>(null);
@@ -96,7 +133,7 @@ export function AiQuickPromoDropSheet({
     matchedName: string | null;
   } | null>(null);
 
-  // Step 2: Structured Promo Form
+  // Form Fields
   const [matchedHotelId, setMatchedHotelId] = useState<string>("");
   const [brandNameTh, setBrandNameTh] = useState("");
   const [brandNameEn, setBrandNameEn] = useState("");
@@ -114,59 +151,160 @@ export function AiQuickPromoDropSheet({
   const [promoCode, setPromoCode] = useState("");
   const [originalPriceText, setOriginalPriceText] = useState("");
   const [dealPriceText, setDealPriceText] = useState("");
-  const [startsAt, setStartsAt] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
-  const [expiresAt, setExpiresAt] = useState(() =>
-    new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
-  );
+  const [startsAt, setStartsAt] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [visualMode, setVisualMode] = useState<"OFFICIAL_PHOTO" | "BRANDED_CARD">(
-    "BRANDED_CARD"
-  );
+  const [visualMode, setVisualMode] = useState<
+    "OFFICIAL_PHOTO" | "BRANDED_CARD"
+  >("BRANDED_CARD");
+  const [isPublished, setIsPublished] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Hydrate form whenever sheet opens or editingTarget changes
   useEffect(() => {
     if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, onClose]);
+    setActiveTab("info");
+    setIsActionsOpen(false);
+    setErrorMsg(null);
+    setExtractNotice(null);
+    setRawText("");
+    setPosterPreviewUrl(null);
+    setPosterBase64(null);
 
-  const provinceOptions = useMemo(() => {
-    return [
-      {
-        value: "nationwide",
-        label: "ทั่วประเทศ / ออนไลน์",
-        sublabel: "ใช้ได้หลายจังหวัดหรือออนไลน์",
-      },
+    if (editingTarget) {
+      setCurrentTarget(editingTarget);
+      setMatchedHotelId(editingTarget.matchedHotelId || "");
+      setBrandNameTh(editingTarget.brandNameTh);
+      setBrandNameEn("");
+      setLocationScope(editingTarget.locationScope);
+      setBranchSummaryTh(editingTarget.branchSummaryTh || "");
+      setProvinceId(editingTarget.provinceId || "bangkok");
+      setPromoCategoryCode(editingTarget.promoCategoryCode);
+      setTitleTh(editingTarget.titleTh || "");
+      setPromoHeadlineTh(editingTarget.promoHeadlineTh || "");
+      setDescriptionTh(editingTarget.descriptionTh || "");
+      setPromoCode(editingTarget.promoCode || "");
+      setOriginalPriceText(
+        editingTarget.originalPriceThb
+          ? String(editingTarget.originalPriceThb)
+          : "",
+      );
+      setDealPriceText(
+        editingTarget.dealPriceThb ? String(editingTarget.dealPriceThb) : "",
+      );
+      setStartsAt(toDateInput(editingTarget.startsAt));
+      setExpiresAt(toDateInput(editingTarget.expiresAt));
+      setExternalUrl(editingTarget.externalUrl || "");
+      setCoverImageUrl(editingTarget.coverImageUrl || "");
+      setVisualMode(editingTarget.visualMode);
+      setIsPublished(editingTarget.isPublished);
+    } else {
+      setCurrentTarget(null);
+      setMatchedHotelId("");
+      setBrandNameTh("");
+      setBrandNameEn("");
+      setLocationScope("SINGLE_LOCATION");
+      setBranchSummaryTh("");
+      setProvinceId("bangkok");
+      setPromoCategoryCode("STAY");
+      setTitleTh("");
+      setPromoHeadlineTh("");
+      setDescriptionTh("");
+      setPromoCode("");
+      setOriginalPriceText("");
+      setDealPriceText("");
+      setStartsAt(new Date().toISOString().slice(0, 10));
+      setExpiresAt(
+        new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+      );
+      setExternalUrl("");
+      setCoverImageUrl("");
+      setVisualMode("BRANDED_CARD");
+      setIsPublished(true);
+    }
+  }, [isOpen, editingTarget]);
+
+  // Close Actions dropdown on outside click
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (
+        actionsBtnRef.current &&
+        !actionsBtnRef.current.contains(t) &&
+        actionsMenuRef.current &&
+        !actionsMenuRef.current.contains(t)
+      ) {
+        setIsActionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [isActionsOpen]);
+
+  // Ctrl+S / Cmd+S shortcut (matches WeGlobal ProductFormSheet)
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (!isSubmitting) {
+          void handleSave(currentTarget ? "UPDATE" : "PUBLISH_NOW");
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    isSubmitting,
+    currentTarget,
+    brandNameTh,
+    promoHeadlineTh,
+    titleTh,
+    descriptionTh,
+    promoCode,
+    originalPriceText,
+    dealPriceText,
+    startsAt,
+    expiresAt,
+    externalUrl,
+    coverImageUrl,
+    visualMode,
+    locationScope,
+    branchSummaryTh,
+    provinceId,
+    promoCategoryCode,
+    isPublished,
+  ]);
+
+  const provinceOptions = useMemo(
+    () => [
+      { value: "nationwide", label: "ทั่วประเทศ / ออนไลน์" },
       ...THAILAND_77_PROVINCES.map((p) => ({
         value: p.id,
         label: p.nameTh.split("(")[0].trim(),
         sublabel: p.nameEn,
       })),
-    ];
-  }, []);
+    ],
+    [],
+  );
 
-  const hotelOptions = useMemo(() => {
-    return [
-      {
-        value: "",
-        label: "สร้างแบรนด์ / สถานที่ใหม่อัตโนมัติ",
-        sublabel: "ระบบจะสร้างหน้าโปรไฟล์ /{slug} ให้ทันที",
-      },
+  const hotelOptions = useMemo(
+    () => [
+      { value: "", label: "สร้างแบรนด์ / สถานที่ใหม่อัตโนมัติ" },
       ...hotels.map((h) => ({
         value: h.id,
         label: h.nameTh,
         sublabel: `/${h.slug} · ${getPlaceCategoryMeta(h.placeCategory).shortLabelTh}`,
       })),
-    ];
-  }, [hotels]);
+    ],
+    [hotels],
+  );
 
   const handleSelectHotel = (nextId: string) => {
     setMatchedHotelId(nextId);
@@ -213,7 +351,9 @@ export function AiQuickPromoDropSheet({
 
   const handleRunAiExtract = async () => {
     if (!rawText.trim() && !posterBase64) {
-      setErrorMsg("กรุณาวางข้อความโปรโมชั่น หรืออัปโหลดรูปโปสเตอร์ก่อนกดให้ AI แกะ");
+      setErrorMsg(
+        "กรุณาวางข้อความโปรโมชั่น หรืออัปโหลดรูปโปสเตอร์ก่อนกดให้ AI แกะ",
+      );
       return;
     }
     setIsExtracting(true);
@@ -245,7 +385,7 @@ export function AiQuickPromoDropSheet({
       setDescriptionTh(data.descriptionTh || "");
       setPromoCode(data.promoCode || "");
       setOriginalPriceText(
-        data.originalPriceThb ? String(data.originalPriceThb) : ""
+        data.originalPriceThb ? String(data.originalPriceThb) : "",
       );
       setDealPriceText(data.dealPriceThb ? String(data.dealPriceThb) : "");
       if (data.startsAt) setStartsAt(data.startsAt);
@@ -268,39 +408,19 @@ export function AiQuickPromoDropSheet({
       });
     } catch (err) {
       setErrorMsg(
-        err instanceof Error ? err.message : "เกิดข้อผิดพลาดระหว่างแกะข้อมูล"
+        err instanceof Error ? err.message : "เกิดข้อผิดพลาดระหว่างแกะข้อมูล",
       );
     } finally {
       setIsExtracting(false);
     }
   };
 
-  const resetForm = () => {
-    setRawText("");
-    setPosterPreviewUrl(null);
-    setPosterBase64(null);
-    setExtractNotice(null);
-    setMatchedHotelId("");
-    setBrandNameTh("");
-    setBrandNameEn("");
-    setLocationScope("SINGLE_LOCATION");
-    setBranchSummaryTh("");
-    setProvinceId("bangkok");
-    setPromoCategoryCode("STAY");
-    setTitleTh("");
-    setPromoHeadlineTh("");
-    setDescriptionTh("");
-    setPromoCode("");
-    setOriginalPriceText("");
-    setDealPriceText("");
-    setExternalUrl("");
-    setCoverImageUrl("");
-    setVisualMode("BRANDED_CARD");
-    setErrorMsg(null);
-  };
-
-  const handleSubmit = async (mode: "INBOX" | "PUBLISH_NOW") => {
+  const handleSave = async (
+    mode: "UPDATE" | "INBOX" | "PUBLISH_NOW",
+    overridePublishStatus?: "PUBLISHED" | "PENDING_APPROVAL",
+  ) => {
     if (!brandNameTh.trim() || !promoHeadlineTh.trim()) {
+      setActiveTab("info");
       setErrorMsg("กรุณากรอกชื่อแบรนด์/ร้าน และหัวข้อส่วนลด (Headline) ให้ครบ");
       return;
     }
@@ -310,12 +430,60 @@ export function AiQuickPromoDropSheet({
     try {
       const origNum = Number(originalPriceText.replace(/,/g, ""));
       const dealNum = Number(dealPriceText.replace(/,/g, ""));
+      const cleanOrig =
+        Number.isFinite(origNum) && origNum > 0 ? Math.round(origNum) : null;
+      const cleanDeal =
+        Number.isFinite(dealNum) && dealNum > 0 ? Math.round(dealNum) : null;
 
+      if (currentTarget && mode === "UPDATE") {
+        const res = await fetch("/api/admin/promos", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetType: currentTarget.targetType,
+            id: currentTarget.id,
+            brandNameTh: brandNameTh.trim(),
+            titleTh: (titleTh || promoHeadlineTh).trim(),
+            promoHeadlineTh: promoHeadlineTh.trim(),
+            descriptionTh: descriptionTh.trim(),
+            promoCode: promoCode.trim().toUpperCase(),
+            promoCategoryCode,
+            locationScope,
+            branchSummaryTh: branchSummaryTh.trim(),
+            provinceId:
+              locationScope === "NATIONWIDE_ONLINE" ? "nationwide" : provinceId,
+            originalPriceThb: cleanOrig,
+            dealPriceThb: cleanDeal,
+            startsAt: startsAt || null,
+            expiresAt: expiresAt || null,
+            externalUrl: externalUrl.trim(),
+            coverImageUrl: coverImageUrl.trim(),
+            visualMode,
+            ...(overridePublishStatus
+              ? { publishStatus: overridePublishStatus }
+              : {}),
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "บันทึกการแก้ไขไม่สำเร็จ");
+
+        onSaved(
+          overridePublishStatus === "PENDING_APPROVAL"
+            ? `ซ่อนโปร "${promoHeadlineTh.trim()}" ออกจากหน้าแรกแล้ว`
+            : overridePublishStatus === "PUBLISHED"
+              ? `เผยแพร่โปร "${promoHeadlineTh.trim()}" แล้ว`
+              : `บันทึกการแก้ไข "${promoHeadlineTh.trim()}" เรียบร้อย`,
+        );
+        onClose();
+        return;
+      }
+
+      // Create new promo (or publish from Inbox)
       const res = await fetch("/api/admin/promos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode,
+          mode: mode === "INBOX" ? "INBOX" : "PUBLISH_NOW",
           sourceType: "ADMIN_AI_DROP",
           matchedHotelId: matchedHotelId || null,
           brandNameTh: brandNameTh.trim(),
@@ -329,10 +497,8 @@ export function AiQuickPromoDropSheet({
           promoHeadlineTh: promoHeadlineTh.trim(),
           descriptionTh: descriptionTh.trim(),
           promoCode: promoCode.trim().toUpperCase(),
-          originalPriceThb:
-            Number.isFinite(origNum) && origNum > 0 ? Math.round(origNum) : null,
-          dealPriceThb:
-            Number.isFinite(dealNum) && dealNum > 0 ? Math.round(dealNum) : null,
+          originalPriceThb: cleanOrig,
+          dealPriceThb: cleanDeal,
           startsAt: startsAt || null,
           expiresAt: expiresAt || null,
           externalUrl: externalUrl.trim(),
@@ -342,28 +508,59 @@ export function AiQuickPromoDropSheet({
         }),
       });
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "บันทึกโปรโมชั่นไม่สำเร็จ");
-      }
+      if (!res.ok) throw new Error(json.error || "บันทึกโปรโมชั่นไม่สำเร็จ");
 
-      resetForm();
-      onCreated(
-        mode === "PUBLISH_NOW"
-          ? `เผยแพร่โปร "${promoHeadlineTh.trim()}" ขึ้นหน้าแรกแล้ว`
-          : `บันทึกโปร "${promoHeadlineTh.trim()}" เข้า Promo Inbox แล้ว`,
-        mode === "PUBLISH_NOW"
+      onSaved(
+        mode === "INBOX"
+          ? `บันทึก "${promoHeadlineTh.trim()}" เข้า Promo Inbox แล้ว`
+          : `เผยแพร่โปร "${promoHeadlineTh.trim()}" ขึ้นหน้าแรกแล้ว`,
+        mode === "INBOX" ? "inbox" : "active",
       );
       onClose();
     } catch (err) {
       setErrorMsg(
-        err instanceof Error ? err.message : "บันทึกโปรโมชั่นไม่สำเร็จ"
+        err instanceof Error ? err.message : "บันทึกโปรโมชั่นไม่สำเร็จ",
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Live 1:1 Branded Card Preview URL
+  const handleDuplicateInSheet = () => {
+    setIsActionsOpen(false);
+    setCurrentTarget(null);
+    setPromoHeadlineTh((prev) =>
+      prev.startsWith("Copy · ") ? prev : `Copy · ${prev}`,
+    );
+    setIsPublished(false);
+  };
+
+  const handleDeleteCurrent = async () => {
+    if (!currentTarget) return;
+    setIsActionsOpen(false);
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const body =
+        currentTarget.targetType === "INBOX"
+          ? { inboxId: currentTarget.id, action: "DELETE" }
+          : { pinId: currentTarget.id, action: "DELETE" };
+      const res = await fetch("/api/admin/promos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "ลบรายการไม่สำเร็จ");
+      onSaved(`ลบโปร "${promoHeadlineTh || currentTarget.brandNameTh}" แล้ว`);
+      onClose();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "ลบรายการไม่สำเร็จ");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const previewCardUrl = useMemo(() => {
     const prov = THAILAND_77_PROVINCES.find((p) => p.id === provinceId);
     const scopeLabel = formatPlaceLocationScopeLabel(
@@ -374,12 +571,12 @@ export function AiQuickPromoDropSheet({
         provinceNameTh: prov ? prov.nameTh.split("(")[0].trim() : "ทั่วไทย",
         provinceNameEn: prov ? prov.nameEn : "Thailand",
       },
-      "th"
+      "th",
     );
     const dateInfo = formatPromoDateRangeLabel(
       startsAt || null,
       expiresAt || null,
-      "th"
+      "th",
     );
     const qs = new URLSearchParams();
     qs.set("headline", promoHeadlineTh.trim() || "ลด 25% โปรเที่ยวไทย");
@@ -401,474 +598,651 @@ export function AiQuickPromoDropSheet({
     startsAt,
   ]);
 
-  const activeCategoryMeta = getPlaceCategoryMeta(promoCategoryCode);
+  const missingFields = useMemo(() => {
+    const list: string[] = [];
+    if (!brandNameTh.trim()) list.push("Brand / Place Name");
+    if (!promoHeadlineTh.trim()) list.push("Promo Headline");
+    return list;
+  }, [brandNameTh, promoHeadlineTh]);
 
-  if (!shouldRender || typeof document === "undefined") return null;
+  const missingInfoCount = missingFields.length;
+  const missingMediaCount =
+    visualMode === "OFFICIAL_PHOTO" && !coverImageUrl.trim() ? 1 : 0;
+  const isReady = missingInfoCount === 0;
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="AI Quick Promo Drop"
-      data-state={dataState}
-      onClick={onClose}
-      className="cgr-modal-backdrop fixed inset-0 z-[95] bg-black/45 backdrop-blur-[2px] flex items-end lg:items-center lg:justify-end"
-    >
-      <div
-        data-state={dataState}
-        onClick={(e) => e.stopPropagation()}
-        className="cgr-modal-surface-lg w-full lg:max-w-[920px] h-[92dvh] lg:h-[100dvh] rounded-t-[24px] lg:rounded-none lg:rounded-l-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden"
-      >
-        {/* Mobile grab handle */}
-        <div
-          aria-hidden="true"
-          className="lg:hidden h-1 w-10 rounded-full bg-[var(--color-border-emphasized)] mx-auto mt-3 shrink-0"
-        />
-
-        {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-border)] flex items-center justify-between gap-3 shrink-0">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-accent)] shrink-0">
-                <Sparkles className="w-4 h-4" />
-              </span>
-              <h2 className="text-[17px] sm:text-[18px] font-bold tracking-[-0.02em] text-[var(--color-text-primary)] truncate">
-                AI Quick Promo Drop
-              </h2>
-            </div>
-            <p className="text-[12.5px] text-[var(--color-text-secondary)] mt-0.5 truncate">
-              โยนรูปโปสเตอร์หรือข้อความโปร → AI แกะลงฟอร์มพร้อมสร้างการ์ด 1:1 ใน 5 วินาที
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="ปิดหน้าต่าง"
-            className="h-9 w-9 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer shrink-0 transition-colors"
+  return (
+    <AdminSlideSheet
+      isOpen={isOpen}
+      onClose={onClose}
+      thumbnailUrl={
+        visualMode === "OFFICIAL_PHOTO" && coverImageUrl
+          ? coverImageUrl
+          : posterPreviewUrl || previewCardUrl
+      }
+      title={
+        currentTarget
+          ? promoHeadlineTh.trim() || brandNameTh.trim() || "Edit Promotion"
+          : brandNameTh.trim() || "New Promotion"
+      }
+      subtitle={
+        brandNameTh.trim()
+          ? `${brandNameTh.trim()} · ${currentTarget ? "แก้ไขโปรโมชั่น" : "ลงโปรโมชั่นใหม่"}`
+          : "AI Quick Promo Drop · แกะโปสเตอร์หรือข้อความอัตโนมัติ"
+      }
+      headerAction={
+        <div className="hidden sm:flex items-center gap-1.5 group relative">
+          <span
+            className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+              isReady
+                ? "bg-[var(--color-accent-yellow)] text-[#182334]"
+                : "bg-red-50 text-red-600"
+            }`}
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-6">
-          {errorMsg && (
-            <div className="rounded-[16px] bg-[var(--color-background-muted)] px-4 py-3 flex items-center gap-2.5 text-[13.5px] text-[var(--color-text-primary)]">
-              <span className="h-2 w-2 rounded-full bg-[#e60023] shrink-0" />
-              <span>{errorMsg}</span>
+            {isReady ? "Ready" : "Incomplete"}
+          </span>
+          {!isReady && (
+            <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-[var(--color-border)] rounded-xl shadow-[var(--shadow-popover)] p-3 ws-caption opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
+              <div className="font-semibold text-red-600 mb-1 ws-badge">
+                ข้อมูลที่ยังไม่ได้กรอก
+              </div>
+              {missingFields.map((f) => (
+                <div
+                  key={f}
+                  className="flex items-center gap-1.5 ws-caption"
+                >
+                  <span className="text-red-400">✕</span>
+                  <span>{f}</span>
+                </div>
+              ))}
             </div>
           )}
+        </div>
+      }
+      footerAction={
+        <div className="flex items-center justify-between gap-3">
+          {/* Left: Actions Dropdown (opens upward cleanly above sticky footer) */}
+          <div ref={actionsBtnRef} className="relative z-20">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => setIsActionsOpen((v) => !v)}
+              className="h-10 px-4 flex items-center gap-1 ws-body-strong bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] rounded-full transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <span>Actions</span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform duration-150 ${
+                  isActionsOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
 
-          {/* STEP 1: Drop Poster / Paste Text -> AI Extract */}
-          <section className="rounded-[22px] bg-[var(--color-background-muted)] p-4 sm:p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[14.5px] font-bold text-[var(--color-text-primary)]">
-                  1. โยนวัตถุดิบโปรโมชั่น (รูปโปสเตอร์ หรือ ข้อความ / ลิงก์)
-                </p>
-                <p className="text-[12.5px] text-[var(--color-text-secondary)]">
-                  รองรับโปสเตอร์โปร Facebook, อีเมลบัตรเครดิต, หรือแคปชันโปรจากร้านค้า
-                </p>
-              </div>
-              {extractNotice && (
-                <StatusPill variant="success">
-                  {extractNotice.usedAi ? "แกะด้วย Gemini Vision" : "แกะอัตโนมัติพร้อมตรวจ"}
-                </StatusPill>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-stretch">
-              {/* Poster Upload Box */}
-              <div className="sm:col-span-4">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePosterFileChange}
-                  className="hidden"
-                />
-                {posterPreviewUrl ? (
-                  <div className="relative aspect-square w-full max-w-[180px] sm:max-w-none rounded-[16px] overflow-hidden bg-[var(--color-background-card)]">
-                    <img
-                      src={posterPreviewUrl}
-                      alt="Promo poster preview"
-                      className="w-full h-full object-cover"
-                    />
+            {isActionsOpen &&
+              typeof document !== "undefined" &&
+              createPortal(
+                <div
+                  ref={actionsMenuRef}
+                  className="fixed w-52 bg-white border border-gray-200 rounded-2xl shadow-[var(--shadow-popover)] py-1.5 z-[110]"
+                  style={{
+                    bottom: actionsBtnRef.current
+                      ? Math.max(
+                          12,
+                          window.innerHeight -
+                            actionsBtnRef.current.getBoundingClientRect().top +
+                            8,
+                        )
+                      : 72,
+                    left: actionsBtnRef.current
+                      ? Math.max(
+                          12,
+                          actionsBtnRef.current.getBoundingClientRect().left,
+                        )
+                      : 16,
+                  }}
+                >
+                  {!currentTarget && (
                     <button
                       type="button"
                       onClick={() => {
-                        setPosterPreviewUrl(null);
-                        setPosterBase64(null);
+                        setIsActionsOpen(false);
+                        void handleSave("INBOX");
                       }}
-                      aria-label="ลบรูปโปสเตอร์"
-                      className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/65 text-white inline-flex items-center justify-center cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Save size={15} className="text-gray-400" />
+                      <span>Save to Inbox</span>
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-full min-h-[126px] rounded-[16px] border border-dashed border-[var(--color-border-emphasized)] bg-[var(--color-background-card)] hover:bg-[var(--color-background-subtle)]/40 flex flex-col items-center justify-center gap-2 p-4 text-center cursor-pointer transition-colors"
-                  >
-                    <span className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] inline-flex items-center justify-center text-[var(--color-text-primary)]">
-                      <Upload className="w-4 h-4" />
-                    </span>
-                    <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">
-                      อัปโหลดรูปโปสเตอร์
-                    </span>
-                    <span className="text-[11.5px] text-[var(--color-text-secondary)]">
-                      PNG, JPG, WebP (สูงสุด 6MB)
-                    </span>
-                  </button>
-                )}
-              </div>
-
-              {/* Raw Text Input + Extract CTA */}
-              <div className="sm:col-span-8 flex flex-col justify-between gap-3">
-                <StandardTextarea
-                  label="วางข้อความโปรโมชั่น / แคปชัน / ลิงก์"
-                  optionalText="วางแล้วกดแกะได้เลย"
-                  rows={4}
-                  value={rawText}
-                  onChange={(e) => setRawText(e.target.value)}
-                  placeholder="เช่น บัตรเครดิต KTC ลด 15% เมื่อจองโรงแรมผ่าน Agoda กรอกโค้ด KTC15 ถึง 31 ธ.ค. 2569 หรือ แคปชันโปรคาเฟ่..."
-                />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  {extractNotice?.matchedName ? (
-                    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--color-text-primary)]">
-                      <CheckCircle2 className="w-4 h-4 text-[var(--color-accent)] shrink-0" />
-                      จับคู่กับแบรนด์เดิมในระบบ:{" "}
-                      <strong>{extractNotice.matchedName}</strong>
-                    </span>
-                  ) : (
-                    <span className="text-[12px] text-[var(--color-text-secondary)]">
-                      AI จะจับคู่กับร้านเดิมและแปลง พ.ศ. → ค.ศ. ให้โดยอัตโนมัติ
-                    </span>
                   )}
 
-                  <StandardButton
+                  {currentTarget?.targetType === "PIN" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        void handleSave(
+                          "UPDATE",
+                          isPublished ? "PENDING_APPROVAL" : "PUBLISHED",
+                        );
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm cursor-pointer ${
+                        isPublished
+                          ? "text-orange-600 hover:bg-orange-50"
+                          : "text-[var(--color-accent)] hover:bg-[var(--color-accent-muted)]"
+                      }`}
+                    >
+                      {isPublished ? <EyeOff size={15} /> : <Eye size={15} />}
+                      <span>
+                        {isPublished ? "Unpublish & Save" : "Publish & Save"}
+                      </span>
+                    </button>
+                  )}
+
+                  {currentTarget?.targetType === "INBOX" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        void handleSave("PUBLISH_NOW");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm text-[var(--color-accent)] hover:bg-[var(--color-accent-muted)] cursor-pointer"
+                    >
+                      <Eye size={15} />
+                      <span>Approve &amp; Publish Now</span>
+                    </button>
+                  )}
+
+                  {currentTarget && (
+                    <>
+                      <div className="border-t border-gray-100 my-1" />
+                      <button
+                        type="button"
+                        onClick={handleDuplicateInSheet}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <Copy size={15} className="text-gray-400" />
+                        <span>Duplicate</span>
+                      </button>
+
+                      {currentTarget.hotelSlug && (
+                        <a
+                          href={`/${encodeURIComponent(currentTarget.hotelSlug)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setIsActionsOpen(false)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <ExternalLink size={15} className="text-gray-400" />
+                          <span>View Public Page</span>
+                        </a>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleDeleteCurrent}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+                      >
+                        <Trash2 size={15} />
+                        <span>Delete</span>
+                      </button>
+                    </>
+                  )}
+                </div>,
+                document.body,
+              )}
+          </div>
+
+          {/* Right: Cancel + Primary Travel-Blue Save/Publish Pill */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 px-5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[14px] font-semibold text-[var(--color-text-primary)] cursor-pointer transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() =>
+                handleSave(currentTarget ? "UPDATE" : "PUBLISH_NOW")
+              }
+              title="Save (Ctrl+S / Cmd+S)"
+              className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Save size={15} />
+              )}
+              <span>
+                {isSubmitting
+                  ? "กำลังบันทึก..."
+                  : currentTarget
+                    ? "บันทึก"
+                    : "เผยแพร่"}
+              </span>
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {/* ═══ STICKY TRAVEL-BLUE TABS BAR (Exact WeGlobal Geometry) ═══ */}
+      <div className="sticky top-0 bg-gray-50 z-10 border-b border-gray-200 shrink-0">
+        <div className="flex w-full">
+          <button
+            type="button"
+            onClick={() => setActiveTab("info")}
+            className={`flex-1 cursor-pointer text-sm font-medium py-2.5 text-center transition-colors border-b-4 ${
+              activeTab === "info"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent-muted)]"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Basic Info
+            {missingInfoCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 ws-badge bg-red-500 text-white rounded-full px-1">
+                {missingInfoCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("schedule")}
+            className={`flex-1 cursor-pointer text-sm font-medium py-2.5 text-center transition-colors border-b-4 ${
+              activeTab === "schedule"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent-muted)]"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Pricing &amp; Dates
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("media")}
+            className={`flex-1 cursor-pointer text-sm font-medium py-2.5 text-center transition-colors border-b-4 ${
+              activeTab === "media"
+                ? "border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent-muted)]"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Media
+            {missingMediaCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-4 ws-badge bg-red-500 text-white rounded-full px-1">
+                {missingMediaCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ SCROLLABLE FORM BODY ═══ */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+        {errorMsg && (
+          <div className="px-3.5 py-2.5 rounded-lg bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+            {errorMsg}
+          </div>
+        )}
+
+        {activeTab === "info" && (
+          <>
+            {/* AI Quick Extract Section (Shown when creating OR optionally re-parsing) */}
+            {!currentTarget && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="ws-subtitle">AI แกะโปรโมชั่นอัตโนมัติ</h3>
+                  <button
                     type="button"
-                    variant="primary"
-                    size="md"
                     disabled={isExtracting}
                     onClick={handleRunAiExtract}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#182334] bg-[var(--color-accent-yellow)] hover:brightness-95 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {isExtracting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>กำลังแกะข้อมูล...</span>
-                      </>
+                      <Loader2 size={13} className="animate-spin" />
                     ) : (
-                      <>
-                        <Wand2 className="w-4 h-4" />
-                        <span>ให้ AI แกะข้อมูล</span>
-                      </>
+                      <Wand2 size={13} />
                     )}
-                  </StandardButton>
+                    <span>{isExtracting ? "Extracting..." : "AI Write"}</span>
+                  </button>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          {/* STEP 2: Structured Form + Live 1:1 Card Preview */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left 7 Cols: Structured Fields */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[14.5px] font-bold text-[var(--color-text-primary)]">
-                  2. ตรวจสอบและแก้ไขข้อมูลโปรโมชั่น
-                </p>
-                <span className="text-[12px] text-[var(--color-text-secondary)]">
-                  รองรับ 3 LocationScope
-                </span>
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <div className="md:col-span-8">
+                    <StandardTextarea
+                      rows={3}
+                      label="วางข้อความโปรโมชั่น / ข่าวสาร / ลิงก์"
+                      value={rawText}
+                      onChange={(e) => setRawText(e.target.value)}
+                      placeholder="วางข้อความโปรโมชั่น โพสต์ Facebook หรืออีเมลข่าวสาร แล้วกด AI Write..."
+                    />
+                  </div>
 
-              <StandardSelectField
-                label="เชื่อมกับแบรนด์ / สถานที่ในระบบ"
-                optionalText="หรือสร้างใหม่"
-                value={matchedHotelId}
-                onChange={handleSelectHotel}
-                options={hotelOptions}
-                searchPlaceholder="ค้นหาชื่อร้าน / แบรนด์..."
-              />
+                  <div className="md:col-span-4 space-y-1">
+                    <label className="block text-xs font-semibold text-gray-600">
+                      Poster Image (Optional)
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePosterFileChange}
+                      className="hidden"
+                    />
+                    {posterPreviewUrl ? (
+                      <div className="relative h-[86px] rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={posterPreviewUrl}
+                          alt="Poster preview"
+                          className="h-full w-full object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPosterPreviewUrl(null);
+                            setPosterBase64(null);
+                          }}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 text-gray-600 hover:text-red-500 inline-flex items-center justify-center cursor-pointer"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full h-[86px] rounded-lg border border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-500 flex flex-col items-center justify-center gap-1 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        <Upload size={16} />
+                        <span>Upload Poster</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {extractNotice && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--color-accent-muted)] text-[var(--color-accent)] text-xs font-medium">
+                    <CheckCircle2 size={13} />
+                    <span>
+                      {extractNotice.usedAi ? "Gemini Vision" : "Smart Parser"}
+                      {extractNotice.matchedName
+                        ? ` · Matched: ${extractNotice.matchedName}`
+                        : " · Ready as new brand"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div
+              className={`${!currentTarget ? "border-t border-gray-100 pt-5" : ""} space-y-4`}
+            >
+              <h3 className="ws-subtitle">ข้อมูลพื้นฐาน</h3>
 
               <StandardFieldGroup>
-                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+                <StandardInput
+                  grouped
+                  label="พาดหัวส่วนลดเด่น (Promo Headline) *"
+                  value={promoHeadlineTh}
+                  onChange={(e) => setPromoHeadlineTh(e.target.value)}
+                  placeholder="เช่น ลด 30% ห้อง Sea View · ซื้อ 1 แถม 1"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
                   <StandardInput
                     grouped
-                    label="ชื่อแบรนด์ / ร้าน (ภาษาไทย)"
+                    label="ชื่อแบรนด์ / สถานที่ (ไทย) *"
                     value={brandNameTh}
+                    disabled={currentTarget?.targetType === "PIN"}
                     onChange={(e) => setBrandNameTh(e.target.value)}
-                    placeholder="เช่น KTC, Café Amazon, ศาลาเขาใหญ่"
+                    placeholder="เช่น Café Amazon, KTC, Centara"
                   />
-                  <StandardInput
-                    grouped
-                    label="ชื่อภาษาอังกฤษ"
-                    optionalText="ช่วยสร้าง slug"
-                    value={brandNameEn}
-                    onChange={(e) => setBrandNameEn(e.target.value)}
-                    placeholder="เช่น KTC Travel, Cafe Amazon"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                  <StandardSelectField
-                    grouped
-                    label="หมวดโปรโมชั่น"
-                    value={promoCategoryCode}
-                    onChange={(v) =>
-                      setPromoCategoryCode(
-                        v as "STAY" | "CAFE" | "RESTAURANT" | "WELLNESS" | "ATTRACTION"
-                      )
-                    }
-                    options={PROMO_CATEGORY_OPTIONS}
-                  />
-                  <StandardSelectField
-                    grouped
-                    label="ขอบเขตพื้นที่ (LocationScope)"
-                    value={locationScope}
-                    onChange={(v) => {
-                      const next = v as
-                        | "SINGLE_LOCATION"
-                        | "MULTI_BRANCH"
-                        | "NATIONWIDE_ONLINE";
-                      setLocationScope(next);
-                      if (next === "NATIONWIDE_ONLINE") {
-                        setProvinceId("nationwide");
-                      }
-                    }}
-                    options={LOCATION_SCOPE_OPTIONS}
-                  />
-                </div>
-                {locationScope !== "NATIONWIDE_ONLINE" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
+
+                  {!currentTarget ? (
                     <StandardSelectField
                       grouped
-                      label="จังหวัดหลัก"
+                      label="เชื่อมกับสถานที่ / แบรนด์ที่มีอยู่"
+                      value={matchedHotelId}
+                      onChange={handleSelectHotel}
+                      options={hotelOptions}
+                      sheetTitle="เลือกสถานที่ / แบรนด์"
+                    />
+                  ) : (
+                    <StandardSelectField
+                      grouped
+                      label="หมวดหมู่ *"
+                      value={promoCategoryCode}
+                      onChange={(v) =>
+                        setPromoCategoryCode(
+                          v as
+                            | "STAY"
+                            | "CAFE"
+                            | "RESTAURANT"
+                            | "WELLNESS"
+                            | "ATTRACTION",
+                        )
+                      }
+                      options={PROMO_CATEGORY_OPTIONS}
+                      sheetTitle="เลือกหมวดหมู่"
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                  {!currentTarget && (
+                    <StandardSelectField
+                      grouped
+                      label="หมวดหมู่ *"
+                      value={promoCategoryCode}
+                      onChange={(v) =>
+                        setPromoCategoryCode(
+                          v as
+                            | "STAY"
+                            | "CAFE"
+                            | "RESTAURANT"
+                            | "WELLNESS"
+                            | "ATTRACTION",
+                        )
+                      }
+                      options={PROMO_CATEGORY_OPTIONS}
+                      sheetTitle="เลือกหมวดหมู่"
+                    />
+                  )}
+
+                  <StandardSelectField
+                    grouped
+                    label="ขอบเขตพื้นที่ให้บริการ"
+                    value={locationScope}
+                    onChange={(v) =>
+                      setLocationScope(
+                        v as
+                          | "SINGLE_LOCATION"
+                          | "MULTI_BRANCH"
+                          | "NATIONWIDE_ONLINE",
+                      )
+                    }
+                    options={LOCATION_SCOPE_OPTIONS}
+                    sheetTitle="ขอบเขตพื้นที่ให้บริการ"
+                  />
+
+                  {currentTarget && locationScope !== "NATIONWIDE_ONLINE" && (
+                    <StandardSelectField
+                      grouped
+                      label="จังหวัด"
                       value={provinceId}
                       onChange={setProvinceId}
                       options={provinceOptions}
-                      searchPlaceholder="ค้นหา 77 จังหวัด..."
+                      sheetTitle="เลือกจังหวัด"
+                    />
+                  )}
+                </div>
+
+                {!currentTarget && locationScope !== "NATIONWIDE_ONLINE" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                    <StandardSelectField
+                      grouped
+                      label="จังหวัด"
+                      value={provinceId}
+                      onChange={setProvinceId}
+                      options={provinceOptions}
+                      sheetTitle="เลือกจังหวัด"
                     />
                     <StandardInput
                       grouped
-                      label="สรุปสาขาที่ร่วมรายการ"
-                      optionalText={
-                        locationScope === "MULTI_BRANCH" ? "แนะนำ" : "ไม่บังคับ"
-                      }
+                      label="สรุปจำนวนสาขา"
+                      optionalText="ไม่บังคับ"
                       value={branchSummaryTh}
                       onChange={(e) => setBranchSummaryTh(e.target.value)}
-                      placeholder="เช่น ทุกสาขาทั่วไทย (ยกเว้นสนามบิน)"
+                      placeholder="เช่น ทุกสาขาในไทย, เฉพาะกรุงเทพฯ"
                     />
                   </div>
                 )}
-              </StandardFieldGroup>
 
-              <StandardFieldGroup>
                 <StandardInput
                   grouped
-                  label="ข้อความส่วนลดเด่นบนการ์ด (Headline สั้นคม)"
-                  optionalText="สูงสุด 60 ตัวอักษร"
-                  value={promoHeadlineTh}
-                  onChange={(e) => setPromoHeadlineTh(e.target.value)}
-                  placeholder="เช่น ลด 25% รวมอาหารเช้า หรือ 1 แถม 1 เครื่องดื่ม"
-                />
-                <StandardInput
-                  grouped
-                  label="ชื่อแคมเปญเต็ม"
+                  label="ชื่อโปรโมชั่นแบบเต็ม"
+                  optionalText="หากว่างจะใช้พาดหัวเด่น"
                   value={titleTh}
                   onChange={(e) => setTitleTh(e.target.value)}
-                  placeholder="เช่น โปรรับลมหนาว จองตรงลดเพิ่ม 25% พร้อมอาหารเช้า"
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-3 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
-                  <StandardInput
-                    grouped
-                    label="โค้ดส่วนลด"
-                    optionalText="ถ้ามี"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                    placeholder="เช่น KTC15"
-                  />
-                  <StandardInput
-                    grouped
-                    label="ราคาเต็ม (บาท)"
-                    inputMode="numeric"
-                    value={originalPriceText}
-                    onChange={(e) => setOriginalPriceText(e.target.value)}
-                    placeholder="เช่น 4500"
-                  />
-                  <StandardInput
-                    grouped
-                    label="ราคาโปร (บาท)"
-                    inputMode="numeric"
-                    value={dealPriceText}
-                    onChange={(e) => setDealPriceText(e.target.value)}
-                    placeholder="เช่น 2990"
-                  />
-                </div>
-                <StudioDateRangePicker
-                  grouped
-                  startDate={startsAt}
-                  endDate={expiresAt}
-                  startLabel="วันเริ่มโปรโมชั่น"
-                  endLabel="วันหมดอายุโปรโมชั่น"
-                  onChange={(nextStart, nextEnd) => {
-                    setStartsAt(nextStart);
-                    setExpiresAt(nextEnd);
-                  }}
+                  placeholder="ชื่อโปรโมชั่นแบบเต็ม"
                 />
               </StandardFieldGroup>
 
+              <StandardTextarea
+                rows={4}
+                label="รายละเอียดและเงื่อนไขโปรโมชั่น"
+                value={descriptionTh}
+                onChange={(e) => setDescriptionTh(e.target.value)}
+                placeholder="เงื่อนไขโปรโมชั่น วิธีรับสิทธิ์ และรายละเอียดเพิ่มเติม..."
+              />
+            </div>
+          </>
+        )}
+
+        {activeTab === "schedule" && (
+          <div className="space-y-5">
+            <h3 className="ws-subtitle">ราคา โค้ด และระยะเวลา</h3>
+
+            <StandardFieldGroup>
+              <div className="grid grid-cols-1 sm:grid-cols-3 sm:divide-x divide-y sm:divide-y-0 divide-[#b0b0b0]">
+                <StandardInput
+                  grouped
+                  label="โค้ดส่วนลด"
+                  optionalText="ไม่บังคับ"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="NONDII25"
+                  className="uppercase"
+                />
+                <StandardInput
+                  grouped
+                  type="number"
+                  min={0}
+                  label="ราคาปกติ (บาท)"
+                  prefixText="฿"
+                  value={originalPriceText}
+                  onChange={(e) => setOriginalPriceText(e.target.value)}
+                  placeholder="3500"
+                />
+                <StandardInput
+                  grouped
+                  type="number"
+                  min={0}
+                  label="ราคาโปรโมชั่น (บาท)"
+                  prefixText="฿"
+                  value={dealPriceText}
+                  onChange={(e) => setDealPriceText(e.target.value)}
+                  placeholder="2490"
+                />
+              </div>
               <StandardInput
-                label="ลิงก์ไปรับโปร / Affiliate URL (HTTPS)"
+                grouped
+                type="url"
+                label="ลิงก์ดีล / เว็บไซต์ภายนอก"
                 optionalText="ไม่บังคับ"
                 value={externalUrl}
                 onChange={(e) => setExternalUrl(e.target.value)}
                 placeholder="https://..."
               />
+            </StandardFieldGroup>
 
-              <StandardTextarea
-                label="เงื่อนไขและรายละเอียดโปรโมชั่น"
-                rows={3}
-                value={descriptionTh}
-                onChange={(e) => setDescriptionTh(e.target.value)}
-                placeholder="เงื่อนไขการใช้สิทธิ์ วันเวลาที่ร่วมรายการ หรือหมายเหตุเพิ่มเติม..."
+            <div className="space-y-1.5">
+              <span className="ws-caption-medium block">ระยะเวลาโปรโมชั่น</span>
+              <StudioDateRangePicker
+                startDate={startsAt}
+                endDate={expiresAt}
+                onChange={(nextStart, nextEnd) => {
+                  setStartsAt(nextStart);
+                  setExpiresAt(nextEnd);
+                }}
               />
             </div>
+          </div>
+        )}
 
-            {/* Right 5 Cols: Visual Mode & Live 1:1 Card Preview */}
-            <div className="lg:col-span-5 lg:sticky lg:top-0 space-y-4">
-              <div className="rounded-[22px] bg-[var(--color-background-muted)] p-4 space-y-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[13.5px] font-bold text-[var(--color-text-primary)]">
-                    ตัวอย่างการ์ด 1:1 บนหน้าแรก
-                  </p>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 h-6 text-[11px] font-semibold text-white"
-                    style={{ backgroundColor: activeCategoryMeta.crestBgHex }}
-                  >
-                    {activeCategoryMeta.shortLabelTh}
-                  </span>
-                </div>
+        {activeTab === "media" && (
+          <div className="space-y-5">
+            <h3 className="ws-subtitle">รูปแบบการ์ดโปรโมชั่น</h3>
 
-                {/* Visual Mode Switch Pills */}
-                <div className="flex items-center gap-1.5 p-1 rounded-full bg-[var(--color-background-card)]">
-                  <button
-                    type="button"
-                    onClick={() => setVisualMode("BRANDED_CARD")}
-                    className={`flex-1 h-8 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ${
-                      visualMode === "BRANDED_CARD"
-                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                        : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    การ์ดแบรนด์อัตโนมัติ
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVisualMode("OFFICIAL_PHOTO")}
-                    className={`flex-1 h-8 px-3 rounded-full text-[12px] font-semibold transition-colors cursor-pointer ${
-                      visualMode === "OFFICIAL_PHOTO"
-                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                        : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                    }`}
-                  >
-                    รูป Official / URL
-                  </button>
-                </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setVisualMode("BRANDED_CARD")}
+                className={`h-9 px-4 rounded-full ws-badge border transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  visualMode === "BRANDED_CARD"
+                    ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] border-[var(--color-accent)]/30"
+                    : "bg-[var(--color-background-card)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:bg-[var(--color-background-muted)]"
+                }`}
+              >
+                <Sparkles size={14} />
+                <span>การ์ดโปรอัตโนมัติ (1:1)</span>
+              </button>
 
-                {visualMode === "OFFICIAL_PHOTO" && (
-                  <StandardInput
-                    label="URL รูปภาพ Official ของร้าน/โปร"
-                    value={coverImageUrl}
-                    onChange={(e) => setCoverImageUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
-                  />
-                )}
+              <button
+                type="button"
+                onClick={() => setVisualMode("OFFICIAL_PHOTO")}
+                className={`h-9 px-4 rounded-full ws-badge border transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  visualMode === "OFFICIAL_PHOTO"
+                    ? "bg-[var(--color-accent-muted)] text-[var(--color-accent)] border-[var(--color-accent)]/30"
+                    : "bg-[var(--color-background-card)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:bg-[var(--color-background-muted)]"
+                }`}
+              >
+                <ImagePlus size={14} />
+                <span>ใช้ลิงก์รูปภาพทางการ</span>
+              </button>
+            </div>
 
-                {/* 1:1 Live Preview Surface */}
-                <div className="aspect-square w-full rounded-[22px] overflow-hidden bg-[var(--color-background-card)] relative">
-                  {visualMode === "BRANDED_CARD" ? (
-                    <img
-                      src={previewCardUrl}
-                      alt="Branded Promo Card Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : coverImageUrl.trim() ? (
-                    <img
-                      src={coverImageUrl.trim()}
-                      alt="Official Promo Photo Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-6 text-center text-[var(--color-text-secondary)]">
-                      <ImagePlus className="w-8 h-8 opacity-60" />
-                      <p className="text-[13px] font-medium">
-                        วาง URL รูป Official หรือสลับใช้การ์ดแบรนด์อัตโนมัติ
-                      </p>
-                    </div>
-                  )}
-                </div>
+            {visualMode === "OFFICIAL_PHOTO" && (
+              <StandardInput
+                type="url"
+                label="ลิงก์รูปภาพหน้าปก (Cover Image URL)"
+                value={coverImageUrl}
+                onChange={(e) => setCoverImageUrl(e.target.value)}
+                placeholder="https://..."
+              />
+            )}
 
-                {/* Below-photo clean 2-line preview */}
-                <div className="px-1 space-y-0.5">
-                  <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate">
-                    {brandNameTh.trim() || "ชื่อแบรนด์ / สถานที่"}
-                  </p>
-                  <p className="text-[13px] font-semibold text-[var(--color-accent)] truncate">
-                    {promoHeadlineTh.trim() || "ข้อความโปรโมชั่นเด่น"}
-                  </p>
-                  <p className="text-[12px] text-[var(--color-text-secondary)] truncate">
-                    {formatPromoDateRangeLabel(startsAt || null, expiresAt || null, "th")
-                      ?.label || "กำหนดช่วงวันที่โปรโมชั่น"}
-                  </p>
-                </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-600">
+                Live 1:1 Card Preview
+              </p>
+              <div className="w-[260px] aspect-square rounded-[20px] overflow-hidden bg-[var(--color-background-muted)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={
+                    visualMode === "OFFICIAL_PHOTO" && coverImageUrl.trim()
+                      ? coverImageUrl.trim()
+                      : previewCardUrl
+                  }
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Sticky Footer Actions */}
-        <div className="px-5 sm:px-6 py-4 border-t border-[var(--color-border)] bg-[var(--color-background-popover)] flex flex-wrap items-center justify-between gap-3 shrink-0 pb-[max(16px,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={resetForm}
-            className="text-[13.5px] font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] underline underline-offset-2 cursor-pointer"
-          >
-            ล้างฟอร์ม
-          </button>
-
-          <div className="flex items-center gap-2.5 ml-auto">
-            <StandardButton
-              type="button"
-              variant="secondary"
-              size="md"
-              disabled={isSubmitting}
-              onClick={() => handleSubmit("INBOX")}
-            >
-              เก็บเข้า Promo Inbox
-            </StandardButton>
-            <StandardButton
-              type="button"
-              variant="primary"
-              size="md"
-              disabled={isSubmitting}
-              onClick={() => handleSubmit("PUBLISH_NOW")}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>กำลังบันทึก...</span>
-                </>
-              ) : (
-                <span>เผยแพร่ขึ้นหน้าแรกทันที</span>
-              )}
-            </StandardButton>
-          </div>
-        </div>
+        )}
       </div>
-    </div>,
-    document.body
+    </AdminSlideSheet>
   );
 }
