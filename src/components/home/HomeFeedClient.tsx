@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import {
   HOME_PROMO_TABS,
   matchesHomePromoTab,
@@ -18,8 +19,6 @@ import {
 } from "@/lib/placeCategories";
 import {
   getEncodedSessionTasteParam,
-  getRecentViewedPinIds,
-  RECENT_VIEWS_UPDATED_EVENT,
   recordRecentViewedPinId,
   trackPinInteraction,
   trackTelemetryEvent,
@@ -27,7 +26,7 @@ import {
 import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
 import { useHotelApp } from "@/components/HotelAppShell";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
-import { DealSlideRow } from "@/components/home/DealSlideRow";
+import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import { HomeCollectibleHero } from "@/components/home/HomeCollectibleHero";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
@@ -111,10 +110,11 @@ function pickPrimaryDealPerHotel(pins: PinFeedItemDto[]): PinFeedItemDto[] {
   return Array.from(bestByKey.values());
 }
 
+const INITIAL_VISIBLE_COUNT = 16;
+const LOAD_MORE_STEP = 16;
+
 export function HomeFeedClient({
   initialPins,
-  initialRecentPinIds = [],
-  initialRecentPins = [],
   initialStyleTab = "all",
   initialSourceFilter = "ALL",
   initialStayId = null,
@@ -135,14 +135,17 @@ export function HomeFeedClient({
 
   const isTh = language === "th";
 
-  const resolvedInitialAnchor: HomePromoTabId = VALID_HOME_PROMO_TAB_IDS.has(
+  const resolvedInitialTab: HomePromoTabId = VALID_HOME_PROMO_TAB_IDS.has(
     initialStyleTab
   )
     ? (initialStyleTab as HomePromoTabId)
     : "all";
 
-  const [activeAnchorId, setActiveAnchorId] = useState<HomePromoTabId>(
-    resolvedInitialAnchor
+  const [activeTab, setActiveTab] = useState<HomePromoTabId>(
+    resolvedInitialTab
+  );
+  const [visibleCount, setVisibleCount] = useState<number>(
+    INITIAL_VISIBLE_COUNT
   );
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] =
@@ -150,18 +153,6 @@ export function HomeFeedClient({
   const [isTabsPinned, setIsTabsPinned] = useState<boolean>(false);
 
   const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>(initialPins);
-  const [recentPinIds, setRecentPinIds] = useState<string[]>(() =>
-    initialRecentPinIds.length > 0
-      ? initialRecentPinIds
-      : initialRecentPins.map((p) => p.id)
-  );
-  const [extraRecentPinsById, setExtraRecentPinsById] = useState<
-    Record<string, PinFeedItemDto>
-  >(() => {
-    const map: Record<string, PinFeedItemDto> = {};
-    for (const p of initialRecentPins) map[p.id] = p;
-    return map;
-  });
   const [searchPins, setSearchPins] = useState<PinFeedItemDto[] | null>(null);
   const [isLoadingPins, setIsLoadingPins] = useState<boolean>(
     initialPins.length === 0
@@ -200,6 +191,7 @@ export function HomeFeedClient({
     index: number;
   } | null>(null);
 
+  const sheetTopRef = useRef<HTMLDivElement | null>(null);
   const inlineTabsSentinelRef = useRef<HTMLDivElement | null>(null);
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
   const stickyTabsScrollRef = useRef<HTMLDivElement | null>(null);
@@ -211,15 +203,26 @@ export function HomeFeedClient({
   );
   const savedFeedScrollYRef = useRef<number>(0);
   const wasPinOpenRef = useRef<boolean>(Boolean(initialStayId));
-  const anchorScrollLockUntilRef = useRef<number>(0);
 
-  // Sync URL query params (?stay=..., ?source=...)
+  // Sync URL query params (?stay=..., ?tab=..., ?source=...)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       const stayParam = params.get("stay") || params.get("pin");
       setSelectedPinId(stayParam);
+
+      const tabParam = (
+        params.get("tab") ||
+        params.get("category") ||
+        params.get("style") ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+      if (VALID_HOME_PROMO_TAB_IDS.has(tabParam)) {
+        setActiveTab(tabParam as HomePromoTabId);
+      }
 
       const srcParam = (params.get("source") || "").toUpperCase();
       if (srcParam === "INTERNAL" || srcParam === "EXTERNAL") {
@@ -236,7 +239,7 @@ export function HomeFeedClient({
     setFetchError(null);
     try {
       const qs = new URLSearchParams();
-      qs.set("limit", "100");
+      qs.set("limit", "120");
       qs.set("compact", "1");
       const tasteParam = getEncodedSessionTasteParam();
       if (tasteParam) qs.set("taste", tasteParam);
@@ -248,7 +251,7 @@ export function HomeFeedClient({
         error?: string;
       };
       if (!res.ok) {
-        throw new Error(data.error || "ไม่สามารถโหลดรายการโปรที่พักได้");
+        throw new Error(data.error || "ไม่สามารถโหลดรายการโปรโมชั่นได้");
       }
       const fetched = data.pins || [];
       setMasterPins(fetched);
@@ -258,7 +261,7 @@ export function HomeFeedClient({
     } catch (err) {
       if (!silent) {
         setFetchError(
-          err instanceof Error ? err.message : "โหลดรายการโปรที่พักไม่สำเร็จ"
+          err instanceof Error ? err.message : "โหลดรายการโปรโมชั่นไม่สำเร็จ"
         );
       }
     } finally {
@@ -271,96 +274,6 @@ export function HomeFeedClient({
       void loadMasterPins(false);
     }
   }, [initialPins.length, loadMasterPins]);
-
-  // Sync recently viewed pin IDs (local instant history + DB SSR history + cross-tab sync)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const dbIds =
-      initialRecentPinIds.length > 0
-        ? initialRecentPinIds
-        : initialRecentPins.map((p) => p.id);
-
-    const mergeIds = (localIds: string[]) => {
-      const merged: string[] = [];
-      const seen = new Set<string>();
-      for (const id of [...localIds, ...dbIds]) {
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        merged.push(id);
-        if (merged.length >= 24) break;
-      }
-      setRecentPinIds(merged);
-    };
-
-    mergeIds(getRecentViewedPinIds());
-
-    const onUpdated = (e: Event) => {
-      const detail = (e as CustomEvent<{ pinIds?: string[] }>).detail;
-      mergeIds(Array.isArray(detail?.pinIds) ? detail.pinIds : getRecentViewedPinIds());
-    };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "cgr_recent_viewed_pins_v1") {
-        mergeIds(getRecentViewedPinIds());
-      }
-    };
-    window.addEventListener(RECENT_VIEWS_UPDATED_EVENT, onUpdated);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(RECENT_VIEWS_UPDATED_EVENT, onUpdated);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, [initialRecentPinIds, initialRecentPins]);
-
-  // Hydrate any locally recorded recent pin IDs not present in masterPins from real Postgres DB
-  useEffect(() => {
-    if (recentPinIds.length === 0) return;
-    const known = new Set<string>(masterPins.map((p) => p.id));
-    for (const id of Object.keys(extraRecentPinsById)) known.add(id);
-    const missing = recentPinIds.filter((id) => !known.has(id)).slice(0, 20);
-    if (missing.length === 0) return;
-
-    let cancelled = false;
-    fetch(`/api/pins?ids=${encodeURIComponent(missing.join(","))}`, {
-      cache: "no-store",
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { pins?: PinFeedItemDto[] } | null) => {
-        if (cancelled || !data?.pins?.length) return;
-        setExtraRecentPinsById((prev) => {
-          const next = { ...prev };
-          for (const p of data.pins!) next[p.id] = p;
-          return next;
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [recentPinIds, masterPins, extraRecentPinsById]);
-
-  const recentViewedDeals = useMemo(() => {
-    if (recentPinIds.length === 0) return [];
-    const byId = new Map<string, PinFeedItemDto>();
-    for (const p of Object.values(extraRecentPinsById)) byId.set(p.id, p);
-    for (const p of masterPins) byId.set(p.id, p);
-
-    const seenHotels = new Set<string>();
-    const out: PinFeedItemDto[] = [];
-    for (const id of recentPinIds) {
-      if (hiddenPinIds.has(id)) continue;
-      const pin = byId.get(id);
-      if (!pin) continue;
-      if (sourceFilter !== "ALL" && pin.dealSourceType !== sourceFilter) {
-        continue;
-      }
-      if (seenHotels.has(pin.hotelId)) continue;
-      seenHotels.add(pin.hotelId);
-      out.push(pin);
-      if (out.length >= 16) break;
-    }
-    return out;
-  }, [recentPinIds, extraRecentPinsById, masterPins, hiddenPinIds, sourceFilter]);
 
   // Debounced search query fetch
   useEffect(() => {
@@ -486,29 +399,28 @@ export function HomeFeedClient({
     });
   }, [baseCatalog, areaFilter]);
 
-  // Build Promotion Category rows & visible tabs (Core Launch Tabs always shown; expansion tabs shown when data exists)
-  const { promoRows, nationwideDeals, visibleTabs } = useMemo(() => {
-    const rows = HOME_PROMO_TABS.filter((t) => t.id !== "all").map((tab) => ({
-      tab,
-      anchorDomId: `group-${tab.id}`,
-      deals: visibleCatalog.filter((p) => matchesHomePromoTab(p, tab.id)),
-    }));
+  // PunPro-style Tab Filtering: compute active tab list + per-tab counts + Load More slice
+  const visibleTabs = HOME_PROMO_TABS;
 
-    const nationwide = visibleCatalog.filter(
-      (p) =>
-        p.locationScope === "NATIONWIDE_ONLINE" ||
-        p.locationScope === "MULTI_BRANCH" ||
-        p.provinceId === "nationwide"
-    );
+  const activeTabDeals = useMemo(() => {
+    if (activeTab === "all") return visibleCatalog;
+    return visibleCatalog.filter((p) => matchesHomePromoTab(p, activeTab));
+  }, [visibleCatalog, activeTab]);
 
-    const tabs = HOME_PROMO_TABS.filter((tab) => {
-      if (tab.isCoreLaunchTab) return true;
-      const row = rows.find((r) => r.tab.id === tab.id);
-      return Boolean(row && row.deals.length > 0);
-    });
+  const displayedDeals = useMemo(
+    () => activeTabDeals.slice(0, visibleCount),
+    [activeTabDeals, visibleCount]
+  );
 
-    return { promoRows: rows, nationwideDeals: nationwide, visibleTabs: tabs };
-  }, [visibleCatalog]);
+  const remainingCount = Math.max(
+    0,
+    activeTabDeals.length - displayedDeals.length
+  );
+
+  // Reset Load More count whenever tab, area filter, or search changes
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [activeTab, areaFilter, globalSearchQuery]);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
     latestPinReqRef.current = pinId;
@@ -605,9 +517,6 @@ export function HomeFeedClient({
       }
 
       recordRecentViewedPinId(pin.id);
-      setExtraRecentPinsById((prev) =>
-        prev[pin.id] ? prev : { ...prev, [pin.id]: pin }
-      );
       setSelectedPinSnapshot(pin);
       setPinDetail((prev) => (prev?.pin.id === pin.id ? prev : null));
       setSelectedPinId(pin.id);
@@ -916,7 +825,11 @@ export function HomeFeedClient({
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        if (entry) setIsTabsPinned(!entry.isIntersecting);
+        if (!entry) return;
+        const topCutoff = window.innerWidth >= 1024 ? 72 : 12;
+        setIsTabsPinned(
+          !entry.isIntersecting && entry.boundingClientRect.top < topCutoff
+        );
       },
       { rootMargin: "-64px 0px 0px 0px", threshold: 0 }
     );
@@ -924,49 +837,7 @@ export function HomeFeedClient({
     return () => observer.disconnect();
   }, [activePin]);
 
-  // Smooth rAF-Throttled Scroll-Spy for Promotion Category Tabs (zero layout thrash on mobile scroll!)
-  useEffect(() => {
-    if (activePin || typeof window === "undefined") return;
-    const sectionIds = visibleTabs.map((t) => ({
-      tabId: t.id,
-      domId: t.id === "all" ? "group-all" : `group-${t.id}`,
-    }));
-
-    let rafId = 0;
-    const evaluateScroll = () => {
-      rafId = 0;
-      if (Date.now() < anchorScrollLockUntilRef.current) return;
-      if (window.scrollY < 100) {
-        setActiveAnchorId((prev) => (prev === "all" ? prev : "all"));
-        return;
-      }
-      let current: HomePromoTabId = "all";
-      const offsetTop = 160;
-      for (const item of sectionIds) {
-        const el = document.getElementById(item.domId);
-        if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= offsetTop) {
-          current = item.tabId;
-        }
-      }
-      setActiveAnchorId((prev) => (prev === current ? prev : current));
-    };
-
-    const onScroll = () => {
-      if (rafId === 0) {
-        rafId = window.requestAnimationFrame(evaluateScroll);
-      }
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (rafId !== 0) window.cancelAnimationFrame(rafId);
-    };
-  }, [activePin, visibleCatalog.length, visibleTabs]);
-
-  // Keep active anchor tab centered in horizontal scroller
+  // Keep active category tab centered in horizontal scroller
   useEffect(() => {
     if (activePin) return;
     const syncScroller = (
@@ -985,12 +856,12 @@ export function HomeFeedClient({
       );
       scroller.scrollTo({ left: targetLeft, behavior: "smooth" });
     };
-    syncScroller(tabsScrollRef.current, tabButtonRefs.current[activeAnchorId]);
+    syncScroller(tabsScrollRef.current, tabButtonRefs.current[activeTab]);
     syncScroller(
       stickyTabsScrollRef.current,
-      stickyTabButtonRefs.current[activeAnchorId]
+      stickyTabButtonRefs.current[activeTab]
     );
-  }, [activeAnchorId, activePin, language]);
+  }, [activeTab, activePin, language]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -1004,46 +875,65 @@ export function HomeFeedClient({
     };
   }, [isTabsPinned, activePin]);
 
-  // Anchor Scroll Handler — scrolls smoothly to the target Promotion Category Row
-  const scrollToGroupAnchor = useCallback((tabId: HomePromoTabId) => {
-    setActiveAnchorId(tabId);
-    anchorScrollLockUntilRef.current = Date.now() + 700;
-    if (tabId !== "all") {
-      trackTelemetryEvent({
-        eventType: "SEARCH_FILTER",
-        styleTab: tabId,
-      });
-    }
+  const scrollToSheetTop = useCallback(() => {
     if (typeof window === "undefined") return;
-    if (tabId === "all") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    const targetEl = document.getElementById(`group-${tabId}`);
-    if (targetEl) {
-      targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    const sheetEl = sheetTopRef.current;
+    if (!sheetEl) return;
+    const topOffset = window.innerWidth >= 1024 ? 72 : 8;
+    const targetY =
+      sheetEl.getBoundingClientRect().top + window.scrollY - topOffset;
+    window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
   }, []);
+
+  // PunPro-Style Tab Switcher (filters vertical grid in-place, syncs ?tab= URL)
+  const handleSelectTab = useCallback(
+    (tabId: HomePromoTabId, scrollToFeed = false) => {
+      setActiveTab(tabId);
+      setVisibleCount(INITIAL_VISIBLE_COUNT);
+      if (tabId !== "all") {
+        trackTelemetryEvent({
+          eventType: "SEARCH_FILTER",
+          styleTab: tabId,
+        });
+      }
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (tabId === "all") {
+          url.searchParams.delete("tab");
+          url.searchParams.delete("category");
+        } else {
+          url.searchParams.set("tab", tabId);
+          url.searchParams.delete("category");
+        }
+        window.history.replaceState(null, "", url.toString());
+        if (scrollToFeed || isTabsPinned) {
+          scrollToSheetTop();
+        }
+      }
+    },
+    [isTabsPinned, scrollToSheetTop]
+  );
 
   const handleResetFilters = () => {
     setSourceFilter("ALL");
     setAreaFilter("all");
     setGlobalSearchQuery("");
-    scrollToGroupAnchor("all");
+    handleSelectTab("all", false);
   };
 
   const exploreMapHref = useMemo(() => {
     const qs = new URLSearchParams();
-    if (activeAnchorId === "stay") qs.set("category", "STAY");
-    else if (activeAnchorId === "cafe") qs.set("category", "CAFE");
-    else if (activeAnchorId === "dining-bar") qs.set("category", "RESTAURANT");
-    else if (activeAnchorId === "wellness") qs.set("category", "WELLNESS");
-    else if (activeAnchorId === "attraction") qs.set("category", "ATTRACTION");
+    if (activeTab === "stay") qs.set("category", "STAY");
+    else if (activeTab === "cafe") qs.set("category", "CAFE");
+    else if (activeTab === "restaurant" || activeTab === "bar") {
+      qs.set("category", "RESTAURANT");
+    } else if (activeTab === "wellness") qs.set("category", "WELLNESS");
+    else if (activeTab === "attraction") qs.set("category", "ATTRACTION");
     if (sourceFilter !== "ALL") qs.set("source", sourceFilter);
     if (globalSearchQuery.trim()) qs.set("q", globalSearchQuery.trim());
     const str = qs.toString();
     return str ? `/explore?${str}` : "/explore";
-  }, [activeAnchorId, sourceFilter, globalSearchQuery]);
+  }, [activeTab, sourceFilter, globalSearchQuery]);
 
   return (
     <div className="cgr-page-wide pb-14 [overflow-anchor:none]">
@@ -1065,7 +955,7 @@ export function HomeFeedClient({
               className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-x-contain overscroll-y-none no-scrollbar select-none"
             >
               {visibleTabs.map((tab) => {
-                const isActive = activeAnchorId === tab.id;
+                const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={`sticky-${tab.id}`}
@@ -1073,7 +963,7 @@ export function HomeFeedClient({
                       stickyTabButtonRefs.current[tab.id] = el;
                     }}
                     type="button"
-                    onClick={() => scrollToGroupAnchor(tab.id)}
+                    onClick={() => handleSelectTab(tab.id, true)}
                     className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
                       isActive
                         ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
@@ -1089,35 +979,62 @@ export function HomeFeedClient({
         </nav>
       )}
 
-      {/* Top 4-Layer Collectible Card Hero + Promotion Hub Header + Inline Category Tabs */}
+      {/* Top Full-Viewport Sticky 3D Island Hero (Apple Inertia Smooth Zoom + 6 Frosted-Glass Icons) */}
+      {!activePin && !globalSearchQuery.trim() && (
+        <HomeCollectibleHero
+          language={language}
+          activeTab={activeTab}
+          onSelectCategory={(tabId) => handleSelectTab(tabId, true)}
+        />
+      )}
+
+      {/* Curved White Sheet Curtain: Peeks at bottom on load, glides smoothly UP over the sticky hero on scroll */}
       <div
+        ref={sheetTopRef}
         aria-hidden={Boolean(activePin)}
-        className={activePin ? "hidden" : ""}
+        className={
+          activePin
+            ? "hidden"
+            : !globalSearchQuery.trim()
+            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-[24svh] sm:-mt-[22svh] lg:-mt-[88px] pt-3 lg:pt-4 pb-10 rounded-t-[28px] bg-[var(--color-background-body)] min-h-[100svh]"
+            : ""
+        }
       >
+        {/* Subtle Curved Peek-Sheet Grab Pill (Matches /explore native sheet feel) */}
         {!globalSearchQuery.trim() && (
-          <HomeCollectibleHero language={language} />
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]"
+          />
         )}
 
-        <div
-          className={
-            !globalSearchQuery.trim()
-              ? "relative z-10 -mx-4 px-4 sm:-mx-6 sm:px-6 -mt-4 pt-5 rounded-t-[24px] bg-[var(--color-background-body)] lg:mx-0 lg:px-0 lg:mt-0 lg:pt-0 lg:rounded-none lg:bg-transparent"
-              : ""
-          }
-        >
+        <div>
           <div className="pb-2.5 sm:pb-3 flex items-baseline justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] leading-tight">
-                {isTh ? "โปรเที่ยวไทย" : "Thailand Travel Deals"}
+                {globalSearchQuery.trim()
+                  ? isTh
+                    ? `ผลค้นหา "${globalSearchQuery.trim()}"`
+                    : `Results for "${globalSearchQuery.trim()}"`
+                  : isTh
+                  ? "โปรเที่ยวไทย"
+                  : "Thailand Travel Deals"}
               </h1>
               <p className="text-[13px] sm:text-[14px] text-[var(--color-text-secondary)] mt-0.5 truncate">
                 {isTh
-                  ? "รวมโปรโมชั่นที่พัก คาเฟ่ ร้านอาหาร & บาร์ และแบรนด์ดังทั่วไทย พร้อมแผนที่และจองตรง 0% GP"
-                  : "Curated Thailand travel deals across stays, cafes, dining & bars, brands, and 0% GP direct stays"}
+                  ? "รวมโปรโมชั่นที่พัก คาเฟ่ ร้านอาหาร บาร์ สปา กิจกรรม และแบรนด์ดังทั่วไทย"
+                  : "Curated Thailand travel deals across stays, cafes, restaurants, bars, spa & activities"}
               </p>
             </div>
+            {!isLoadingPins && (
+              <span className="text-[12.5px] font-medium text-[var(--color-text-secondary)] tabular-nums shrink-0">
+                {activeTabDeals.length.toLocaleString()}{" "}
+                {isTh ? "โปร" : "deals"}
+              </span>
+            )}
           </div>
 
+          {/* 7 PunPro-Style Filter Tabs */}
           <div ref={inlineTabsSentinelRef}>
             <div
               ref={tabsScrollRef}
@@ -1125,7 +1042,7 @@ export function HomeFeedClient({
               className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
             >
               {visibleTabs.map((tab) => {
-                const isActive = activeAnchorId === tab.id;
+                const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
@@ -1133,7 +1050,7 @@ export function HomeFeedClient({
                       tabButtonRefs.current[tab.id] = el;
                     }}
                     type="button"
-                    onClick={() => scrollToGroupAnchor(tab.id)}
+                    onClick={() => handleSelectTab(tab.id, false)}
                     className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
                       isActive
                         ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
@@ -1147,7 +1064,7 @@ export function HomeFeedClient({
             </div>
           </div>
 
-          {/* Compact Borderless Area / Scope Filter Pills (All Thailand · Nationwide/Online · Popular Provinces) */}
+          {/* Compact Borderless Area / Scope Filter Pills */}
           {(areaOptions.provinces.length > 1 || areaOptions.hasNationwide) && (
             <div className="pt-3 pb-1 flex items-center gap-2 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
               <button
@@ -1194,6 +1111,110 @@ export function HomeFeedClient({
             </div>
           )}
         </div>
+
+        {/* Error State */}
+        {fetchError && !activePin && (
+          <div className="mt-6 rounded-[16px] bg-[var(--color-background-muted)] p-5 flex items-center justify-between gap-4">
+            <p className="ty-body font-semibold text-[var(--color-error)]">
+              {fetchError}
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadMasterPins(false)}
+              className="btn-round-solid !h-9 shrink-0"
+            >
+              {isTh ? "ลองใหม่" : "Retry"}
+            </button>
+          </div>
+        )}
+
+        {/* PunPro-Style Pure Vertical Grid + Load More ("ดูเพิ่มเติม") — Zero Horizontal Slide Carousels! */}
+        {!activePin &&
+          (isLoadingPins && masterPins.length === 0 ? (
+            <div className="pt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-3.5 gap-y-6 sm:gap-x-5 sm:gap-y-7">
+              {Array.from({ length: 10 }).map((_, idx) => (
+                <div key={idx} className="space-y-2.5">
+                  <div className="w-full aspect-square rounded-[22px] bg-[var(--color-background-muted)] cgr-skeleton-block" />
+                  <div className="h-4 w-3/4 rounded-full bg-[var(--color-background-muted)] cgr-skeleton-block" />
+                  <div className="h-3.5 w-1/2 rounded-full bg-[var(--color-background-muted)] cgr-skeleton-block" />
+                </div>
+              ))}
+            </div>
+          ) : activeTabDeals.length === 0 ? (
+            <div className="mt-6 rounded-[22px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
+              <h2 className="ty-title">
+                {isTh
+                  ? "ยังไม่มีโปรโมชั่นในหมวดหรือพื้นที่นี้"
+                  : "No promotions in this category yet"}
+              </h2>
+              <p className="ty-caption">
+                {isTh
+                  ? "ลองเลือกหมวดอื่น หรือดูโปรเที่ยวไทยทั้งหมดที่มีตอนนี้"
+                  : "Try another category or explore all active Thailand travel deals."}
+              </p>
+              <div className="flex items-center justify-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="btn-round-solid"
+                >
+                  {isTh ? "แสดงโปรทั้งหมด" : "Show all deals"}
+                </button>
+                <Link href={exploreMapHref} className="btn-fw-secondary">
+                  {isTh ? "เปิดแผนที่" : "Open map"}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="pt-5 space-y-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-3.5 gap-y-6 sm:gap-x-5 sm:gap-y-7">
+                {displayedDeals.map((deal, idx) => (
+                  <VerticalCouponCard
+                    key={deal.id}
+                    pin={deal}
+                    language={language}
+                    isSaved={effectiveSavedPinIds.has(deal.id)}
+                    priority={idx < 8}
+                    onSelect={handleSelectFeedDeal}
+                    onToggleSave={handleToggleSaveStable}
+                  />
+                ))}
+              </div>
+
+              {/* PunPro-Style Load More ("ดูเพิ่มเติม") Pill */}
+              <div className="pt-2 pb-4 flex flex-col items-center gap-2.5">
+                {remainingCount > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleCount((prev) => prev + LOAD_MORE_STEP)
+                      }
+                      className="h-11 px-7 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <span>
+                        {isTh
+                          ? `ดูเพิ่มเติม (อีก ${remainingCount.toLocaleString()} โปร)`
+                          : `Load more (${remainingCount.toLocaleString()} more)`}
+                      </span>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                    <p className="text-[12px] text-[var(--color-text-secondary)] tabular-nums">
+                      {isTh
+                        ? `แสดง ${displayedDeals.length.toLocaleString()} จาก ${activeTabDeals.length.toLocaleString()} โปรโมชั่น`
+                        : `Showing ${displayedDeals.length.toLocaleString()} of ${activeTabDeals.length.toLocaleString()} deals`}
+                    </p>
+                  </>
+                ) : activeTabDeals.length > INITIAL_VISIBLE_COUNT ? (
+                  <p className="text-[12.5px] text-[var(--color-text-secondary)] tabular-nums">
+                    {isTh
+                      ? `แสดงครบทั้งหมด ${activeTabDeals.length.toLocaleString()} โปรโมชั่นแล้ว`
+                      : `Showing all ${activeTabDeals.length.toLocaleString()} deals`}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ))}
       </div>
 
       {/* Shared 2-Layer Place Profile View (Identical Across /, /style, /explore, /trip!) */}
@@ -1256,156 +1277,6 @@ export function HomeFeedClient({
           onDeleteComment={handleDeleteComment}
         />
       )}
-
-      {/* Error State */}
-      {fetchError && !activePin && (
-        <div className="mt-6 rounded-[16px] bg-[var(--color-background-muted)] p-5 flex items-center justify-between gap-4">
-          <p className="ty-body font-semibold text-[var(--color-error)]">
-            {fetchError}
-          </p>
-          <button
-            type="button"
-            onClick={() => void loadMasterPins(false)}
-            className="btn-round-solid !h-9 shrink-0"
-          >
-            {isTh ? "ลองใหม่" : "Retry"}
-          </button>
-        </div>
-      )}
-
-      {/* Pure 100% Card Slide Home Feed (Airbnb-Style Horizontal Carousels Only!) */}
-      {!activePin &&
-        (isLoadingPins && masterPins.length === 0 ? (
-          <div className="pt-6 space-y-8">
-            {[0, 1].map((row) => (
-              <div key={row} className="space-y-4">
-                <div className="h-6 w-56 rounded-[8px] bg-[var(--color-background-muted)] animate-pulse" />
-                <div className="flex gap-4 overflow-hidden">
-                  {Array.from({ length: 4 }).map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="w-[266px] aspect-square shrink-0 rounded-[22px] bg-[var(--color-background-muted)] animate-pulse"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : visibleCatalog.length === 0 ? (
-          <div className="mt-6 rounded-[20px] bg-[var(--color-background-muted)] p-10 text-center space-y-3">
-            <h2 className="ty-title">
-              {isTh
-                ? "ยังไม่พบโปรที่พักที่ตรงกับคำค้นหานี้"
-                : "No stay deals match your search"}
-            </h2>
-            <p className="ty-caption">
-              {isTh
-                ? "ลองล้างคำค้นหา หรือสำรวจทุกโปรบนแผนที่ทั่วไทย"
-                : "Try clearing filters or exploring all deals on the map."}
-            </p>
-            <div className="flex items-center justify-center gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="btn-round-solid"
-              >
-                {isTh ? "แสดงโปรทั้งหมด" : "Show all deals"}
-              </button>
-              <Link href="/explore" className="btn-fw-secondary">
-                {isTh ? "เปิดแผนที่" : "Open map"}
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-0.5 sm:space-y-1">
-            {/* Search Results Slide Row (When searching) */}
-            {globalSearchQuery.trim() && (
-              <DealSlideRow
-                id="group-all"
-                title={
-                  isTh
-                    ? `ผลค้นหา "${globalSearchQuery.trim()}" (${visibleCatalog.length})`
-                    : `Results for "${globalSearchQuery.trim()}" (${visibleCatalog.length})`
-                }
-                seeAllHref={exploreMapHref}
-                deals={visibleCatalog}
-                language={language}
-                savedPinIds={effectiveSavedPinIds}
-                priorityRow={true}
-                onSelectDeal={handleSelectFeedDeal}
-                onToggleSave={handleToggleSaveStable}
-              />
-            )}
-
-            {/* Featured Top Anchor Section (#group-all) */}
-            {!globalSearchQuery.trim() && (
-              <>
-                {recentViewedDeals.length > 0 && areaFilter === "all" && (
-                  <DealSlideRow
-                    id="group-all"
-                    title={isTh ? "ดูล่าสุด" : "Recently viewed"}
-                    seeAllHref="/style/recent"
-                    deals={recentViewedDeals}
-                    language={language}
-                    savedPinIds={effectiveSavedPinIds}
-                    priorityRow={true}
-                    onSelectDeal={handleSelectFeedDeal}
-                    onToggleSave={handleToggleSaveStable}
-                  />
-                )}
-
-                {/* Promotion Category Slide Rows (Stays -> Cafes -> Dining & Bars -> Expansion Categories) */}
-                {promoRows.map((row, rowIdx) => {
-                  if (row.deals.length === 0) return null;
-                  const isFirstSection =
-                    (recentViewedDeals.length === 0 || areaFilter !== "all") &&
-                    rowIdx ===
-                      promoRows.findIndex((candidate) => candidate.deals.length > 0);
-                  return (
-                    <div
-                      key={row.tab.id}
-                      id={isFirstSection ? "group-all" : undefined}
-                    >
-                      <DealSlideRow
-                        id={row.anchorDomId}
-                        title={
-                          isTh
-                            ? row.tab.sectionTitleTh
-                            : row.tab.sectionTitleEn
-                        }
-                        seeAllHref={row.tab.seeAllHref}
-                        deals={row.deals}
-                        language={language}
-                        savedPinIds={effectiveSavedPinIds}
-                        priorityRow={isFirstSection}
-                        onSelectDeal={handleSelectFeedDeal}
-                        onToggleSave={handleToggleSaveStable}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Nationwide Brands, Chains & Credit Card Deals Row (shown when available) */}
-                {nationwideDeals.length > 0 && areaFilter !== "nationwide" && (
-                  <DealSlideRow
-                    id="group-nationwide"
-                    title={
-                      isTh
-                        ? "โปรแบรนด์ดัง & บัตรเครดิตทั่วไทย"
-                        : "Nationwide brands & credit card deals"
-                    }
-                    seeAllHref="/style/nationwide"
-                    deals={nationwideDeals}
-                    language={language}
-                    savedPinIds={effectiveSavedPinIds}
-                    onSelectDeal={handleSelectFeedDeal}
-                    onToggleSave={handleToggleSaveStable}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        ))}
 
       {fullscreenMedia && (
         <PureMediaViewer

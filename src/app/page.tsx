@@ -34,6 +34,7 @@ const loadPinDetailForSsr = cache(async (stayId: string) => {
 interface HomeSearchParams {
   stay?: string;
   pin?: string;
+  tab?: string;
   category?: string;
   style?: string;
   source?: string;
@@ -100,7 +101,9 @@ export default async function HomePage({
   ]);
 
   const stayId = (sp?.stay || sp?.pin || "").trim() || null;
-  const rawCategoryParam = (sp?.category || sp?.style || "").trim().toLowerCase();
+  const rawCategoryParam = (sp?.tab || sp?.category || sp?.style || "")
+    .trim()
+    .toLowerCase();
   const initialStyleTab = VALID_HOME_PROMO_TAB_IDS.has(rawCategoryParam)
     ? rawCategoryParam
     : "all";
@@ -138,7 +141,7 @@ export default async function HomePage({
     const [fetchedPins, fetchedDetail, recentPinIds] = await Promise.all([
       searchDiscoveryPins({
         style: null,
-        limit: 64,
+        limit: 120,
         compact: true,
         userId: sessionUser?.id ?? null,
         ...hints,

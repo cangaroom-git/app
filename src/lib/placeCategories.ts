@@ -170,7 +170,8 @@ export type HomePromoTabId =
   | "all"
   | "stay"
   | "cafe"
-  | "dining-bar"
+  | "restaurant"
+  | "bar"
   | "wellness"
   | "attraction";
 
@@ -181,7 +182,7 @@ export interface HomePromoTabConfig {
   sectionTitleTh: string;
   sectionTitleEn: string;
   seeAllHref: string;
-  /** Core launch focus tabs stay visible even when sparse; expansion tabs show automatically when promos exist */
+  /** Core launch focus tabs stay visible even when sparse */
   isCoreLaunchTab: boolean;
 }
 
@@ -190,8 +191,8 @@ export const HOME_PROMO_TABS: readonly HomePromoTabConfig[] = [
     id: "all",
     labelTh: "ทั้งหมด",
     labelEn: "All Deals",
-    sectionTitleTh: "โปรเที่ยวไทยแนะนำ",
-    sectionTitleEn: "Featured Thailand deals",
+    sectionTitleTh: "โปรเที่ยวไทยทั้งหมด",
+    sectionTitleEn: "All Thailand travel deals",
     seeAllHref: "/style/curated",
     isCoreLaunchTab: true,
   },
@@ -214,31 +215,40 @@ export const HOME_PROMO_TABS: readonly HomePromoTabConfig[] = [
     isCoreLaunchTab: true,
   },
   {
-    id: "dining-bar",
-    labelTh: "ร้านอาหาร & บาร์",
-    labelEn: "Dining & Bars",
-    sectionTitleTh: "โปรร้านอาหาร & บาร์",
-    sectionTitleEn: "Dining, buffets & bars",
+    id: "restaurant",
+    labelTh: "ร้านอาหาร",
+    labelEn: "Restaurants",
+    sectionTitleTh: "โปรร้านอาหาร & บุฟเฟ่ต์",
+    sectionTitleEn: "Restaurant & buffet deals",
+    seeAllHref: "/style/dining-bar",
+    isCoreLaunchTab: true,
+  },
+  {
+    id: "bar",
+    labelTh: "บาร์",
+    labelEn: "Bars",
+    sectionTitleTh: "โปรบาร์ รูฟท็อป & บีชคลับ",
+    sectionTitleEn: "Bars, rooftops & beach clubs",
     seeAllHref: "/style/dining-bar",
     isCoreLaunchTab: true,
   },
   {
     id: "wellness",
-    labelTh: "สปา & เวลเนส",
-    labelEn: "Spa & Wellness",
+    labelTh: "สปา",
+    labelEn: "Spa",
     sectionTitleTh: "โปรสปา ออนเซ็น & เวลเนส",
     sectionTitleEn: "Spa, onsen & wellness deals",
     seeAllHref: "/style/wellness",
-    isCoreLaunchTab: false,
+    isCoreLaunchTab: true,
   },
   {
     id: "attraction",
-    labelTh: "กิจกรรม & ที่เที่ยว",
+    labelTh: "กิจกรรม",
     labelEn: "Activities",
     sectionTitleTh: "โปรกิจกรรม & ที่เที่ยว",
     sectionTitleEn: "Activities & attractions",
     seeAllHref: "/style/attraction",
-    isCoreLaunchTab: false,
+    isCoreLaunchTab: true,
   },
 ] as const;
 
@@ -246,25 +256,58 @@ export const VALID_HOME_PROMO_TAB_IDS: ReadonlySet<string> = new Set(
   HOME_PROMO_TABS.map((t) => t.id)
 );
 
+const BAR_KEYWORD_PATTERN =
+  /(?:บาร์|รูฟท็อป|บีชคลับ|ค็อกเทล|ไวน์|ผับ|เลานจ์|\bbar\b|\brooftop\b|\bbeach\s*club\b|\bcocktail\b|\blounge\b|\bpub\b|\bizakaya\b)/i;
+
+function isBarPromoPin(pin: {
+  promoCategoryCode?: string | null;
+  stayStyles?: string[];
+  hotelNameTh?: string;
+  hotelNameEn?: string;
+  titleTh?: string;
+  titleEn?: string;
+  promoHeadlineTh?: string | null;
+}): boolean {
+  const override = (pin.promoCategoryCode || "").trim().toUpperCase();
+  if (override === "BAR") return true;
+  if (
+    pin.stayStyles?.some(
+      (s) => s === "bars" || s === "bar" || s === "rooftop" || s === "beach-club"
+    )
+  ) {
+    return true;
+  }
+  const haystack = `${pin.hotelNameTh || ""} ${pin.hotelNameEn || ""} ${pin.titleTh || ""} ${pin.titleEn || ""} ${pin.promoHeadlineTh || ""}`;
+  return BAR_KEYWORD_PATTERN.test(haystack);
+}
+
 export function resolveEffectivePromoCategory(pin: {
   placeCategory: PlaceCategoryDto;
   promoCategoryCode?: string | null;
   stayStyles?: string[];
+  hotelNameTh?: string;
+  hotelNameEn?: string;
+  titleTh?: string;
+  titleEn?: string;
+  promoHeadlineTh?: string | null;
 }): Exclude<HomePromoTabId, "all"> {
   const override = (pin.promoCategoryCode || "").trim().toUpperCase();
   if (override === "STAY") return "stay";
   if (override === "CAFE") return "cafe";
-  if (override === "RESTAURANT" || override === "BAR" || override === "DINING-BAR") {
-    return "dining-bar";
+  if (override === "BAR") return "bar";
+  if (override === "RESTAURANT" || override === "DINING-BAR") {
+    return isBarPromoPin(pin) ? "bar" : "restaurant";
   }
   if (override === "WELLNESS") return "wellness";
   if (override === "ATTRACTION") return "attraction";
 
   if (pin.placeCategory === "CAFE") return "cafe";
-  if (pin.placeCategory === "RESTAURANT") return "dining-bar";
+  if (pin.placeCategory === "RESTAURANT") {
+    return isBarPromoPin(pin) ? "bar" : "restaurant";
+  }
   if (pin.placeCategory === "WELLNESS") return "wellness";
   if (pin.placeCategory === "ATTRACTION") return "attraction";
-  return "stay";
+  return isBarPromoPin(pin) ? "bar" : "stay";
 }
 
 export function matchesHomePromoTab(
@@ -272,16 +315,23 @@ export function matchesHomePromoTab(
     placeCategory: PlaceCategoryDto;
     promoCategoryCode?: string | null;
     stayStyles?: string[];
+    hotelNameTh?: string;
+    hotelNameEn?: string;
+    titleTh?: string;
+    titleEn?: string;
+    promoHeadlineTh?: string | null;
   },
-  tabId: HomePromoTabId
+  tabId: HomePromoTabId | "dining-bar"
 ): boolean {
   if (tabId === "all") return true;
   const resolved = resolveEffectivePromoCategory(pin);
-  if (resolved === tabId) return true;
-  if (tabId === "dining-bar" && pin.stayStyles?.includes("bars")) {
-    return true;
+  if (tabId === "dining-bar") {
+    return resolved === "restaurant" || resolved === "bar";
   }
-  return false;
+  if (tabId === "bar") {
+    return resolved === "bar" || isBarPromoPin(pin);
+  }
+  return resolved === tabId;
 }
 
 const THAI_SHORT_MONTHS = [

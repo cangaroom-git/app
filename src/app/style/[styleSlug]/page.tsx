@@ -117,7 +117,7 @@ export default async function StyleCollectionPage({
     meta.slug === "attraction"
   ) {
     collectionPins = allCatalogPins.filter((p) =>
-      matchesHomePromoTab(p, meta.slug as HomePromoTabId)
+      matchesHomePromoTab(p, meta.slug as HomePromoTabId | "dining-bar")
     );
   } else {
     collectionPins = allCatalogPins.filter((p) =>
