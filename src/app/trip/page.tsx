@@ -112,7 +112,9 @@ export default function TripPlannerPage() {
         if (!entry) return;
         setShowBottomWhiteShield(entry.isIntersecting);
       },
-      { rootMargin: "0px 0px -55% 0px", threshold: 0 }
+      // Trigger only once the sheet top is in the upper 25% of screen so the 35vh bottom shield
+      // (sitting at 65%–100%) stays hidden ~320px below the rounded sheet corners (zero flash!).
+      { rootMargin: "0px 0px -75% 0px", threshold: 0 }
     );
     topObserver.observe(sheetEl);
     midObserver.observe(sheetEl);
@@ -241,7 +243,7 @@ export default function TripPlannerPage() {
       />
       <div
         aria-hidden="true"
-        className={`lg:hidden fixed bottom-0 inset-x-0 z-[15] h-[55vh] bg-[var(--color-background-body)] pointer-events-none ${
+        className={`lg:hidden fixed bottom-0 inset-x-0 z-[15] h-[35vh] bg-[var(--color-background-body)] pointer-events-none ${
           showBottomWhiteShield ? "block" : "hidden"
         }`}
       />

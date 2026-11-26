@@ -1109,6 +1109,9 @@ html.dark .border-stone-300 {
   pointer-events: auto;
   transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+.cgr-modal-sheet-only[data-dragging="true"] {
+  transition: none !important;
+}
 
 /* Airbnb Slide-Over Right Menu Drawer (2-frame GPU-composited slide-in & slide-out) */
 .cgr-right-drawer-panel {

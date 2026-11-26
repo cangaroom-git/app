@@ -144,12 +144,12 @@ function RouteProgressBarInner() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed top-0 inset-x-0 z-[120] h-[2.5px] pointer-events-none transition-opacity duration-200 ${
+      className={`fixed top-0 inset-x-0 z-[120] h-[3px] pointer-events-none transition-opacity duration-200 ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
     >
       <div
-        className="h-full bg-[var(--color-text-primary)] origin-left transition-[transform] duration-200 ease-out"
+        className="h-full bg-[var(--color-accent-yellow)] origin-left transition-[transform] duration-200 ease-out"
         style={{ transform: `scaleX(${progress / 100})` }}
       />
     </div>

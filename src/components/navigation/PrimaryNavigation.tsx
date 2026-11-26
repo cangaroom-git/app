@@ -11,9 +11,11 @@ import type {
   SmartSearchRecentPin,
 } from "@/lib/services/smartSearchService";
 import {
+  prewarmSmartSearchSuggestions,
   SmartSearchDropdown,
   type SmartSearchSelectQueryPayload,
 } from "@/components/navigation/SmartSearchDropdown";
+import { HOME_PROMO_TABS } from "@/lib/placeCategories";
 import { startRouteProgress } from "@/components/navigation/RouteProgressBar";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
 import { useModalPresence } from "@/lib/useModalPresence";
@@ -83,9 +85,41 @@ export function PrimaryNavigation({
   const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const floatingSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const mobileSearchResultsScrollRef = useRef<HTMLDivElement | null>(null);
+  const searchDragStartYRef = useRef<number | null>(null);
+  const searchDragStartTimeRef = useRef<number>(0);
 
-  const floatingSearchPresence = useModalPresence(isFloatingSearchOpen, 220);
+  const [searchSheetDragY, setSearchSheetDragY] = useState(0);
+  const [isDraggingSearchSheet, setIsDraggingSearchSheet] = useState(false);
+  const [visualViewportBox, setVisualViewportBox] = useState<{
+    top: number;
+    height: number;
+    keyboardOpen: boolean;
+  } | null>(null);
+
+  const floatingSearchPresence = useModalPresence(isFloatingSearchOpen, 250);
   useBodyScrollLock(floatingSearchPresence.shouldRender);
+
+  // Idle-prewarm smart search focus suggestions so first open is 0ms with zero hitch
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const win = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number }
+      ) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof win.requestIdleCallback === "function") {
+      const idleId = win.requestIdleCallback(
+        () => prewarmSmartSearchSuggestions(),
+        { timeout: 1600 }
+      );
+      return () => win.cancelIdleCallback?.(idleId);
+    }
+    const t = window.setTimeout(() => prewarmSmartSearchSuggestions(), 1100);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     setIsFloatingSearchOpen(false);
@@ -108,20 +142,99 @@ export function PrimaryNavigation({
     };
   }, [isDesktopSearchOpen]);
 
+  // Track visualViewport while mobile search sheet is rendered so the bottom search bar
+  // docks cleanly flush above the iOS/Android software keyboard with zero overlap or jump.
   useEffect(() => {
-    if (!isFloatingSearchOpen) return;
-    const t = window.setTimeout(() => {
-      floatingSearchInputRef.current?.focus();
-    }, 60);
+    if (!floatingSearchPresence.shouldRender) {
+      setVisualViewportBox(null);
+      setSearchSheetDragY(0);
+      setIsDraggingSearchSheet(false);
+      return;
+    }
+
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsFloatingSearchOpen(false);
+      if (e.key === "Escape") {
+        floatingSearchInputRef.current?.blur();
+        setIsFloatingSearchOpen(false);
+      }
     };
     window.addEventListener("keydown", onEsc);
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener("keydown", onEsc);
+
+    const vv = window.visualViewport;
+    if (!vv) {
+      return () => window.removeEventListener("keydown", onEsc);
+    }
+
+    let rafId = 0;
+    const syncViewport = () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => {
+        const innerH = window.innerHeight || vv.height;
+        const vvH = Math.round(vv.height);
+        const vvTop = Math.max(0, Math.round(vv.offsetTop));
+        const keyboardOpen = innerH - vvH > 120;
+        setVisualViewportBox(
+          keyboardOpen || vvTop > 0
+            ? { top: vvTop, height: vvH, keyboardOpen }
+            : null
+        );
+      });
     };
-  }, [isFloatingSearchOpen]);
+
+    syncViewport();
+    vv.addEventListener("resize", syncViewport);
+    vv.addEventListener("scroll", syncViewport);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener("keydown", onEsc);
+      vv.removeEventListener("resize", syncViewport);
+      vv.removeEventListener("scroll", syncViewport);
+    };
+  }, [floatingSearchPresence.shouldRender]);
+
+  // Reset results scroll to top when typing a new query so best matches stay visible
+  useEffect(() => {
+    if (!isFloatingSearchOpen) return;
+    mobileSearchResultsScrollRef.current?.scrollTo({ top: 0 });
+  }, [isFloatingSearchOpen, searchQuery]);
+
+  const handleCloseFloatingSearch = useCallback(() => {
+    floatingSearchInputRef.current?.blur();
+    setIsFloatingSearchOpen(false);
+  }, []);
+
+  const handleSearchHeaderTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 1) return;
+      searchDragStartYRef.current = e.touches[0].clientY;
+      searchDragStartTimeRef.current = performance.now();
+      setIsDraggingSearchSheet(true);
+    },
+    []
+  );
+
+  const handleSearchHeaderTouchMove = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (searchDragStartYRef.current === null || e.touches.length !== 1) return;
+      const dy = e.touches[0].clientY - searchDragStartYRef.current;
+      setSearchSheetDragY(dy > 0 ? dy : dy * 0.18);
+    },
+    []
+  );
+
+  const handleSearchHeaderTouchEnd = useCallback(() => {
+    if (searchDragStartYRef.current === null) return;
+    const elapsed = Math.max(16, performance.now() - searchDragStartTimeRef.current);
+    const velocity = searchSheetDragY / elapsed;
+    searchDragStartYRef.current = null;
+    setIsDraggingSearchSheet(false);
+    if (searchSheetDragY >= 72 || (searchSheetDragY >= 28 && velocity > 0.38)) {
+      setSearchSheetDragY(0);
+      handleCloseFloatingSearch();
+    } else {
+      setSearchSheetDragY(0);
+    }
+  }, [handleCloseFloatingSearch, searchSheetDragY]);
 
   const isDarkTheme = theme === "dark";
   const ownedHotel = user?.ownedHotels?.[0] ?? null;
@@ -215,6 +328,7 @@ export function PrimaryNavigation({
   };
 
   const handleOpenFloatingSearch = () => {
+    prewarmSmartSearchSuggestions();
     setIsMobileProfileDrawerOpen(false);
     setIsFloatingSearchOpen((prev) => !prev);
   };
@@ -345,6 +459,8 @@ export function PrimaryNavigation({
         {showSearchBar ? (
           <div
             ref={desktopSearchWrapperRef}
+            onMouseEnter={() => prewarmSmartSearchSuggestions()}
+            onPointerDown={() => prewarmSmartSearchSuggestions()}
             className="hidden lg:block relative flex-1 min-w-0"
           >
             <form
@@ -358,7 +474,7 @@ export function PrimaryNavigation({
                 desktopSearchInputRef.current?.blur();
                 ensureOnDiscoveryFeed();
               }}
-              className="flex w-full h-11 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/70 focus-within:bg-[var(--color-background-muted)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-3.5 pr-2 items-center gap-2 transition-colors min-w-0"
+              className="flex w-full h-11 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)]/70 focus-within:bg-[var(--color-background-card)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-4 pr-2 items-center gap-2 transition-colors min-w-0"
             >
               <Search className="w-[19px] h-[19px] text-[var(--color-text-secondary)] shrink-0" />
 
@@ -367,18 +483,22 @@ export function PrimaryNavigation({
                 id="global-stay-search"
                 name="q"
                 type="text"
+                autoComplete="off"
                 value={searchQuery}
-                onFocus={() => setIsDesktopSearchOpen(true)}
+                onFocus={() => {
+                  prewarmSmartSearchSuggestions();
+                  setIsDesktopSearchOpen(true);
+                }}
                 onChange={(e) => {
                   onChangeSearchQuery(e.target.value);
                   if (!isDesktopSearchOpen) setIsDesktopSearchOpen(true);
                 }}
                 placeholder={
                   language === "th"
-                    ? "ค้นหาโปรที่พัก จังหวัด ชื่อโรงแรม หรือแหล่งดีล..."
-                    : "Search stay deals, provinces, hotels, or sources..."
+                    ? "ค้นหาที่พัก คาเฟ่ ร้านอาหาร จังหวัด หรือโปรโมชั่น..."
+                    : "Search stays, cafes, dining, provinces, or deals..."
                 }
-                aria-label={language === "th" ? "ค้นหาโปรที่พัก" : "Search deals"}
+                aria-label={language === "th" ? "ค้นหาโปรเที่ยว" : "Search deals"}
                 className="flex-1 min-w-[60px] bg-transparent ty-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
               />
 
@@ -391,7 +511,7 @@ export function PrimaryNavigation({
                     setIsDesktopSearchOpen(true);
                   }}
                   aria-label="Clear search"
-                  className="h-7 w-7 rounded-[10px] bg-[var(--color-text-secondary)]/20 hover:bg-[var(--color-text-secondary)]/35 flex items-center justify-center cursor-pointer shrink-0"
+                  className="h-7 w-7 rounded-full bg-[var(--color-text-secondary)]/15 hover:bg-[var(--color-text-secondary)]/28 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -454,48 +574,154 @@ export function PrimaryNavigation({
       </header>
 
       {/* =====================================================================
-          3. FLOATING SEARCH BAR OVERLAY (< lg) — Smooth Fade Slide-In / Slide-Out
-             Triggered directly from the 5-icon Mobile Bottom Bar "Search" tab
+          3. THUMB-FIRST BOTTOM-ANCHORED MOBILE SEARCH SHEET (< lg)
+             - Inverted ergonomic UX: Results & Suggestions ABOVE, Search Input at BOTTOM
+               right in the natural thumb zone (and docked flush above the software keyboard).
+             - Fixed stable sheet height + idle-prewarmed module cache = 0ms open, ZERO hitch!
       ====================================================================== */}
       {floatingSearchPresence.shouldRender && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={language === "th" ? "ค้นหาที่พัก" : "Search stays"}
+          aria-label={language === "th" ? "ค้นหาใน Nondii" : "Search Nondii"}
           data-state={floatingSearchPresence.dataState}
-          className="lg:hidden fixed inset-0 z-[82] overflow-hidden"
+          style={
+            visualViewportBox
+              ? {
+                  top: `${visualViewportBox.top}px`,
+                  height: `${visualViewportBox.height}px`,
+                  bottom: "auto",
+                }
+              : undefined
+          }
+          className="lg:hidden fixed inset-0 z-[82] flex flex-col justify-end overflow-hidden"
         >
           <div
             data-state={floatingSearchPresence.dataState}
             className="fixed inset-0 bg-black/42 backdrop-blur-[2px] cgr-modal-backdrop"
-            onClick={() => setIsFloatingSearchOpen(false)}
+            onClick={handleCloseFloatingSearch}
           />
 
           <div
             data-state={floatingSearchPresence.dataState}
-            className="relative z-10 px-3 pt-[max(12px,env(safe-area-inset-top))] cgr-floating-card-motion"
+            data-dragging={isDraggingSearchSheet ? "true" : undefined}
+            style={
+              searchSheetDragY !== 0
+                ? { transform: `translate3d(0, ${searchSheetDragY}px, 0)` }
+                : undefined
+            }
+            onClick={(e) => e.stopPropagation()}
+            className={`relative z-10 w-full flex flex-col rounded-t-[24px] bg-[var(--color-background-popover)] shadow-[var(--shadow-popover)] overflow-hidden cgr-modal-sheet-only ${
+              visualViewportBox?.keyboardOpen
+                ? "h-[calc(100%-max(8px,env(safe-area-inset-top)))]"
+                : "h-[min(78dvh,620px)] max-h-[calc(100%-max(12px,env(safe-area-inset-top)))]"
+            }`}
           >
+            {/* Top Draggable Grab Bar + Compact Header */}
             <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-h-[82dvh] flex flex-col rounded-[18px] bg-[var(--color-background-popover)] border border-[var(--color-border)] shadow-[var(--shadow-popover)] p-3"
+              onTouchStart={handleSearchHeaderTouchStart}
+              onTouchMove={handleSearchHeaderTouchMove}
+              onTouchEnd={handleSearchHeaderTouchEnd}
+              onTouchCancel={handleSearchHeaderTouchEnd}
+              className="shrink-0 touch-none select-none border-b border-[var(--color-border)] px-4 pt-2.5 pb-2.5"
+            >
+              <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[14px] font-semibold text-[var(--color-text-primary)] truncate">
+                  {searchQuery.trim()
+                    ? language === "th"
+                      ? `ผลการค้นหา “${searchQuery.trim()}”`
+                      : `Results for “${searchQuery.trim()}”`
+                    : language === "th"
+                      ? "ค้นหาที่พัก คาเฟ่ & โปรเที่ยว"
+                      : "Search stays, cafes & deals"}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCloseFloatingSearch}
+                  aria-label={language === "th" ? "ปิดการค้นหา" : "Close search"}
+                  className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* UPPER SCROLLABLE RESULTS & RECOMMENDATIONS AREA (Above the Bottom Search Bar) */}
+            <div
+              ref={mobileSearchResultsScrollRef}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-4 py-3"
+            >
+              <SmartSearchDropdown
+                isOpen={isFloatingSearchOpen}
+                query={searchQuery}
+                language={language}
+                variant="mobile"
+                inputRef={floatingSearchInputRef}
+                onSelectQuery={handleSelectSmartQuery}
+                onSelectHotel={handleSelectSmartHotel}
+                onSelectPin={handleSelectSmartPin}
+                onClose={handleCloseFloatingSearch}
+              />
+            </div>
+
+            {/* QUICK CATEGORY THUMB CHIPS (Directly above the bottom search bar when input is empty) */}
+            {!searchQuery.trim() && (
+              <div className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-background-popover)] px-3 pt-2.5 pb-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {HOME_PROMO_TABS.filter((tab) => tab.id !== "all").map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() =>
+                        handleSelectSmartQuery({
+                          query: language === "th" ? tab.labelTh : tab.labelEn,
+                          subtitle:
+                            language === "th"
+                              ? tab.sectionTitleTh
+                              : tab.sectionTitleEn,
+                        })
+                      }
+                      className="shrink-0 h-8 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[13px] font-medium text-[var(--color-text-primary)] transition-colors cursor-pointer whitespace-nowrap"
+                    >
+                      {language === "th" ? tab.labelTh : tab.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* BOTTOM-PINNED THUMB-ZONE SEARCH INPUT BAR */}
+            <div
+              className={`shrink-0 bg-[var(--color-background-popover)] px-3 pt-2 ${
+                searchQuery.trim() ? "border-t border-[var(--color-border)]" : ""
+              } ${
+                visualViewportBox?.keyboardOpen
+                  ? "pb-2.5"
+                  : "pb-[max(14px,env(safe-area-inset-bottom))]"
+              }`}
             >
               <form
                 onSubmit={handleFloatingSearchSubmit}
-                className="flex items-center gap-2 shrink-0"
+                className="flex items-center gap-2"
               >
-                <div className="flex-1 h-11 rounded-[13px] bg-[var(--color-background-muted)] focus-within:ring-1 focus-within:ring-[var(--color-border-emphasized)] pl-3.5 pr-2 flex items-center gap-2 min-w-0">
+                <div className="flex-1 h-11 rounded-full bg-[var(--color-background-muted)] focus-within:bg-[var(--color-background-card)] focus-within:ring-1 focus-within:ring-[var(--color-text-primary)] pl-3.5 pr-2 flex items-center gap-2 min-w-0 transition-colors">
                   <Search className="w-[18px] h-[18px] text-[var(--color-text-secondary)] shrink-0" />
                   <input
                     ref={floatingSearchInputRef}
                     type="search"
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={searchQuery}
                     onChange={(e) => onChangeSearchQuery(e.target.value)}
                     placeholder={
                       language === "th"
-                        ? "ค้นหาชื่อที่พัก จังหวัด หรือสไตล์..."
-                        : "Search stays, provinces, or styles..."
+                        ? "พิมพ์ชื่อที่พัก คาเฟ่ จังหวัด หรือโปร..."
+                        : "Search stays, cafes, provinces, or deals..."
                     }
-                    className="flex-1 min-w-0 bg-transparent text-[15px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
+                    className="flex-1 min-w-0 bg-transparent text-[16px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none"
                   />
                   {searchQuery && (
                     <button
@@ -505,7 +731,7 @@ export function PrimaryNavigation({
                         floatingSearchInputRef.current?.focus();
                       }}
                       aria-label="Clear search"
-                      className="h-7 w-7 rounded-[9px] bg-[var(--color-background-subtle)] flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer"
+                      className="h-7 w-7 rounded-full bg-[var(--color-background-subtle)] flex items-center justify-center text-[var(--color-text-primary)] shrink-0 cursor-pointer transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -519,18 +745,6 @@ export function PrimaryNavigation({
                   {language === "th" ? "ค้นหา" : "Search"}
                 </button>
               </form>
-
-              <SmartSearchDropdown
-                isOpen={isFloatingSearchOpen}
-                query={searchQuery}
-                language={language}
-                variant="mobile"
-                inputRef={floatingSearchInputRef}
-                onSelectQuery={handleSelectSmartQuery}
-                onSelectHotel={handleSelectSmartHotel}
-                onSelectPin={handleSelectSmartPin}
-                onClose={() => setIsFloatingSearchOpen(false)}
-              />
             </div>
           </div>
         </div>
@@ -606,9 +820,11 @@ export function PrimaryNavigation({
             );
           })}
 
-          {/* Tab 3 (Center): Search (Opens Floating SmartSearch Overlay) */}
+          {/* Tab 3 (Center): Search (Opens Bottom-Anchored SmartSearch Sheet) */}
           <button
             type="button"
+            onPointerDown={() => prewarmSmartSearchSuggestions()}
+            onTouchStart={() => prewarmSmartSearchSuggestions()}
             onClick={() => {
               setIsMobileProfileDrawerOpen(false);
               handleOpenFloatingSearch();
