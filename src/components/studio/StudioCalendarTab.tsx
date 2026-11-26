@@ -105,23 +105,18 @@ export function StudioCalendarTab({
     matchedInitialRoom?.id || rooms[0]?.id || ""
   );
 
-  // On mobile (< 768px), default to Single-Room Month Grid instead of wide 14-day Matrix
+  // Sync only when a specific room URL (`/studio/calendar/[roomCode]`) is navigated to directly.
+  // Never force-override `viewMode` back to "month" on mobile when viewing `/studio/calendar` (รวมห้อง).
   useEffect(() => {
     if (matchedInitialRoom) {
       setActiveRoomId(matchedInitialRoom.id);
       setViewMode("month");
-      return;
     }
-    if (!initialRoomCode && rooms.length >= 2) {
-      const isNarrow =
-        typeof window !== "undefined" && window.innerWidth < 768;
-      setViewMode(isNarrow ? "month" : "matrix");
-    }
-  }, [matchedInitialRoom, initialRoomCode, rooms.length]);
+  }, [matchedInitialRoom]);
 
-  // Keep mobile selected date within the active 7-day strip when navigating weeks
+  // Keep mobile selected date within the active 14-day horizontally scrollable strip when navigating weeks
   useEffect(() => {
-    const stripEnd = addDaysToDate(matrixStartDate, 6);
+    const stripEnd = addDaysToDate(matrixStartDate, 13);
     if (selectedMobileDate < matrixStartDate || selectedMobileDate > stripEnd) {
       setSelectedMobileDate(matrixStartDate);
     }
@@ -409,7 +404,7 @@ export function StudioCalendarTab({
     );
   }
 
-  const mobileStripDays = matrixDays.slice(0, 7);
+  const mobileStripDays = matrixDays;
   const selectedMobileTotals = rooms.reduce(
     (acc, rm) => {
       const m = getCellMetrics(rm, selectedMobileDate);
@@ -575,48 +570,57 @@ export function StudioCalendarTab({
         </div>
       </div>
 
-      {/* ═══ MAIN SCROLLABLE CALENDAR BODY (1160px Aligned + Auto-Hide Scrollbar) ═══ */}
-      <div className="cgr-admin-body py-4 sm:py-6">
+      {/* ═══ MAIN CALENDAR BODY (1160px Aligned — Sticky Top Headers + Independent Vertical Scroll) ═══ */}
+      <div
+        className={`cgr-admin-body ${
+          viewMode === "month"
+            ? "!overflow-hidden flex flex-col !py-0"
+            : "py-4 sm:py-6 max-md:!overflow-hidden max-md:flex max-md:flex-col max-md:!py-0"
+        }`}
+      >
         {/* VIEW 1: MOBILE-OPTIMIZED & DESKTOP SPACIOUS MONTH GRID */}
         {viewMode === "month" && activeRoom ? (
-          <div className="flex flex-col space-y-4">
-            {/* 1-Tap Horizontal Room Switcher Pills (Zero dropdown hunt on mobile!) */}
-            {rooms.length >= 2 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar pb-0.5">
-                {rooms.map((rm) => {
-                  const picked = rm.id === activeRoom.id;
-                  return (
-                    <button
-                      key={rm.id}
-                      type="button"
-                      onClick={() => handleSelectRoomForMonth(rm)}
-                      className={`h-9 px-3.5 rounded-full ws-caption-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                        picked
-                          ? "bg-[var(--color-accent)] !text-white font-semibold"
-                          : "bg-[var(--color-background-muted)] !text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
-                      }`}
-                    >
-                      {rm.code} · {rm.nameTh}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 7-Column Weekday Header */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2.5 pb-2 border-b border-[var(--color-border)]">
-              {SUNDAY_FIRST_WEEKDAYS_TH.map((wd) => (
-                <div
-                  key={wd}
-                  className="text-center ws-badge font-medium text-[var(--color-text-secondary)]"
-                >
-                  {wd}
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {/* Pinned Top Room Switcher Pills (Scroll-X, hidden scrollbar) + 7-Column Weekday Header */}
+            <div className="shrink-0 bg-[var(--color-background-body)] pt-3 sm:pt-4 pb-2 border-b border-[var(--color-border)] space-y-3">
+              {rooms.length >= 2 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 scroll-px-4 sm:scroll-px-6 pb-0.5">
+                  {rooms.map((rm) => {
+                    const picked = rm.id === activeRoom.id;
+                    return (
+                      <button
+                        key={rm.id}
+                        type="button"
+                        onClick={() => handleSelectRoomForMonth(rm)}
+                        className={`h-9 px-3.5 rounded-full ws-caption-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                          picked
+                            ? "bg-[var(--color-accent)] !text-white font-semibold"
+                            : "bg-[var(--color-background-muted)] !text-[var(--color-text-primary)] hover:bg-[var(--color-background-subtle)]"
+                        }`}
+                      >
+                        {rm.code} · {rm.nameTh}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
+
+              {/* 7-Column Weekday Header */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2.5">
+                {SUNDAY_FIRST_WEEKDAYS_TH.map((wd) => (
+                  <div
+                    key={wd}
+                    className="text-center ws-badge font-medium text-[var(--color-text-secondary)]"
+                  >
+                    {wd}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* 7-Column Responsive Month Grid (Tight 4px gap on mobile = 45px+ clean touch cells!) */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2.5">
+            {/* Independently Scrollable 7-Column Month Grid + Legend */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain cgr-scroll-autohide pt-3 pb-20 sm:pb-10 space-y-4">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2.5">
               {buildSundayFirstMonthCells(
                 monthCursor.year,
                 monthCursor.month
@@ -757,148 +761,153 @@ export function StudioCalendarTab({
                 คลิกที่วันใดก็ได้เพื่อปรับราคา ปิดรับจอง หรือกำหนดคืนขั้นต่ำ
               </span>
             </div>
+            </div>
           </div>
         ) : (
-          /* VIEW 2: MOBILE 7-DAY AGENDA STRIP + DESKTOP 14-DAY MATRIX */
-          <div className="flex flex-col space-y-5">
-            {/* ─── MOBILE (< md): Native 7-Day Date Strip + Vertical Room Cards (Zero horizontal table scroll!) ─── */}
-            <div className="md:hidden space-y-4">
-              {/* 7-Day Date Selector Strip */}
-              <div className="grid grid-cols-7 gap-1 pb-3 border-b border-[var(--color-border)]">
-                {mobileStripDays.map((day) => {
-                  const isSelected = day.dateStr === selectedMobileDate;
-                  const freeAll = rooms.reduce(
-                    (sum, rm) => sum + getCellMetrics(rm, day.dateStr).free,
-                    0
-                  );
-                  return (
-                    <button
-                      key={day.dateStr}
-                      type="button"
-                      onClick={() => setSelectedMobileDate(day.dateStr)}
-                      className={`py-2 px-1 rounded-[14px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
-                        isSelected
-                          ? "bg-[var(--color-accent)] !text-white"
-                          : day.isToday
-                            ? "bg-[#edf5fd] text-[var(--color-accent)]"
-                            : "bg-[var(--color-background-muted)]/65 text-[var(--color-text-primary)]"
-                      }`}
-                    >
-                      <span
-                        className={`text-[12px] leading-none ${
+          /* VIEW 2: MOBILE STICKY 14-DAY HORIZONTAL STRIP + DESKTOP 14-DAY MATRIX */
+          <div className="flex flex-col flex-1 min-h-0 md:space-y-5">
+            {/* ─── MOBILE (< md): Sticky Scroll-X 14-Day Date Strip + Independently Scrollable Room List ─── */}
+            <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Pinned Top Date Strip + Summary (Never scrolls vertically; swipes smoothly horizontally) */}
+              <div className="shrink-0 bg-[var(--color-background-body)] pt-3 pb-3 border-b border-[var(--color-border)] space-y-3">
+                <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar -mx-4 px-4 scroll-px-4">
+                  {mobileStripDays.map((day) => {
+                    const isSelected = day.dateStr === selectedMobileDate;
+                    const freeAll = rooms.reduce(
+                      (sum, rm) => sum + getCellMetrics(rm, day.dateStr).free,
+                      0
+                    );
+                    return (
+                      <button
+                        key={day.dateStr}
+                        type="button"
+                        onClick={() => setSelectedMobileDate(day.dateStr)}
+                        className={`w-[52px] shrink-0 py-2 px-1 rounded-[14px] flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
                           isSelected
-                            ? "text-white/85"
-                            : "text-[var(--color-text-secondary)]"
+                            ? "bg-[var(--color-accent)] !text-white"
+                            : day.isToday
+                              ? "bg-[#edf5fd] text-[var(--color-accent)]"
+                              : "bg-[var(--color-background-muted)]/65 text-[var(--color-text-primary)]"
                         }`}
                       >
-                        {day.weekdayLabel}
-                      </span>
-                      <span className="text-[15px] font-semibold tabular-nums leading-none">
-                        {day.dayNum}
-                      </span>
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          freeAll > 0
-                            ? isSelected
-                              ? "bg-[var(--color-accent-yellow)]"
-                              : "bg-[var(--color-accent)]"
-                            : isSelected
-                              ? "bg-white/40"
-                              : "bg-[var(--color-border-emphasized)]"
-                        }`}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selected Day Summary Line */}
-              <div className="flex items-center justify-between gap-2">
-                <p className="ws-subtitle">
-                  {formatShortDate(selectedMobileDate, "th")}
-                </p>
-                <span className="ws-caption tabular-nums">
-                  ว่างรวม {selectedMobileTotals.free}/{selectedMobileTotals.total}{" "}
-                  ห้อง
-                </span>
-              </div>
-
-              {/* Vertical Room List for Selected Date */}
-              <div className="divide-y divide-[var(--color-border)]">
-                {rooms.map((room) => {
-                  const m = getCellMetrics(room, selectedMobileDate);
-                  const isClosed = m.free === 0;
-                  return (
-                    <div
-                      key={room.id}
-                      onClick={() => openDayEditor(room, selectedMobileDate)}
-                      className="py-3.5 flex items-center justify-between gap-3 cursor-pointer active:bg-[var(--color-background-muted)]/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {room.galleryUrls[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={room.galleryUrls[0]}
-                            alt={room.nameTh}
-                            className="h-12 w-12 aspect-square rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
-                          />
-                        ) : (
-                          <span className="h-12 w-12 aspect-square rounded-[12px] bg-[var(--color-background-muted)] inline-flex items-center justify-center ws-badge text-[var(--color-text-secondary)] shrink-0">
-                            {room.code}
-                          </span>
-                        )}
-                        <div className="min-w-0">
-                          <p className="ws-body-medium truncate">
-                            {room.code} · {room.nameTh}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span
-                              className={`inline-flex px-2 py-0.5 rounded-full ws-badge ${
-                                isClosed
-                                  ? "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
-                                  : m.booked > 0
-                                    ? "bg-[#edf5fd] text-[var(--color-accent)]"
-                                    : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
-                              }`}
-                            >
-                              {isClosed
-                                ? m.booked > 0
-                                  ? "จองเต็ม"
-                                  : "ปิดขาย"
-                                : `ว่าง ${m.free}/${room.totalUnits}`}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectRoomForMonth(room);
-                              }}
-                              className="ws-badge text-[var(--color-accent)] hover:underline cursor-pointer"
-                            >
-                              ดูรายเดือน →
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <p
-                          className={`ws-subtitle tabular-nums ${
-                            m.hasCustomPrice ? "!text-[var(--color-accent)]" : ""
+                        <span
+                          className={`text-[12px] leading-none ${
+                            isSelected
+                              ? "text-white/85"
+                              : "text-[var(--color-text-secondary)]"
                           }`}
                         >
-                          ฿{m.price.toLocaleString()}
-                        </p>
-                        <p className="ws-caption">ต่อคืน</p>
-                      </div>
-                    </div>
-                  );
-                })}
+                          {day.weekdayLabel}
+                        </span>
+                        <span className="text-[15px] font-semibold tabular-nums leading-none">
+                          {day.dayNum}
+                        </span>
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            freeAll > 0
+                              ? isSelected
+                                ? "bg-[var(--color-accent-yellow)]"
+                                : "bg-[var(--color-accent)]"
+                              : isSelected
+                                ? "bg-white/40"
+                                : "bg-[var(--color-border-emphasized)]"
+                          }`}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Day Summary Line (also pinned cleanly under the strip) */}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="ws-subtitle">
+                    {formatShortDate(selectedMobileDate, "th")}
+                  </p>
+                  <span className="ws-caption tabular-nums">
+                    ว่างรวม {selectedMobileTotals.free}/{selectedMobileTotals.total}{" "}
+                    ห้อง
+                  </span>
+                </div>
               </div>
 
-              <p className="ws-caption pt-1">
-                แตะที่ห้องเพื่อปรับราคาหรือปิด–เปิดขายสำหรับวันนี้
-              </p>
+              {/* Independently Scrollable Vertical Room List for Selected Date */}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain cgr-scroll-autohide pb-20">
+                <div className="divide-y divide-[var(--color-border)]">
+                  {rooms.map((room) => {
+                    const m = getCellMetrics(room, selectedMobileDate);
+                    const isClosed = m.free === 0;
+                    return (
+                      <div
+                        key={room.id}
+                        onClick={() => openDayEditor(room, selectedMobileDate)}
+                        className="py-3.5 flex items-center justify-between gap-3 cursor-pointer active:bg-[var(--color-background-muted)]/60 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {room.galleryUrls[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={room.galleryUrls[0]}
+                              alt={room.nameTh}
+                              className="h-12 w-12 aspect-square rounded-[12px] object-cover bg-[var(--color-background-muted)] shrink-0"
+                            />
+                          ) : (
+                            <span className="h-12 w-12 aspect-square rounded-[12px] bg-[var(--color-background-muted)] inline-flex items-center justify-center ws-badge text-[var(--color-text-secondary)] shrink-0">
+                              {room.code}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <p className="ws-body-medium truncate">
+                              {room.code} · {room.nameTh}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded-full ws-badge ${
+                                  isClosed
+                                    ? "bg-[var(--color-background-muted)] text-[var(--color-text-secondary)]"
+                                    : m.booked > 0
+                                      ? "bg-[#edf5fd] text-[var(--color-accent)]"
+                                      : "bg-[var(--color-background-muted)] text-[var(--color-text-primary)]"
+                                }`}
+                              >
+                                {isClosed
+                                  ? m.booked > 0
+                                    ? "จองเต็ม"
+                                    : "ปิดขาย"
+                                  : `ว่าง ${m.free}/${room.totalUnits}`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectRoomForMonth(room);
+                                }}
+                                className="ws-badge text-[var(--color-accent)] hover:underline cursor-pointer"
+                              >
+                                ดูรายเดือน →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p
+                            className={`ws-subtitle tabular-nums ${
+                              m.hasCustomPrice ? "!text-[var(--color-accent)]" : ""
+                            }`}
+                          >
+                            ฿{m.price.toLocaleString()}
+                          </p>
+                          <p className="ws-caption">ต่อคืน</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="ws-caption pt-2">
+                  แตะที่ห้องเพื่อปรับราคาหรือปิด–เปิดขายสำหรับวันนี้
+                </p>
+              </div>
             </div>
 
             {/* ─── DESKTOP (>= md): Breathable 14-Day Multi-Room Matrix ─── */}

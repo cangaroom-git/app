@@ -586,7 +586,7 @@ export function PrimaryNavigation({
                 }}
                 className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
                   isTabActive
-                    ? "text-[var(--color-text-primary)]"
+                    ? "text-[var(--color-accent)]"
                     : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 }`}
               >
@@ -616,7 +616,7 @@ export function PrimaryNavigation({
             aria-label={language === "th" ? "ค้นหา" : "Search"}
             className={`h-full flex flex-col items-center justify-center gap-0.5 cursor-pointer relative transition-colors ${
               isFloatingSearchOpen
-                ? "text-[var(--color-text-primary)]"
+                ? "text-[var(--color-accent)]"
                 : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
             }`}
           >
@@ -653,7 +653,7 @@ export function PrimaryNavigation({
                 onClick={() => setIsFloatingSearchOpen(false)}
                 className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
                   isTabActive
-                    ? "text-[var(--color-text-primary)]"
+                    ? "text-[var(--color-accent)]"
                     : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                 }`}
               >
@@ -675,46 +675,53 @@ export function PrimaryNavigation({
 
           {/* Tab 5: Log in (when signed out) / Profile with Circular Avatar (when signed in) */}
           {user ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIsFloatingSearchOpen(false);
-                setIsMobileProfileDrawerOpen((prev) => !prev);
-              }}
-              aria-label={language === "th" ? "โปรไฟล์" : "Profile"}
-              className={`h-full flex flex-col items-center justify-center gap-0.5 cursor-pointer relative transition-colors ${
+            (() => {
+              const isProfileActive =
                 isMobileProfileDrawerOpen ||
                 activeTab === "trips" ||
+                activeTab === "wishlist" ||
                 activeTab === "studio" ||
-                activeTab === "super-admin"
-                  ? "text-[var(--color-text-primary)]"
-                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              <span
-                className={`relative inline-flex items-center justify-center rounded-full ${
-                  isMobileProfileDrawerOpen
-                    ? "ring-2 ring-[var(--color-text-primary)] ring-offset-1 ring-offset-[var(--color-background-body)]"
-                    : ""
-                }`}
-              >
-                <UserAvatarCircle
-                  user={user}
-                  sizeClass="h-[22px] w-[22px]"
-                  iconSizeClass="w-[14px] h-[14px]"
-                />
-                {pendingStudioBookings > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--color-promo)] ring-1 ring-[var(--color-background-body)]" />
-                )}
-              </span>
-              <span
-                className={`text-[10px] leading-tight tracking-[-0.01em] ${
-                  isMobileProfileDrawerOpen ? "font-semibold" : "font-medium"
-                }`}
-              >
-                {language === "th" ? "โปรไฟล์" : "Profile"}
-              </span>
-            </button>
+                activeTab === "super-admin";
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFloatingSearchOpen(false);
+                    setIsMobileProfileDrawerOpen((prev) => !prev);
+                  }}
+                  aria-label={language === "th" ? "โปรไฟล์" : "Profile"}
+                  className={`h-full flex flex-col items-center justify-center gap-0.5 cursor-pointer relative transition-colors ${
+                    isProfileActive
+                      ? "text-[var(--color-accent)]"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  }`}
+                >
+                  <span
+                    className={`relative inline-flex items-center justify-center rounded-full ${
+                      isProfileActive
+                        ? "ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-background-body)]"
+                        : ""
+                    }`}
+                  >
+                    <UserAvatarCircle
+                      user={user}
+                      sizeClass="h-[22px] w-[22px]"
+                      iconSizeClass="w-[14px] h-[14px]"
+                    />
+                    {pendingStudioBookings > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--color-promo)] ring-1 ring-[var(--color-background-body)]" />
+                    )}
+                  </span>
+                  <span
+                    className={`text-[10px] leading-tight tracking-[-0.01em] ${
+                      isProfileActive ? "font-semibold" : "font-medium"
+                    }`}
+                  >
+                    {language === "th" ? "โปรไฟล์" : "Profile"}
+                  </span>
+                </button>
+              );
+            })()
           ) : (
             <Link
               href="/login"
@@ -722,7 +729,7 @@ export function PrimaryNavigation({
               onClick={() => setIsFloatingSearchOpen(false)}
               className={`h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
                 activeTab === "login"
-                  ? "text-[var(--color-text-primary)]"
+                  ? "text-[var(--color-accent)]"
                   : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
               }`}
             >

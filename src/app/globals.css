@@ -2854,6 +2854,7 @@ html.dark .cgr-scroll-autohide[data-scrolling="true"] {
   position: absolute;
   inset: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   will-change: transform, opacity;
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);

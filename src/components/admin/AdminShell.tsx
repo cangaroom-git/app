@@ -47,19 +47,19 @@ export function AdminShell({
   }, []);
 
   return (
-    <div className="cgr-admin-theme flex flex-col h-[100dvh] overflow-hidden font-sans text-[var(--color-text-primary)] bg-[var(--color-background-body)]">
+    <div className="cgr-admin-theme fixed inset-0 flex flex-col overflow-hidden font-sans text-[var(--color-text-primary)] bg-[var(--color-background-body)]">
       {/* Left Vertical Hover-Expand Icon Rail (`60px -> 200px`) */}
       <AdminSidebar counts={counts} />
 
-      {/* Unified Clean Top Bar (`h-14` + safe-area top for `viewport-fit=cover`, solid opaque for iOS Safari) */}
-      <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)] border-b border-[var(--color-border)] lg:pl-[60px] shrink-0">
+      {/* Unified Clean Top Bar (`h-14` + safe-area top for `viewport-fit=cover`, solid opaque + touch-none so dragging header never scrolls outer viewport) */}
+      <header className="relative z-40 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)] border-b border-[var(--color-border)] lg:pl-[60px] shrink-0 touch-none">
         <div className="relative w-full max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14 gap-3">
-          {/* Left: Horizontal Nondii Logo + Admin Center Red Pill */}
+          {/* Left: Horizontal Nondii Logo (Desktop only to prevent accidental mis-taps above mobile Back button) + Admin Center Red Pill */}
           <div className="flex items-center gap-3 min-w-0 z-30">
             <Link
               href="/"
               aria-label="Nondii Home"
-              className="flex items-center shrink-0"
+              className="hidden lg:flex items-center shrink-0"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -69,7 +69,7 @@ export function AdminShell({
               />
             </Link>
 
-            <div className="w-px h-5 bg-[var(--color-border)] hidden sm:block shrink-0" />
+            <div className="w-px h-5 bg-[var(--color-border)] hidden lg:block shrink-0" />
 
             <Link
               href="/admin"
@@ -145,7 +145,7 @@ export function AdminShell({
       </header>
 
       {/* Main Content Stage */}
-      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:pl-[60px] relative bg-[var(--color-background-body)] pb-[56px] lg:pb-0">
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:pl-[60px] relative bg-[var(--color-background-body)] pb-[calc(56px+env(safe-area-inset-bottom,0px))] lg:pb-0 overflow-hidden">
         {children}
       </main>
     </div>

@@ -386,7 +386,7 @@ export function WorkspaceSplitLayout({
           className="cgr-split-pane-detail"
         >
           {/* Sticky Mobile Drill-Down Back Header */}
-          <div className="sticky top-0 z-20 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-3 h-12 flex items-center gap-2 shrink-0">
+          <div className="sticky top-0 z-20 bg-[var(--color-background-body)] border-b border-[var(--color-border)] px-3 h-12 flex items-center gap-2 shrink-0 touch-none">
             <button
               type="button"
               onClick={onMobileBack}
@@ -404,7 +404,7 @@ export function WorkspaceSplitLayout({
 
           <div
             ref={mobileDetailRef}
-            className="flex-1 min-h-0 overflow-y-auto cgr-scroll-autohide"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain cgr-scroll-autohide"
           >
             <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 pb-24">
               {children}

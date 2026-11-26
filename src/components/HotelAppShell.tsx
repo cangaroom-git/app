@@ -1287,7 +1287,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
         style={{ backgroundColor: mobileTopChromeColor }}
       />
       {isDedicatedShellPage ? (
-        <main className="flex min-h-screen flex-col">
+        <main className="flex min-h-[100dvh] flex-col">
           {children}
           {(hasMountedAuth || isAuthModalOpen) && (
             <AuthPromptModal
@@ -1317,7 +1317,13 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
           <CookieConsentBanner language={lang} theme={theme} />
         </main>
       ) : (
-        <div className="flex min-h-screen flex-col">
+        <div
+          className={
+            isAccountSplitPage
+              ? "fixed inset-0 flex flex-col overflow-hidden"
+              : "flex min-h-[100dvh] flex-col"
+          }
+        >
           <PrimaryNavigation
             activeTab={activeTab}
             showSearchBar={showSearchBar}

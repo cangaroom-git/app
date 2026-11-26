@@ -25,7 +25,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
   const ownedHotels = user?.ownedHotels ?? [];
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden font-sans text-[var(--color-text-primary)] bg-[var(--color-background-body)]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden font-sans text-[var(--color-text-primary)] bg-[var(--color-background-body)]">
       {/* Floating Toast Notification */}
       {notice && (
         <div className="fixed bottom-20 lg:bottom-6 right-5 z-[110] rounded-full bg-[var(--color-accent)] !text-white shadow-[var(--shadow-popover)] px-5 py-2.5 ws-body-strong">
@@ -36,15 +36,15 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
       {/* Left Vertical Hover-Expand Icon Rail (`60px -> 200px`) */}
       <StudioSidebar />
 
-      {/* Unified Clean Top Bar (`h-14` + safe-area top for `viewport-fit=cover`, solid opaque for iOS Safari) */}
-      <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)] border-b border-[var(--color-border)] lg:pl-[60px] shrink-0">
+      {/* Unified Clean Top Bar (`h-14` + safe-area top for `viewport-fit=cover`, solid opaque + touch-none so dragging header never scrolls outer viewport) */}
+      <header className="relative z-40 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)] border-b border-[var(--color-border)] lg:pl-[60px] shrink-0 touch-none">
         <div className="relative w-full max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14 gap-3">
-          {/* Left: Horizontal Nondii Logo + Store Switcher */}
-          <div className="flex items-center gap-3 min-w-0 z-30">
+          {/* Left: Horizontal Nondii Logo (Desktop only to prevent accidental mis-taps above mobile Back button) + Store Switcher */}
+          <div className="flex items-center gap-3 flex-1 min-w-0 z-30">
             <Link
               href="/"
               aria-label="Nondii Home"
-              className="flex items-center shrink-0"
+              className="hidden lg:flex items-center shrink-0"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -54,15 +54,15 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
               />
             </Link>
 
-            <div className="w-px h-5 bg-[var(--color-border)] hidden sm:block shrink-0" />
+            <div className="w-px h-5 bg-[var(--color-border)] hidden lg:block shrink-0" />
 
             {ownedHotels.length > 1 ? (
-              <div className="w-[155px] sm:w-[210px] min-w-0">
+              <div className="w-full max-w-[280px] sm:max-w-[340px] lg:max-w-[300px] min-w-0">
                 <ResponsiveSelect
                   value={data.hotel.slug}
                   onChange={switchHotel}
                   sheetTitle="เลือกร้าน / ที่พักที่ต้องการจัดการ"
-                  triggerClassName="w-full h-8 px-3 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ws-badge text-[var(--color-text-primary)]"
+                  triggerClassName="w-full h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] ws-caption-medium text-[var(--color-text-primary)]"
                   options={ownedHotels.map((item) => ({
                     value: item.slug,
                     label: item.nameTh,
@@ -76,7 +76,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
             ) : (
               <Link
                 href={buildHref("/studio")}
-                className="hidden sm:inline-flex items-center h-8 px-3 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] ws-badge max-w-[200px] truncate"
+                className="inline-flex items-center h-9 px-3.5 rounded-full bg-[var(--color-background-muted)] text-[var(--color-text-primary)] ws-caption-medium max-w-[280px] sm:max-w-[340px] lg:max-w-[300px] truncate"
               >
                 <span className="truncate">{data.hotel.nameTh}</span>
               </Link>
@@ -160,7 +160,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content Stage */}
-      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:pl-[60px] relative bg-[var(--color-background-body)] pb-[56px] lg:pb-0 overflow-y-auto cgr-scroll-autohide">
+      <main className="flex-1 min-h-0 min-w-0 flex flex-col lg:pl-[60px] relative bg-[var(--color-background-body)] pb-[calc(56px+env(safe-area-inset-bottom,0px))] lg:pb-0 overflow-hidden">
         {children}
       </main>
     </div>
