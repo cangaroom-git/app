@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#5FAEE9",
 };
 import { VALID_HOME_PROMO_TAB_IDS } from "@/lib/placeCategories";

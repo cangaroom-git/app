@@ -38,6 +38,7 @@ import {
   type PlatformNavTabId,
 } from "@/components/navigation/NavigationIcons";
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
+import { MobileChromeController } from "@/components/navigation/MobileChromeController";
 import { RouteProgressBar } from "@/components/navigation/RouteProgressBar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
 import { useGlobalAutoHideScrollbars } from "@/components/workspace/WorkspaceSplitLayout";
@@ -1226,6 +1227,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   return (
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
+      <MobileChromeController
+        theme={theme}
+        hasActiveHomeSearch={globalSearchQuery.trim().length > 0}
+      />
       {isDedicatedShellPage ? (
         <main className="flex min-h-screen flex-col">
           {children}

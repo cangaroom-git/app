@@ -676,7 +676,7 @@ export function PrimaryNavigation({
         aria-label="Mobile navigation"
         aria-hidden={shouldHideMobileBottomNav}
         data-hide-on-hotel={isHotelBookingFlowPage ? "true" : undefined}
-        className={`fixed bottom-0 inset-x-0 z-[70] lg:hidden pb-[var(--cgr-safe-bottom)] bg-[var(--color-background-body)]/96 backdrop-blur-md border-t border-[var(--color-border)] select-none transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+        className={`fixed bottom-0 inset-x-0 z-[70] lg:hidden pb-[var(--cgr-safe-bottom)] bg-[var(--color-background-body)] border-t border-[var(--color-border)] select-none transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
           shouldHideMobileBottomNav
             ? "translate-y-full opacity-0 pointer-events-none"
             : "translate-y-0 opacity-100 pointer-events-auto"

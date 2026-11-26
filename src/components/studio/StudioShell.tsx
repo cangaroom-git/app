@@ -36,8 +36,8 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
       {/* Left Vertical Hover-Expand Icon Rail (`60px -> 200px`) */}
       <StudioSidebar />
 
-      {/* Unified Clean Top Bar (`h-14`, matches AdminShell 1:1) */}
-      <header className="sticky top-0 z-40 bg-[var(--color-background-body)]/90 backdrop-blur-md border-b border-[var(--color-border)] lg:pl-[60px] shrink-0">
+      {/* Unified Clean Top Bar (`h-14` + safe-area top for `viewport-fit=cover`) */}
+      <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] lg:pl-[60px] shrink-0">
         <div className="relative w-full max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14 gap-3">
           {/* Left: Horizontal Nondii Logo + Store Switcher */}
           <div className="flex items-center gap-3 min-w-0 z-30">

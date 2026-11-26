@@ -219,12 +219,15 @@ select {
 
 html {
   font-size: 16px;
+  background-color: var(--color-background-body);
+  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background-color: var(--color-background-body);
   color: var(--color-text-primary);
+  overscroll-behavior-y: none;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
   line-height: 1.5;

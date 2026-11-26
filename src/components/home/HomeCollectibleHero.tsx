@@ -283,7 +283,7 @@ export function HomeCollectibleHero({
       {/* Layer 0.5: White `☁ nondii` Logo + "โปรเที่ยวไทย" + Subtitle + 6 Frosted-Glass Icons with Short Labels */}
       <div
         ref={headerLayerRef}
-        className="cgr-home-hero-layer cgr-home-hero-logo absolute inset-x-0 top-[9svh] sm:top-[8.5svh] lg:top-[7.5%] flex flex-col items-center px-4 z-20 text-center"
+        className="cgr-home-hero-layer cgr-home-hero-logo absolute inset-x-0 top-[max(9svh,calc(env(safe-area-inset-top,0px)+20px))] sm:top-[8.5svh] lg:top-[7.5%] flex flex-col items-center px-4 z-20 text-center"
       >
         <img
           src="/brand/nondii-icon-with-text-white.svg"
