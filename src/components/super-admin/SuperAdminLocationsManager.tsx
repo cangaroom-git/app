@@ -80,11 +80,11 @@ function SortableRegionRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 py-3 px-2.5 rounded-[12px] transition-colors ${
+      className={`h-[38px] px-3 border-b border-[var(--color-border)] flex items-center gap-2 transition-colors ${
         isDragging
           ? "bg-[var(--color-background-muted)] opacity-90"
           : isSelected
-          ? "bg-[var(--color-background-muted)]"
+          ? "bg-[var(--color-accent)]/8"
           : "hover:bg-[var(--color-background-muted)]/60"
       }`}
     >
@@ -93,9 +93,9 @@ function SortableRegionRow({
         aria-label={`ลากจัดลำดับ ${region.labelTh}`}
         {...attributes}
         {...listeners}
-        className="h-8 w-7 inline-flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing touch-none shrink-0"
+        className="h-6 w-5 inline-flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing touch-none shrink-0"
       >
-        <GripVertical className="w-4 h-4" />
+        <GripVertical className="w-3.5 h-3.5" />
       </button>
 
       <button
@@ -103,20 +103,18 @@ function SortableRegionRow({
         onClick={onSelect}
         className="flex-1 min-w-0 text-left flex items-center justify-between gap-2 cursor-pointer"
       >
-        <div className="min-w-0">
-          <p
-            className={`text-[14.5px] truncate ${
-              isSelected
-                ? "font-semibold text-[var(--color-text-primary)]"
-                : "font-medium text-[var(--color-text-primary)]"
-            }`}
-          >
-            {region.labelTh}
-          </p>
-          <p className="text-[12px] text-[var(--color-text-secondary)] tabular-nums">
-            {provinceCount} จังหวัด · {placeCount} สถานที่
-          </p>
-        </div>
+        <span
+          className={`text-[13px] truncate ${
+            isSelected
+              ? "font-semibold text-[var(--color-accent)]"
+              : "font-medium text-[var(--color-text-primary)]"
+          }`}
+        >
+          {region.labelTh}
+        </span>
+        <span className="text-[11.5px] text-[var(--color-text-secondary)] tabular-nums shrink-0">
+          {provinceCount} · {placeCount}
+        </span>
       </button>
     </div>
   );
@@ -154,57 +152,58 @@ function SortableProvinceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`py-3.5 flex items-center justify-between gap-3 transition-colors ${
+      className={`h-[38px] px-4 border-b border-[var(--color-border)] flex items-center gap-3 text-[13px] transition-colors ${
         isDragging
-          ? "bg-[var(--color-background-muted)] rounded-[12px] px-2"
-          : ""
+          ? "bg-[var(--color-background-muted)] opacity-90"
+          : "hover:bg-[var(--color-background-muted)]/60"
       }`}
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <button
-          type="button"
-          disabled={disableDrag}
-          aria-label={`ลากจัดลำดับ ${province.nameTh}`}
-          {...attributes}
-          {...listeners}
-          className={`h-8 w-7 inline-flex items-center justify-center shrink-0 touch-none ${
-            disableDrag
-              ? "text-[var(--color-border-emphasized)] cursor-not-allowed"
-              : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing"
-          }`}
-        >
-          <GripVertical className="w-4 h-4" />
-        </button>
+      <button
+        type="button"
+        disabled={disableDrag}
+        aria-label={`ลากจัดลำดับ ${province.nameTh}`}
+        {...attributes}
+        {...listeners}
+        className={`h-6 w-5 inline-flex items-center justify-center shrink-0 touch-none ${
+          disableDrag
+            ? "text-[var(--color-border-emphasized)] cursor-not-allowed"
+            : "text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-grab active:cursor-grabbing"
+        }`}
+      >
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
 
-        <span className="w-6 text-[12px] font-semibold text-[var(--color-text-secondary)] tabular-nums shrink-0 text-right">
-          {rankIndex + 1}
+      <span className="w-6 text-[11.5px] font-semibold text-[var(--color-text-tertiary)] tabular-nums shrink-0 text-right">
+        {rankIndex + 1}
+      </span>
+
+      <div className="min-w-0 flex-1 flex items-center gap-2">
+        <span className="font-semibold text-[var(--color-text-primary)] truncate">
+          {province.shortNameTh}
         </span>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate">
-              {province.shortNameTh}
-            </p>
-            {province.isTouristHub && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-[8px] bg-[var(--color-background-muted)] text-[var(--color-text-primary)] shrink-0">
-                เมืองท่องเที่ยว
-              </span>
-            )}
-            {!province.isActive && (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-[8px] bg-[var(--color-background-muted)] text-[var(--color-text-secondary)] shrink-0">
-                ซ่อนอยู่
-              </span>
-            )}
-          </div>
-          <p className="text-[12px] text-[var(--color-text-secondary)] truncate tabular-nums">
-            {province.nameTh} · {province.centerLat.toFixed(3)},{" "}
-            {province.centerLng.toFixed(3)} · ซูม {province.defaultZoom} ·{" "}
-            {province.placeCount} สถานที่
-          </p>
-        </div>
+        <span className="hidden md:inline text-[12px] text-[var(--color-text-tertiary)] truncate">
+          {province.nameEn}
+        </span>
+        {!province.isActive && (
+          <span className="text-[11px] font-semibold text-[#e60023] shrink-0">
+            ซ่อน
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <span className="hidden xl:inline text-[11.5px] font-mono text-[var(--color-text-secondary)] tabular-nums shrink-0 w-[140px] text-right">
+        {province.centerLat.toFixed(3)}, {province.centerLng.toFixed(3)}
+      </span>
+
+      <span className="hidden sm:inline text-[11.5px] text-[var(--color-text-secondary)] tabular-nums shrink-0 w-[44px] text-right">
+        z{province.defaultZoom}
+      </span>
+
+      <span className="text-[12px] font-medium text-[var(--color-text-primary)] tabular-nums shrink-0 w-[56px] text-right">
+        {province.placeCount} แห่ง
+      </span>
+
+      <div className="flex items-center gap-1 shrink-0">
         <button
           type="button"
           onClick={() => onToggleTouristHub(province)}
@@ -213,14 +212,14 @@ function SortableProvinceRow({
               ? "นำออกจากเมืองท่องเที่ยวเด่น"
               : "ตั้งเป็นเมืองท่องเที่ยวเด่น"
           }
-          className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+          className={`h-6.5 px-2.5 rounded-full text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors ${
             province.isTouristHub
               ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+              : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-secondary)]"
           }`}
         >
           <Star
-            className="w-3.5 h-3.5"
+            className="w-3 h-3"
             fill={province.isTouristHub ? "currentColor" : "none"}
           />
           <span className="hidden sm:inline">เด่น</span>
@@ -229,10 +228,10 @@ function SortableProvinceRow({
         <button
           type="button"
           onClick={() => onEditGeo(province)}
-          title="แก้ไขพิกัด lat/lng และขอบเขต"
-          className="h-9 px-3 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+          title="แก้ไขพิกัด lat/lng"
+          className="h-6.5 px-2.5 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[11.5px] font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <Pencil className="w-3.5 h-3.5" />
+          <Pencil className="w-3 h-3" />
           <span className="hidden sm:inline">พิกัด</span>
         </button>
       </div>
@@ -253,7 +252,6 @@ export function SuperAdminLocationsManager({
     useState<ThailandRegionId>("north");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Edit Geo Modal state
   const [editingProvince, setEditingProvince] =
     useState<ProvinceConfigDto | null>(null);
   const [cachedEditingProvince, setCachedEditingProvince] =
@@ -344,8 +342,6 @@ export function SuperAdminLocationsManager({
       ...r,
       sortOrder: i,
     }));
-
-    // Optimistic UI update (<16ms)
     setRegions(reordered);
 
     try {
@@ -358,7 +354,7 @@ export function SuperAdminLocationsManager({
         }),
       });
       if (res.ok) {
-        onNotice("บันทึกลำดับภาคเรียบร้อย (อัปเดตหน้า /explore ทันที)");
+        onNotice("บันทึกลำดับภาคเรียบร้อย");
       } else {
         await fetchLocations();
       }
@@ -378,7 +374,6 @@ export function SuperAdminLocationsManager({
     const reorderedSubset = arrayMove(displayedProvinces, oldIdx, newIdx);
     const rankMap = new Map(reorderedSubset.map((p, idx) => [p.id, idx]));
 
-    // Optimistic UI update (<16ms)
     setProvinces((prev) =>
       prev.map((p) => {
         const nextRank = rankMap.get(p.id);
@@ -401,11 +396,7 @@ export function SuperAdminLocationsManager({
         }),
       });
       if (res.ok) {
-        onNotice(
-          scopeMode === "national"
-            ? "บันทึกลำดับเมืองท่องเที่ยวทั่วประเทศเรียบร้อย"
-            : "บันทึกลำดับจังหวัดในภาคนี้เรียบร้อย"
-        );
+        onNotice("บันทึกลำดับจังหวัดเรียบร้อย");
       } else {
         await fetchLocations();
       }
@@ -434,7 +425,7 @@ export function SuperAdminLocationsManager({
         onNotice(
           nextVal
             ? `ตั้ง ${prov.shortNameTh} เป็นเมืองท่องเที่ยวเด่นแล้ว`
-            : `นำ ${prov.shortNameTh} ออกจากเมืองท่องเที่ยวเด่นแล้ว`
+            : `นำ ${prov.shortNameTh} ออกจากเมืองเด่นแล้ว`
         );
       } else {
         await fetchLocations();
@@ -527,10 +518,10 @@ export function SuperAdminLocationsManager({
               : p
           )
         );
-        onNotice(`อัปเดตพิกัด จ.${editingProvince.shortNameTh} เรียบร้อย`);
+        onNotice(`อัปเดตพิกัด จ.${editingProvince.shortNameTh} แล้ว`);
         setEditingProvince(null);
       } else {
-        onNotice("บันทึกพิกัดไม่สำเร็จ กรุณาตรวจสอบช่วงค่า lat/lng");
+        onNotice("บันทึกพิกัดไม่สำเร็จ");
       }
     } finally {
       setIsSaving(false);
@@ -539,92 +530,88 @@ export function SuperAdminLocationsManager({
 
   const modalProvince = editingProvince ?? cachedEditingProvince;
 
-  if (isLoading) {
-    return (
-      <div className="py-10 space-y-3">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="h-14 rounded-[12px] bg-[var(--color-background-muted)] animate-pulse"
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Top Mode & Search Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)]">
-        <div className="space-y-0.5">
-          <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
-            จัดลำดับภาค & จังหวัดเมืองท่องเที่ยว (หน้าแผนที่ /explore)
-          </h2>
-          <p className="text-[13px] text-[var(--color-text-secondary)]">
-            ลากวางเพื่อจัดลำดับวงล้อเลือกจังหวัด — บันทึกแล้วหน้า /explore อัปเดตทันที
-          </p>
+    <>
+      {/* Single Compact Flush Toolbar */}
+      <div className="cgr-admin-toolbar">
+        <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto no-scrollbar">
+          <h1 className="text-[14.5px] font-bold text-[var(--color-text-primary)] whitespace-nowrap">
+            จังหวัด &amp; ภูมิภาค
+          </h1>
+          <span className="w-px h-4 bg-[var(--color-border)] shrink-0" />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setScopeMode("region")}
+              className={`h-7.5 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                scopeMode === "region"
+                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              เรียงตามภาค (6)
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopeMode("national")}
+              className={`h-7.5 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap cursor-pointer transition-colors ${
+                scopeMode === "national"
+                  ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                  : "text-[var(--color-text-secondary)] hover:bg-[var(--color-background-muted)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              ทั่วประเทศ (77)
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setScopeMode("region")}
-            className={`h-10 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
-              scopeMode === "region"
-                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-            }`}
-          >
-            เรียงตามภาค (6 ภาค)
-          </button>
-          <button
-            type="button"
-            onClick={() => setScopeMode("national")}
-            className={`h-10 px-4 rounded-full text-[13px] font-semibold cursor-pointer transition-colors ${
-              scopeMode === "national"
-                ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
-                : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
-            }`}
-          >
-            เรียงเมืองท่องเที่ยวทั่วประเทศ (77)
-          </button>
+        <div className="relative w-[190px] sm:w-[220px]">
+          <Search className="w-3.5 h-3.5 text-[var(--color-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="กรองชื่อจังหวัด..."
+            className="w-full h-7.5 pl-8 pr-3 rounded-full bg-[var(--color-background-muted)] text-[12.5px] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+          />
         </div>
       </div>
 
-      {/* Main Layout: Regions (Left) + Provinces (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Sortable Regions */}
-        <section className="lg:col-span-4 space-y-2">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              ลำดับภาค (วงล้อซ้าย)
-            </h3>
-            <span className="text-[12px] text-[var(--color-text-secondary)]">
-              ลากเพื่อสลับลำดับ
-            </span>
-          </div>
+      {/* Full-Bleed 2-Pane Split (Zero Outer Boxes, Pure border-b + border-r) */}
+      {isLoading ? (
+        <div className="p-6 text-[13px] text-[var(--color-text-secondary)]">
+          กำลังโหลดข้อมูล 77 จังหวัด...
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[var(--color-border)] overflow-y-auto lg:overflow-hidden">
+          {/* Left: Sortable Regions */}
+          <section className="lg:col-span-3 flex flex-col min-h-0">
+            <div className="h-[34px] px-3 border-b border-[var(--color-border)] flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)] shrink-0">
+              <span>ภูมิภาค (ลากสลับได้)</span>
+              <span>จ. · ร้าน</span>
+            </div>
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleRegionDragEnd}
-          >
-            <SortableContext
-              items={sortedRegions.map((r) => r.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="divide-y divide-[var(--color-border)]">
-                {sortedRegions.map((reg) => {
-                  const regProvs = provinces.filter(
-                    (p) => p.regionId === reg.id
-                  );
-                  const regPlaces = regProvs.reduce(
-                    (acc, p) => acc + p.placeCount,
-                    0
-                  );
-                  return (
-                    <div key={reg.id} className="py-1">
+            <div className="flex-1 overflow-y-auto">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleRegionDragEnd}
+              >
+                <SortableContext
+                  items={sortedRegions.map((r) => r.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {sortedRegions.map((reg) => {
+                    const regProvs = provinces.filter(
+                      (p) => p.regionId === reg.id
+                    );
+                    const regPlaces = regProvs.reduce(
+                      (acc, p) => acc + p.placeCount,
+                      0
+                    );
+                    return (
                       <SortableRegionRow
+                        key={reg.id}
                         region={reg}
                         isSelected={
                           scopeMode === "region" && selectedRegionId === reg.id
@@ -636,65 +623,55 @@ export function SuperAdminLocationsManager({
                           setSelectedRegionId(reg.id);
                         }}
                       />
-                    </div>
-                  );
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </section>
-
-        {/* Right: Sortable Provinces */}
-        <section className="lg:col-span-8 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[var(--color-border)]">
-            <h3 className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-              {scopeMode === "national"
-                ? `ลำดับจังหวัดทั่วประเทศ (${displayedProvinces.length})`
-                : `จังหวัดใน${
-                    sortedRegions.find((r) => r.id === selectedRegionId)
-                      ?.labelTh ?? ""
-                  } (${displayedProvinces.length})`}
-            </h3>
-
-            <div className="relative w-full sm:w-56">
-              <Search className="w-4 h-4 text-[var(--color-text-secondary)] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="กรองชื่อจังหวัด..."
-                className="w-full h-9 rounded-[10px] bg-[var(--color-background-muted)] pl-9 pr-3 text-[13.5px] text-[var(--color-text-primary)] focus:outline-none"
-              />
+                    );
+                  })}
+                </SortableContext>
+              </DndContext>
             </div>
-          </div>
+          </section>
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleProvinceDragEnd}
-          >
-            <SortableContext
-              items={displayedProvinces.map((p) => p.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="divide-y divide-[var(--color-border)]">
-                {displayedProvinces.map((prov, idx) => (
-                  <SortableProvinceRow
-                    key={prov.id}
-                    province={prov}
-                    rankIndex={idx}
-                    disableDrag={Boolean(searchQuery.trim())}
-                    onToggleTouristHub={handleToggleTouristHub}
-                    onEditGeo={openEditGeo}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </section>
-      </div>
+          {/* Right: Compact Single-Row Sortable Provinces */}
+          <section className="lg:col-span-9 flex flex-col min-h-0">
+            <div className="h-[34px] px-4 border-b border-[var(--color-border)] flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)] shrink-0">
+              <span>
+                {scopeMode === "national"
+                  ? `จังหวัดทั่วประเทศ (${displayedProvinces.length})`
+                  : `${
+                      sortedRegions.find((r) => r.id === selectedRegionId)
+                        ?.labelTh ?? ""
+                    } (${displayedProvinces.length} จังหวัด)`}
+              </span>
+              <span>พิกัด / จำนวนร้าน / จัดการ</span>
+            </div>
 
-      {/* Edit Province Geo & Coordinates Sheet (Airbnb Warm Minimal + Inset-Label Inputs) */}
+            <div className="flex-1 overflow-y-auto">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleProvinceDragEnd}
+              >
+                <SortableContext
+                  items={displayedProvinces.map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {displayedProvinces.map((prov, idx) => (
+                    <SortableProvinceRow
+                      key={prov.id}
+                      province={prov}
+                      rankIndex={idx}
+                      disableDrag={Boolean(searchQuery.trim())}
+                      onToggleTouristHub={handleToggleTouristHub}
+                      onEditGeo={openEditGeo}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Edit Province Geo & Coordinates Sheet */}
       {editPresence.shouldRender &&
         modalProvince &&
         typeof document !== "undefined" &&
@@ -715,10 +692,10 @@ export function SuperAdminLocationsManager({
                 <span className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]" />
               </div>
 
-              <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[var(--color-border)] shrink-0">
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[var(--color-border)] shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <MapPin className="w-4 h-4 text-[var(--color-text-primary)] shrink-0" />
-                  <h3 className="text-[16px] font-semibold text-[var(--color-text-primary)] truncate">
+                  <h3 className="text-[15.5px] font-semibold text-[var(--color-text-primary)] truncate">
                     ตั้งค่าพิกัด · {modalProvince.nameTh}
                   </h3>
                 </div>
@@ -726,16 +703,16 @@ export function SuperAdminLocationsManager({
                   type="button"
                   onClick={() => setEditingProvince(null)}
                   aria-label="ปิดหน้าต่าง"
-                  className="h-8 w-8 rounded-[10px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer"
+                  className="h-8 w-8 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3.5">
                 <StandardFieldGroup>
                   <StandardInput
-                    label="ชื่อย่อที่แสดงบนปีกสมุด & วงล้อ"
+                    label="ชื่อย่อที่แสดงบนหน้าเว็บ"
                     value={editShortNameTh}
                     onChange={(e) => setEditShortNameTh(e.target.value)}
                     grouped
@@ -771,7 +748,7 @@ export function SuperAdminLocationsManager({
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
                     <StandardInput
-                      label="South Lat (ขอบล่าง)"
+                      label="South Lat"
                       type="number"
                       step="0.0001"
                       value={editSouthLat}
@@ -779,7 +756,7 @@ export function SuperAdminLocationsManager({
                       grouped
                     />
                     <StandardInput
-                      label="North Lat (ขอบบน)"
+                      label="North Lat"
                       type="number"
                       step="0.0001"
                       value={editNorthLat}
@@ -789,7 +766,7 @@ export function SuperAdminLocationsManager({
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-[#b0b0b0] dark:divide-[var(--color-border-emphasized)]">
                     <StandardInput
-                      label="West Lng (ขอบซ้าย)"
+                      label="West Lng"
                       type="number"
                       step="0.0001"
                       value={editWestLng}
@@ -797,7 +774,7 @@ export function SuperAdminLocationsManager({
                       grouped
                     />
                     <StandardInput
-                      label="East Lng (ขอบขวา)"
+                      label="East Lng"
                       type="number"
                       step="0.0001"
                       value={editEastLng}
@@ -807,7 +784,7 @@ export function SuperAdminLocationsManager({
                   </div>
                 </StandardFieldGroup>
 
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2.5 pt-1">
                   <StandardCheckbox
                     checked={editIsTouristHub}
                     onChange={setEditIsTouristHub}
@@ -821,18 +798,18 @@ export function SuperAdminLocationsManager({
                 </div>
               </div>
 
-              <div className="shrink-0 px-6 py-4 pb-[max(16px,env(safe-area-inset-bottom))] border-t border-[var(--color-border)] flex items-center justify-end gap-2.5">
+              <div className="shrink-0 px-5 py-3.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-[var(--color-border)] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingProvince(null)}
-                  className="h-11 px-5 rounded-[12px] bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[14px] font-semibold cursor-pointer transition-colors"
+                  className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold cursor-pointer transition-colors"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="h-11 px-6 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[14px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                  className="h-9 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13px] font-semibold cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {isSaving ? "กำลังบันทึก..." : "บันทึกพิกัด"}
                 </button>
@@ -841,6 +818,6 @@ export function SuperAdminLocationsManager({
           </div>,
           document.body
         )}
-    </div>
+    </>
   );
 }

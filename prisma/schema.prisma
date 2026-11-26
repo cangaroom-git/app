@@ -89,6 +89,34 @@ enum MerchantMode {
   PROFILE_ONLY
 }
 
+enum LocationScope {
+  SINGLE_LOCATION
+  MULTI_BRANCH
+  NATIONWIDE_ONLINE
+}
+
+enum PromoVisualMode {
+  OFFICIAL_PHOTO
+  BRANDED_CARD
+  CATEGORY_FALLBACK
+}
+
+enum PromoIngestionSource {
+  AFFILIATE_API
+  EMAIL_WEBHOOK
+  FACEBOOK_SYNC
+  ADMIN_AI_DROP
+  MERCHANT_SUBMIT
+  COMMUNITY_TIP
+}
+
+enum PromoInboxStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
 enum PromoKind {
   BOOKING_COUPON
   ONSITE_PERK
@@ -235,6 +263,10 @@ model Hotel {
   propertyType         PropertyType        @default(BOUTIQUE_HOTEL)
   placeCategory        PlaceCategory       @default(STAY)
   merchantMode         MerchantMode        @default(DIRECT_BOOKING)
+  locationScope        LocationScope       @default(SINGLE_LOCATION)
+  branchSummaryTh      String              @default("")
+  branchSummaryEn      String              @default("")
+  eligibleProvinceIds  String[]            @default([])
   externalWebsiteUrl   String              @default("")
   primaryCtaLabelTh    String              @default("")
   openingHoursJson     Json?
@@ -258,14 +290,39 @@ model Hotel {
   campaigns            SponsoredCampaign[]
   posts                HotelPost[]
   reports              PlaceReport[]
+  branches             PlaceBranch[]
 
   @@index([provinceId])
   @@index([ownerId])
   @@index([verificationStatus, isPublished])
   @@index([placeCategory, merchantMode, isPublished])
+  @@index([locationScope, placeCategory, isPublished])
   @@index([latitude, longitude])
   @@index([googlePlaceId])
   @@index([canonicalPinId])
+}
+
+model PlaceBranch {
+  id            String   @id @default(cuid())
+  hotelId       String
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  branchNameTh  String
+  branchNameEn  String   @default("")
+  provinceId    String
+  districtTh    String   @default("")
+  addressTh     String   @default("")
+  latitude      Float?
+  longitude     Float?
+  googleMapsUrl String?
+  googlePlaceId String?
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([hotelId, isActive, sortOrder])
+  @@index([provinceId, isActive])
+  @@index([latitude, longitude])
 }
 
 model Room {
@@ -389,7 +446,11 @@ model Pin {
   promoCode          String?
   promoOriginalPriceThb Int?
   promoDealPriceThb  Int?
+  promoStartsAt      DateTime?
   promoExpiresAt     DateTime?
+  promoCategoryCode  String?
+  visualMode         PromoVisualMode   @default(OFFICIAL_PHOTO)
+  ingestionHash      String?
   externalClickCount Int               @default(0)
   externalPostId     String?
   externalPermalink  String?
@@ -416,6 +477,8 @@ model Pin {
   @@index([publishStatus, provinceId])
   @@index([publishStatus, isCanonicalCard, provinceId])
   @@index([publishStatus, dealSourceType, promoExpiresAt])
+  @@index([publishStatus, promoCategoryCode, promoExpiresAt])
+  @@index([ingestionHash])
   @@index([publishStatus, isSponsored, sponsoredPriority, createdAt])
 }
 
@@ -852,4 +915,111 @@ model ProvinceConfig {
 
   @@index([regionId, isActive, regionSortOrder])
   @@index([isActive, nationalSortOrder])
+}
+
+model ExploreDestinationHub {
+  id         String   @id @default(cuid())
+  provinceId String
+  labelTh    String
+  labelEn    String   @default("")
+  subtitleTh String   @default("")
+  subtitleEn String   @default("")
+  latitude   Float
+  longitude  Float
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([provinceId])
+}
+
+model PlaceCategoryConfig {
+  id                  String                @id @default(cuid())
+  code                String                @unique
+  slug                String                @unique
+  labelTh             String
+  labelEn             String
+  shortLabelTh        String                @default("")
+  shortLabelEn        String                @default("")
+  descriptionTh       String                @default("")
+  descriptionEn       String                @default("")
+  iconKey             String                @default("TicketPercent")
+  crestBgHex          String                @default("#1e78d6")
+  schemaOrgType       String                @default("LocalBusiness")
+  defaultCtaTh        String                @default("ดูรายละเอียด")
+  defaultCtaEn        String                @default("View Details")
+  defaultMerchantMode MerchantMode          @default(PROFILE_ONLY)
+  level               Int                   @default(1)
+  position            Int                   @default(0)
+  isActive            Boolean               @default(true)
+  isSystem            Boolean               @default(false)
+  parentId            String?
+  parent              PlaceCategoryConfig?  @relation("PlaceCategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children            PlaceCategoryConfig[] @relation("PlaceCategoryTree")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([parentId, position])
+  @@index([level, isActive, position])
+}
+
+model PromoInboxItem {
+  id                 String               @id @default(cuid())
+  sourceType         PromoIngestionSource @default(ADMIN_AI_DROP)
+  sourceRefId        String?
+  rawText            String               @default("")
+  rawImageUrl        String?
+  extractedJson      Json?
+  matchedHotelId     String?
+  brandNameTh        String
+  brandNameEn        String               @default("")
+  locationScope      LocationScope        @default(SINGLE_LOCATION)
+  branchSummaryTh    String               @default("")
+  provinceId         String               @default("nationwide")
+  promoCategoryCode  String               @default("STAY")
+  titleTh            String
+  titleEn            String               @default("")
+  descriptionTh      String               @default("")
+  promoCode          String?
+  discountLabelTh    String               @default("")
+  originalPriceThb   Int?
+  dealPriceThb       Int?
+  startsAt           DateTime?
+  expiresAt          DateTime?
+  externalUrl        String?
+  affiliateUrl       String?
+  coverImageUrl      String?
+  visualMode         PromoVisualMode      @default(OFFICIAL_PHOTO)
+  status             PromoInboxStatus     @default(PENDING_REVIEW)
+  dedupeHash         String?
+  reviewedById       String?
+  publishedPinId     String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([promoCategoryCode, status])
+  @@index([dedupeHash])
+  @@index([matchedHotelId])
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AiPrompt {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  titleTh   String   @default("")
+  prompt    String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

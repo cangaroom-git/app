@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { getStyleCollectionMeta } from "@/data/thailandProvinces";
+import { matchesHomePromoTab, type HomePromoTabId } from "@/lib/placeCategories";
 import { getServerSessionUser } from "@/lib/auth/session";
 import {
   getPinsByIds,
@@ -94,13 +95,30 @@ export default async function StyleCollectionPage({
     );
   } else if (meta.slug === "curated") {
     collectionPins = allCatalogPins.filter(
-      (p) => p.dealSourceType === "EXTERNAL"
+      (p) => p.dealSourceType === "EXTERNAL" || Boolean(p.hasActivePromo)
     );
   } else if (meta.slug === "recent") {
     collectionPins =
       recentIds.length > 0
         ? await getPinsByIds(recentIds, sessionUser?.id ?? null)
         : [];
+  } else if (meta.slug === "nationwide") {
+    collectionPins = allCatalogPins.filter(
+      (p) =>
+        p.locationScope === "MULTI_BRANCH" ||
+        p.locationScope === "NATIONWIDE_ONLINE" ||
+        p.provinceId === "nationwide"
+    );
+  } else if (
+    meta.slug === "stay" ||
+    meta.slug === "cafe" ||
+    meta.slug === "dining-bar" ||
+    meta.slug === "wellness" ||
+    meta.slug === "attraction"
+  ) {
+    collectionPins = allCatalogPins.filter((p) =>
+      matchesHomePromoTab(p, meta.slug as HomePromoTabId)
+    );
   } else {
     collectionPins = allCatalogPins.filter((p) =>
       p.stayStyles.includes(meta.slug)

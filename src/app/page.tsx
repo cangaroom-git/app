@@ -1,7 +1,7 @@
 import React, { cache } from "react";
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-import { VALID_STYLE_TAGS } from "@/data/thailandProvinces";
+import { VALID_HOME_PROMO_TAB_IDS } from "@/lib/placeCategories";
 import { getServerSessionUser } from "@/lib/auth/session";
 import {
   getPinDetailById,
@@ -34,6 +34,7 @@ const loadPinDetailForSsr = cache(async (stayId: string) => {
 interface HomeSearchParams {
   stay?: string;
   pin?: string;
+  category?: string;
   style?: string;
   source?: string;
 }
@@ -48,9 +49,9 @@ export async function generateMetadata({
 
   if (!stayId) {
     return {
-      title: "Nondii — รวมคูปองและโปรที่พักสวยทั่วไทย · จองตรง 0% GP",
+      title: "Nondii — ศูนย์รวมโปรเที่ยวไทย · ที่พัก คาเฟ่ ร้านอาหาร & บาร์",
       description:
-        "ศูนย์รวมส่วนลด คูปอง และโปรโมชั่นที่พักสวยทั่วไทย ทั้งโปรจองตรง 0% GP และดีลคัดพิเศษจากทุกแหล่ง ค้นหาตามจังหวัด สไตล์ และแผนที่ได้ในที่เดียว",
+        "แหล่งรวมโปรโมชั่นสำหรับนักท่องเที่ยวทั่วไทย ทั้งที่พักจองตรง 0% GP คาเฟ่ ร้านอาหาร บาร์ แบรนด์ดัง และบัตรเครดิต ค้นหาตามหมวด จังหวัด และแผนที่ได้ในที่เดียว",
     };
   }
 
@@ -99,9 +100,9 @@ export default async function HomePage({
   ]);
 
   const stayId = (sp?.stay || sp?.pin || "").trim() || null;
-  const styleParam = (sp?.style || "").trim();
-  const initialStyleTab = VALID_STYLE_TAGS.has(styleParam)
-    ? styleParam
+  const rawCategoryParam = (sp?.category || sp?.style || "").trim().toLowerCase();
+  const initialStyleTab = VALID_HOME_PROMO_TAB_IDS.has(rawCategoryParam)
+    ? rawCategoryParam
     : "all";
   const sourceParam = (sp?.source || "").trim().toUpperCase();
   const initialSourceFilter: "ALL" | "INTERNAL" | "EXTERNAL" =

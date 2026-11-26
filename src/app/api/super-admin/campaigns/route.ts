@@ -33,7 +33,7 @@ export async function GET() {
       prisma.pin.findMany({
         where: { publishStatus: "PUBLISHED" },
         orderBy: [{ isSponsored: "desc" }, { sponsoredPriority: "desc" }, { likesCount: "desc" }],
-        take: 60,
+        take: 500,
         select: {
           id: true,
           titleTh: true,
@@ -49,7 +49,7 @@ export async function GET() {
       prisma.coupon.findMany({
         where: { isActive: true },
         orderBy: [{ isFeaturedDeal: "desc" }, { claimedCount: "desc" }],
-        take: 40,
+        take: 500,
         select: {
           id: true,
           code: true,

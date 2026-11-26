@@ -42,4 +42,4 @@
    - **GPU-First, Zero Hover-Scale & Reduced Motion**: Animate `translate3d` + `opacity` (never `hover:scale-*`), cache last item during detail-card fade slide-out so content doesn't flash empty, and always respect `@media (prefers-reduced-motion: reduce)`.
 7. **UNIFIED SHELL & 3-TIER CONTAINER GRID**:
    - Persistent `72px` Left Sidebar + `64px` Top Bar on Desktop (`>= lg`); zero top navbar on Mobile/Tablet (`< lg`, replaced by clean docked 5-icon Airbnb Bottom Bar: `Coupon`, `Explore`, `Search`, `Trip`, `Log in / Profile`, auto-hidden on `/{hotelSlug}` in favor of the sticky booking footer).
-   - Strictly 3 widths: `cgr-page-fluid` (`/` & `/trip` map stage), `cgr-page-standard` (`max-w-[1120px]`: `/deal`, `/{hotelSlug}`, `/{hotelSlug}/book`, `/{hotelSlug}/posts`, `/bookings`, `/studio`, `/super-admin`), and `cgr-page-reading` (`760px`) / `cgr-page-form` (`640px`).
+   - Strictly 3 widths: `cgr-page-fluid` (`/` & `/trip` map stage), `cgr-page-standard` (`max-w-[1120px]`: `/deal`, `/{hotelSlug}`, `/{hotelSlug}/book`, `/{hotelSlug}/posts`, `/bookings`, `/studio`, `/admin`), and `cgr-page-reading` (`760px`) / `cgr-page-form` (`640px`).

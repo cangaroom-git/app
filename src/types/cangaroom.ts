@@ -26,6 +26,29 @@ export type PlaceCategoryDto =
   | "ATTRACTION"
   | "WELLNESS";
 export type MerchantModeDto = "DIRECT_BOOKING" | "PROFILE_ONLY";
+export type LocationScopeDto =
+  | "SINGLE_LOCATION"
+  | "MULTI_BRANCH"
+  | "NATIONWIDE_ONLINE";
+export type PromoVisualModeDto =
+  | "OFFICIAL_PHOTO"
+  | "BRANDED_CARD"
+  | "CATEGORY_FALLBACK";
+export interface PlaceBranchDto {
+  id: string;
+  hotelId: string;
+  branchNameTh: string;
+  branchNameEn: string;
+  provinceId: string;
+  provinceNameTh: string;
+  provinceNameEn: string;
+  districtTh: string;
+  addressTh: string;
+  latitude: number | null;
+  longitude: number | null;
+  googleMapsUrl: string | null;
+  googlePlaceId: string | null;
+}
 export type PromoKindDto =
   | "BOOKING_COUPON"
   | "ONSITE_PERK"
@@ -82,6 +105,10 @@ export interface PinFeedItemDto {
   hotelRatingAvg: number;
   placeCategory: PlaceCategoryDto;
   merchantMode: MerchantModeDto;
+  locationScope?: LocationScopeDto;
+  branchSummaryTh?: string;
+  branchSummaryEn?: string;
+  eligibleProvinceIds?: string[];
   externalWebsiteUrl?: string;
   primaryCtaLabelTh?: string;
   featuredCouponId?: string | null;
@@ -109,7 +136,10 @@ export interface PinFeedItemDto {
   promoCode: string | null;
   promoOriginalPriceThb: number | null;
   promoDealPriceThb: number | null;
+  promoStartsAt?: string | null;
   promoExpiresAt: string | null;
+  promoCategoryCode?: string | null;
+  visualMode?: PromoVisualModeDto;
   externalClickCount: number;
   mediaType: PinMediaTypeDto;
   category: PinCategoryDto;
@@ -322,6 +352,11 @@ export interface HotelProfileDto {
   ownerId: string;
   placeCategory?: PlaceCategoryDto;
   merchantMode?: MerchantModeDto;
+  locationScope?: LocationScopeDto;
+  branchSummaryTh?: string;
+  branchSummaryEn?: string;
+  eligibleProvinceIds?: string[];
+  branches?: PlaceBranchDto[];
   externalWebsiteUrl?: string;
   primaryCtaLabelTh?: string;
   openingHours?: PlaceOpeningHoursDayDto[];

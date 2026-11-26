@@ -29,7 +29,7 @@ export function resolveRoleFromEmail(email?: string | null): AppRole {
 }
 
 export function resolveDestinationByRole(role?: AppRole | null): string {
-  if (role === "SUPER_ADMIN") return "/super-admin";
+  if (role === "SUPER_ADMIN") return "/admin";
   if (role === "HOTEL_OWNER") return "/studio";
   return "/";
 }

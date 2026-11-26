@@ -11,9 +11,11 @@ import React, {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  STAY_STYLE_TABS,
-  VALID_STYLE_TAGS,
-} from "@/data/thailandProvinces";
+  HOME_PROMO_TABS,
+  matchesHomePromoTab,
+  VALID_HOME_PROMO_TAB_IDS,
+  type HomePromoTabId,
+} from "@/lib/placeCategories";
 import {
   getEncodedSessionTasteParam,
   getRecentViewedPinIds,
@@ -26,6 +28,7 @@ import { clearLastClickedPinOrigin } from "@/lib/pinOriginStore";
 import { useHotelApp } from "@/components/HotelAppShell";
 import type { PureMediaSlide } from "@/components/media/PureMediaViewer";
 import { DealSlideRow } from "@/components/home/DealSlideRow";
+import { HomeCollectibleHero } from "@/components/home/HomeCollectibleHero";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
 import { useUltraHorizontalScroll } from "@/lib/useUltraHorizontalScroll";
 import type {
@@ -74,11 +77,12 @@ export interface HomeFeedClientProps {
 }
 
 /**
- * Deduplicate pins by hotelId + dealSourceType so every Card Slide row displays
- * distinct properties/deals instead of repeating the same stay.
+ * Hybrid Deduplication for Home Promotion Feed:
+ * - SINGLE_LOCATION: 1 Place = 1 Canonical Card (dedupe by hotelId + dealSourceType)
+ * - MULTI_BRANCH / NATIONWIDE_ONLINE: 1 Active Campaign = 1 Promo Card (allow 1 brand like KTC/KFC to run multiple promos across categories)
  */
 function pickPrimaryDealPerHotel(pins: PinFeedItemDto[]): PinFeedItemDto[] {
-  const bestByHotel = new Map<string, PinFeedItemDto>();
+  const bestByKey = new Map<string, PinFeedItemDto>();
 
   const scoreDeal = (p: PinFeedItemDto) => {
     let sc = 0;
@@ -92,24 +96,20 @@ function pickPrimaryDealPerHotel(pins: PinFeedItemDto[]): PinFeedItemDto[] {
   };
 
   for (const pin of pins) {
-    const key = `${pin.hotelId}:${pin.dealSourceType}`;
-    const existing = bestByHotel.get(key);
+    const isMultiCampaignBrand =
+      pin.locationScope === "MULTI_BRANCH" ||
+      pin.locationScope === "NATIONWIDE_ONLINE";
+    const key = isMultiCampaignBrand
+      ? `campaign:${pin.id}`
+      : `${pin.hotelId}:${pin.dealSourceType}`;
+    const existing = bestByKey.get(key);
     if (!existing || scoreDeal(pin) > scoreDeal(existing)) {
-      bestByHotel.set(key, pin);
+      bestByKey.set(key, pin);
     }
   }
 
-  return Array.from(bestByHotel.values());
+  return Array.from(bestByKey.values());
 }
-
-const STYLE_GROUP_TITLES: Record<string, { th: string; en: string }> = {
-  mountain: { th: "ภูเขา & ทะเลหมอก", en: "Mountain & mist stays" },
-  "pool-villa": { th: "พูลวิลล่าส่วนตัว", en: "Private pool villas" },
-  sea: { th: "ติดทะเล & ชายหาด", en: "Beachfront & island deals" },
-  bars: { th: "บาร์ & รูฟท็อป", en: "Rooftop & bar stays" },
-  bathtub: { th: "อ่างแช่น้ำ & ออนเซ็น", en: "Onsen & soaking tubs" },
-  glamping: { th: "แกลมปิ้ง & เคบิน", en: "Glamping & mountain cabins" },
-};
 
 export function HomeFeedClient({
   initialPins,
@@ -135,13 +135,16 @@ export function HomeFeedClient({
 
   const isTh = language === "th";
 
-  const resolvedInitialAnchor = VALID_STYLE_TAGS.has(initialStyleTab)
-    ? initialStyleTab
+  const resolvedInitialAnchor: HomePromoTabId = VALID_HOME_PROMO_TAB_IDS.has(
+    initialStyleTab
+  )
+    ? (initialStyleTab as HomePromoTabId)
     : "all";
 
-  const [activeAnchorId, setActiveAnchorId] = useState<string>(
+  const [activeAnchorId, setActiveAnchorId] = useState<HomePromoTabId>(
     resolvedInitialAnchor
   );
+  const [areaFilter, setAreaFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] =
     useState<DealSourceFilter>(initialSourceFilter);
   const [isTabsPinned, setIsTabsPinned] = useState<boolean>(false);
@@ -408,8 +411,8 @@ export function HomeFeedClient({
     };
   }, [globalSearchQuery, masterPins.length]);
 
-  // Deduplicated deal catalog (1 hero coupon per hotel+source) filtered by Source switcher
-  const visibleCatalog = useMemo(() => {
+  // Deduplicated deal catalog (Hybrid: 1 card per single-location place, multi-campaign for chains/brands)
+  const baseCatalog = useMemo(() => {
     const base = globalSearchQuery.trim()
       ? searchPins ?? masterPins
       : masterPins;
@@ -419,45 +422,92 @@ export function HomeFeedClient({
     return deduped.filter((p) => p.dealSourceType === sourceFilter);
   }, [globalSearchQuery, searchPins, masterPins, hiddenPinIds, sourceFilter]);
 
-  // Build pure horizontal Card Slide groups matching the top Anchor Tabs
-  const slideGroups = useMemo(() => {
-    const internalDeals = visibleCatalog.filter(
-      (p) => p.placeCategory === "STAY" && p.dealSourceType === "INTERNAL"
-    );
-    const cafeDiningPlaces = visibleCatalog.filter(
-      (p) => p.placeCategory === "CAFE" || p.placeCategory === "RESTAURANT"
-    );
-    const attractionWellnessPlaces = visibleCatalog.filter(
-      (p) => p.placeCategory === "ATTRACTION" || p.placeCategory === "WELLNESS"
-    );
-    const externalDeals = visibleCatalog.filter(
-      (p) => p.placeCategory === "STAY" && p.dealSourceType === "EXTERNAL"
-    );
+  // Build quick area/province chips strictly from real data present in the catalog
+  const areaOptions = useMemo(() => {
+    const counts = new Map<
+      string,
+      { id: string; labelTh: string; labelEn: string; count: number }
+    >();
+    let hasNationwide = false;
 
-    const styleGroups = STAY_STYLE_TABS.filter((t) => t.id !== "all").map(
-      (tab) => {
-        const titleMeta = STYLE_GROUP_TITLES[tab.id] ?? {
-          th: tab.labelTh,
-          en: tab.labelEn,
-        };
-        return {
-          id: tab.id,
-          anchorDomId: `group-${tab.id}`,
-          titleTh: titleMeta.th,
-          titleEn: titleMeta.en,
-          seeAllHref: `/style/${encodeURIComponent(tab.id)}`,
-          deals: visibleCatalog.filter((p) => p.stayStyles.includes(tab.id)),
-        };
+    for (const p of baseCatalog) {
+      if (
+        p.locationScope === "NATIONWIDE_ONLINE" ||
+        p.locationScope === "MULTI_BRANCH" ||
+        p.provinceId === "nationwide"
+      ) {
+        hasNationwide = true;
       }
+      if (p.provinceId && p.provinceId !== "nationwide") {
+        const existing = counts.get(p.provinceId);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          counts.set(p.provinceId, {
+            id: p.provinceId,
+            labelTh: p.provinceNameTh,
+            labelEn: p.provinceNameEn,
+            count: 1,
+          });
+        }
+      }
+    }
+
+    const sortedProvinces = Array.from(counts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return { hasNationwide, provinces: sortedProvinces };
+  }, [baseCatalog]);
+
+  const visibleCatalog = useMemo(() => {
+    if (areaFilter === "all") return baseCatalog;
+    if (areaFilter === "nationwide") {
+      return baseCatalog.filter(
+        (p) =>
+          p.locationScope === "NATIONWIDE_ONLINE" ||
+          p.locationScope === "MULTI_BRANCH" ||
+          p.provinceId === "nationwide"
+      );
+    }
+    return baseCatalog.filter((p) => {
+      if (p.provinceId === areaFilter) return true;
+      if (
+        p.locationScope === "NATIONWIDE_ONLINE" ||
+        p.locationScope === "MULTI_BRANCH"
+      ) {
+        return (
+          !p.eligibleProvinceIds ||
+          p.eligibleProvinceIds.length === 0 ||
+          p.eligibleProvinceIds.includes(areaFilter)
+        );
+      }
+      return false;
+    });
+  }, [baseCatalog, areaFilter]);
+
+  // Build Promotion Category rows & visible tabs (Core Launch Tabs always shown; expansion tabs shown when data exists)
+  const { promoRows, nationwideDeals, visibleTabs } = useMemo(() => {
+    const rows = HOME_PROMO_TABS.filter((t) => t.id !== "all").map((tab) => ({
+      tab,
+      anchorDomId: `group-${tab.id}`,
+      deals: visibleCatalog.filter((p) => matchesHomePromoTab(p, tab.id)),
+    }));
+
+    const nationwide = visibleCatalog.filter(
+      (p) =>
+        p.locationScope === "NATIONWIDE_ONLINE" ||
+        p.locationScope === "MULTI_BRANCH" ||
+        p.provinceId === "nationwide"
     );
 
-    return {
-      internalDeals,
-      cafeDiningPlaces,
-      attractionWellnessPlaces,
-      externalDeals,
-      styleGroups,
-    };
+    const tabs = HOME_PROMO_TABS.filter((tab) => {
+      if (tab.isCoreLaunchTab) return true;
+      const row = rows.find((r) => r.tab.id === tab.id);
+      return Boolean(row && row.deals.length > 0);
+    });
+
+    return { promoRows: rows, nationwideDeals: nationwide, visibleTabs: tabs };
   }, [visibleCatalog]);
 
   const loadPinDetail = useCallback(async (pinId: string) => {
@@ -874,10 +924,10 @@ export function HomeFeedClient({
     return () => observer.disconnect();
   }, [activePin]);
 
-  // Smooth rAF-Throttled Scroll-Spy for Anchor Tabs (zero layout thrash on mobile scroll!)
+  // Smooth rAF-Throttled Scroll-Spy for Promotion Category Tabs (zero layout thrash on mobile scroll!)
   useEffect(() => {
     if (activePin || typeof window === "undefined") return;
-    const sectionIds = STAY_STYLE_TABS.map((t) => ({
+    const sectionIds = visibleTabs.map((t) => ({
       tabId: t.id,
       domId: t.id === "all" ? "group-all" : `group-${t.id}`,
     }));
@@ -890,7 +940,7 @@ export function HomeFeedClient({
         setActiveAnchorId((prev) => (prev === "all" ? prev : "all"));
         return;
       }
-      let current = "all";
+      let current: HomePromoTabId = "all";
       const offsetTop = 160;
       for (const item of sectionIds) {
         const el = document.getElementById(item.domId);
@@ -914,7 +964,7 @@ export function HomeFeedClient({
       window.removeEventListener("scroll", onScroll);
       if (rafId !== 0) window.cancelAnimationFrame(rafId);
     };
-  }, [activePin, visibleCatalog.length]);
+  }, [activePin, visibleCatalog.length, visibleTabs]);
 
   // Keep active anchor tab centered in horizontal scroller
   useEffect(() => {
@@ -954,8 +1004,8 @@ export function HomeFeedClient({
     };
   }, [isTabsPinned, activePin]);
 
-  // Anchor Scroll Handler — scrolls smoothly to the target Slide Group without switching tabs!
-  const scrollToGroupAnchor = useCallback((tabId: string) => {
+  // Anchor Scroll Handler — scrolls smoothly to the target Promotion Category Row
+  const scrollToGroupAnchor = useCallback((tabId: HomePromoTabId) => {
     setActiveAnchorId(tabId);
     anchorScrollLockUntilRef.current = Date.now() + 700;
     if (tabId !== "all") {
@@ -977,13 +1027,18 @@ export function HomeFeedClient({
 
   const handleResetFilters = () => {
     setSourceFilter("ALL");
+    setAreaFilter("all");
     setGlobalSearchQuery("");
     scrollToGroupAnchor("all");
   };
 
   const exploreMapHref = useMemo(() => {
     const qs = new URLSearchParams();
-    if (activeAnchorId !== "all") qs.set("style", activeAnchorId);
+    if (activeAnchorId === "stay") qs.set("category", "STAY");
+    else if (activeAnchorId === "cafe") qs.set("category", "CAFE");
+    else if (activeAnchorId === "dining-bar") qs.set("category", "RESTAURANT");
+    else if (activeAnchorId === "wellness") qs.set("category", "WELLNESS");
+    else if (activeAnchorId === "attraction") qs.set("category", "ATTRACTION");
     if (sourceFilter !== "ALL") qs.set("source", sourceFilter);
     if (globalSearchQuery.trim()) qs.set("q", globalSearchQuery.trim());
     const str = qs.toString();
@@ -992,10 +1047,10 @@ export function HomeFeedClient({
 
   return (
     <div className="cgr-page-wide pb-14 [overflow-anchor:none]">
-      {/* Scroll-Reveal Sticky Anchor Tabs Bar */}
+      {/* Scroll-Reveal Sticky Promotion Category Tabs Bar */}
       {!activePin && (
         <nav
-          aria-label={isTh ? "ลัดไปกลุ่มโปรที่พัก" : "Jump to deal category"}
+          aria-label={isTh ? "ลัดไปหมวดโปรโมชั่น" : "Jump to promotion category"}
           aria-hidden={!isTabsPinned}
           className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
             isTabsPinned
@@ -1009,7 +1064,7 @@ export function HomeFeedClient({
               data-style-tabs-bar="true"
               className="h-12 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-x-contain overscroll-y-none no-scrollbar select-none"
             >
-              {STAY_STYLE_TABS.map((tab) => {
+              {visibleTabs.map((tab) => {
                 const isActive = activeAnchorId === tab.id;
                 return (
                   <button
@@ -1034,51 +1089,110 @@ export function HomeFeedClient({
         </nav>
       )}
 
-      {/* Top Editorial "เที่ยวอะไรดี" Prompt + Inline Anchor Tabs */}
+      {/* Top 4-Layer Collectible Card Hero + Promotion Hub Header + Inline Category Tabs */}
       <div
         aria-hidden={Boolean(activePin)}
         className={activePin ? "hidden" : ""}
       >
-        <div className="pb-2.5 sm:pb-3 flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] leading-tight">
-              {isTh ? "เที่ยวอะไรดี" : "What kind of escape?"}
-            </h1>
-            <p className="text-[13px] sm:text-[14px] text-[var(--color-text-secondary)] mt-0.5 truncate">
-              {isTh
-                ? "สะสมการ์ดที่พัก คาเฟ่ ร้านอาหาร และที่เที่ยวสวยทั่วไทย พร้อมโปรโมชั่นและดีลจองตรง 0% GP"
-                : "Collect stays, cafes, dining, and attractions across Thailand with curated perks & 0% GP booking"}
-            </p>
-          </div>
-        </div>
+        {!globalSearchQuery.trim() && (
+          <HomeCollectibleHero language={language} />
+        )}
 
-        <div ref={inlineTabsSentinelRef}>
-          <div
-            ref={tabsScrollRef}
-            data-style-tabs-bar="true"
-            className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
-          >
-            {STAY_STYLE_TABS.map((tab) => {
-              const isActive = activeAnchorId === tab.id;
-              return (
+        <div
+          className={
+            !globalSearchQuery.trim()
+              ? "relative z-10 -mx-4 px-4 sm:-mx-6 sm:px-6 -mt-4 pt-5 rounded-t-[24px] bg-[var(--color-background-body)] lg:mx-0 lg:px-0 lg:mt-0 lg:pt-0 lg:rounded-none lg:bg-transparent"
+              : ""
+          }
+        >
+          <div className="pb-2.5 sm:pb-3 flex items-baseline justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] leading-tight">
+                {isTh ? "โปรเที่ยวไทย" : "Thailand Travel Deals"}
+              </h1>
+              <p className="text-[13px] sm:text-[14px] text-[var(--color-text-secondary)] mt-0.5 truncate">
+                {isTh
+                  ? "รวมโปรโมชั่นที่พัก คาเฟ่ ร้านอาหาร & บาร์ และแบรนด์ดังทั่วไทย พร้อมแผนที่และจองตรง 0% GP"
+                  : "Curated Thailand travel deals across stays, cafes, dining & bars, brands, and 0% GP direct stays"}
+              </p>
+            </div>
+          </div>
+
+          <div ref={inlineTabsSentinelRef}>
+            <div
+              ref={tabsScrollRef}
+              data-style-tabs-bar="true"
+              className="h-11 flex items-center gap-5 sm:gap-6 overflow-x-auto overflow-y-hidden touch-pan-y overscroll-y-none overscroll-x-contain no-scrollbar border-b border-[var(--color-border)] select-none"
+            >
+              {visibleTabs.map((tab) => {
+                const isActive = activeAnchorId === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(el) => {
+                      tabButtonRefs.current[tab.id] = el;
+                    }}
+                    type="button"
+                    onClick={() => scrollToGroupAnchor(tab.id)}
+                    className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
+                      isActive
+                        ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
+                        : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    <span>{isTh ? tab.labelTh : tab.labelEn}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Compact Borderless Area / Scope Filter Pills (All Thailand · Nationwide/Online · Popular Provinces) */}
+          {(areaOptions.provinces.length > 1 || areaOptions.hasNationwide) && (
+            <div className="pt-3 pb-1 flex items-center gap-2 overflow-x-auto overflow-y-hidden touch-pan-x no-scrollbar -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+              <button
+                type="button"
+                onClick={() => setAreaFilter("all")}
+                className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold shrink-0 whitespace-nowrap cursor-pointer transition-colors ${
+                  areaFilter === "all"
+                    ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                    : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                }`}
+              >
+                {isTh ? "ทุกพื้นที่" : "All Thailand"}
+              </button>
+              {areaOptions.hasNationwide && (
                 <button
-                  key={tab.id}
-                  ref={(el) => {
-                    tabButtonRefs.current[tab.id] = el;
-                  }}
                   type="button"
-                  onClick={() => scrollToGroupAnchor(tab.id)}
-                  className={`h-full border-b-2 inline-flex items-center shrink-0 ty-body whitespace-nowrap cursor-pointer transition-colors ${
-                    isActive
-                      ? "border-[var(--color-text-primary)] font-bold text-[var(--color-text-primary)]"
-                      : "border-transparent font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  onClick={() => setAreaFilter("nationwide")}
+                  className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold shrink-0 whitespace-nowrap cursor-pointer transition-colors ${
+                    areaFilter === "nationwide"
+                      ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                      : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
                   }`}
                 >
-                  <span>{isTh ? tab.labelTh : tab.labelEn}</span>
+                  {isTh ? "ทั่วประเทศ / ออนไลน์" : "Nationwide / Online"}
                 </button>
-              );
-            })}
-          </div>
+              )}
+              {areaOptions.provinces.map((prov) => {
+                const isSelected = areaFilter === prov.id;
+                return (
+                  <button
+                    key={prov.id}
+                    type="button"
+                    onClick={() => setAreaFilter(isSelected ? "all" : prov.id)}
+                    className={`h-8 px-3.5 rounded-full text-[12.5px] font-semibold shrink-0 whitespace-nowrap cursor-pointer transition-colors ${
+                      isSelected
+                        ? "bg-[var(--color-accent)] !text-[var(--color-on-accent)]"
+                        : "bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)]"
+                    }`}
+                  >
+                    {isTh ? prov.labelTh : prov.labelEn}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1226,7 +1340,7 @@ export function HomeFeedClient({
             {/* Featured Top Anchor Section (#group-all) */}
             {!globalSearchQuery.trim() && (
               <>
-                {recentViewedDeals.length > 0 && (
+                {recentViewedDeals.length > 0 && areaFilter === "all" && (
                   <DealSlideRow
                     id="group-all"
                     title={isTh ? "ดูล่าสุด" : "Recently viewed"}
@@ -1240,98 +1354,56 @@ export function HomeFeedClient({
                   />
                 )}
 
-                {slideGroups.internalDeals.length > 0 && (
-                  <DealSlideRow
-                    id={recentViewedDeals.length === 0 ? "group-all" : undefined}
-                    title={
-                      isTh
-                        ? "ที่พักจองตรง 0% GP แนะนำ"
-                        : "Direct 0% GP featured stays"
-                    }
-                    seeAllHref="/style/direct"
-                    deals={slideGroups.internalDeals}
-                    language={language}
-                    savedPinIds={effectiveSavedPinIds}
-                    priorityRow={recentViewedDeals.length === 0}
-                    onSelectDeal={handleSelectFeedDeal}
-                    onToggleSave={handleToggleSaveStable}
-                  />
-                )}
+                {/* Promotion Category Slide Rows (Stays -> Cafes -> Dining & Bars -> Expansion Categories) */}
+                {promoRows.map((row, rowIdx) => {
+                  if (row.deals.length === 0) return null;
+                  const isFirstSection =
+                    (recentViewedDeals.length === 0 || areaFilter !== "all") &&
+                    rowIdx ===
+                      promoRows.findIndex((candidate) => candidate.deals.length > 0);
+                  return (
+                    <div
+                      key={row.tab.id}
+                      id={isFirstSection ? "group-all" : undefined}
+                    >
+                      <DealSlideRow
+                        id={row.anchorDomId}
+                        title={
+                          isTh
+                            ? row.tab.sectionTitleTh
+                            : row.tab.sectionTitleEn
+                        }
+                        seeAllHref={row.tab.seeAllHref}
+                        deals={row.deals}
+                        language={language}
+                        savedPinIds={effectiveSavedPinIds}
+                        priorityRow={isFirstSection}
+                        onSelectDeal={handleSelectFeedDeal}
+                        onToggleSave={handleToggleSaveStable}
+                      />
+                    </div>
+                  );
+                })}
 
-                {slideGroups.cafeDiningPlaces.length > 0 && (
+                {/* Nationwide Brands, Chains & Credit Card Deals Row (shown when available) */}
+                {nationwideDeals.length > 0 && areaFilter !== "nationwide" && (
                   <DealSlideRow
+                    id="group-nationwide"
                     title={
                       isTh
-                        ? "คาเฟ่ & ร้านอาหารน่าสะสม"
-                        : "Curated cafes & dining"
+                        ? "โปรแบรนด์ดัง & บัตรเครดิตทั่วไทย"
+                        : "Nationwide brands & credit card deals"
                     }
-                    seeAllHref="/explore?category=CAFE"
-                    deals={slideGroups.cafeDiningPlaces}
+                    seeAllHref="/style/nationwide"
+                    deals={nationwideDeals}
                     language={language}
                     savedPinIds={effectiveSavedPinIds}
-                    onSelectDeal={handleSelectFeedDeal}
-                    onToggleSave={handleToggleSaveStable}
-                  />
-                )}
-
-                {slideGroups.attractionWellnessPlaces.length > 0 && (
-                  <DealSlideRow
-                    title={
-                      isTh
-                        ? "ที่เที่ยวธรรมชาติ & สปาแนะนำ"
-                        : "Attractions & wellness"
-                    }
-                    seeAllHref="/explore?category=ATTRACTION"
-                    deals={slideGroups.attractionWellnessPlaces}
-                    language={language}
-                    savedPinIds={effectiveSavedPinIds}
-                    onSelectDeal={handleSelectFeedDeal}
-                    onToggleSave={handleToggleSaveStable}
-                  />
-                )}
-
-                {slideGroups.externalDeals.length > 0 && (
-                  <DealSlideRow
-                    id={
-                      recentViewedDeals.length === 0 &&
-                      slideGroups.internalDeals.length === 0
-                        ? "group-all"
-                        : undefined
-                    }
-                    title={
-                      isTh
-                        ? "รวมโปรที่พักเด็ดจากทุกแหล่งทั่วไทย"
-                        : "Curated stay deals from every source"
-                    }
-                    seeAllHref="/style/curated"
-                    deals={slideGroups.externalDeals}
-                    language={language}
-                    savedPinIds={effectiveSavedPinIds}
-                    priorityRow={
-                      recentViewedDeals.length === 0 &&
-                      slideGroups.internalDeals.length === 0
-                    }
                     onSelectDeal={handleSelectFeedDeal}
                     onToggleSave={handleToggleSaveStable}
                   />
                 )}
               </>
             )}
-
-            {/* All 6 Travel-Style Anchor Slide Groups */}
-            {slideGroups.styleGroups.map((group) => (
-              <DealSlideRow
-                key={group.id}
-                id={group.anchorDomId}
-                title={isTh ? group.titleTh : group.titleEn}
-                seeAllHref={group.seeAllHref}
-                deals={group.deals}
-                language={language}
-                savedPinIds={effectiveSavedPinIds}
-                onSelectDeal={handleSelectFeedDeal}
-                onToggleSave={handleToggleSaveStable}
-              />
-            ))}
           </div>
         ))}
 

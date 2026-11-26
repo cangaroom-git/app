@@ -172,6 +172,9 @@ function isInBox(
   east: number,
   west: number
 ): boolean {
+  if (d.locationScope === "NATIONWIDE_ONLINE") {
+    return false;
+  }
   if (
     typeof d.hotelLatitude !== "number" ||
     typeof d.hotelLongitude !== "number"

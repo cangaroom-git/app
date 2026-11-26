@@ -187,9 +187,9 @@ export default function TripPlannerPage() {
     : null;
 
   return (
-    <div className="pb-12 space-y-8 sm:space-y-10">
+    <div className="pb-12">
       {/* Section 1: 3D Scroll-Depth Parallax Storytelling Hero */}
-      <div className="w-full lg:max-w-[1120px] lg:mx-auto lg:px-8 lg:pt-6">
+      <div className="w-full lg:px-6 lg:pt-2">
         <TripStoryParallaxHero
           language={language}
           isSignedIn={Boolean(currentUser)}
@@ -201,8 +201,9 @@ export default function TripPlannerPage() {
         />
       </div>
 
-      {/* Main Content Container */}
-      <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 space-y-10">
+      {/* Main Content Container — Airbnb-style rounded white sheet overlapping straight-edge Hero on Mobile */}
+      <div className="relative z-20 -mt-7 lg:mt-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 lg:pt-0">
+        <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section 2: Cute Popular Province Groups (Scrapbook Clusters) */}
         <TripProvinceGroupsSection
           language={language}
@@ -415,6 +416,7 @@ export default function TripPlannerPage() {
               </div>
             )}
           </section>
+        </div>
         </div>
       </div>
 

@@ -66,7 +66,7 @@ export function revalidateLocationConfigs() {
     revalidateTag(NONDII_CACHE_TAGS.locations, "max");
     revalidatePath("/explore");
     revalidatePath("/");
-    revalidatePath("/super-admin");
+    revalidatePath("/admin");
   } catch (err) {
     console.error("[revalidateLocationConfigs] cache revalidation warning:", err);
   }

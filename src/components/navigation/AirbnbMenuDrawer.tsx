@@ -395,7 +395,7 @@ export function AirbnbMenuDrawer({
 
                 {user?.role === "SUPER_ADMIN" && (
                   <Link
-                    href="/super-admin"
+                    href="/admin"
                     onClick={onClose}
                     className={rowClass}
                   >
@@ -648,7 +648,7 @@ export function AirbnbMenuDrawer({
 
                 {user?.role === "SUPER_ADMIN" && (
                   <Link
-                    href="/super-admin"
+                    href="/admin"
                     onClick={onClose}
                     className={
                       activeTab === "super-admin" ? activeRowClass : rowClass

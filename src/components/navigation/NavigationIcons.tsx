@@ -54,7 +54,7 @@ export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
     return "wishlist";
   }
   if (pathname.startsWith("/deal")) return "deal";
-  if (pathname.startsWith("/studio") || pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/studio")) {
     return "studio";
   }
   if (pathname.startsWith("/register")) return "register-hotel";
@@ -65,7 +65,9 @@ export function getTabIdFromPathname(pathname: string): PlatformNavTabId {
   ) {
     return "trips";
   }
-  if (pathname.startsWith("/super-admin")) return "super-admin";
+  if (pathname.startsWith("/admin") || pathname.startsWith("/super-admin")) {
+    return "super-admin";
+  }
   if (pathname.startsWith("/login")) return "login";
   return "hotel";
 }

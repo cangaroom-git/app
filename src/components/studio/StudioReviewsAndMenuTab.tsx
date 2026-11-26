@@ -314,12 +314,12 @@ export function StudioMobileMenuTab({
 
         {user.role === "SUPER_ADMIN" && (
           <Link
-            href="/super-admin"
+            href="/admin"
             className="w-full py-4 flex items-center justify-between text-[15.5px] font-medium text-[var(--color-text-primary)]"
           >
             <span className="flex items-center gap-3">
               <Crown className="w-5 h-5" />
-              <span>Super Admin Console</span>
+              <span>Admin Center</span>
             </span>
           </Link>
         )}

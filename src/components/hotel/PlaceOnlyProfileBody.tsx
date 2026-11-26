@@ -22,7 +22,12 @@ import {
 } from "lucide-react";
 import type { LanguageCode } from "@/lib/dateFormatters";
 import { getOptimizedPinImageUrl } from "@/lib/mediaUtils";
-import { getPlaceCategoryMeta } from "@/lib/placeCategories";
+import {
+  buildGoogleMapsNearMeUrl,
+  formatPlaceLocationScopeLabel,
+  formatPromoDateRangeLabel,
+  getPlaceCategoryMeta,
+} from "@/lib/placeCategories";
 import { VerticalCouponCard } from "@/components/home/VerticalCouponCard";
 import { UltraHorizontalScroll } from "@/components/shared/UltraHorizontalScroll";
 import type { CardOriginRect } from "@/components/trip/TripCardFlipModal";
@@ -135,6 +140,13 @@ export function PlaceOnlyProfileBody({
   const { hotel, coupons, reviews } = storefront;
   const catMeta = getPlaceCategoryMeta(hotel.placeCategory);
   const placeName = isTh ? hotel.nameTh : hotel.nameEn;
+  const locationScope = hotel.locationScope ?? "SINGLE_LOCATION";
+  const isNationwideOnline = locationScope === "NATIONWIDE_ONLINE";
+  const isMultiBranch = locationScope === "MULTI_BRANCH";
+  const branches = hotel.branches ?? [];
+  const nearMeMapsUrl = isMultiBranch
+    ? buildGoogleMapsNearMeUrl(placeName)
+    : null;
 
   const ownerFeedPosts: HotelPostSummaryDto[] = useMemo(
     () =>
@@ -151,7 +163,8 @@ export function PlaceOnlyProfileBody({
   );
 
   const nearbyPlaces = storefront.nearbyPlaces ?? [];
-  const showNearbySection = !isNearbyHop && nearbyPlaces.length > 0;
+  const showNearbySection =
+    !isNationwideOnline && !isNearbyHop && nearbyPlaces.length > 0;
 
   const openingHours = hotel.openingHours ?? [];
   const todaySummary = useMemo(
@@ -161,22 +174,36 @@ export function PlaceOnlyProfileBody({
 
   const primaryOutboundUrl =
     getSafeExternalUrl(hotel.externalWebsiteUrl) ??
+    (isMultiBranch ? nearMeMapsUrl : null) ??
     getSafeExternalUrl(hotel.googleMapsUrl) ??
     getSafeExternalUrl(hotel.facebookPageUrl) ??
     getSafeExternalUrl(hotel.instagramUrl) ??
-    (hotel.latitude && hotel.longitude
+    (!isNationwideOnline && hotel.latitude && hotel.longitude
       ? `https://www.google.com/maps/search/?api=1&query=${hotel.latitude},${hotel.longitude}`
       : null);
 
   const primaryCtaLabel =
     hotel.primaryCtaLabelTh?.trim() ||
-    (isTh ? catMeta.defaultCtaTh : catMeta.defaultCtaEn);
+    (isNationwideOnline
+      ? isTh
+        ? "ดูรายละเอียด & ใช้สิทธิ์"
+        : "View offer details"
+      : isMultiBranch
+      ? isTh
+        ? "ดูโปร & ค้นหาสาขา"
+        : "Deals & branches"
+      : isTh
+      ? catMeta.defaultCtaTh
+      : catMeta.defaultCtaEn);
 
-  const mapsUrl =
-    getSafeExternalUrl(hotel.googleMapsUrl) ??
-    (hotel.latitude && hotel.longitude
-      ? `https://www.google.com/maps/search/?api=1&query=${hotel.latitude},${hotel.longitude}`
-      : null);
+  const mapsUrl = isNationwideOnline
+    ? null
+    : isMultiBranch
+    ? nearMeMapsUrl
+    : getSafeExternalUrl(hotel.googleMapsUrl) ??
+      (hotel.latitude && hotel.longitude
+        ? `https://www.google.com/maps/search/?api=1&query=${hotel.latitude},${hotel.longitude}`
+        : null);
 
   const todayJs = new Date().getDay();
 
@@ -192,7 +219,15 @@ export function PlaceOnlyProfileBody({
           <section className="py-8 first:pt-0 space-y-3">
             <div className="space-y-1">
               <h2 className="ty-title text-[var(--color-text-primary)] leading-snug">
-                {isTh
+                {isNationwideOnline
+                  ? isTh
+                    ? `โปรโมชั่น${catMeta.labelTh} · ทั่วประเทศ / ออนไลน์`
+                    : `${catMeta.labelEn} · Nationwide / Online`
+                  : isMultiBranch
+                  ? isTh
+                    ? `${catMeta.labelTh} · ${hotel.branchSummaryTh?.trim() || "หลายสาขาทั่วไทย"}`
+                    : `${catMeta.labelEn} · ${hotel.branchSummaryEn?.trim() || hotel.branchSummaryTh?.trim() || "Multiple branches"}`
+                  : isTh
                   ? `${catMeta.labelTh}ใน ${hotel.districtTh ? `${hotel.districtTh} ` : ""}จ.${hotel.provinceNameTh}`
                   : `${catMeta.labelEn} in ${hotel.districtTh ? `${hotel.districtTh}, ` : ""}${hotel.provinceNameEn}`}
               </h2>
@@ -273,7 +308,15 @@ export function PlaceOnlyProfileBody({
                     className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center gap-1.5 transition-colors"
                   >
                     <Navigation className="w-3.5 h-3.5 shrink-0" />
-                    <span>{isTh ? "นำทาง" : "Directions"}</span>
+                    <span>
+                      {isMultiBranch
+                        ? isTh
+                          ? "หาสาขาใกล้ฉัน"
+                          : "Near me"
+                        : isTh
+                        ? "นำทาง"
+                        : "Directions"}
+                    </span>
                   </a>
                 )}
                 {hotel.contactLine && (
@@ -358,6 +401,11 @@ export function PlaceOnlyProfileBody({
                       ? "โปรโมชั่นพิเศษ"
                       : "Special offer";
                   const couponUrl = getSafeExternalUrl(coupon.externalUrl);
+                  const dateRangeInfo = formatPromoDateRangeLabel(
+                    coupon.startsAt,
+                    coupon.expiresAt,
+                    language
+                  );
 
                   return (
                     <div
@@ -385,6 +433,18 @@ export function PlaceOnlyProfileBody({
                         {(isTh ? coupon.descriptionTh : coupon.descriptionEn) && (
                           <p className="text-[12.5px] text-[var(--color-text-secondary)] leading-relaxed">
                             {isTh ? coupon.descriptionTh : coupon.descriptionEn}
+                          </p>
+                        )}
+                        {dateRangeInfo && (
+                          <p
+                            className={`text-[12px] inline-flex items-center gap-1 pt-0.5 tabular-nums ${
+                              dateRangeInfo.isExpiringSoon
+                                ? "text-[var(--color-accent)] font-semibold"
+                                : "text-[var(--color-text-secondary)]"
+                            }`}
+                          >
+                            <Clock className="w-3.5 h-3.5 shrink-0" />
+                            <span>{dateRangeInfo.label}</span>
                           </p>
                         )}
                       </div>
@@ -493,7 +553,17 @@ export function PlaceOnlyProfileBody({
             <div className="space-y-1">
               <p className="text-[12.5px] font-semibold text-[var(--color-text-secondary)]">
                 {isTh ? catMeta.labelTh : catMeta.labelEn} ·{" "}
-                {isTh ? hotel.provinceNameTh : hotel.provinceNameEn}
+                {formatPlaceLocationScopeLabel(
+                  {
+                    locationScope,
+                    branchSummaryTh: hotel.branchSummaryTh,
+                    branchSummaryEn: hotel.branchSummaryEn,
+                    provinceId: hotel.provinceId,
+                    provinceNameTh: hotel.provinceNameTh,
+                    provinceNameEn: hotel.provinceNameEn,
+                  },
+                  language
+                )}
               </p>
               <p className="text-[18px] font-semibold text-[var(--color-text-primary)] leading-snug">
                 {placeName}
@@ -518,7 +588,7 @@ export function PlaceOnlyProfileBody({
               </a>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className={mapsUrl ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
               {mapsUrl && (
                 <a
                   href={mapsUrl}
@@ -528,7 +598,15 @@ export function PlaceOnlyProfileBody({
                   className="h-10 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Navigation className="w-3.5 h-3.5 shrink-0" />
-                  <span>{isTh ? "นำทาง" : "Directions"}</span>
+                  <span>
+                    {isMultiBranch
+                      ? isTh
+                        ? "หาสาขาใกล้ฉัน"
+                        : "Near me"
+                      : isTh
+                      ? "นำทาง"
+                      : "Directions"}
+                  </span>
                 </a>
               )}
 
@@ -803,8 +881,91 @@ export function PlaceOnlyProfileBody({
           </section>
         )}
 
-        {/* Interactive Location Map */}
-        {typeof hotel.latitude === "number" &&
+        {/* Multi-Branch Directory + Free "Find Nearest Branch on Google Maps" CTA */}
+        {isMultiBranch && (
+          <section id="section-location" className="py-8 lg:py-10 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-[-0.015em] text-[var(--color-text-primary)]">
+                  {isTh ? "สาขาที่ร่วมรายการ" : "Participating branches"}
+                </h2>
+                <p className="text-[13.5px] text-[var(--color-text-secondary)]">
+                  {isTh
+                    ? hotel.branchSummaryTh?.trim() ||
+                      "ใช้สิทธิ์ได้ตามสาขาที่ร่วมรายการทั่วประเทศไทย"
+                    : hotel.branchSummaryEn?.trim() ||
+                      hotel.branchSummaryTh?.trim() ||
+                      "Valid across participating branches in Thailand"}
+                </p>
+              </div>
+              {nearMeMapsUrl && (
+                <a
+                  href={nearMeMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => onContactClick("MAP")}
+                  className="h-10 px-5 rounded-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] !text-[var(--color-on-accent)] text-[13.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  <Navigation className="w-4 h-4 shrink-0" />
+                  <span>
+                    {isTh
+                      ? "ค้นหาสาขาใกล้ฉันบน Google Maps"
+                      : "Find nearest branch on Google Maps"}
+                  </span>
+                  <ArrowUpRight className="w-4 h-4 shrink-0" />
+                </a>
+              )}
+            </div>
+
+            {branches.length > 0 && (
+              <div className="divide-y divide-[var(--color-border)]">
+                {branches.map((br) => {
+                  const brUrl =
+                    getSafeExternalUrl(br.googleMapsUrl) ??
+                    (typeof br.latitude === "number" &&
+                    typeof br.longitude === "number"
+                      ? `https://www.google.com/maps/search/?api=1&query=${br.latitude},${br.longitude}`
+                      : nearMeMapsUrl);
+                  return (
+                    <div
+                      key={br.id}
+                      className="py-3.5 flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-[14.5px] font-semibold text-[var(--color-text-primary)] truncate">
+                          {isTh ? br.branchNameTh : br.branchNameEn}
+                        </p>
+                        <p className="text-[13px] text-[var(--color-text-secondary)] truncate">
+                          {br.addressTh ||
+                            `${br.districtTh ? `${br.districtTh} · ` : ""}${
+                              isTh ? br.provinceNameTh : br.provinceNameEn
+                            }`}
+                        </p>
+                      </div>
+                      {brUrl && (
+                        <a
+                          href={brUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => onContactClick("MAP")}
+                          className="h-9 px-4 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] text-[12.5px] font-semibold inline-flex items-center gap-1 shrink-0 transition-colors"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>{isTh ? "นำทาง" : "Directions"}</span>
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Interactive Location Map (Hidden for NATIONWIDE_ONLINE & MULTI_BRANCH without single fixed HQ pin) */}
+        {!isNationwideOnline &&
+          !isMultiBranch &&
+          typeof hotel.latitude === "number" &&
           typeof hotel.longitude === "number" && (
             <section id="section-location" className="py-8 lg:py-10 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

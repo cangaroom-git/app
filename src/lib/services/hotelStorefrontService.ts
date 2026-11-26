@@ -143,6 +143,10 @@ async function fetchPublicStorefrontBaseFromDb(
         ownerId: true,
         placeCategory: true,
         merchantMode: true,
+        locationScope: true,
+        branchSummaryTh: true,
+        branchSummaryEn: true,
+        eligibleProvinceIds: true,
         externalWebsiteUrl: true,
         primaryCtaLabelTh: true,
         openingHoursJson: true,
@@ -289,7 +293,10 @@ async function fetchPublicStorefrontBaseFromDb(
             promoCode: true,
             promoOriginalPriceThb: true,
             promoDealPriceThb: true,
+            promoStartsAt: true,
             promoExpiresAt: true,
+            promoCategoryCode: true,
+            visualMode: true,
             externalClickCount: true,
             publishStatus: true,
             aiConfidenceScore: true,
@@ -357,6 +364,24 @@ async function fetchPublicStorefrontBaseFromDb(
             },
           },
         },
+        branches: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          take: 50,
+          select: {
+            id: true,
+            hotelId: true,
+            branchNameTh: true,
+            branchNameEn: true,
+            provinceId: true,
+            districtTh: true,
+            addressTh: true,
+            latitude: true,
+            longitude: true,
+            googleMapsUrl: true,
+            googlePlaceId: true,
+          },
+        },
       },
     }),
     prisma.pin.aggregate({
@@ -368,10 +393,39 @@ async function fetchPublicStorefrontBaseFromDb(
   if (!hotel) return null;
 
   const province = getProvinceById(hotel.provinceId);
-  const provinceNameTh = province
-    ? province.nameTh.split("(")[0].trim()
-    : hotel.provinceId;
-  const provinceNameEn = province ? province.nameEn : hotel.provinceId;
+  const provinceNameTh =
+    hotel.provinceId === "nationwide"
+      ? "ทั่วประเทศ"
+      : province
+      ? province.nameTh.split("(")[0].trim()
+      : hotel.provinceId;
+  const provinceNameEn =
+    hotel.provinceId === "nationwide"
+      ? "Nationwide"
+      : province
+      ? province.nameEn
+      : hotel.provinceId;
+
+  const branchesDto = hotel.branches.map((br) => {
+    const brProv = getProvinceById(br.provinceId);
+    return {
+      id: br.id,
+      hotelId: br.hotelId,
+      branchNameTh: br.branchNameTh,
+      branchNameEn: br.branchNameEn || br.branchNameTh,
+      provinceId: br.provinceId,
+      provinceNameTh: brProv
+        ? brProv.nameTh.split("(")[0].trim()
+        : br.provinceId,
+      provinceNameEn: brProv ? brProv.nameEn : br.provinceId,
+      districtTh: br.districtTh,
+      addressTh: br.addressTh,
+      latitude: br.latitude,
+      longitude: br.longitude,
+      googleMapsUrl: br.googleMapsUrl,
+      googlePlaceId: br.googlePlaceId,
+    };
+  });
 
   const hotelProfile: HotelProfileDto = {
     id: hotel.id,
@@ -379,6 +433,11 @@ async function fetchPublicStorefrontBaseFromDb(
     ownerId: hotel.ownerId,
     placeCategory: hotel.placeCategory,
     merchantMode: hotel.merchantMode,
+    locationScope: hotel.locationScope,
+    branchSummaryTh: hotel.branchSummaryTh,
+    branchSummaryEn: hotel.branchSummaryEn,
+    eligibleProvinceIds: hotel.eligibleProvinceIds,
+    branches: branchesDto,
     externalWebsiteUrl: hotel.externalWebsiteUrl,
     primaryCtaLabelTh: hotel.primaryCtaLabelTh,
     openingHours: parseJsonArray<PlaceOpeningHoursDayDto>(
@@ -512,6 +571,10 @@ async function fetchPublicStorefrontBaseFromDb(
           ratingAvg: hotel.ratingAvg,
           placeCategory: hotel.placeCategory,
           merchantMode: hotel.merchantMode,
+          locationScope: hotel.locationScope,
+          branchSummaryTh: hotel.branchSummaryTh,
+          branchSummaryEn: hotel.branchSummaryEn,
+          eligibleProvinceIds: hotel.eligibleProvinceIds,
           externalWebsiteUrl: hotel.externalWebsiteUrl,
           primaryCtaLabelTh: hotel.primaryCtaLabelTh,
           featuredCouponId: hotel.featuredCouponId,
@@ -570,7 +633,10 @@ async function fetchPublicStorefrontBaseFromDb(
     promoCode: true,
     promoOriginalPriceThb: true,
     promoDealPriceThb: true,
+    promoStartsAt: true,
     promoExpiresAt: true,
+    promoCategoryCode: true,
+    visualMode: true,
     externalClickCount: true,
     publishStatus: true,
     aiConfidenceScore: true,
@@ -589,6 +655,10 @@ async function fetchPublicStorefrontBaseFromDb(
         districtTh: true,
         placeCategory: true,
         merchantMode: true,
+        locationScope: true,
+        branchSummaryTh: true,
+        branchSummaryEn: true,
+        eligibleProvinceIds: true,
         externalWebsiteUrl: true,
         primaryCtaLabelTh: true,
         featuredCouponId: true,
@@ -620,40 +690,46 @@ async function fetchPublicStorefrontBaseFromDb(
     coupon: { select: PIN_COUPON_SELECT },
   };
 
-  let nearbyRaw = await prisma.pin.findMany({
-    where: {
-      hotelId: { not: hotel.id },
-      publishStatus: "PUBLISHED",
-      isCanonicalCard: true,
-      ...(hasCoords
-        ? {
-            hotel: {
-              isPublished: true,
-              verificationStatus: { not: "SUSPENDED" },
-              latitude: {
-                gte: hotel.latitude! - 0.85,
-                lte: hotel.latitude! + 0.85,
-              },
-              longitude: {
-                gte: hotel.longitude! - 0.85,
-                lte: hotel.longitude! + 0.85,
-              },
-            },
-          }
-        : {
-            provinceId: hotel.provinceId,
-            hotel: {
-              isPublished: true,
-              verificationStatus: { not: "SUSPENDED" },
-            },
-          }),
-    },
-    orderBy: [{ isSponsored: "desc" }, { likesCount: "desc" }],
-    take: 28,
-    select: nearbySelect,
-  });
+  const isNationwideOnline = hotel.locationScope === "NATIONWIDE_ONLINE";
 
-  if (nearbyRaw.length < 3) {
+  let nearbyRaw = isNationwideOnline
+    ? []
+    : await prisma.pin.findMany({
+        where: {
+          hotelId: { not: hotel.id },
+          publishStatus: "PUBLISHED",
+          isCanonicalCard: true,
+          ...(hasCoords
+            ? {
+                hotel: {
+                  isPublished: true,
+                  locationScope: { not: "NATIONWIDE_ONLINE" },
+                  verificationStatus: { not: "SUSPENDED" },
+                  latitude: {
+                    gte: hotel.latitude! - 0.85,
+                    lte: hotel.latitude! + 0.85,
+                  },
+                  longitude: {
+                    gte: hotel.longitude! - 0.85,
+                    lte: hotel.longitude! + 0.85,
+                  },
+                },
+              }
+            : {
+                provinceId: hotel.provinceId,
+                hotel: {
+                  isPublished: true,
+                  locationScope: { not: "NATIONWIDE_ONLINE" },
+                  verificationStatus: { not: "SUSPENDED" },
+                },
+              }),
+        },
+        orderBy: [{ isSponsored: "desc" }, { likesCount: "desc" }],
+        take: 28,
+        select: nearbySelect,
+      });
+
+  if (!isNationwideOnline && nearbyRaw.length < 3) {
     nearbyRaw = await prisma.pin.findMany({
       where: {
         hotelId: { not: hotel.id },
@@ -661,6 +737,7 @@ async function fetchPublicStorefrontBaseFromDb(
         isCanonicalCard: true,
         hotel: {
           isPublished: true,
+          locationScope: { not: "NATIONWIDE_ONLINE" },
           verificationStatus: { not: "SUSPENDED" },
         },
       },
@@ -777,7 +854,7 @@ function getCachedPublicStorefrontBase(
 ): Promise<CachedPublicStorefrontBase | null> {
   return unstable_cache(
     async () => fetchPublicStorefrontBaseFromDb(slug),
-    [`place-storefront-base-v2-${slug}`],
+    [`place-storefront-base-v3-${slug}`],
     {
       revalidate: 1800, // 30m data cache; invalidated immediately via revalidatePlaceCatalog
       tags: [NONDII_CACHE_TAGS.places, NONDII_CACHE_TAGS.place(slug)],

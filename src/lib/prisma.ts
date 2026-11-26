@@ -1,8 +1,49 @@
+import { createRequire } from "module";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const PRISMA_SCHEMA_VERSION = "2026-11-23-location-configs-v5";
+const PRISMA_SCHEMA_VERSION = "2026-11-25-admin-promo-hub-v6";
+
+const REQUIRED_PRISMA_DELEGATES = [
+  "hotelDiscountRule",
+  "placeReport",
+  "provinceConfig",
+  "placeBranch",
+  "placeCategoryConfig",
+  "promoInboxItem",
+  "systemConfig",
+  "aiPrompt",
+] as const;
+
+function hasRequiredDelegates(client: PrismaClient): boolean {
+  return REQUIRED_PRISMA_DELEGATES.every((key) => key in client);
+}
+
+function loadFreshPrismaClientCtor(): typeof PrismaClient {
+  try {
+    const req = createRequire(`${process.cwd()}/package.json`);
+    for (const cacheKey of Object.keys(req.cache)) {
+      if (
+        cacheKey.includes("@prisma/client") ||
+        cacheKey.includes(".prisma/client") ||
+        cacheKey.includes("@prisma\\client") ||
+        cacheKey.includes(".prisma\\client")
+      ) {
+        delete req.cache[cacheKey];
+      }
+    }
+    const freshMod = req("@prisma/client") as {
+      PrismaClient?: typeof PrismaClient;
+    };
+    if (freshMod?.PrismaClient) {
+      return freshMod.PrismaClient;
+    }
+  } catch (err) {
+    console.warn("[prisma] Could not hot-reload @prisma/client:", err);
+  }
+  return PrismaClient;
+}
 
 const globalForPrisma = globalThis as unknown as {
   __cangaroomPrisma?: PrismaClient;
@@ -37,9 +78,7 @@ function getOrCreatePrismaClient(): PrismaClient {
     cachedPrisma &&
     globalForPrisma.__cangaroomPgPoolSslNormalized &&
     globalForPrisma.__cangaroomPrismaSchemaVersion === PRISMA_SCHEMA_VERSION &&
-    "hotelDiscountRule" in cachedPrisma &&
-    "placeReport" in cachedPrisma &&
-    "provinceConfig" in cachedPrisma
+    hasRequiredDelegates(cachedPrisma)
   ) {
     return cachedPrisma;
   }
@@ -81,7 +120,12 @@ function getOrCreatePrismaClient(): PrismaClient {
   }
 
   const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({ adapter });
+  let client = new PrismaClient({ adapter });
+
+  if (!hasRequiredDelegates(client) && process.env.NODE_ENV !== "production") {
+    const FreshPrismaClient = loadFreshPrismaClientCtor();
+    client = new FreshPrismaClient({ adapter });
+  }
 
   // Cache unconditionally in BOTH dev and production (fixes production per-query pool leak)
   globalForPrisma.__cangaroomPrisma = client;

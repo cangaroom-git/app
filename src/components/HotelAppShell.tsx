@@ -1077,7 +1077,8 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const isDedicatedShellPage =
     activeTab === "login" ||
     activeTab === "studio" ||
-    activeTab === "register-hotel";
+    activeTab === "register-hotel" ||
+    activeTab === "super-admin";
 
   const showSearchBar =
     activeTab === "home" ||

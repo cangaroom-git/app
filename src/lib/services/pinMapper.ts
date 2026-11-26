@@ -1,10 +1,12 @@
 import { getProvinceById } from "@/data/thailandProvinces";
 import type {
+  LocationScopeDto,
   MerchantModeDto,
   PinActiveCouponDto,
   PinFeedItemDto,
   PlaceCategoryDto,
   PromoKindDto,
+  PromoVisualModeDto,
 } from "@/types/cangaroom";
 
 export const PIN_COUPON_SELECT = {
@@ -82,7 +84,10 @@ export interface RawPinWithRelations {
   promoCode?: string | null;
   promoOriginalPriceThb?: number | null;
   promoDealPriceThb?: number | null;
+  promoStartsAt?: Date | null;
   promoExpiresAt?: Date | null;
+  promoCategoryCode?: string | null;
+  visualMode?: PromoVisualModeDto;
   externalClickCount?: number;
   publishStatus: "PUBLISHED" | "PENDING_APPROVAL" | "DISCARDED";
   aiConfidenceScore: number | null;
@@ -103,6 +108,10 @@ export interface RawPinWithRelations {
     ratingAvg: number;
     placeCategory?: PlaceCategoryDto;
     merchantMode?: MerchantModeDto;
+    locationScope?: LocationScopeDto;
+    branchSummaryTh?: string | null;
+    branchSummaryEn?: string | null;
+    eligibleProvinceIds?: string[];
     externalWebsiteUrl?: string | null;
     primaryCtaLabelTh?: string | null;
     featuredCouponId?: string | null;
@@ -249,6 +258,9 @@ export function mapPinToDto(
   const merchantMode: MerchantModeDto =
     pin.hotel.merchantMode ??
     (pin.dealSourceType === "EXTERNAL" ? "PROFILE_ONLY" : "DIRECT_BOOKING");
+  const locationScope: LocationScopeDto =
+    pin.hotel.locationScope ??
+    (pin.provinceId === "nationwide" ? "NATIONWIDE_ONLINE" : "SINGLE_LOCATION");
   const dealSourceType = pin.dealSourceType ?? "INTERNAL";
 
   const couponHeadlineTh = activeCoupon
@@ -291,6 +303,10 @@ export function mapPinToDto(
     hotelRatingAvg: pin.hotel.ratingAvg,
     placeCategory,
     merchantMode,
+    locationScope,
+    branchSummaryTh: pin.hotel.branchSummaryTh ?? "",
+    branchSummaryEn: pin.hotel.branchSummaryEn ?? "",
+    eligibleProvinceIds: pin.hotel.eligibleProvinceIds ?? [],
     externalWebsiteUrl: pin.hotel.externalWebsiteUrl ?? "",
     primaryCtaLabelTh: pin.hotel.primaryCtaLabelTh ?? "",
     featuredCouponId,
@@ -319,9 +335,14 @@ export function mapPinToDto(
     promoCode: pin.promoCode ?? activeCoupon?.code ?? null,
     promoOriginalPriceThb: pin.promoOriginalPriceThb ?? null,
     promoDealPriceThb: pin.promoDealPriceThb ?? null,
+    promoStartsAt: pin.promoStartsAt
+      ? pin.promoStartsAt.toISOString()
+      : activeCoupon?.startsAt ?? null,
     promoExpiresAt: pin.promoExpiresAt
       ? pin.promoExpiresAt.toISOString()
       : activeCoupon?.expiresAt ?? null,
+    promoCategoryCode: pin.promoCategoryCode ?? null,
+    visualMode: pin.visualMode ?? "OFFICIAL_PHOTO",
     externalClickCount: pin.externalClickCount ?? 0,
     mediaType: pin.mediaType,
     category: pin.category,
@@ -335,10 +356,18 @@ export function mapPinToDto(
     videoUrl: pin.videoUrl,
     aspectRatio: pin.aspectRatio || "aspect-square",
     provinceId: pin.provinceId,
-    provinceNameTh: province
-      ? province.nameTh.split("(")[0].trim()
-      : pin.provinceId,
-    provinceNameEn: province ? province.nameEn : pin.provinceId,
+    provinceNameTh:
+      pin.provinceId === "nationwide"
+        ? "ทั่วประเทศ"
+        : province
+        ? province.nameTh.split("(")[0].trim()
+        : pin.provinceId,
+    provinceNameEn:
+      pin.provinceId === "nationwide"
+        ? "Nationwide"
+        : province
+        ? province.nameEn
+        : pin.provinceId,
     stayStyles: pin.stayStyles,
     semanticTags: pin.semanticTags,
     sourcePlatform: pin.sourcePlatform,

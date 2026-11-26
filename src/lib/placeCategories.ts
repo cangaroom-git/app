@@ -38,14 +38,14 @@ export const PLACE_CATEGORIES: readonly PlaceCategoryMeta[] = [
   },
   {
     id: "RESTAURANT",
-    labelTh: "ร้านอาหาร",
-    labelEn: "Restaurants",
-    shortLabelTh: "ร้านอาหาร",
-    shortLabelEn: "Dining",
+    labelTh: "ร้านอาหาร & บาร์",
+    labelEn: "Dining & Bars",
+    shortLabelTh: "อาหาร & บาร์",
+    shortLabelEn: "Dining & Bars",
     crestBgHex: "#C6566E",
     schemaOrgType: "Restaurant",
-    defaultCtaTh: "ดูเมนู & จองโต๊ะ",
-    defaultCtaEn: "Menu & Reserve",
+    defaultCtaTh: "ดูเมนู & โปรโมชั่น",
+    defaultCtaEn: "Menu & Deals",
   },
   {
     id: "ATTRACTION",
@@ -164,4 +164,283 @@ export function sanitizeOutboundHttpsUrl(raw?: string | null): string {
   } catch {
     return "";
   }
+}
+
+export type HomePromoTabId =
+  | "all"
+  | "stay"
+  | "cafe"
+  | "dining-bar"
+  | "wellness"
+  | "attraction";
+
+export interface HomePromoTabConfig {
+  id: HomePromoTabId;
+  labelTh: string;
+  labelEn: string;
+  sectionTitleTh: string;
+  sectionTitleEn: string;
+  seeAllHref: string;
+  /** Core launch focus tabs stay visible even when sparse; expansion tabs show automatically when promos exist */
+  isCoreLaunchTab: boolean;
+}
+
+export const HOME_PROMO_TABS: readonly HomePromoTabConfig[] = [
+  {
+    id: "all",
+    labelTh: "ทั้งหมด",
+    labelEn: "All Deals",
+    sectionTitleTh: "โปรเที่ยวไทยแนะนำ",
+    sectionTitleEn: "Featured Thailand deals",
+    seeAllHref: "/style/curated",
+    isCoreLaunchTab: true,
+  },
+  {
+    id: "stay",
+    labelTh: "ที่พัก",
+    labelEn: "Stays",
+    sectionTitleTh: "โปรที่พัก & โรงแรม",
+    sectionTitleEn: "Stay & hotel promotions",
+    seeAllHref: "/style/stay",
+    isCoreLaunchTab: true,
+  },
+  {
+    id: "cafe",
+    labelTh: "คาเฟ่",
+    labelEn: "Cafes",
+    sectionTitleTh: "โปรคาเฟ่ยอดฮิต",
+    sectionTitleEn: "Popular cafe promotions",
+    seeAllHref: "/style/cafe",
+    isCoreLaunchTab: true,
+  },
+  {
+    id: "dining-bar",
+    labelTh: "ร้านอาหาร & บาร์",
+    labelEn: "Dining & Bars",
+    sectionTitleTh: "โปรร้านอาหาร & บาร์",
+    sectionTitleEn: "Dining, buffets & bars",
+    seeAllHref: "/style/dining-bar",
+    isCoreLaunchTab: true,
+  },
+  {
+    id: "wellness",
+    labelTh: "สปา & เวลเนส",
+    labelEn: "Spa & Wellness",
+    sectionTitleTh: "โปรสปา ออนเซ็น & เวลเนส",
+    sectionTitleEn: "Spa, onsen & wellness deals",
+    seeAllHref: "/style/wellness",
+    isCoreLaunchTab: false,
+  },
+  {
+    id: "attraction",
+    labelTh: "กิจกรรม & ที่เที่ยว",
+    labelEn: "Activities",
+    sectionTitleTh: "โปรกิจกรรม & ที่เที่ยว",
+    sectionTitleEn: "Activities & attractions",
+    seeAllHref: "/style/attraction",
+    isCoreLaunchTab: false,
+  },
+] as const;
+
+export const VALID_HOME_PROMO_TAB_IDS: ReadonlySet<string> = new Set(
+  HOME_PROMO_TABS.map((t) => t.id)
+);
+
+export function resolveEffectivePromoCategory(pin: {
+  placeCategory: PlaceCategoryDto;
+  promoCategoryCode?: string | null;
+  stayStyles?: string[];
+}): Exclude<HomePromoTabId, "all"> {
+  const override = (pin.promoCategoryCode || "").trim().toUpperCase();
+  if (override === "STAY") return "stay";
+  if (override === "CAFE") return "cafe";
+  if (override === "RESTAURANT" || override === "BAR" || override === "DINING-BAR") {
+    return "dining-bar";
+  }
+  if (override === "WELLNESS") return "wellness";
+  if (override === "ATTRACTION") return "attraction";
+
+  if (pin.placeCategory === "CAFE") return "cafe";
+  if (pin.placeCategory === "RESTAURANT") return "dining-bar";
+  if (pin.placeCategory === "WELLNESS") return "wellness";
+  if (pin.placeCategory === "ATTRACTION") return "attraction";
+  return "stay";
+}
+
+export function matchesHomePromoTab(
+  pin: {
+    placeCategory: PlaceCategoryDto;
+    promoCategoryCode?: string | null;
+    stayStyles?: string[];
+  },
+  tabId: HomePromoTabId
+): boolean {
+  if (tabId === "all") return true;
+  const resolved = resolveEffectivePromoCategory(pin);
+  if (resolved === tabId) return true;
+  if (tabId === "dining-bar" && pin.stayStyles?.includes("bars")) {
+    return true;
+  }
+  return false;
+}
+
+const THAI_SHORT_MONTHS = [
+  "ม.ค.",
+  "ก.พ.",
+  "มี.ค.",
+  "เม.ย.",
+  "พ.ค.",
+  "มิ.ย.",
+  "ก.ค.",
+  "ส.ค.",
+  "ก.ย.",
+  "ต.ค.",
+  "พ.ย.",
+  "ธ.ค.",
+] as const;
+
+const EN_SHORT_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatShortDayMonth(d: Date, lang: "th" | "en", includeYear = false): string {
+  const day = d.getDate();
+  const monthIdx = d.getMonth();
+  if (lang === "th") {
+    const base = `${day} ${THAI_SHORT_MONTHS[monthIdx]}`;
+    if (!includeYear) return base;
+    const beShort = String((d.getFullYear() + 543) % 100).padStart(2, "0");
+    return `${base} ${beShort}`;
+  }
+  const base = `${EN_SHORT_MONTHS[monthIdx]} ${day}`;
+  return includeYear ? `${base}, ${d.getFullYear()}` : base;
+}
+
+export interface PromoDateBadgeInfo {
+  label: string;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+}
+
+/**
+ * Formats a concise, readable promotion validity window for 1:1 cards & promo detail blocks.
+ * Examples:
+ * - "ใกล้หมดเขต · เหลือ 2 วัน" (when <= 3 days left)
+ * - "23 ต.ค. – 26 ต.ค." (when start & end window is tight)
+ * - "ถึง 30 พ.ย." / "Until Nov 30" (when active ongoing promo)
+ * - "หมดอายุ" / "Expired" (if past expiresAt)
+ */
+export function formatPromoDateRangeLabel(
+  startsAtIso?: string | null,
+  expiresAtIso?: string | null,
+  lang: "th" | "en" = "th"
+): PromoDateBadgeInfo | null {
+  if (!expiresAtIso) return null;
+  const endDate = new Date(expiresAtIso);
+  const endMs = endDate.getTime();
+  if (!Number.isFinite(endMs)) return null;
+
+  const now = new Date();
+  const nowMs = now.getTime();
+  const diffMs = endMs - nowMs;
+
+  if (diffMs <= 0) {
+    return {
+      label: lang === "th" ? "หมดอายุ" : "Expired",
+      isExpired: true,
+      isExpiringSoon: false,
+    };
+  }
+
+  const daysLeft = Math.ceil(diffMs / 86_400_000);
+  const endYearDiffers = endDate.getFullYear() !== now.getFullYear();
+
+  if (daysLeft <= 3) {
+    const endShort = formatShortDayMonth(endDate, lang, endYearDiffers);
+    return {
+      label:
+        lang === "th"
+          ? daysLeft === 1
+            ? `วันสุดท้าย · ${endShort}`
+            : `เหลือ ${daysLeft} วัน · ถึง ${endShort}`
+          : daysLeft === 1
+          ? `Last day · ${endShort}`
+          : `${daysLeft}d left · Until ${endShort}`,
+      isExpired: false,
+      isExpiringSoon: true,
+    };
+  }
+
+  if (startsAtIso) {
+    const startDate = new Date(startsAtIso);
+    const startMs = startDate.getTime();
+    if (Number.isFinite(startMs)) {
+      const spanDays = Math.ceil((endMs - startMs) / 86_400_000);
+      // Show explicit start–end range for scheduled/short campaigns (<= 90 days) or upcoming promos
+      if (startMs > nowMs || (spanDays > 0 && spanDays <= 90)) {
+        const showYear =
+          startDate.getFullYear() !== now.getFullYear() || endYearDiffers;
+        const startStr = formatShortDayMonth(startDate, lang, showYear);
+        const endStr = formatShortDayMonth(endDate, lang, showYear);
+        return {
+          label: `${startStr} – ${endStr}`,
+          isExpired: false,
+          isExpiringSoon: false,
+        };
+      }
+    }
+  }
+
+  const endLabel = formatShortDayMonth(endDate, lang, endYearDiffers);
+  return {
+    label: lang === "th" ? `ถึง ${endLabel}` : `Until ${endLabel}`,
+    isExpired: false,
+    isExpiringSoon: false,
+  };
+}
+
+/** Build a free Google Maps "Find nearest branch" search URL for MULTI_BRANCH chains */
+export function buildGoogleMapsNearMeUrl(brandName: string): string {
+  const clean = brandName.trim();
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    `${clean} near me`
+  )}`;
+}
+
+/** Resolve concise location / scope label for cards & headers */
+export function formatPlaceLocationScopeLabel(
+  params: {
+    locationScope?: "SINGLE_LOCATION" | "MULTI_BRANCH" | "NATIONWIDE_ONLINE" | null;
+    branchSummaryTh?: string | null;
+    branchSummaryEn?: string | null;
+    provinceId?: string | null;
+    provinceNameTh: string;
+    provinceNameEn: string;
+  },
+  lang: "th" | "en" = "th"
+): string {
+  const scope = params.locationScope ?? "SINGLE_LOCATION";
+  if (scope === "NATIONWIDE_ONLINE" || params.provinceId === "nationwide") {
+    return lang === "th" ? "ทั่วประเทศ · ออนไลน์" : "Nationwide · Online";
+  }
+  if (scope === "MULTI_BRANCH") {
+    const custom =
+      lang === "th"
+        ? params.branchSummaryTh?.trim()
+        : params.branchSummaryEn?.trim() || params.branchSummaryTh?.trim();
+    if (custom) return custom;
+    return lang === "th" ? "หลายสาขาทั่วไทย" : "Multiple branches";
+  }
+  return lang === "th" ? params.provinceNameTh : params.provinceNameEn;
 }

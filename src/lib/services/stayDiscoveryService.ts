@@ -276,24 +276,70 @@ async function fetchPublicDiscoveryCandidatesFromDb(params: {
     hotelFilter.placeCategory = placeCategory;
   }
   if (bounds) {
+    hotelFilter.locationScope = { not: "NATIONWIDE_ONLINE" };
     hotelFilter.latitude = { gte: bounds.south, lte: bounds.north };
     hotelFilter.longitude = { gte: bounds.west, lte: bounds.east };
   }
 
-  const where: Prisma.PinWhereInput = {
-    publishStatus: "PUBLISHED",
-    isCanonicalCard: true,
-    AND: [
-      {
-        OR: [{ promoExpiresAt: null }, { promoExpiresAt: { gt: nowDate } }],
-      },
-    ],
-    hotel: hotelFilter,
-  };
+  const andConditions: Prisma.PinWhereInput[] = [
+    {
+      OR: [{ promoExpiresAt: null }, { promoExpiresAt: { gt: nowDate } }],
+    },
+  ];
+
+  // Hybrid Card Rule:
+  // - Map viewport (bounds): strictly canonical 1-location / geocoded places
+  // - Home & Discovery feed: canonical single-location places + multi-campaign brand/credit-card promos
+  if (bounds) {
+    andConditions.push({ isCanonicalCard: true });
+  } else {
+    andConditions.push({
+      OR: [
+        { isCanonicalCard: true },
+        {
+          hotel: {
+            locationScope: { in: ["MULTI_BRANCH", "NATIONWIDE_ONLINE"] },
+          },
+        },
+      ],
+    });
+  }
 
   if (provinceId && provinceId !== "all") {
-    where.provinceId = provinceId;
+    if (provinceId === "nationwide") {
+      andConditions.push({
+        OR: [
+          { provinceId: "nationwide" },
+          {
+            hotel: {
+              locationScope: { in: ["MULTI_BRANCH", "NATIONWIDE_ONLINE"] },
+            },
+          },
+        ],
+      });
+    } else {
+      andConditions.push({
+        OR: [
+          { provinceId },
+          {
+            hotel: {
+              locationScope: { in: ["MULTI_BRANCH", "NATIONWIDE_ONLINE"] },
+              OR: [
+                { eligibleProvinceIds: { isEmpty: true } },
+                { eligibleProvinceIds: { has: provinceId } },
+              ],
+            },
+          },
+        ],
+      });
+    }
   }
+
+  const where: Prisma.PinWhereInput = {
+    publishStatus: "PUBLISHED",
+    AND: andConditions,
+    hotel: hotelFilter,
+  };
 
   if (sourceType === "INTERNAL" || sourceType === "EXTERNAL") {
     where.dealSourceType = sourceType;
@@ -335,7 +381,10 @@ async function fetchPublicDiscoveryCandidatesFromDb(params: {
       promoCode: true,
       promoOriginalPriceThb: true,
       promoDealPriceThb: true,
+      promoStartsAt: true,
       promoExpiresAt: true,
+      promoCategoryCode: true,
+      visualMode: true,
       externalClickCount: true,
       publishStatus: true,
       aiConfidenceScore: true,
@@ -363,6 +412,10 @@ async function fetchPublicDiscoveryCandidatesFromDb(params: {
           districtTh: true,
           placeCategory: true,
           merchantMode: true,
+          locationScope: true,
+          branchSummaryTh: true,
+          branchSummaryEn: true,
+          eligibleProvinceIds: true,
           externalWebsiteUrl: true,
           primaryCtaLabelTh: true,
           featuredCouponId: true,
@@ -478,7 +531,7 @@ function getCachedPublicDiscoveryCandidates(params: {
 
   return unstable_cache(
     async () => fetchPublicDiscoveryCandidatesFromDb(params),
-    ["nondii-discovery-pins-v1", normalizedKey],
+    ["nondii-discovery-pins-v2", normalizedKey],
     {
       revalidate: 300, // 5m server cache; immediately purged on host/admin mutations
       tags: [
@@ -641,6 +694,10 @@ async function fetchPublicPinDetailBaseFromDb(
           addressTh: true,
           placeCategory: true,
           merchantMode: true,
+          locationScope: true,
+          branchSummaryTh: true,
+          branchSummaryEn: true,
+          eligibleProvinceIds: true,
           externalWebsiteUrl: true,
           primaryCtaLabelTh: true,
           featuredCouponId: true,
@@ -721,7 +778,10 @@ async function fetchPublicPinDetailBaseFromDb(
         promoCode: true,
         promoOriginalPriceThb: true,
         promoDealPriceThb: true,
+        promoStartsAt: true,
         promoExpiresAt: true,
+        promoCategoryCode: true,
+        visualMode: true,
         externalClickCount: true,
         publishStatus: true,
         aiConfidenceScore: true,
@@ -740,6 +800,10 @@ async function fetchPublicPinDetailBaseFromDb(
             districtTh: true,
             placeCategory: true,
             merchantMode: true,
+            locationScope: true,
+            branchSummaryTh: true,
+            branchSummaryEn: true,
+            eligibleProvinceIds: true,
             externalWebsiteUrl: true,
             primaryCtaLabelTh: true,
             featuredCouponId: true,
@@ -1144,6 +1208,10 @@ export async function getPinsByIds(
           addressTh: true,
           placeCategory: true,
           merchantMode: true,
+          locationScope: true,
+          branchSummaryTh: true,
+          branchSummaryEn: true,
+          eligibleProvinceIds: true,
           externalWebsiteUrl: true,
           primaryCtaLabelTh: true,
           featuredCouponId: true,

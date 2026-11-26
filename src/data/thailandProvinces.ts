@@ -271,7 +271,13 @@ export type StyleCollectionSlug =
   | StayStyleTag
   | "direct"
   | "curated"
-  | "recent";
+  | "recent"
+  | "stay"
+  | "cafe"
+  | "dining-bar"
+  | "wellness"
+  | "attraction"
+  | "nationwide";
 
 export interface StyleCollectionMeta {
   slug: StyleCollectionSlug;
@@ -342,10 +348,52 @@ export const STYLE_COLLECTION_META: Readonly<
   },
   recent: {
     slug: "recent",
-    labelTh: "ที่พักที่ดูล่าสุด",
-    labelEn: "Recently Viewed Stays",
-    taglineTh: "ย้อนดูคูปองและที่พักสวยที่คุณเพิ่งเปิดชมไว้ก่อนหน้านี้",
-    taglineEn: "Pick up right where you left off on stays you recently explored.",
+    labelTh: "โปรและสถานที่ที่ดูล่าสุด",
+    labelEn: "Recently Viewed",
+    taglineTh: "ย้อนดูโปรโมชั่นและสถานที่สวยที่คุณเพิ่งเปิดชมไว้ก่อนหน้านี้",
+    taglineEn: "Pick up right where you left off on deals and places you recently explored.",
+  },
+  stay: {
+    slug: "stay",
+    labelTh: "โปรที่พัก & โรงแรม",
+    labelEn: "Stay & Hotel Promotions",
+    taglineTh: "รวมโปรที่พัก รีสอร์ต พูลวิลล่า ทั้งดีลจองตรง 0% GP และส่วนลดพิเศษทั่วไทย",
+    taglineEn: "Curated hotel, resort, and pool villa promotions across Thailand.",
+  },
+  cafe: {
+    slug: "cafe",
+    labelTh: "โปรคาเฟ่ยอดฮิต",
+    labelEn: "Popular Cafe Promotions",
+    taglineTh: "ส่วนลดเครื่องดื่ม เบเกอรี และคาเฟ่บรรยากาศดีน่าแวะระหว่างทริป",
+    taglineEn: "Coffee, bakery perks, and scenic cafes worth stopping for.",
+  },
+  "dining-bar": {
+    slug: "dining-bar",
+    labelTh: "โปรร้านอาหาร & บาร์",
+    labelEn: "Dining, Buffets & Bars",
+    taglineTh: "ดีลร้านอาหาร บุฟเฟ่ต์โรงแรม รูฟท็อปบาร์ และบีชคลับทั่วไทย",
+    taglineEn: "Restaurant perks, hotel buffets, rooftop bars, and beach clubs.",
+  },
+  wellness: {
+    slug: "wellness",
+    labelTh: "โปรสปา ออนเซ็น & เวลเนส",
+    labelEn: "Spa, Onsen & Wellness",
+    taglineTh: "แพ็กเกจสปา นวดผ่อนคลาย และออนเซ็นราคาคุ้มสำหรับวันพักผ่อน",
+    taglineEn: "Relaxing spa packages, Thai massage, and onsen deals.",
+  },
+  attraction: {
+    slug: "attraction",
+    labelTh: "โปรกิจกรรม & ที่เที่ยว",
+    labelEn: "Activities & Attractions",
+    taglineTh: "บัตรสวนน้ำ ทัวร์เกาะ ล่องเรือ ฟาร์ม และแหล่งท่องเที่ยวทั่วไทย",
+    taglineEn: "Waterparks, island tours, cruises, and local experiences.",
+  },
+  nationwide: {
+    slug: "nationwide",
+    labelTh: "โปรแบรนด์ดัง & บัตรเครดิตทั่วไทย",
+    labelEn: "Nationwide Brands & Credit Card Deals",
+    taglineTh: "โปรโมชั่นจากร้านเชนหลายสาขา บัตรเครดิต และพาร์ทเนอร์ที่ใช้ได้ทั่วประเทศ",
+    taglineEn: "Multi-branch chain perks and nationwide online travel offers.",
   },
 };
 
@@ -359,6 +407,9 @@ export function formatProvinceLabel(
   provinceId: string,
   language: "th" | "en"
 ): string {
+  if (provinceId === "nationwide") {
+    return language === "th" ? "ทั่วประเทศ / ออนไลน์" : "Nationwide / Online";
+  }
   const found = getProvinceById(provinceId);
   if (!found) return provinceId;
   return language === "th"

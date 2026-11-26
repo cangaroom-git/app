@@ -10,6 +10,8 @@ import {
 } from "@/lib/mediaUtils";
 import {
   formatDistanceKmLabel,
+  formatPlaceLocationScopeLabel,
+  formatPromoDateRangeLabel,
   getPlaceCategoryMeta,
 } from "@/lib/placeCategories";
 import { PlaceCategoryCrest } from "@/components/shared/PlaceCategoryCrest";
@@ -131,12 +133,30 @@ export const VerticalCouponCard = React.memo(function VerticalCouponCard({
     return { left: r.left, top: r.top, width: r.width, height: r.height };
   };
   const hotelName = isTh ? pin.hotelNameTh : pin.hotelNameEn;
-  const provinceName = isTh ? pin.provinceNameTh : pin.provinceNameEn;
-  const promoHeadline = getDealPromoOnlyHeadline(pin, language);
-  const resolvedDistance = formatDistanceKmLabel(
-    distanceKm ?? pin.distanceKm,
+  const locationScope = pin.locationScope ?? "SINGLE_LOCATION";
+  const locationLabel = formatPlaceLocationScopeLabel(
+    {
+      locationScope,
+      branchSummaryTh: pin.branchSummaryTh,
+      branchSummaryEn: pin.branchSummaryEn,
+      provinceId: pin.provinceId,
+      provinceNameTh: pin.provinceNameTh,
+      provinceNameEn: pin.provinceNameEn,
+    },
     language
   );
+  const promoHeadline = getDealPromoOnlyHeadline(pin, language);
+  const promoDateInfo = promoHeadline
+    ? formatPromoDateRangeLabel(
+        pin.promoStartsAt ?? pin.activeCoupon?.startsAt ?? null,
+        pin.promoExpiresAt ?? pin.activeCoupon?.expiresAt ?? null,
+        language
+      )
+    : null;
+  const resolvedDistance =
+    locationScope === "SINGLE_LOCATION"
+      ? formatDistanceKmLabel(distanceKm ?? pin.distanceKm, language)
+      : null;
 
   // Build deduplicated photo slides when inline photo sliding is enabled:
   // Slide 0 is ALWAYS coverImageUrl (Coupon Front), followed by up to 4 additional mediaUrls.
@@ -471,9 +491,22 @@ export const VerticalCouponCard = React.memo(function VerticalCouponCard({
         </div>
         <p className="text-[12px] sm:text-[12.5px] text-[var(--color-text-secondary)] leading-snug truncate tabular-nums">
           {resolvedDistance
-            ? `${resolvedDistance} · ${provinceName}`
-            : provinceName}
+            ? `${resolvedDistance} · ${locationLabel}`
+            : locationLabel}
         </p>
+        {promoDateInfo && (
+          <p
+            className={`text-[11.5px] leading-snug truncate tabular-nums ${
+              promoDateInfo.isExpired
+                ? "text-[var(--color-error)] font-medium"
+                : promoDateInfo.isExpiringSoon
+                ? "text-[var(--color-accent)] font-semibold"
+                : "text-[var(--color-text-secondary)]"
+            }`}
+          >
+            {promoDateInfo.label}
+          </p>
+        )}
       </div>
     </article>
   );
