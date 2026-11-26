@@ -74,53 +74,20 @@ export function PrimaryNavigation({
 
   const [isMobileProfileDrawerOpen, setIsMobileProfileDrawerOpen] =
     useState(false);
-  const [isMobileNavHidden, setIsMobileNavHidden] = useState(false);
   const [isFloatingSearchOpen, setIsFloatingSearchOpen] = useState(false);
   const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false);
 
-  const shouldHideMobileBottomNav =
-    activeTab !== "explore" &&
-    activeTab !== "board" &&
-    !pathname.startsWith("/account") &&
-    !pathname.startsWith("/bookings") &&
-    isMobileNavHidden &&
-    !isMobileProfileDrawerOpen &&
-    !isFloatingSearchOpen;
   const isHotelBookingFlowPage =
     activeTab === "hotel" && !pathname.includes("/posts");
-  const [isBottomNavRendered, setIsBottomNavRendered] = useState(
-    !shouldHideMobileBottomNav
-  );
-
-  useEffect(() => {
-    if (!shouldHideMobileBottomNav) {
-      setIsBottomNavRendered(true);
-    } else {
-      const timer = window.setTimeout(() => setIsBottomNavRendered(false), 300);
-      return () => window.clearTimeout(timer);
-    }
-  }, [shouldHideMobileBottomNav]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.documentElement.dataset.mobileNavHidden =
-      shouldHideMobileBottomNav ? "true" : "false";
-    return () => {
-      document.documentElement.dataset.mobileNavHidden = "false";
-    };
-  }, [shouldHideMobileBottomNav]);
 
   const desktopSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement | null>(null);
   const floatingSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const lastScrollYRef = useRef<number>(0);
-  const lastScrollTargetRef = useRef<EventTarget | null>(null);
 
   const floatingSearchPresence = useModalPresence(isFloatingSearchOpen, 220);
   useBodyScrollLock(floatingSearchPresence.shouldRender);
 
   useEffect(() => {
-    setIsMobileNavHidden(false);
     setIsFloatingSearchOpen(false);
     setIsDesktopSearchOpen(false);
   }, [pathname]);
@@ -155,84 +122,6 @@ export function PrimaryNavigation({
       window.removeEventListener("keydown", onEsc);
     };
   }, [isFloatingSearchOpen]);
-
-  // Smooth Mobile/Tablet Auto-Hide Navbar on Scroll Down & Reveal on Scroll Up (< lg)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    let rafId = 0;
-
-    const handleScroll = (e: Event) => {
-      if (window.innerWidth >= 1024) {
-        return;
-      }
-
-      const target = e.target;
-      let currentY = 0;
-
-      if (
-        target === document ||
-        target === window ||
-        target === document.documentElement ||
-        target === document.body
-      ) {
-        currentY = window.scrollY;
-        const maxScrollY =
-          document.documentElement.scrollHeight - window.innerHeight;
-        // Ignore iOS rubber-band overscroll beyond the top or bottom
-        if (currentY < 0 || (maxScrollY > 0 && currentY > maxScrollY)) {
-          return;
-        }
-      } else if (
-        target instanceof HTMLElement &&
-        target.dataset.mobileScrollContainer === "true"
-      ) {
-        currentY = target.scrollTop;
-        const maxScrollTop = target.scrollHeight - target.clientHeight;
-        if (currentY < 0 || (maxScrollTop > 0 && currentY > maxScrollTop)) {
-          return;
-        }
-      } else {
-        return;
-      }
-
-      if (lastScrollTargetRef.current !== target) {
-        lastScrollTargetRef.current = target;
-        lastScrollYRef.current = currentY;
-        if (currentY <= 32) setIsMobileNavHidden(false);
-        return;
-      }
-
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0;
-        const prevY = lastScrollYRef.current;
-        const delta = currentY - prevY;
-
-        if (currentY <= 32) {
-          setIsMobileNavHidden(false);
-          lastScrollYRef.current = currentY;
-          return;
-        }
-
-        if (delta > 10 && currentY > 56) {
-          setIsMobileNavHidden(true);
-          lastScrollYRef.current = currentY;
-        } else if (delta < -8) {
-          setIsMobileNavHidden(false);
-          lastScrollYRef.current = currentY;
-        }
-      });
-    };
-
-    window.addEventListener("scroll", handleScroll, {
-      capture: true,
-      passive: true,
-    });
-    return () => {
-      window.removeEventListener("scroll", handleScroll, { capture: true });
-      if (rafId) window.cancelAnimationFrame(rafId);
-    };
-  }, []);
 
   const isDarkTheme = theme === "dark";
   const ownedHotel = user?.ownedHotels?.[0] ?? null;
@@ -327,7 +216,6 @@ export function PrimaryNavigation({
 
   const handleOpenFloatingSearch = () => {
     setIsMobileProfileDrawerOpen(false);
-    setIsMobileNavHidden(false);
     setIsFloatingSearchOpen((prev) => !prev);
   };
 
@@ -674,13 +562,8 @@ export function PrimaryNavigation({
       ====================================================================== */}
       <nav
         aria-label="Mobile navigation"
-        aria-hidden={shouldHideMobileBottomNav}
         data-hide-on-hotel={isHotelBookingFlowPage ? "true" : undefined}
-        className={`fixed bottom-0 inset-x-0 z-[70] lg:hidden pb-[var(--cgr-safe-bottom)] bg-[var(--color-background-body)] border-t border-[var(--color-border)] select-none transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
-          shouldHideMobileBottomNav
-            ? "translate-y-full opacity-0 pointer-events-none"
-            : "translate-y-0 opacity-100 pointer-events-auto"
-        } ${!isBottomNavRendered && shouldHideMobileBottomNav ? "hidden" : ""}`}
+        className="fixed bottom-0 inset-x-0 z-[70] lg:hidden pb-[var(--cgr-safe-bottom)] bg-[var(--color-background-body)] border-t border-[var(--color-border)] select-none"
       >
         <div className="h-[56px] max-w-lg mx-auto grid grid-cols-5 items-center px-1">
           {/* Tabs 1 & 2: Coupon (/) and Explore (/explore) */}

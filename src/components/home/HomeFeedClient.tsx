@@ -937,15 +937,19 @@ export function HomeFeedClient({
 
   return (
     <div className="cgr-page-wide pb-14 [overflow-anchor:none]">
-      {/* Scroll-Reveal Sticky Promotion Category Tabs Bar */}
+      {/* Scroll-Reveal Sticky Promotion Category Tabs Bar
+          - Solid opaque white/dark at `z-[60]` (above top 5px hero sentinel) when pinned so
+            scrolled-down Home tabs sit seamlessly under a matching white/dark Safari bar.
+          - Uses `hidden` (`display: none`) on mobile when unpinned so WebKit cleanly restores
+            the underlying `#5FAEE9` Hero status bar when scrolling back to the top (0 JS scroll hooks). */}
       {!activePin && (
         <nav
           aria-label={isTh ? "ลัดไปหมวดโปรโมชั่น" : "Jump to promotion category"}
           aria-hidden={!isTabsPinned}
-          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-30 bg-[var(--color-background-body)]/95 backdrop-blur-md border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 transition-[opacity,transform] duration-200 ${
+          className={`fixed top-0 lg:top-16 inset-x-0 lg:left-[72px] z-[60] pt-[env(safe-area-inset-top,0px)] lg:pt-0 bg-[var(--color-background-body)] border-b border-[var(--color-border)] px-4 sm:px-6 lg:px-8 lg:transition-[opacity,transform] lg:duration-200 ${
             isTabsPinned
               ? "opacity-100 translate-y-0 pointer-events-auto"
-              : "opacity-0 -translate-y-2 pointer-events-none"
+              : "hidden lg:block lg:opacity-0 lg:-translate-y-2 lg:pointer-events-none"
           }`}
         >
           <div className="max-w-[1360px] mx-auto">
