@@ -2533,74 +2533,75 @@ html.dark .cgr-map-floating-label {
 
 /* Default initial poses (top-anchored sky so #2986D6 blends seamlessly into iPhone Status Bar!) */
 .cgr-trip-hero-bg {
-  transform: translate3d(0, 0px, 0) scale(1.16);
+  transform: translate3d(0, 0%, 0) scale(1.16);
   transform-origin: 50% 0%;
 }
 
 .cgr-trip-hero-logo {
   opacity: 0;
-  transform: translate3d(0, 28px, 0) scale(0.95);
+  transform: translate3d(0, 36px, 0) scale(0.94);
   will-change: transform, opacity;
 }
 
 .cgr-trip-hero-fg {
-  transform: translate3d(0, 24px, 0) scale(1.09);
+  transform: translate3d(0, -6px, 0) scale(1.12);
   transform-origin: 50% 100%;
 }
 
 @media (min-width: 1024px) {
   .cgr-trip-hero-bg {
-    transform: translate3d(0, 0px, 0) scale(1.28);
+    transform: translate3d(0, 0%, 0) scale(1.24);
   }
   .cgr-trip-hero-fg {
-    transform: translate3d(0, 38px, 0) scale(1.15);
+    transform: translate3d(0, -8px, 0) scale(1.18);
   }
 }
 
+/* Deep Cliff-Overlook Crane Parallax: BG valleys sweep upward (-18% / -21%) while foreground cliff settles down (+24px / +32px) */
 @keyframes cgrTripBgDollyMobile {
   from {
-    transform: translate3d(0, 0px, 0) scale(1.16);
+    transform: translate3d(0, 0%, 0) scale(1.16);
   }
   to {
-    transform: translate3d(0, 0px, 0) scale(1);
+    transform: translate3d(0, -18%, 0) scale(1);
   }
 }
 
 @keyframes cgrTripBgDollyDesktop {
   from {
-    transform: translate3d(0, 0px, 0) scale(1.28);
+    transform: translate3d(0, 0%, 0) scale(1.24);
   }
   to {
-    transform: translate3d(0, 0px, 0) scale(1);
+    transform: translate3d(0, -21%, 0) scale(1);
   }
 }
 
 @keyframes cgrTripLogoRise {
   0% {
     opacity: 0;
-    transform: translate3d(0, 28px, 0) scale(0.95);
+    transform: translate3d(0, 36px, 0) scale(0.94);
   }
   100% {
     opacity: 0.94;
-    transform: translate3d(0, 0px, 0) scale(1);
+    transform: translate3d(0, -12px, 0) scale(1);
   }
 }
 
 @keyframes cgrTripFgDollyMobile {
   from {
-    transform: translate3d(0, 24px, 0) scale(1.09);
+    transform: translate3d(0, -6px, 0) scale(1.12);
   }
   to {
-    transform: translate3d(0, 0px, 0) scale(1);
+    transform: translate3d(0, 24px, 0) scale(0.98);
   }
 }
 
 @keyframes cgrTripFgDollyDesktop {
   from {
-    transform: translate3d(0, 38px, 0) scale(1.15);
+    transform: translate3d(0, -8px, 0) scale(1.18);
   }
   to {
-    transform: translate3d(0, 0px, 0) scale(1);
+    transform: translate3d(0, 32px, 0) scale(0.96);
   }
 }
 
@@ -2609,7 +2610,16 @@ html.dark .cgr-map-floating-label {
     transform: translate3d(0, 0px, 0);
   }
   to {
-    transform: translate3d(0, -24px, 0);
+    transform: translate3d(0, -20px, 0);
+  }
+}
+
+@keyframes cgrTripScrimOpen {
+  from {
+    opacity: 0.96;
+  }
+  to {
+    opacity: 0.62;
   }
 }
 
@@ -2623,7 +2633,7 @@ html.dark .cgr-map-floating-label {
   }
 }
 
-/* Native GPU Compositor Scroll-Driven Parallax (continuous 1:1 finger glide, zero dead-zone hitch!) */
+/* Native GPU Compositor Scroll-Driven Parallax (continuous 1:1 cliff-overlook depth glide!) */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .cgr-trip-hero-runway {
@@ -2657,6 +2667,12 @@ html.dark .cgr-map-floating-label {
 
     .cgr-trip-hero-copy {
       animation: cgrTripCopyLift linear both;
+      animation-timeline: --cgr-trip-runway;
+      animation-range: contain 0% contain 100%;
+    }
+
+    .cgr-trip-hero-scrim {
+      animation: cgrTripScrimOpen linear both;
       animation-timeline: --cgr-trip-runway;
       animation-range: contain 0% contain 100%;
     }
@@ -3124,7 +3140,8 @@ html.dark .cgr-trip-scrapbook-sky {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cgr-trip-hero-runway {
+  .cgr-trip-hero-runway,
+  .cgr-home-hero-runway {
     height: auto !important;
   }
   .cgr-trip-hero-layer,

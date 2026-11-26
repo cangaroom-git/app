@@ -1003,7 +1003,7 @@ export function HomeFeedClient({
           activePin
             ? "hidden"
             : !globalSearchQuery.trim()
-            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-7 lg:mt-8 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 pt-3.5 lg:pt-0 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pb-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] min-h-[100svh]"
+            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-7 lg:mt-8 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 pt-4 sm:pt-5 lg:pt-8 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pb-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] min-h-[100svh]"
             : ""
         }
       >

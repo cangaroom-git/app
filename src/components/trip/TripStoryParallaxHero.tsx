@@ -79,32 +79,37 @@ export function TripStoryParallaxHero({
       const logoEased = 1 - Math.pow(1 - rawProgress, 1.35);
 
       if (bgLayerRef.current) {
+        // Crane-up + pitch-down vista reveal: mountain ridges & valley rise deeply upward while widening
         const bgScale = cachedIsDesktop
-          ? 1.28 - rawProgress * 0.28
+          ? 1.24 - rawProgress * 0.24
           : 1.16 - rawProgress * 0.16;
-        bgLayerRef.current.style.transform = `translate3d(0, 0px, 0) scale(${bgScale.toFixed(4)})`;
+        const bgShiftPct = cachedIsDesktop
+          ? -rawProgress * 21
+          : -rawProgress * 18;
+        bgLayerRef.current.style.transform = `translate3d(0, ${bgShiftPct.toFixed(2)}%, 0) scale(${bgScale.toFixed(4)})`;
       }
 
       if (brandLogoLayerRef.current) {
         const logoOpacity = logoEased * 0.94;
-        const logoY = 28 - logoEased * 28;
-        const logoScale = 0.95 + logoEased * 0.05;
+        const logoY = 36 - logoEased * 48;
+        const logoScale = 0.94 + logoEased * 0.06;
         brandLogoLayerRef.current.style.opacity = logoOpacity.toFixed(3);
         brandLogoLayerRef.current.style.transform = `translate3d(0, ${logoY.toFixed(1)}px, 0) scale(${logoScale.toFixed(4)})`;
       }
 
       if (travellerLayerRef.current) {
+        // Opposite differential depth: foreground cliff + traveller settle downward as valley rises behind
         const fgScale = cachedIsDesktop
-          ? 1.15 - rawProgress * 0.15
-          : 1.09 - rawProgress * 0.09;
+          ? 1.18 - rawProgress * 0.22
+          : 1.12 - rawProgress * 0.14;
         const fgY = cachedIsDesktop
-          ? 38 - rawProgress * 38
-          : 24 - rawProgress * 24;
+          ? -8 + rawProgress * 40
+          : -6 + rawProgress * 30;
         travellerLayerRef.current.style.transform = `translate3d(0, ${fgY.toFixed(1)}px, 0) scale(${fgScale.toFixed(4)})`;
       }
 
       if (contentLayerRef.current) {
-        const contentY = -rawProgress * 24;
+        const contentY = -rawProgress * 20;
         contentLayerRef.current.style.transform = `translate3d(0, ${contentY.toFixed(1)}px, 0)`;
       }
 
@@ -144,17 +149,17 @@ export function TripStoryParallaxHero({
   return (
     <div
       ref={runwayRef}
-      className="cgr-trip-hero-runway relative w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] lg:mx-auto h-[128svh] lg:h-[142vh]"
+      className="cgr-trip-hero-runway relative w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] lg:mx-auto h-[134svh] lg:h-[155vh]"
     >
       <section
         ref={stickyStageRef}
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
         className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2986D6] flex flex-col justify-end select-none"
       >
-        {/* Layer 0: Uninterrupted Mountain & Sky Panorama (Flush top #2986D6 into iPhone Status Bar) */}
+        {/* Layer 0: Tall Mountain & Deep Valley Panorama (h-134%/138% pans upward on scroll to reveal deep valley below!) */}
         <div
           ref={bgLayerRef}
-          className="cgr-trip-hero-layer cgr-trip-hero-bg pointer-events-none absolute -inset-x-6 top-0 -bottom-8 lg:-inset-x-9 lg:top-0 lg:-bottom-10"
+          className="cgr-trip-hero-layer cgr-trip-hero-bg pointer-events-none absolute -inset-x-6 top-0 h-[134%] lg:-inset-x-9 lg:top-0 lg:h-[138%]"
         >
           <picture className="block w-full h-full">
             <source
@@ -197,10 +202,10 @@ export function TripStoryParallaxHero({
           />
         </div>
 
-        {/* Layer 1: Ultra-Sharp 5.5K Traveller Standing On Summit Ground Ledge (AVIF + WebP) */}
+        {/* Layer 1: Ultra-Sharp 5.5K Traveller Standing On Summit Ground Ledge (anchored -bottom-10 so downward settle has zero edge gap) */}
         <div
           ref={travellerLayerRef}
-          className="cgr-trip-hero-layer cgr-trip-hero-fg pointer-events-none absolute inset-x-0 top-0 bottom-0 flex items-end justify-center"
+          className="cgr-trip-hero-layer cgr-trip-hero-fg pointer-events-none absolute inset-x-0 -top-6 -bottom-10 flex items-end justify-center"
         >
           <picture className="block w-full h-full">
             <source

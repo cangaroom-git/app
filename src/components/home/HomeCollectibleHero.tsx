@@ -61,6 +61,7 @@ export function HomeCollectibleHero({
   onScrollToDeals,
 }: HomeCollectibleHeroProps) {
   const isTh = language === "th";
+  const runwayRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
   const headerLayerRef = useRef<HTMLDivElement | null>(null);
   const islandLayerRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +81,9 @@ export function HomeCollectibleHero({
     let lastTs = 0;
     let cachedVh = Math.max(window.innerHeight, 540);
     let cachedIsDesktop = window.innerWidth >= 1024;
+    let cachedRunwayTop = 0;
+    let cachedScrubRange = 1;
+    let cachedStickyTop = cachedIsDesktop ? 72 : 0;
     let lastWidth = window.innerWidth;
     const supportsFinePointer = window.matchMedia(
       "(hover: hover) and (pointer: fine)",
@@ -92,46 +96,69 @@ export function HomeCollectibleHero({
     let targetPy = 0;
     let currentPy = 0;
 
+    // Measure sticky runway geometry ONCE on mount & width-resize (never inside scroll!)
+    // so the 3D island zoom-out completes 1:1 with the exact sticky runway (matching /trip!).
+    const measureGeometry = () => {
+      const runwayEl = runwayRef.current;
+      const stageEl = stageRef.current;
+      cachedIsDesktop = window.innerWidth >= 1024;
+      cachedVh = Math.max(window.innerHeight, 540);
+      cachedStickyTop = cachedIsDesktop ? 72 : 0;
+      if (runwayEl && stageEl) {
+        const rect = runwayEl.getBoundingClientRect();
+        cachedRunwayTop = rect.top + window.scrollY;
+        cachedScrubRange = Math.max(
+          runwayEl.offsetHeight - stageEl.offsetHeight,
+          1,
+        );
+      } else {
+        cachedRunwayTop = 0;
+        cachedScrubRange = Math.max(
+          cachedVh * (cachedIsDesktop ? 0.55 : 0.34),
+          1,
+        );
+      }
+    };
+
     const computeTargets = () => {
-      const y = Math.max(0, window.scrollY);
-      const cardRange = cachedVh * (cachedIsDesktop ? 0.38 : 0.28);
-      targetCard = Math.max(0, Math.min(1, y / cardRange));
+      const scrollDelta = window.scrollY + cachedStickyTop - cachedRunwayTop;
+      targetCard = Math.max(0, Math.min(1, scrollDelta / cachedScrubRange));
     };
 
     const renderFrame = (cardP: number, px: number, py: number) => {
-      const cardEased = 1 - Math.pow(1 - cardP, 1.9);
+      const cardEased = 1 - Math.pow(1 - cardP, 1.45);
       // Natural optical flare shimmer peaking gently through mid-scroll
       const opticalPulse = Math.sin(cardEased * Math.PI);
       const axisScale = cachedIsDesktop ? 1 : 0.54;
 
       if (headerLayerRef.current) {
         const headerY = cachedIsDesktop
-          ? -cardEased * (cachedVh * 0.045)
-          : -cardEased * (cachedVh * 0.085);
+          ? -cardEased * (cachedVh * 0.04)
+          : -cardEased * (cachedVh * 0.055);
         const headerScale = cachedIsDesktop
-          ? 1 - cardEased * 0.1
-          : 1 - cardEased * 0.14;
+          ? 1 - cardEased * 0.08
+          : 1 - cardEased * 0.1;
         headerLayerRef.current.style.transform = `translate3d(0, ${headerY.toFixed(2)}px, 0) scale(${headerScale.toFixed(4)})`;
       }
 
       if (islandLayerRef.current) {
         const islandScale = cachedIsDesktop
-          ? 1 - cardEased * 0.3
-          : 1 - cardEased * 0.56;
+          ? 1 - cardEased * 0.32
+          : 1 - cardEased * 0.58;
         const startY = cachedIsDesktop ? cachedVh * 0.22 : cachedVh * 0.24;
-        const endY = cachedIsDesktop ? -cachedVh * 0.03 : -cachedVh * 0.06;
+        const endY = cachedIsDesktop ? cachedVh * 0.145 : cachedVh * 0.08;
         const islandY = startY + (endY - startY) * cardEased;
         islandLayerRef.current.style.transform = `translate3d(0, ${islandY.toFixed(2)}px, 0) scale(${islandScale.toFixed(4)})`;
       }
 
       if (shadowLayerRef.current) {
-        const shadowT = Math.max(0, Math.min(1, (cardEased - 0.3) / 0.7));
+        const shadowT = Math.max(0, Math.min(1, (cardEased - 0.22) / 0.78));
         shadowLayerRef.current.style.opacity = shadowT.toFixed(3);
         shadowLayerRef.current.style.transform = `scale(${(0.75 + shadowT * 0.25).toFixed(3)})`;
       }
 
       if (scrollHintRef.current) {
-        const hintOpacity = Math.max(0, Math.min(1, 1 - cardP * 3.2));
+        const hintOpacity = Math.max(0, Math.min(1, 1 - cardP * 2.5));
         scrollHintRef.current.style.opacity = hintOpacity.toFixed(3);
       }
 
@@ -242,8 +269,7 @@ export function HomeCollectibleHero({
     const handleResize = () => {
       if (Math.abs(window.innerWidth - lastWidth) < 2) return;
       lastWidth = window.innerWidth;
-      cachedIsDesktop = window.innerWidth >= 1024;
-      cachedVh = Math.max(window.innerHeight, 540);
+      measureGeometry();
       if (!cachedIsDesktop) {
         targetPx = 0;
         targetPy = 0;
@@ -251,6 +277,7 @@ export function HomeCollectibleHero({
       wakeLoop();
     };
 
+    measureGeometry();
     computeTargets();
     currentCard = targetCard;
     renderFrame(currentCard, 0, 0);
@@ -279,15 +306,19 @@ export function HomeCollectibleHero({
   }, []);
 
   return (
-    <section
-      ref={stageRef}
-      aria-label={
-        isTh
-          ? "Nondii โปรเที่ยวไทย — แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
-          : "Nondii Thailand Travel Deals"
-      }
-      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#5FAEE9] flex flex-col items-center justify-center select-none"
+    <div
+      ref={runwayRef}
+      className="cgr-home-hero-runway relative -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:-mt-3 w-auto lg:w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] h-[134svh] lg:h-[155vh]"
     >
+      <section
+        ref={stageRef}
+        aria-label={
+          isTh
+            ? "Nondii โปรเที่ยวไทย — แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
+            : "Nondii Thailand Travel Deals"
+        }
+        className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#5FAEE9] flex flex-col items-center justify-center select-none"
+      >
       {/* Layer 0.25: Optical Sunlight Core + Rotating Starburst Rays (keeps top edge pure #5FAEE9) */}
       <HeroSunlightSkyLayer sunCoreRef={sunCoreRef} sunRaysRef={sunRaysRef} />
 
@@ -428,6 +459,7 @@ export function HomeCollectibleHero({
         </span>
         <ChevronDown className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
       </button>
-    </section>
+      </section>
+    </div>
   );
 }
