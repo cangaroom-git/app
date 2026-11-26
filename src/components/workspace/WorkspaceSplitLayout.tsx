@@ -3,42 +3,58 @@
 import React, { useEffect, useRef } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 
+let autoHideListenerMountCount = 0;
+let autoHideCleanup: (() => void) | null = null;
+
 /**
- * Global passive scroll observer that sets `data-scrolling="true"` on any
- * `.cgr-scroll-autohide` or `.cgr-admin-body` container while scrolling,
- * and clears it cleanly after 650ms of inactivity so scrollbars vanish when idle.
+ * Ref-counted passive scroll observer scoped strictly to workspace shells
+ * (`AdminShell`, `StudioShell`, `WorkspaceSplitLayout`) so consumer pages
+ * (`/`, `/explore`, `/trip`, `/{hotelSlug}`) carry zero global scroll listeners.
  */
 export function useGlobalAutoHideScrollbars() {
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const timers = new WeakMap<HTMLElement, number>();
+    autoHideListenerMountCount += 1;
 
-    const onScrollCapture = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (
-        !target.classList.contains("cgr-scroll-autohide") &&
-        !target.classList.contains("cgr-admin-body")
-      ) {
-        return;
-      }
+    if (autoHideListenerMountCount === 1) {
+      const timers = new WeakMap<HTMLElement, number>();
 
-      target.dataset.scrolling = "true";
-      const prev = timers.get(target);
-      if (prev) window.clearTimeout(prev);
-      const next = window.setTimeout(() => {
-        delete target.dataset.scrolling;
-        timers.delete(target);
-      }, 650);
-      timers.set(target, next);
-    };
+      const onScrollCapture = (event: Event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (
+          !target.classList.contains("cgr-scroll-autohide") &&
+          !target.classList.contains("cgr-admin-body")
+        ) {
+          return;
+        }
 
-    document.addEventListener("scroll", onScrollCapture, {
-      capture: true,
-      passive: true,
-    });
+        target.dataset.scrolling = "true";
+        const prev = timers.get(target);
+        if (prev) window.clearTimeout(prev);
+        const next = window.setTimeout(() => {
+          delete target.dataset.scrolling;
+          timers.delete(target);
+        }, 650);
+        timers.set(target, next);
+      };
+
+      document.addEventListener("scroll", onScrollCapture, {
+        capture: true,
+        passive: true,
+      });
+
+      autoHideCleanup = () => {
+        document.removeEventListener("scroll", onScrollCapture, true);
+      };
+    }
+
     return () => {
-      document.removeEventListener("scroll", onScrollCapture, true);
+      autoHideListenerMountCount = Math.max(0, autoHideListenerMountCount - 1);
+      if (autoHideListenerMountCount === 0 && autoHideCleanup) {
+        autoHideCleanup();
+        autoHideCleanup = null;
+      }
     };
   }, []);
 }
@@ -135,6 +151,7 @@ export function WorkspaceSplitLayout({
   topBanner,
   children,
 }: WorkspaceSplitLayoutProps) {
+  useGlobalAutoHideScrollbars();
   const desktopMainRef = useRef<HTMLDivElement>(null);
   const mobileDetailRef = useRef<HTMLDivElement>(null);
 

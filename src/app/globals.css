@@ -220,14 +220,12 @@ select {
 html {
   font-size: 16px;
   background-color: var(--color-background-body);
-  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background-color: var(--color-background-body);
   color: var(--color-text-primary);
-  overscroll-behavior-y: none;
   font-family: var(--font-family-body);
   font-size: var(--font-size-body);
   line-height: 1.5;
@@ -235,6 +233,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: normal;
   transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+/* Pure-CSS zero-JS bottom edge guard for iOS 26+ Safari Liquid Glass URL bar:
+   ensures the bottom edge always samples the solid canvas surface even while
+   the mobile bottom navigation bar auto-hides during scroll (0 JS, 0 listeners). */
+@media (max-width: 1023px) {
+  body::after {
+    content: "";
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background-color: var(--color-background-body);
+    pointer-events: none;
+    z-index: 65;
+  }
 }
 
 h1, h2, h3, h4, .font-serif {

@@ -38,10 +38,8 @@ import {
   type PlatformNavTabId,
 } from "@/components/navigation/NavigationIcons";
 import { PrimaryNavigation } from "@/components/navigation/PrimaryNavigation";
-import { MobileChromeController } from "@/components/navigation/MobileChromeController";
 import { RouteProgressBar } from "@/components/navigation/RouteProgressBar";
 import { useAuthenticatedProfile } from "@/components/navigation/UserProfileDropdown";
-import { useGlobalAutoHideScrollbars } from "@/components/workspace/WorkspaceSplitLayout";
 import type { BoardSaveToastState } from "@/components/board/BoardActionModals";
 
 const PlaceCardFlipOverlay = dynamic(
@@ -193,7 +191,6 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const activeTab: PlatformNavTabId = getTabIdFromPathname(pathname);
-  useGlobalAutoHideScrollbars();
 
   // Persistent Cross-Route 3D Card Flip state (survives Next.js route transitions at 120fps!)
   const flipSeqRef = useRef(0);
@@ -1227,10 +1224,6 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   return (
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
-      <MobileChromeController
-        theme={theme}
-        hasActiveHomeSearch={globalSearchQuery.trim().length > 0}
-      />
       {isDedicatedShellPage ? (
         <main className="flex min-h-screen flex-col">
           {children}

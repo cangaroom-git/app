@@ -214,7 +214,7 @@ export function StudioSidebar() {
       {/* ═══ MOBILE: Docked 5-Icon Bottom Bar ═══ */}
       <nav
         aria-label="Mobile Studio Navigation"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pb-[env(safe-area-inset-bottom,0px)]"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--color-background-body)] border-t border-gray-200 pb-[env(safe-area-inset-bottom,0px)]"
       >
         <div className="grid grid-cols-5 h-[56px] px-1">
           {primaryItems.map((item) => {
