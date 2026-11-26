@@ -1191,6 +1191,37 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const todayFormatted = formatDateStr(today);
   void todayFormatted;
 
+  // Lightweight zero-listener iOS Safari status-bar sync on SPA `<Link>` navigation.
+  // Runs ONLY when `pathname`, `theme`, or active home search changes (0 scroll/touch listeners, 0 timers).
+  const hasActiveHomeSearch = globalSearchQuery.trim().length > 0;
+  const mobileTopChromeColor =
+    pathname === "/" && !hasActiveHomeSearch
+      ? "#5FAEE9"
+      : pathname === "/trip"
+        ? "#2986D6"
+        : theme === "dark"
+          ? "#11161d"
+          : "#ffffff";
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.head) return;
+    const existing = document.head.querySelectorAll('meta[name="theme-color"]');
+    if (
+      existing.length === 1 &&
+      existing[0].getAttribute("content") === mobileTopChromeColor
+    ) {
+      return;
+    }
+    // Replace our own `<meta name="theme-color">` node cleanly so iOS Safari repaints immediately
+    // on soft SPA `<Link>` navigation (Next.js `export const viewport` does not re-emit on soft nav).
+    existing.forEach((node) => node.remove());
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.content = mobileTopChromeColor;
+    meta.setAttribute("data-cgr-theme-color", "1");
+    document.head.appendChild(meta);
+  }, [mobileTopChromeColor, pathname]);
+
   // Sticky mount flags so dynamic modal/overlay chunks stay 0 KB on initial load
   // while preserving smooth Fade Slide-Out animations (`useModalPresence`) once opened.
   const [hasMountedAuth, setHasMountedAuth] = useState(false);
@@ -1224,6 +1255,13 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   return (
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
+      {/* Static 1px top-edge anchor (zero animation, zero JS listeners) so iOS 26 Safari Liquid Glass
+          re-samples the exact route status-bar color immediately on SPA `<Link>` navigation */}
+      <div
+        aria-hidden="true"
+        className="lg:hidden fixed top-0 inset-x-0 z-[55] h-[1px] pointer-events-none"
+        style={{ backgroundColor: mobileTopChromeColor }}
+      />
       {isDedicatedShellPage ? (
         <main className="flex min-h-screen flex-col">
           {children}

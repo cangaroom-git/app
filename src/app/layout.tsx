@@ -21,7 +21,6 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ffffff",
 };
 
 export const metadata: Metadata = {
@@ -49,7 +48,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("my-hotel-theme");document.documentElement.classList.toggle("dark",t==="dark");}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("my-hotel-theme");var d=t==="dark";document.documentElement.classList.toggle("dark",d);var p=location.pathname||"/";var c=p==="/"?"#5FAEE9":(p==="/trip"?"#2986D6":(d?"#11161d":"#ffffff"));var m=document.createElement("meta");m.name="theme-color";m.content=c;m.setAttribute("data-cgr-theme-color","1");document.head.appendChild(m);}catch(e){}})();`,
           }}
         />
         <link

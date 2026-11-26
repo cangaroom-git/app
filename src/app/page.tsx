@@ -1,13 +1,6 @@
 import React, { cache } from "react";
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
-  themeColor: "#5FAEE9",
-};
 import { VALID_HOME_PROMO_TAB_IDS } from "@/lib/placeCategories";
 import { getServerSessionUser } from "@/lib/auth/session";
 import {
