@@ -23,13 +23,19 @@ export function TripStoryParallaxHero({
   const runwayRef = useRef<HTMLDivElement | null>(null);
   const stickyStageRef = useRef<HTMLElement | null>(null);
   const bgLayerRef = useRef<HTMLDivElement | null>(null);
+  const bgImgRef = useRef<HTMLImageElement | null>(null);
   const brandLogoLayerRef = useRef<HTMLDivElement | null>(null);
   const travellerLayerRef = useRef<HTMLDivElement | null>(null);
   const contentLayerRef = useRef<HTMLDivElement | null>(null);
   const scrollHintRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync iOS Safari status bar seamlessly with /trip mountain sky top edge (#2985D7) across the 175svh runway
-  useHeroThemeColor("#2985D7", 1.55);
+  // Automatically learn the real visible top-edge sky color from /trip background & sync iOS Safari status bar
+  const learnedTopColor = useHeroThemeColor(
+    "#2985D7",
+    1.55,
+    bgImgRef,
+    stickyStageRef
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -156,8 +162,14 @@ export function TripStoryParallaxHero({
     >
       <section
         ref={stickyStageRef}
+        style={
+          {
+            backgroundColor: learnedTopColor,
+            "--cgr-hero-top-color": learnedTopColor,
+          } as React.CSSProperties
+        }
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
-        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2985D7] flex flex-col justify-end select-none"
+        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] flex flex-col justify-end select-none"
       >
         {/* Layer 0: Uninterrupted Mountain & Sky Panorama (4K AVIF + WebP + Compositor Dolly-Out) */}
         <div
@@ -180,6 +192,7 @@ export function TripStoryParallaxHero({
               type="image/avif"
             />
             <img
+              ref={bgImgRef}
               src="/brand/nondii-trip-bg-4k-desktop.webp"
               alt=""
               aria-hidden="true"
@@ -189,6 +202,12 @@ export function TripStoryParallaxHero({
             />
           </picture>
         </div>
+
+        {/* Seamless 36px Mobile Status-Bar Edge Feather */}
+        <div
+          aria-hidden="true"
+          className="cgr-hero-status-feather lg:hidden pointer-events-none absolute top-0 inset-x-0 h-[36px] z-10"
+        />
 
         {/* Layer 0.5: Pure White Nondii Wordmark SVG (Zero CSS filter/drop-shadow overhead!) */}
         <div

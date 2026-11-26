@@ -2616,6 +2616,15 @@ html.dark .cgr-trip-scrapbook-sky {
   animation: cgrHomeIslandFloat 5.6s ease-in-out infinite;
 }
 
+/* Seamless Mobile Status-Bar Edge Feather (blends multi-shade top sky smoothly into exact learned iOS theme-color) */
+.cgr-hero-status-feather {
+  background: linear-gradient(
+    to bottom,
+    var(--cgr-hero-top-color, #85b5e3) 0%,
+    transparent 100%
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cgr-trip-hero-runway {
     height: auto !important;

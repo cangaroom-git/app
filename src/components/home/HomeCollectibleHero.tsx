@@ -53,13 +53,15 @@ export function HomeCollectibleHero({
   onSelectCategory,
 }: HomeCollectibleHeroProps) {
   const isTh = language === "th";
+  const stageRef = useRef<HTMLElement | null>(null);
   const bgLayerRef = useRef<HTMLDivElement | null>(null);
+  const bgImgRef = useRef<HTMLImageElement | null>(null);
   const headerLayerRef = useRef<HTMLDivElement | null>(null);
   const islandLayerRef = useRef<HTMLDivElement | null>(null);
   const shadowLayerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync iOS Safari status bar seamlessly with the top sky edge (#6BA9E2), reverting to canvas when white sheet rises
-  useHeroThemeColor("#6BA9E2", 0.66);
+  // Automatically learn the real visible top-edge sky color from the loaded image & sync iOS Safari status bar
+  const learnedTopColor = useHeroThemeColor("#85b5e3", 0.66, bgImgRef, stageRef);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -183,12 +185,19 @@ export function HomeCollectibleHero({
 
   return (
     <section
+      ref={stageRef}
+      style={
+        {
+          backgroundColor: learnedTopColor,
+          "--cgr-hero-top-color": learnedTopColor,
+        } as React.CSSProperties
+      }
       aria-label={
         isTh
           ? "Nondii โปรเที่ยวไทย — แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
           : "Nondii Thailand Travel Deals"
       }
-      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#6BA9E2] flex flex-col items-center justify-center select-none"
+      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden flex flex-col items-center justify-center select-none"
     >
       {/* Layer 0: Sky Cloud Background (AVIF 6.6–13.8KB + WebP fallback) */}
       <div
@@ -211,6 +220,7 @@ export function HomeCollectibleHero({
             type="image/avif"
           />
           <img
+            ref={bgImgRef}
             src="/brand/hero-slider/opt/sky-cloud-bg-desktop.webp"
             alt=""
             aria-hidden="true"
@@ -220,6 +230,12 @@ export function HomeCollectibleHero({
           />
         </picture>
       </div>
+
+      {/* Seamless 32px Mobile Status-Bar Edge Feather (eliminates hard horizontal cut line on iOS Safari) */}
+      <div
+        aria-hidden="true"
+        className="cgr-hero-status-feather lg:hidden pointer-events-none absolute top-0 inset-x-0 h-[36px] z-10"
+      />
 
       {/* Layer 0.5: White `☁ nondii` Logo + "โปรเที่ยวไทย" + Subtitle + 6 Frosted-Glass Icons with Short Labels */}
       <div
