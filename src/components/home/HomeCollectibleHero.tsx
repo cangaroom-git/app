@@ -10,6 +10,7 @@ import {
   Wine,
 } from "lucide-react";
 import type { HomePromoTabId } from "@/lib/placeCategories";
+import { useHeroThemeColor } from "@/lib/useHeroThemeColor";
 
 interface HomeCollectibleHeroProps {
   language: "th" | "en";
@@ -56,6 +57,9 @@ export function HomeCollectibleHero({
   const headerLayerRef = useRef<HTMLDivElement | null>(null);
   const islandLayerRef = useRef<HTMLDivElement | null>(null);
   const shadowLayerRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync iOS Safari status bar seamlessly with the top sky edge (#6BA9E2), reverting to canvas when white sheet rises
+  useHeroThemeColor("#6BA9E2", 0.66);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -184,7 +188,7 @@ export function HomeCollectibleHero({
           ? "Nondii โปรเที่ยวไทย — แหล่งรวมโปรโมชั่นที่เที่ยวในไทย"
           : "Nondii Thailand Travel Deals"
       }
-      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#5caee8] flex flex-col items-center justify-center select-none"
+      className="cgr-home-hero-stage sticky top-0 lg:top-[72px] z-0 -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:mt-0 w-auto lg:w-full lg:max-w-[min(1360px,calc((100vh-84px)*1.72))] h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] rounded-none lg:rounded-[28px] overflow-hidden bg-[#6BA9E2] flex flex-col items-center justify-center select-none"
     >
       {/* Layer 0: Sky Cloud Background (AVIF 6.6–13.8KB + WebP fallback) */}
       <div

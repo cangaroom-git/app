@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { Camera, ChevronDown, Users } from "lucide-react";
+import { useHeroThemeColor } from "@/lib/useHeroThemeColor";
 import type { PublicCommunityTripDto } from "@/lib/services/boardService";
 
 interface TripStoryParallaxHeroProps {
@@ -26,6 +27,9 @@ export function TripStoryParallaxHero({
   const travellerLayerRef = useRef<HTMLDivElement | null>(null);
   const contentLayerRef = useRef<HTMLDivElement | null>(null);
   const scrollHintRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync iOS Safari status bar seamlessly with /trip mountain sky top edge (#2985D7) across the 175svh runway
+  useHeroThemeColor("#2985D7", 1.55);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -153,7 +157,7 @@ export function TripStoryParallaxHero({
       <section
         ref={stickyStageRef}
         aria-label={isTh ? "เล่าเรื่องเที่ยวบน Nondii" : "Nondii Travel Stories"}
-        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2a629a] flex flex-col justify-end select-none"
+        className="cgr-trip-hero-stage sticky top-0 lg:top-[72px] w-full h-[100svh] lg:h-[calc(100vh-84px)] min-h-[540px] overflow-hidden rounded-none lg:rounded-[28px] bg-[#2985D7] flex flex-col justify-end select-none"
       >
         {/* Layer 0: Uninterrupted Mountain & Sky Panorama (4K AVIF + WebP + Compositor Dolly-Out) */}
         <div
