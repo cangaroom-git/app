@@ -235,17 +235,6 @@ body {
   transition: color 0.18s ease;
 }
 
-/* Pure-CSS zero-JS iOS 26+ Safari Liquid Glass root color sync:
-   Live mobile root background follows `--cgr-mobile-chrome-bg` (Priority 2 WebKit live observer)
-   while Desktop (`>= 1024px`) stays pure `--color-background-body`.
-   Bottom edge is permanently anchored by the solid docked mobile bottom nav (`56px >= 3px`). */
-@media (max-width: 1023px) {
-  html,
-  body {
-    background-color: var(--cgr-mobile-chrome-bg, var(--color-background-body));
-  }
-}
-
 h1, h2, h3, h4, .font-serif {
   font-family: var(--font-family-heading);
   letter-spacing: -0.01em;

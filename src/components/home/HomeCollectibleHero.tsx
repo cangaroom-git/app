@@ -310,6 +310,11 @@ export function HomeCollectibleHero({
       ref={runwayRef}
       className="cgr-home-hero-runway relative -mx-4 -mt-[calc(1rem+env(safe-area-inset-top,0px))] sm:-mx-6 sm:-mt-[calc(1.25rem+env(safe-area-inset-top,0px))] lg:mx-auto lg:-mt-3 w-auto lg:w-full lg:max-w-[min(1380px,calc((100vh-84px)*1.72))] h-[134svh] lg:h-[155vh]"
     >
+      {/* Seamless sky extension above top:0 so iOS top rubber-band pull stays sky blue while bottom stays pure white */}
+      <div
+        aria-hidden="true"
+        className="lg:hidden pointer-events-none absolute -top-[40vh] inset-x-0 h-[40vh] bg-[#5FAEE9]"
+      />
       <section
         ref={stageRef}
         aria-label={

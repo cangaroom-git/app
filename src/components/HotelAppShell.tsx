@@ -1209,13 +1209,9 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined" || !document.head) return;
 
-    // 1. Update live mobile `html`/`body` background CSS variable (iOS 26 Safari Live Observer)
-    document.documentElement.style.setProperty(
-      "--cgr-mobile-chrome-bg",
-      mobileTopChromeColor
-    );
-
-    // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
+    // 1. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
+    // Note: `html`/`body` stay pure `--color-background-body` so bottom overscroll bounce on
+    // `/` and `/trip` is always clean white/dark (never blue); top chrome uses Priority-1 `z-[55]` 5px sentinel.
     const existing = document.head.querySelectorAll('meta[name="theme-color"]');
     if (
       existing.length !== 1 ||
@@ -1229,7 +1225,7 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
       document.head.appendChild(meta);
     }
 
-    // 3. Gently wake WebKit's `PageColorSampler` strictly on route switch (never during scroll)
+    // 2. Gently wake WebKit's `PageColorSampler` strictly on route switch (never during scroll)
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       const rafId = window.requestAnimationFrame(() => {
         window.scrollTo(window.scrollX, window.scrollY);

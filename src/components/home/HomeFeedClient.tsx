@@ -151,6 +151,7 @@ export function HomeFeedClient({
   const [sourceFilter, setSourceFilter] =
     useState<DealSourceFilter>(initialSourceFilter);
   const [isTabsPinned, setIsTabsPinned] = useState<boolean>(false);
+  const [isSheetAtTop, setIsSheetAtTop] = useState<boolean>(false);
 
   const [masterPins, setMasterPins] = useState<PinFeedItemDto[]>(initialPins);
   const [searchPins, setSearchPins] = useState<PinFeedItemDto[] | null>(null);
@@ -810,6 +811,35 @@ export function HomeFeedClient({
     ]
   );
 
+  // Observe when the white promo sheet itself reaches the top edge on mobile
+  // (covers even short-result tabs before `isTabsPinned` engages, matching /trip 1:1!)
+  useEffect(() => {
+    if (activePin || globalSearchQuery.trim()) {
+      setIsSheetAtTop(false);
+      return;
+    }
+    if (
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024 ||
+      !("IntersectionObserver" in window)
+    ) {
+      return;
+    }
+    const sheetEl = sheetTopRef.current;
+    if (!sheetEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        setIsSheetAtTop(entry.isIntersecting);
+      },
+      { rootMargin: "0px 0px -98% 0px", threshold: 0 }
+    );
+    observer.observe(sheetEl);
+    return () => observer.disconnect();
+  }, [activePin, globalSearchQuery]);
+
   // Sticky Anchor Tabs Observer
   useEffect(() => {
     if (activePin) {
@@ -936,7 +966,18 @@ export function HomeFeedClient({
   }, [activeTab, sourceFilter, globalSearchQuery]);
 
   return (
-    <div className="cgr-page-wide pb-14 [overflow-anchor:none]">
+    <div className="cgr-page-wide lg:pb-14 [overflow-anchor:none]">
+      {/* Mobile Solid-White Top Cover (z-[60] > z-[55] blue sentinel) the instant the white promo
+          sheet reaches top:0 (even before tabs pin on short tabs); hidden when Hero is visible. */}
+      {!activePin && !globalSearchQuery.trim() && (
+        <div
+          aria-hidden="true"
+          className={`lg:hidden fixed top-0 inset-x-0 z-[60] h-[max(6px,env(safe-area-inset-top,0px))] bg-[var(--color-background-body)] pointer-events-none ${
+            isSheetAtTop ? "block" : "hidden"
+          }`}
+        />
+      )}
+
       {/* Scroll-Reveal Sticky Promotion Category Tabs Bar
           - Solid opaque white/dark at `z-[60]` (above top 5px hero sentinel) when pinned so
             scrolled-down Home tabs sit seamlessly under a matching white/dark Safari bar.
