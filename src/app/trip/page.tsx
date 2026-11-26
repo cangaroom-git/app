@@ -187,7 +187,7 @@ export default function TripPlannerPage() {
     : null;
 
   return (
-    <div className="pb-12">
+    <div className="lg:pb-12">
       {/* Section 1: 3D Scroll-Depth Parallax Storytelling Hero */}
       <div className="w-full lg:px-6 lg:pt-2">
         <TripStoryParallaxHero
@@ -202,10 +202,7 @@ export default function TripPlannerPage() {
       </div>
 
       {/* Main Content Container — Airbnb-style rounded white sheet overlapping straight-edge Hero on Mobile */}
-      <div
-        data-cgr-hero-sheet="true"
-        className="relative z-20 -mt-7 lg:mt-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 lg:pt-0 min-h-[100svh]"
-      >
+      <div className="relative z-20 -mt-7 lg:mt-10 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pt-0 lg:pb-0 min-h-[100svh]">
         <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section 2: Cute Popular Province Groups (Scrapbook Clusters) */}
         <TripProvinceGroupsSection

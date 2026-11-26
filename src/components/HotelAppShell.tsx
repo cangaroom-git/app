@@ -1191,69 +1191,16 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   const todayFormatted = formatDateStr(today);
   void todayFormatted;
 
-  // Zero-scroll-listener iOS Safari (iOS 15–18 & iOS 26+ Liquid Glass) status-bar sync.
-  // Observes the full-height white sheet crossing the top 14% (~110px) band of the viewport
-  // so fast flicks & iOS Tap-to-Top are guaranteed to trigger `true -> false` cleanly when
-  // the entire top sampling zone is pure blue sky again (0 scroll/touch listeners).
+  // Pure route-level iOS Safari (iOS 15–18 & iOS 26+ Liquid Glass) status-bar sync.
+  // Runs STRICTLY on route (`pathname`), `theme`, or home search changes — NEVER during scroll
+  // (0 scroll listeners, 0 IntersectionObservers, 0 scrollTo calls while scrolling = 120fps smooth).
+  // Note: `#fffffe` is visually identical to pure white `#ffffff` (1/255th off) while bypassing
+  // Safari's optimization that ignores resets from a colored bar back to `#ffffff`.
   const hasActiveHomeSearch = globalSearchQuery.trim().length > 0;
-  const isMobileHeroRoute =
-    (pathname === "/" && !hasActiveHomeSearch) || pathname === "/trip";
-  const [isMobileHeroCovered, setIsMobileHeroCovered] = useState(false);
-  const [mobileChromeCommitTick, setMobileChromeCommitTick] = useState(0);
-  const prevHeroCoveredRef = useRef(false);
-
-  useEffect(() => {
-    setIsMobileHeroCovered(false);
-    prevHeroCoveredRef.current = false;
-    if (!isMobileHeroRoute || typeof window === "undefined") return;
-    if (window.innerWidth >= 1024 || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    let io: IntersectionObserver | null = null;
-    let mo: MutationObserver | null = null;
-
-    const attachObserver = (el: Element) => {
-      io = new IntersectionObserver(
-        (entries) => {
-          const entry = entries[0];
-          if (!entry) return;
-          const covered = entry.isIntersecting;
-          setIsMobileHeroCovered((prev) => (prev === covered ? prev : covered));
-        },
-        // Top 14% band (~110px on iPhone, taller than the 59px Dynamic Island safe area)
-        { rootMargin: "0px 0px -86% 0px", threshold: 0 }
-      );
-      io.observe(el);
-    };
-
-    const existingSheet = document.querySelector('[data-cgr-hero-sheet="true"]');
-    if (existingSheet) {
-      attachObserver(existingSheet);
-    } else {
-      mo = new MutationObserver(() => {
-        const found = document.querySelector('[data-cgr-hero-sheet="true"]');
-        if (found) {
-          mo?.disconnect();
-          mo = null;
-          attachObserver(found);
-        }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-
-    return () => {
-      io?.disconnect();
-      mo?.disconnect();
-    };
-  }, [isMobileHeroRoute, pathname]);
-
-  // Note: `#fffffe` is visually identical to pure white `#ffffff` (1/255th off)
-  // while bypassing iOS Safari's known optimization that ignores resets back to `#ffffff`.
   const mobileTopChromeColor =
-    pathname === "/" && !hasActiveHomeSearch && !isMobileHeroCovered
+    pathname === "/" && !hasActiveHomeSearch
       ? "#5FAEE9"
-      : pathname === "/trip" && !isMobileHeroCovered
+      : pathname === "/trip"
         ? "#2986D6"
         : theme === "dark"
           ? "#11161d"
@@ -1262,65 +1209,34 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined" || !document.head) return;
 
-    const returnedToHeroTop =
-      prevHeroCoveredRef.current && !isMobileHeroCovered && isMobileHeroRoute;
-    prevHeroCoveredRef.current = isMobileHeroCovered;
+    // 1. Update live mobile `html`/`body` background CSS variable (iOS 26 Safari Live Observer)
+    document.documentElement.style.setProperty(
+      "--cgr-mobile-chrome-bg",
+      mobileTopChromeColor
+    );
 
-    const applyChromeMeta = () => {
-      // 1. Update live mobile `html`/`body` background CSS variable (iOS 26 Safari Live Observer)
-      document.documentElement.style.setProperty(
-        "--cgr-mobile-chrome-bg",
-        mobileTopChromeColor
-      );
-
-      // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
-      const existing = document.head.querySelectorAll('meta[name="theme-color"]');
+    // 2. Replace our own `<meta name="theme-color">` node (iOS 15–18 Safari & installed PWA)
+    const existing = document.head.querySelectorAll('meta[name="theme-color"]');
+    if (
+      existing.length !== 1 ||
+      existing[0].getAttribute("content") !== mobileTopChromeColor
+    ) {
       existing.forEach((node) => node.remove());
       const meta = document.createElement("meta");
       meta.name = "theme-color";
       meta.content = mobileTopChromeColor;
       meta.setAttribute("data-cgr-theme-color", "1");
       document.head.appendChild(meta);
-    };
+    }
 
-    applyChromeMeta();
-
-    // 3. Gently wake WebKit's `PageColorSampler` on mobile route switches and after
-    //    scroll-back-to-top momentum settles (when iOS Safari throttles mid-scroll chrome repaints).
+    // 3. Gently wake WebKit's `PageColorSampler` strictly on route switch (never during scroll)
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
-      let rafId = window.requestAnimationFrame(() => {
+      const rafId = window.requestAnimationFrame(() => {
         window.scrollTo(window.scrollX, window.scrollY);
       });
-
-      if (!returnedToHeroTop) {
-        return () => window.cancelAnimationFrame(rafId);
-      }
-
-      let settled = false;
-      const reCommitAfterMomentum = () => {
-        if (settled) return;
-        settled = true;
-        applyChromeMeta();
-        setMobileChromeCommitTick((n) => n + 1);
-        rafId = window.requestAnimationFrame(() => {
-          window.scrollTo(window.scrollX, window.scrollY);
-        });
-      };
-
-      window.addEventListener("scrollend", reCommitAfterMomentum, {
-        once: true,
-        passive: true,
-      });
-      const settleTimer = window.setTimeout(reCommitAfterMomentum, 320);
-
-      return () => {
-        settled = true;
-        window.cancelAnimationFrame(rafId);
-        window.clearTimeout(settleTimer);
-        window.removeEventListener("scrollend", reCommitAfterMomentum);
-      };
+      return () => window.cancelAnimationFrame(rafId);
     }
-  }, [mobileTopChromeColor, pathname, isMobileHeroCovered, isMobileHeroRoute]);
+  }, [mobileTopChromeColor, pathname]);
 
   // Sticky mount flags so dynamic modal/overlay chunks stay 0 KB on initial load
   // while preserving smooth Fade Slide-Out animations (`useModalPresence`) once opened.
@@ -1356,10 +1272,10 @@ export function HotelAppShell({ children }: { children: React.ReactNode }) {
     <PlatformAppContext.Provider value={contextValue}>
       <RouteProgressBar />
       {/* Top-edge 5px fixed sentinel (>= 3px WebKit PageColorSampler minimum threshold).
-          Keyed by color + post-momentum commit tick so iOS 26 Safari commits a fresh fixed
-          layer on route switch and when returning to the Hero top (0 scroll/touch listeners). */}
+          Keyed strictly by route color so iOS 26 Safari locks onto the route's exact status-bar
+          color across both scrolling and SPA route switches (0 scroll/touch work). */}
       <div
-        key={`${mobileTopChromeColor}-${mobileChromeCommitTick}`}
+        key={mobileTopChromeColor}
         aria-hidden="true"
         className="lg:hidden fixed top-0 inset-x-0 z-[55] h-[5px] pointer-events-none"
         style={{ backgroundColor: mobileTopChromeColor }}

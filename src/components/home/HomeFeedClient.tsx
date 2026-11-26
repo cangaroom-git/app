@@ -991,13 +991,12 @@ export function HomeFeedClient({
       {/* Curved White Sheet Curtain: Peeks at bottom on load, glides smoothly UP over the sticky hero on scroll */}
       <div
         ref={sheetTopRef}
-        data-cgr-hero-sheet={!activePin && !globalSearchQuery.trim() ? "true" : undefined}
         aria-hidden={Boolean(activePin)}
         className={
           activePin
             ? "hidden"
             : !globalSearchQuery.trim()
-            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-[24svh] sm:-mt-[22svh] lg:-mt-[88px] pt-3 lg:pt-4 pb-10 rounded-t-[28px] bg-[var(--color-background-body)] min-h-[100svh]"
+            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-[24svh] sm:-mt-[22svh] lg:-mt-[88px] -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 pt-3 lg:pt-4 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pb-10 rounded-t-[28px] bg-[var(--color-background-body)] min-h-[100svh]"
             : ""
         }
       >
