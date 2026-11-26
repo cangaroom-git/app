@@ -991,6 +991,7 @@ export function HomeFeedClient({
       {/* Curved White Sheet Curtain: Peeks at bottom on load, glides smoothly UP over the sticky hero on scroll */}
       <div
         ref={sheetTopRef}
+        data-cgr-hero-sheet={!activePin && !globalSearchQuery.trim() ? "true" : undefined}
         aria-hidden={Boolean(activePin)}
         className={
           activePin
@@ -1000,13 +1001,6 @@ export function HomeFeedClient({
             : ""
         }
       >
-        {!activePin && !globalSearchQuery.trim() && (
-          <span
-            data-cgr-hero-sheet-top="true"
-            aria-hidden="true"
-            className="lg:hidden pointer-events-none absolute top-0 inset-x-0 h-px"
-          />
-        )}
         {/* Subtle Curved Peek-Sheet Grab Pill (Matches /explore native sheet feel) */}
         {!globalSearchQuery.trim() && (
           <div

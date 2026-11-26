@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeftRight,
   Bell,
@@ -34,6 +33,7 @@ import {
 } from "@/components/navigation/UserProfileDropdown";
 import { openPrivacySettingsModal } from "@/lib/telemetry/clientTelemetry";
 import { useBodyScrollLock } from "@/lib/useBodyScrollLock";
+import { useModalPresence } from "@/lib/useModalPresence";
 
 export interface AirbnbMenuDrawerStudioContext {
   hotelName: string;
@@ -81,19 +81,25 @@ export function AirbnbMenuDrawer({
   studio,
 }: AirbnbMenuDrawerProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
+  const { shouldRender, dataState } = useModalPresence(isOpen, 310);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartYRef = useRef<number | null>(null);
+  const dragStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsExiting(true);
+    if (!isOpen) {
+      setIsDragging(false);
+      setDragOffsetY(0);
+      dragStartYRef.current = null;
     }
   }, [isOpen]);
 
-  useBodyScrollLock(isOpen || isExiting);
+  useBodyScrollLock(shouldRender);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -106,7 +112,38 @@ export function AirbnbMenuDrawer({
     };
   }, [isOpen, onClose]);
 
-  if (!isMounted || typeof document === "undefined") {
+  const handleHeaderTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (typeof window === "undefined" || window.innerWidth >= 768) return;
+    if (e.touches.length !== 1) return;
+    dragStartYRef.current = e.touches[0].clientY;
+    dragStartTimeRef.current = Date.now();
+    setIsDragging(true);
+  };
+
+  const handleHeaderTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (dragStartYRef.current === null || e.touches.length !== 1) return;
+    const dy = e.touches[0].clientY - dragStartYRef.current;
+    if (dy > 0) {
+      setDragOffsetY(dy);
+    } else {
+      setDragOffsetY(0);
+    }
+  };
+
+  const handleHeaderTouchEnd = () => {
+    if (dragStartYRef.current === null) return;
+    const elapsed = Math.max(1, Date.now() - dragStartTimeRef.current);
+    const velocity = dragOffsetY / elapsed;
+    const shouldDismiss = dragOffsetY >= 72 || (dragOffsetY >= 32 && velocity > 0.45);
+    dragStartYRef.current = null;
+    setIsDragging(false);
+    setDragOffsetY(0);
+    if (shouldDismiss) {
+      onClose();
+    }
+  };
+
+  if (!isMounted || !shouldRender || typeof document === "undefined") {
     return null;
   }
 
@@ -154,85 +191,85 @@ export function AirbnbMenuDrawer({
     "w-full min-h-[48px] px-3 -mx-3 rounded-[14px] bg-[var(--color-background-muted)] flex items-center justify-between gap-3 text-[15px] font-semibold text-[var(--color-text-primary)] transition-colors cursor-pointer";
 
   return createPortal(
-    <AnimatePresence onExitComplete={() => setIsExiting(false)}>
-      {isOpen && (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isTh ? "เมนูหลัก" : "Main menu"}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-[95] overflow-hidden"
+    >
+      {/* Smooth Airbnb Fade Backdrop */}
+      <div
+        data-state={dataState}
+        onClick={onClose}
+        className="cgr-modal-backdrop fixed inset-0 bg-black/40 dark:bg-black/60"
+      />
+
+      {/* Mobile: Rounded Slide-Up Bottom Sheet (< md) | Desktop/Tablet: Airbnb Slide-Over Right Drawer (>= md) */}
+      <aside
+        data-state={dataState}
+        data-dragging={isDragging ? "true" : undefined}
+        style={
+          dragOffsetY > 0
+            ? { transform: `translate3d(0, ${dragOffsetY}px, 0)` }
+            : undefined
+        }
+        className="cgr-menu-drawer-surface fixed inset-x-0 bottom-0 md:inset-y-0 md:left-auto md:right-0 z-10 w-full md:w-[min(100vw,396px)] max-h-[88dvh] md:max-h-none rounded-t-[28px] md:rounded-t-none md:rounded-l-[24px] bg-[var(--color-background-popover)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden select-none"
+      >
+        {/* Mobile Grab Handle + Sticky Top Utility Row (supports 1:1 swipe-down to close on mobile) */}
         <div
-          key="airbnb-menu-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label={isTh ? "เมนูหลัก" : "Main menu"}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          className="fixed inset-0 z-[95] overflow-hidden"
+          onTouchStart={handleHeaderTouchStart}
+          onTouchMove={handleHeaderTouchMove}
+          onTouchEnd={handleHeaderTouchEnd}
+          onTouchCancel={handleHeaderTouchEnd}
+          className="shrink-0 bg-[var(--color-background-popover)] touch-none md:touch-auto"
         >
-          {/* Smooth Airbnb Fade Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{
-              opacity: 1,
-              transition: { duration: 0.42, ease: [0.16, 1, 0.3, 1] },
-            }}
-            exit={{
-              opacity: 0,
-              transition: { duration: 0.34, ease: [0.32, 0.72, 0, 1] },
-            }}
-            onClick={onClose}
-            style={{ willChange: "opacity" }}
-            className="fixed inset-0 bg-black/30 dark:bg-black/55"
-          />
+          <div className="md:hidden flex justify-center pt-3 pb-1">
+            <span
+              aria-hidden="true"
+              className="h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]"
+            />
+          </div>
 
-          {/* Airbnb Slide-Over Right Drawer */}
-          <motion.aside
-            initial={{ x: "100%" }}
-            animate={{
-              x: 0,
-              transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
-            }}
-            exit={{
-              x: "100%",
-              transition: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
-            }}
-            style={{ willChange: "transform" }}
-            className="fixed inset-y-0 right-0 z-10 w-[min(100vw,396px)] sm:rounded-l-[24px] bg-[var(--color-background-popover)] text-[var(--color-text-primary)] shadow-[var(--shadow-popover)] flex flex-col overflow-hidden select-none"
-          >
-            {/* Sticky Top Utility Row (Notification + Close) */}
-            <div className="px-6 pt-5 pb-2 flex items-center justify-between gap-2 shrink-0 bg-[var(--color-background-popover)]">
-              <h2 className="text-[24px] leading-[1.25] font-semibold tracking-tight text-[var(--color-text-primary)]">
-                {isTh ? "เมนู" : "Menu"}
-              </h2>
+          <div className="px-6 pt-2 md:pt-5 pb-2 flex items-center justify-between gap-2">
+            <h2 className="text-[22px] md:text-[24px] leading-[1.25] font-semibold tracking-tight text-[var(--color-text-primary)]">
+              {isTh ? "เมนู" : "Menu"}
+            </h2>
 
-              <div className="flex items-center gap-2">
-                {isStudio && studio ? (
-                  <Link
-                    href={studio.todayHref}
-                    onClick={onClose}
-                    aria-label={
-                      isTh ? "รายการแจ้งเตือนการจอง" : "Booking alerts"
-                    }
-                    title={isTh ? "รายการวันนี้" : "Today"}
-                    className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center relative transition-colors"
-                  >
-                    <Bell className="w-[18px] h-[18px]" strokeWidth={1.85} />
-                    {studio.pendingBookingsCount > 0 && (
-                      <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
-                    )}
-                  </Link>
-                ) : null}
-
-                <button
-                  type="button"
+            <div className="flex items-center gap-2">
+              {isStudio && studio ? (
+                <Link
+                  href={studio.todayHref}
                   onClick={onClose}
-                  aria-label={isTh ? "ปิดเมนู" : "Close menu"}
-                  className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label={
+                    isTh ? "รายการแจ้งเตือนการจอง" : "Booking alerts"
+                  }
+                  title={isTh ? "รายการวันนี้" : "Today"}
+                  className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center relative transition-colors"
                 >
-                  <X className="w-[18px] h-[18px]" strokeWidth={2} />
-                </button>
-              </div>
-            </div>
+                  <Bell className="w-[18px] h-[18px]" strokeWidth={1.85} />
+                  {studio.pendingBookingsCount > 0 && (
+                    <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--color-promo)]" />
+                  )}
+                </Link>
+              ) : null}
 
-            {/* Smooth Auto-Hide Scrollable Content */}
-            <div className="flex-1 overflow-y-auto cgr-scroll-autohide overscroll-contain px-6 pt-3 pb-[max(2rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={isTh ? "ปิดเมนู" : "Close menu"}
+                className="h-10 w-10 rounded-full bg-[var(--color-background-muted)] hover:bg-[var(--color-background-subtle)] text-[var(--color-text-primary)] inline-flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-[18px] h-[18px]" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Smooth Auto-Hide Scrollable Content */}
+        <div className="flex-1 overflow-y-auto cgr-scroll-autohide overscroll-contain px-6 pt-2.5 pb-[max(1.75rem,env(safe-area-inset-bottom))]">
               {/* Single Minimal Nondii Membership / Workspace Card */}
               <div
                 className={`relative rounded-[20px] overflow-hidden text-white p-5 mb-6 ${
@@ -822,10 +859,8 @@ export function AirbnbMenuDrawer({
                 </nav>
               )}
             </div>
-          </motion.aside>
-        </div>
-      )}
-    </AnimatePresence>,
+          </aside>
+        </div>,
     document.body,
   );
 }

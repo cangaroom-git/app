@@ -1139,6 +1139,34 @@ html.dark .border-stone-300 {
   transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Responsive Account Menu: Mobile Slide-Up Bottom Sheet (< md) / Desktop Right Slide-Over Drawer (>= md) */
+.cgr-menu-drawer-surface {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0, 100%, 0);
+  pointer-events: none;
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.cgr-menu-drawer-surface[data-state="open"] {
+  transform: translate3d(0, 0, 0);
+  pointer-events: auto;
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cgr-menu-drawer-surface[data-dragging="true"] {
+  transition: none !important;
+}
+
+@media (min-width: 768px) {
+  .cgr-menu-drawer-surface {
+    transform: translate3d(100%, 0, 0);
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .cgr-menu-drawer-surface[data-state="open"] {
+    transform: translate3d(0, 0, 0);
+    transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
 .cgr-modal-surface-sm,
 .cgr-modal-surface-md,
 .cgr-modal-surface-lg {
@@ -1212,6 +1240,7 @@ html.dark .border-stone-300 {
 @media (prefers-reduced-motion: reduce) {
   .cgr-modal-fade-slide,
   .cgr-modal-sheet-only,
+  .cgr-menu-drawer-surface,
   .cgr-modal-surface-sm,
   .cgr-modal-surface-md,
   .cgr-modal-surface-lg,
@@ -1224,6 +1253,7 @@ html.dark .border-stone-300 {
   }
   .cgr-modal-fade-slide[data-state="open"],
   .cgr-modal-sheet-only[data-state="open"],
+  .cgr-menu-drawer-surface[data-state="open"],
   .cgr-modal-surface-sm[data-state="open"],
   .cgr-modal-surface-md[data-state="open"],
   .cgr-modal-surface-lg[data-state="open"],
