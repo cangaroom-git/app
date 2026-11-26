@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -79,6 +79,35 @@ export default function TripPlannerPage() {
     PublicCommunityTripDto[]
   >([]);
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(true);
+  const tripSheetRef = useRef<HTMLDivElement | null>(null);
+  const [isTripSheetPinned, setIsTripSheetPinned] = useState(false);
+
+  // Match Home (`/`)'s zero-scroll-listener `z-[60]` solid-white cover pattern:
+  // when the white Trip sheet reaches the top edge on mobile, mount a solid 6px white cover
+  // above the `z-[55]` blue sentinel so Safari samples white; hide via `display: none` when
+  // scrolling back up so Safari seamlessly restores `#2986D6` with zero stutter.
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      window.innerWidth >= 1024 ||
+      !("IntersectionObserver" in window)
+    ) {
+      return;
+    }
+    const sheetEl = tripSheetRef.current;
+    if (!sheetEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        setIsTripSheetPinned(entry.isIntersecting);
+      },
+      { rootMargin: "0px 0px -98% 0px", threshold: 0 }
+    );
+    observer.observe(sheetEl);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (tripToDelete) setHasMountedDeleteModal(true);
@@ -188,6 +217,15 @@ export default function TripPlannerPage() {
 
   return (
     <div className="lg:pb-12">
+      {/* Mobile Solid-White Top Cover (z-[60] > z-[55] blue sentinel) when scrolled into white Trip sheet;
+          uses `hidden` (`display: none`) while Hero is visible so Safari seamlessly restores `#2986D6`. */}
+      <div
+        aria-hidden="true"
+        className={`lg:hidden fixed top-0 inset-x-0 z-[60] h-[max(6px,env(safe-area-inset-top,0px))] bg-[var(--color-background-body)] pointer-events-none ${
+          isTripSheetPinned ? "block" : "hidden"
+        }`}
+      />
+
       {/* Section 1: 3D Scroll-Depth Parallax Storytelling Hero */}
       <div className="w-full lg:px-6 lg:pt-2">
         <TripStoryParallaxHero
@@ -202,7 +240,10 @@ export default function TripPlannerPage() {
       </div>
 
       {/* Main Content Container — Airbnb-style rounded white sheet overlapping straight-edge Hero on Mobile */}
-      <div className="relative z-20 -mt-7 lg:mt-10 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pt-0 lg:pb-0 min-h-[100svh]">
+      <div
+        ref={tripSheetRef}
+        className="relative z-20 -mt-7 lg:mt-10 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] pt-7 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pt-0 lg:pb-0 min-h-[100svh]"
+      >
         <div className="cgr-page-standard px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section 2: Cute Popular Province Groups (Scrapbook Clusters) */}
         <TripProvinceGroupsSection

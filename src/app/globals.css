@@ -3058,8 +3058,17 @@ html.dark .cgr-trip-scrapbook-sky {
 }
 
 .cgr-home-hero-island {
-  transform: translate3d(0, 17svh, 0) scale(1);
+  transform: translate3d(0, 24svh, 0) scale(1);
   transform-origin: 50% 50%;
+}
+
+.cgr-home-hero-scrim {
+  background: linear-gradient(
+    to top,
+    rgba(10, 44, 74, 0.52) 0%,
+    rgba(14, 58, 96, 0.22) 48%,
+    rgba(14, 58, 96, 0) 100%
+  );
 }
 
 .cgr-home-hero-shadow {
@@ -3073,7 +3082,7 @@ html.dark .cgr-trip-scrapbook-sky {
     transform: translate3d(0, 18px, 0) scale(1.26);
   }
   .cgr-home-hero-island {
-    transform: translate3d(0, 23vh, 0) scale(1);
+    transform: translate3d(0, 22vh, 0) scale(1);
   }
 }
 

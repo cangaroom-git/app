@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import {
   BedDouble,
+  ChevronDown,
   Coffee,
   Compass,
   Sparkles,
@@ -19,6 +20,8 @@ interface HomeCollectibleHeroProps {
   language: "th" | "en";
   activeTab: HomePromoTabId;
   onSelectCategory: (tabId: HomePromoTabId) => void;
+  totalDealsCount?: number;
+  onScrollToDeals?: () => void;
 }
 
 const HERO_CATEGORY_ICONS: Array<{
@@ -54,12 +57,15 @@ export function HomeCollectibleHero({
   language,
   activeTab,
   onSelectCategory,
+  totalDealsCount,
+  onScrollToDeals,
 }: HomeCollectibleHeroProps) {
   const isTh = language === "th";
   const stageRef = useRef<HTMLElement | null>(null);
   const headerLayerRef = useRef<HTMLDivElement | null>(null);
   const islandLayerRef = useRef<HTMLDivElement | null>(null);
   const shadowLayerRef = useRef<HTMLDivElement | null>(null);
+  const scrollHintRef = useRef<HTMLButtonElement | null>(null);
   const sunCoreRef = useRef<HTMLDivElement | null>(null);
   const sunRaysRef = useRef<HTMLDivElement | null>(null);
   const flareNearRef = useRef<HTMLDivElement | null>(null);
@@ -111,9 +117,9 @@ export function HomeCollectibleHero({
       if (islandLayerRef.current) {
         const islandScale = cachedIsDesktop
           ? 1 - cardEased * 0.3
-          : 1 - cardEased * 0.58;
-        const startY = cachedIsDesktop ? cachedVh * 0.23 : cachedVh * 0.17;
-        const endY = cachedIsDesktop ? -cachedVh * 0.03 : -cachedVh * 0.09;
+          : 1 - cardEased * 0.56;
+        const startY = cachedIsDesktop ? cachedVh * 0.22 : cachedVh * 0.24;
+        const endY = cachedIsDesktop ? -cachedVh * 0.03 : -cachedVh * 0.06;
         const islandY = startY + (endY - startY) * cardEased;
         islandLayerRef.current.style.transform = `translate3d(0, ${islandY.toFixed(2)}px, 0) scale(${islandScale.toFixed(4)})`;
       }
@@ -122,6 +128,11 @@ export function HomeCollectibleHero({
         const shadowT = Math.max(0, Math.min(1, (cardEased - 0.3) / 0.7));
         shadowLayerRef.current.style.opacity = shadowT.toFixed(3);
         shadowLayerRef.current.style.transform = `scale(${(0.75 + shadowT * 0.25).toFixed(3)})`;
+      }
+
+      if (scrollHintRef.current) {
+        const hintOpacity = Math.max(0, Math.min(1, 1 - cardP * 3.2));
+        scrollHintRef.current.style.opacity = hintOpacity.toFixed(3);
       }
 
       // Optical Sunlight Core: subtle upward & inward camera-tilt glide
@@ -283,7 +294,7 @@ export function HomeCollectibleHero({
       {/* Layer 0.5: White `☁ nondii` Logo + "โปรเที่ยวไทย" + Subtitle + 6 Frosted-Glass Icons with Short Labels */}
       <div
         ref={headerLayerRef}
-        className="cgr-home-hero-layer cgr-home-hero-logo absolute inset-x-0 top-[max(9svh,calc(env(safe-area-inset-top,0px)+20px))] sm:top-[8.5svh] lg:top-[7.5%] flex flex-col items-center px-4 z-20 text-center"
+        className="cgr-home-hero-layer cgr-home-hero-logo absolute inset-x-0 top-[max(8.5svh,calc(env(safe-area-inset-top,0px)+18px))] sm:top-[8.5svh] lg:top-[7.5%] flex flex-col items-center px-4 z-20 text-center"
       >
         <img
           src="/brand/nondii-icon-with-text-white.svg"
@@ -342,11 +353,11 @@ export function HomeCollectibleHero({
         </div>
       </div>
 
-      {/* Layer 1: 4K 3D Beachfront Travel Card (1:1 Retina scale 1.0 -> down for razor sharpness!) */}
+      {/* Layer 1: 4K 3D Beachfront Travel Card (Full-viewport ocean bleed on Mobile matching /trip!) */}
       <div className="relative z-10 w-full flex flex-col items-center justify-center pointer-events-none">
         <div
           ref={islandLayerRef}
-          className="cgr-home-hero-layer cgr-home-hero-island w-[182vw] max-w-[760px] sm:w-[135vw] sm:max-w-[780px] lg:w-[760px] xl:w-[840px] 2xl:w-[900px] lg:max-w-none flex flex-col items-center shrink-0"
+          className="cgr-home-hero-layer cgr-home-hero-island w-[215vw] max-w-[920px] sm:w-[155vw] sm:max-w-[860px] lg:w-[760px] xl:w-[840px] 2xl:w-[900px] lg:max-w-none flex flex-col items-center shrink-0"
         >
           <div className="cgr-home-island-float w-full flex flex-col items-center">
             <picture className="block w-full">
@@ -393,6 +404,30 @@ export function HomeCollectibleHero({
         flareMidRef={flareMidRef}
         flareFarRef={flareFarRef}
       />
+
+      {/* Layer 2: Soft Bottom Ocean Scrim + Clickable Scroll Cue (matches /trip full-bleed layout!) */}
+      <div
+        aria-hidden="true"
+        className="cgr-home-hero-scrim pointer-events-none absolute inset-x-0 bottom-0 h-[28%] lg:h-[22%] z-20"
+      />
+      <button
+        ref={scrollHintRef}
+        type="button"
+        onClick={() => onScrollToDeals?.()}
+        aria-label={isTh ? "เลื่อนลงเพื่อดูโปรเที่ยวไทย" : "Scroll to browse Thailand deals"}
+        className="absolute bottom-[calc(var(--cgr-mobile-nav-h)+18px)] sm:bottom-[calc(var(--cgr-mobile-nav-h)+22px)] lg:bottom-6 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 bg-[#0a3052]/30 hover:bg-[#0a3052]/44 backdrop-blur-md border border-white/25 text-[12.5px] font-medium text-white/95 whitespace-nowrap cursor-pointer transition-colors"
+      >
+        <span>
+          {typeof totalDealsCount === "number" && totalDealsCount > 0
+            ? isTh
+              ? `เลื่อนลงเพื่อดู ${totalDealsCount.toLocaleString()} โปรเที่ยวไทย`
+              : `Scroll for ${totalDealsCount.toLocaleString()} Thailand deals`
+            : isTh
+              ? "เลื่อนลงเพื่อดูโปรเที่ยวไทย"
+              : "Scroll for Thailand deals"}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 shrink-0" strokeWidth={2.2} />
+      </button>
     </section>
   );
 }

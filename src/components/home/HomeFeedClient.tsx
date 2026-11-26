@@ -983,16 +983,19 @@ export function HomeFeedClient({
         </nav>
       )}
 
-      {/* Top Full-Viewport Sticky 3D Island Hero (Apple Inertia Smooth Zoom + 6 Frosted-Glass Icons) */}
+      {/* Top Full-Viewport Sticky 3D Island Hero (Matches /trip Full-Bleed Poster Layout) */}
       {!activePin && !globalSearchQuery.trim() && (
         <HomeCollectibleHero
           language={language}
           activeTab={activeTab}
           onSelectCategory={(tabId) => handleSelectTab(tabId, true)}
+          totalDealsCount={isLoadingPins ? undefined : activeTabDeals.length}
+          onScrollToDeals={scrollToSheetTop}
         />
       )}
 
-      {/* Curved White Sheet Curtain: Peeks at bottom on load, glides smoothly UP over the sticky hero on scroll */}
+      {/* Curved White Sheet Curtain: Starts tucked cleanly behind the bottom nav (matching /trip),
+          gliding smoothly UP over the full-viewport ocean hero as soon as you scroll */}
       <div
         ref={sheetTopRef}
         aria-hidden={Boolean(activePin)}
@@ -1000,15 +1003,15 @@ export function HomeFeedClient({
           activePin
             ? "hidden"
             : !globalSearchQuery.trim()
-            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-[24svh] sm:-mt-[22svh] lg:-mt-[88px] -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 pt-3 lg:pt-4 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pb-10 rounded-t-[28px] bg-[var(--color-background-body)] min-h-[100svh]"
+            ? "relative z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 -mt-7 lg:mt-8 -mb-[calc(var(--cgr-mobile-nav-h)+20px)] lg:mb-0 pt-3.5 lg:pt-0 pb-[calc(var(--cgr-mobile-nav-h)+48px)] lg:pb-10 rounded-t-[28px] lg:rounded-none bg-[var(--color-background-body)] min-h-[100svh]"
             : ""
         }
       >
-        {/* Subtle Curved Peek-Sheet Grab Pill (Matches /explore native sheet feel) */}
+        {/* Subtle Mobile Grab Pill (Matches /trip & /explore native sheet feel; hidden on flat Desktop) */}
         {!globalSearchQuery.trim() && (
           <div
             aria-hidden="true"
-            className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]"
+            className="lg:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--color-border-emphasized)]"
           />
         )}
 
